@@ -21,3 +21,14 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+[package.metadata.dist]
+# `mock-rtk` is a test fixture (tests/bin/mock_rtk.rs). It has to be a [[bin]]
+# so the e2e tests can reach it via CARGO_BIN_EXE_mock-rtk, but cargo-dist ships
+# every binary in a package by default, which would put a test mock in the
+# release artifacts. Listing the binaries explicitly keeps it out.
+#
+# This must be a map keyed by target ("*" = all); a bare list is rejected with
+# "invalid type: sequence, expected a map".
+[package.metadata.dist.binaries]
+"*" = ["rtk-mcp-qwen"]
