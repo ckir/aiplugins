@@ -1,0 +1,20 @@
+# Build Artifacts
+target/
+dist/
+
+# Rust Specific
+Cargo.lock
+**/*.rs.bk
+*.pdb
+**/mutants.out*/
+
+# Agent Caches & Metadata
+.serena/
+.claude-profile
+
+# IDEs
+.idea/
+.vscode/
+
+# Ignore CI by default (can be removed if working on actions)
+#.github/
