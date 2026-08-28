@@ -49,7 +49,10 @@ impl QwenOutput {
             hook_specific_output: HookSpecificOutput {
                 hook_event_name: "PreToolUse".into(),
                 permission_decision: "allow".into(),
-                permission_decision_reason: format!("RTK rewrite applied: {} -> {}", original, rewritten),
+                permission_decision_reason: format!(
+                    "RTK rewrite applied: {} -> {}",
+                    original, rewritten
+                ),
                 updated_input: Some(UpdatedInput {
                     command: rewritten.into(),
                 }),
@@ -95,10 +98,7 @@ pub fn process_hook(
     // Ask RTK to rewrite the command
     match rtk_rewrite_fn(&command) {
         Some(rewritten) => QwenOutput::rewritten(&command, &rewritten),
-        None => QwenOutput::pass_through(&format!(
-            "No RTK rewrite available for: {}",
-            command
-        )),
+        None => QwenOutput::pass_through(&format!("No RTK rewrite available for: {}", command)),
     }
 }
 
@@ -111,7 +111,10 @@ mod tests {
         let output = QwenOutput::pass_through("test reason");
         assert_eq!(output.hook_specific_output.hook_event_name, "PreToolUse");
         assert_eq!(output.hook_specific_output.permission_decision, "allow");
-        assert_eq!(output.hook_specific_output.permission_decision_reason, "test reason");
+        assert_eq!(
+            output.hook_specific_output.permission_decision_reason,
+            "test reason"
+        );
         assert!(output.hook_specific_output.updated_input.is_none());
     }
 
@@ -121,7 +124,12 @@ mod tests {
         assert_eq!(output.hook_specific_output.permission_decision, "allow");
         assert!(output.hook_specific_output.updated_input.is_some());
         assert_eq!(
-            output.hook_specific_output.updated_input.as_ref().unwrap().command,
+            output
+                .hook_specific_output
+                .updated_input
+                .as_ref()
+                .unwrap()
+                .command,
             "ls -la"
         );
     }
@@ -171,7 +179,12 @@ mod tests {
         let result = process_hook(input, |_| Some("ls -la --color".to_string()));
         assert!(result.hook_specific_output.updated_input.is_some());
         assert_eq!(
-            result.hook_specific_output.updated_input.as_ref().unwrap().command,
+            result
+                .hook_specific_output
+                .updated_input
+                .as_ref()
+                .unwrap()
+                .command,
             "ls -la --color"
         );
     }

@@ -1,0 +1,11 @@
+[default]
+extend-ignore-re = [
+    # Ignore hex strings or specific patterns if needed
+    "(?i)^[a-f0-9]{32,64}$"
+]
+
+[default.extend-words]
+# Add custom domain-specific words here that typos might flag
+qwen = "qwen"
+rtk = "rtk"
+agy = "agy"

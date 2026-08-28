@@ -16,7 +16,9 @@ fn main() {
     let mut input_json = String::new();
     if let Err(e) = io::stdin().read_to_string(&mut input_json) {
         error!("Failed to read stdin: {}", e);
-        output(&QwenOutput::pass_through("stdin read error, passing through"));
+        output(&QwenOutput::pass_through(
+            "stdin read error, passing through",
+        ));
         return;
     }
 
@@ -25,7 +27,7 @@ fn main() {
         return;
     }
 
-    let result = process_hook(&input_json, |cmd| rtk_rewrite(cmd));
+    let result = process_hook(&input_json, rtk_rewrite);
     output(&result);
 }
 
@@ -45,7 +47,11 @@ fn rtk_rewrite(command: &str) -> Option<String> {
         return None;
     }
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if stdout.is_empty() { None } else { Some(stdout) }
+    if stdout.is_empty() {
+        None
+    } else {
+        Some(stdout)
+    }
 }
 
 fn output(result: &QwenOutput) {

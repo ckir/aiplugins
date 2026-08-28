@@ -1,0 +1,14 @@
+{
+  "name": "qwen-example",
+  "version": "1.0.0",
+  "displayName": "Qwen Example Extension",
+  "description": "Example Qwen Code extension with Rust MCP server, commands, skills, and agents",
+  "contextFileName": "QWEN.md",
+  "mcpServers": {
+    "exampleServer": {
+      "command": "cargo",
+      "args": ["run", "-p", "qwen-example", "--bin", "qwen-example-mcp"],
+      "cwd": "${extensionPath}${/}..${/}.."
+    }
+  }
+}

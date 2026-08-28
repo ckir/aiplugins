@@ -1,0 +1,57 @@
+name: Deploy Rust Docs to GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build documentation
+        # --no-deps avoids building docs for all dependencies (which is slow)
+        # --document-private-items includes internal documentation
+        run: cargo doc --workspace --no-deps --document-private-items
+
+      - name: Create index.html redirect
+        # Cargo puts docs in target/doc, but without a root index.html.
+        # This redirects the root GitHub Pages URL to your main crate's docs.
+        run: |
+          echo '<meta http-equiv="refresh" content="0; url=qwen_bridge/index.html">' > target/doc/index.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+        
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          retention-days: 1
+          # Upload entire doc directory
+          path: 'target/doc'
+          
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

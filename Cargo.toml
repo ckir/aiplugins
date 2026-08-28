@@ -1,0 +1,30 @@
+[workspace]
+resolver = "2"
+members = [
+    "claude-code/*",
+    "antigravity/*",
+    "qwen/*",
+    "shared/*"
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["AI Plugins Marketplace Contributors"]
+license = "PolyForm-Noncommercial-1.0.0"
+description = "AI Plugins and Bridges for Qwen, Claude, and Antigravity"
+repository = "https://github.com/aiplugins/aiplugins"
+readme = "README.md"
+
+[workspace.dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
