@@ -1,0 +1,5 @@
+# Built plugin binaries, produced by `just build-claude-example`.
+#
+# The leading slash is load-bearing: a bare `bin/` would also match `src/bin/`,
+# which is this crate's binary *source* and must be committed.
+/bin/

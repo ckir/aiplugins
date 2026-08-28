@@ -4,5 +4,38 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
+description.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+# The MCP server exposed to Claude Code via .mcp.json
+[[bin]]
+name = "claude-example-mcp"
+path = "src/bin/mcp.rs"
+
+# The PostToolUse hook binary referenced from hooks/hooks.json
+[[bin]]
+name = "claude-example-hook"
+path = "src/bin/hook.rs"
 
 [dependencies]
+anyhow = { workspace = true }
+rmcp = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+# The MCP e2e tests drive our own server binary with rmcp's client, so the
+# handshake and tool dispatch are exercised for real rather than mocked.
+rmcp = { workspace = true, features = ["client", "transport-child-process"] }
+
+[package.metadata.release]
+# cargo-release bumps the version in Cargo.toml, but the plugin manifest carries
+# it too. Rewrite it in the same commit so the two can never drift.
+pre-release-replacements = [
+  { file = ".claude-plugin/plugin.json", search = '"version": "[0-9]+\.[0-9]+\.[0-9]+"', replace = '"version": "{{version}}"', exactly = 1 },
+]

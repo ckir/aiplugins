@@ -1,0 +1,17 @@
+{
+  "description": "Reports TODO/FIXME/HACK markers written without an owner. Non-blocking: it reports, it never denies an edit.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/claude-example-hook",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

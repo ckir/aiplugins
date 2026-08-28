@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "claude-example": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/claude-example-mcp",
+      "args": [],
+      "env": {
+        "RUST_LOG": "info"
+      }
+    }
+  }
+}
