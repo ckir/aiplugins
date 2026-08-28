@@ -1,0 +1,24 @@
+{
+  "name": "qwen-bridge",
+  "version": "1.0.0",
+  "displayName": "Qwen Bridge — RTK Command Rewriter",
+  "description": "PreToolUse hook that rewrites run_shell_command invocations via the rtk CLI before execution.",
+  "contextFileName": "QWEN.md",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^run_shell_command$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cargo",
+            "args": ["run", "-p", "qwen-bridge", "--bin", "rtk-mcp-qwen", "--quiet"],
+            "cwd": "${extensionPath}${/}..${/}..",
+            "name": "rtk-command-rewrite",
+            "timeout": 10000
+          }
+        ]
+      }
+    ]
+  }
+}
