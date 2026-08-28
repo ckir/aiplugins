@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "agy-example"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "aho-corasick"
@@ -41,7 +41,7 @@ checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
 name = "claude-example"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "errno"
@@ -55,7 +55,7 @@ dependencies = [
 
 [[package]]
 name = "gemini"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -186,7 +186,7 @@ dependencies = [
 
 [[package]]
 name = "qwen-bridge"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -196,7 +196,7 @@ dependencies = [
 
 [[package]]
 name = "qwen-example"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "serde",
@@ -291,7 +291,7 @@ dependencies = [
 
 [[package]]
 name = "shared-core"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "signal-hook-registry"
