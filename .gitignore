@@ -21,5 +21,10 @@ target
 .serena/
 .claude-profile
 
+# Per-session scratch written by the Qwen CLI. The directory is named after a
+# session id, so every session leaves a new one behind; the contents are
+# leftover prompts, not configuration. The rest of .qwen/ stays tracked.
+.qwen/tmp/
+
 # Release / Dist
 dist/

@@ -1,1 +1,0 @@
-check the release workflow 33250327697 for v0.1.5. Use `gh run view 33250327697` to see if host and announce completed, then `gh release view v0.1.5 --json assets --jq ".assets[].name"` to verify only qwen-bridge and rtk-mcp-agy are present.
