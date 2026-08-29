@@ -1,4 +1,4 @@
-use qwen_bridge::{process_hook, resolve_rtk_bin, QwenOutput};
+use rtk_mcp_qwen::{process_hook, resolve_rtk_bin, QwenOutput};
 use std::env;
 use std::io::{self, Read};
 use std::process::Command;
