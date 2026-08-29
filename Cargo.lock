@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "agy-example"
-version = "0.1.2"
+version = "0.1.3"
 
 [[package]]
 name = "aho-corasick"
@@ -96,7 +96,7 @@ dependencies = [
 
 [[package]]
 name = "claude-example"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anyhow",
  "rmcp",
@@ -498,7 +498,7 @@ dependencies = [
 
 [[package]]
 name = "qwen-bridge"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -508,7 +508,7 @@ dependencies = [
 
 [[package]]
 name = "qwen-example"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anyhow",
  "serde",
@@ -609,7 +609,7 @@ dependencies = [
 
 [[package]]
 name = "rtk-mcp-agy"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -720,7 +720,7 @@ dependencies = [
 
 [[package]]
 name = "shared-core"
-version = "0.1.2"
+version = "0.1.3"
 
 [[package]]
 name = "shlex"
