@@ -1,0 +1,17 @@
+{
+  "description": "Rewrites Bash/PowerShell commands through `rtk hook claude` before they run, for token-optimized execution. Fail-open: if rtk is missing or errors, the command runs unchanged.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/rtk-cc-hook",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

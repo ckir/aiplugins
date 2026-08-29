@@ -1,0 +1,64 @@
+[package]
+name = "rtk-mcp-cc"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+# The PreToolUse hook binary referenced from hooks/hooks.json
+[[bin]]
+name = "rtk-cc-hook"
+path = "src/bin/hook.rs"
+
+# The MCP server exposed to Claude Code via .mcp.json
+[[bin]]
+name = "rtk-cc-mcp"
+path = "src/bin/mcp.rs"
+
+# Test fixture: a fake `rtk` the e2e tests point RTK_BIN at, so the suite runs
+# on a machine (or CI runner) that has no real rtk installed.
+#
+# The `-cc` suffix is load-bearing. `qwen-bridge` already ships a fixture named
+# `mock-rtk`, and two bin targets with the same name in one workspace write to
+# the same `target/debug/mock-rtk.exe` — so a workspace-wide build silently
+# leaves whichever compiled last, and `CARGO_BIN_EXE_mock-rtk` then resolves to
+# the wrong mock. That failed only under `cargo nextest run --workspace`, never
+# under `-p rtk-mcp-cc`.
+[[bin]]
+name = "mock-rtk-cc"
+path = "tests/bin/mock_rtk.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+rmcp = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+# The MCP e2e tests drive our own server binary with rmcp's client, so the
+# handshake and tool dispatch are exercised for real rather than mocked.
+rmcp = { workspace = true, features = ["client", "transport-child-process"] }
+
+[package.metadata.release]
+# cargo-release bumps the version in Cargo.toml, but the plugin manifest carries
+# it too. Rewrite it in the same commit so the two can never drift.
+pre-release-replacements = [
+  { file = ".claude-plugin/plugin.json", search = '"version": "[0-9]+\.[0-9]+\.[0-9]+"', replace = '"version": "{{version}}"', exactly = 1 },
+]
+
+# `mock-rtk-cc` is a test fixture (tests/bin/mock_rtk.rs). It has to be a [[bin]]
+# so the e2e tests can reach it via CARGO_BIN_EXE_mock-rtk-cc, but cargo-dist ships
+# every binary in a package by default, which would put a test mock in the
+# release artifacts. Listing the binaries explicitly keeps it out.
+#
+# This must be a map keyed by target ("*" = all); a bare list is rejected with
+# "invalid type: sequence, expected a map".
+[package.metadata.dist.binaries]
+"*" = ["rtk-cc-hook", "rtk-cc-mcp"]

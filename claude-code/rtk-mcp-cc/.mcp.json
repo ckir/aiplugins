@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "rtk-mcp-cc": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/rtk-cc-mcp",
+      "args": [],
+      "env": {
+        "RUST_LOG": "info"
+      }
+    }
+  }
+}
