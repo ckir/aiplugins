@@ -26,6 +26,23 @@
 - **Alternatives Considered:** Block the command if rewrite fails.
 - **Why Chosen:** `rtk rewrite` only covers specific known commands (e.g., `cat`, `grep`). We must allow all other commands (e.g., `git`, `npm`) to pass through unhindered.
 
+### 3. Shell and rtk Executable Selection
+- **Decision:** Resolve both from the environment with platform-aware defaults —
+  `RTK_BIN` (default `rtk` on `PATH`) and `RTK_AGY_SHELL` (default `pwsh` on
+  Windows, `sh` elsewhere).
+- **Alternatives Considered:**
+  - *Keep `pwsh` hardcoded:* rejected — it made `rtk_run` unable to execute
+    anything on Linux or macOS, where PowerShell 7 is rarely installed. The
+    failure was silent: every call returned a spawn error as a tool error.
+  - *Probe for a shell at startup:* rejected — adds a launch cost and a failure
+    mode of its own, to answer a question the target OS already answers.
+- **Why Chosen:** Windows behaviour is unchanged, so existing installs are
+  unaffected, while the other platforms get a shell that POSIX guarantees
+  exists. The override covers the rest.
+- **Note:** Both resolvers are pure functions in `src/lib.rs`, so the platform
+  matrix is unit-tested rather than only observable on the machine that happens
+  to be running the tests.
+
 ## Final Design
 
 ### Architecture & Components

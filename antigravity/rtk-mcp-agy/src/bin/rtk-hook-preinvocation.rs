@@ -1,25 +1,24 @@
-use serde::Serialize;
-use serde_json::json;
-use std::env;
+//! `rtk-hook-preinvocation` — the plugin's `PreInvocation` hook.
+//!
+//! Antigravity runs this at the start of an execution loop and reads an
+//! `injectSteps` array from stdout. The payload lives in [`rtk_mcp_agy`]; this
+//! file only serializes it.
 
-#[derive(Serialize)]
-struct PreInvocationOutput {
-    #[serde(rename = "injectSteps")]
-    inject_steps: Vec<serde_json::Value>,
-}
+use rtk_mcp_agy::preinvocation_payload;
+use std::env;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.iter().any(|a| a == "--version" || a == "-V") {
-        println!("rtk-hook-preinvocation {}", env!("CARGO_PKG_VERSION"));
+        println!("rtk-hook-preinvocation {}", rtk_mcp_agy::version());
         return;
     }
 
     if args.iter().any(|a| a == "--help" || a == "-h") {
         println!(
             "rtk-hook-preinvocation {} — Antigravity PreInvocation hook",
-            env!("CARGO_PKG_VERSION")
+            rtk_mcp_agy::version()
         );
         println!();
         println!("Usage: rtk-hook-preinvocation");
@@ -28,13 +27,7 @@ fn main() {
         return;
     }
 
-    let output = PreInvocationOutput {
-        inject_steps: vec![json!({
-            "ephemeralMessage": "CRITICAL: Do NOT use the native `run_command` tool. You MUST use the `call_mcp_tool` with ServerName='rtkmcp' and ToolName='rtk_run' for all shell commands to ensure token-optimized execution."
-        })],
-    };
-
-    if let Ok(json_str) = serde_json::to_string(&output) {
-        println!("{}", json_str);
+    if let Ok(json_str) = serde_json::to_string(&preinvocation_payload()) {
+        println!("{json_str}");
     }
 }

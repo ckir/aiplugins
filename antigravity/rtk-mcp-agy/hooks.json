@@ -1,0 +1,8 @@
+{
+  "PreInvocation": [
+    {
+      "type": "command",
+      "command": "rtk-hook-preinvocation"
+    }
+  ]
+}

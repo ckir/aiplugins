@@ -16,5 +16,10 @@ path = "src/bin/rtk-mcp.rs"
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
+
+# No tokio: `rtk-mcp` used to carry `#[tokio::main]` on a `main` with no `.await`
+# in it, which pulled in a full async runtime to do blocking stdin reads and
+# blocking `Command::output()` calls. The server is synchronous by nature — one
+# request, one response, in order — so it is now a plain `fn main`.
+#
+# No tracing either: it was declared but never used.
