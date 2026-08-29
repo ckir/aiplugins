@@ -265,16 +265,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gemini"
-version = "0.1.2"
-dependencies = [
- "serde",
- "serde_json",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "getrandom"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -615,6 +605,16 @@ dependencies = [
  "quote",
  "serde_json",
  "syn 3.0.4",
+]
+
+[[package]]
+name = "rtk-mcp-agy"
+version = "0.1.2"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
