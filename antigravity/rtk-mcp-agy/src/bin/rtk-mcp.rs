@@ -1,9 +1,31 @@
 use serde_json::{json, Value};
+use std::env;
 use std::io::{self, BufRead, Write};
 use std::process::Command;
 
 #[tokio::main]
 async fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    if args.iter().any(|a| a == "--version" || a == "-V") {
+        println!("rtk-mcp {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        println!(
+            "rtk-mcp {} — MCP server for Antigravity rtk shell command optimization",
+            env!("CARGO_PKG_VERSION")
+        );
+        println!();
+        println!("Usage: rtk-mcp");
+        println!("  JSON-RPC MCP server over stdin/stdout. Exposes a single tool:");
+        println!(
+            "    rtk_run  — Rewrites the given CommandLine via `rtk rewrite` and executes it."
+        );
+        return;
+    }
+
     let stdin = io::stdin();
     let mut stdout = io::stdout();
 

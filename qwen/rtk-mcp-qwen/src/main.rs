@@ -5,6 +5,26 @@ use std::process::Command;
 use tracing::error;
 
 fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    // Handle --version and --help before setting up stdin
+    if args.iter().any(|a| a == "--version" || a == "-V") {
+        println!("rtk-mcp-qwen {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        println!(
+            "rtk-mcp-qwen {} — PreToolUse hook for run_shell_command rewriting",
+            env!("CARGO_PKG_VERSION")
+        );
+        println!();
+        println!("Usage: rtk-mcp-qwen");
+        println!("  Reads JSON hook input from stdin, calls `rtk rewrite` on the command,");
+        println!("and writes the rewritten (or pass-through) decision to stdout.");
+        return;
+    }
+
     tracing_subscriber::fmt()
         .with_writer(io::stderr)
         .with_env_filter(
