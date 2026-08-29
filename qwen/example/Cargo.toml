@@ -18,4 +18,4 @@ tracing-subscriber = { workspace = true }
 
 # Example package — not included in release artifacts.
 [package.metadata.dist]
-include = []
+dist = false
