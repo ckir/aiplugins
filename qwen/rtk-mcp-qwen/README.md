@@ -11,6 +11,63 @@ chance to produce a safer, more idiomatic, or context-appropriate version of
 the command. If `rtk` is unavailable or declines to rewrite, the original
 command passes through unchanged (fail-open).
 
+## Installation
+
+### From release artifacts (recommended)
+
+Download the latest release from <https://github.com/ckir/aiplugins/releases>
+and extract the `qwen-bridge` archive for your platform:
+
+**Windows (x86_64):**
+```powershell
+curl -LO https://github.com/ckir/aiplugins/releases/latest/download/qwen-bridge-x86_64-pc-windows-msvc.zip
+Expand-Archive qwen-bridge-x86_64-pc-windows-msvc.zip -DestinationPath qwen-bridge
+```
+
+**macOS (x86_64 / Apple Silicon):**
+```bash
+curl -LO https://github.com/ckir/aiplugins/releases/latest/download/qwen-bridge-$(uname -m)-apple-darwin.tar.xz
+tar xf qwen-bridge-*.tar.xz
+```
+
+**Linux (x86_64 / aarch64):**
+```bash
+curl -LO https://github.com/ckir/aiplugins/releases/latest/download/qwen-bridge-$(uname -m)-unknown-linux-gnu.tar.xz
+tar xf qwen-bridge-*.tar.xz
+```
+
+Then place the binary in your `PATH` (e.g. `~/.local/bin`, `~/bin`, or `/usr/local/bin`):
+
+```bash
+mkdir -p ~/.local/bin
+cp rtk-mcp-qwen* ~/.local/bin/   # add the platform-specific binary
+chmod +x ~/.local/bin/rtk-mcp-qwen
+```
+
+Verify the installation:
+
+```bash
+rtk-mcp-qwen --version
+rtk-mcp-qwen --help
+```
+
+### Updating
+
+To update, simply download the latest release again and replace the binary
+in your `PATH`. Check your current version first:
+
+```bash
+rtk-mcp-qwen --version
+```
+
+### Building from source
+
+```bash
+cargo build -p qwen-bridge --bin rtk-mcp-qwen --release
+```
+
+The binary will be at `target/release/rtk-mcp-qwen`.
+
 ## Structure
 
 ```
@@ -20,12 +77,6 @@ qwen/rtk-mcp-qwen/
 ├── src/
 │   └── main.rs           # Hook binary (stdio JSON-RPC)
 └── QWEN.md               # Extension context
-```
-
-## Building
-
-```bash
-cargo build -p qwen-bridge --bin rtk-mcp-qwen
 ```
 
 ## Hook contract
