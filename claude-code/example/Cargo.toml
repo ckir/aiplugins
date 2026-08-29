@@ -39,3 +39,7 @@ rmcp = { workspace = true, features = ["client", "transport-child-process"] }
 pre-release-replacements = [
   { file = ".claude-plugin/plugin.json", search = '"version": "[0-9]+\.[0-9]+\.[0-9]+"', replace = '"version": "{{version}}"', exactly = 1 },
 ]
+
+# Example package — not included in release artifacts.
+[package.metadata.dist]
+include = []

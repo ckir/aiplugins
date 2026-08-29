@@ -1,15 +1,15 @@
-# Antigravity (Gemini) rtk Hook Design
+# Antigravity (agy) rtk Hook Design
 
 ## Understanding Summary
-- **What is being built:** A Rust-based integration (`rtk/crates/gemini`) to intercept Antigravity tool calls and optimize them using `rtk rewrite`.
+- **What is being built:** A Rust-based integration (`rtk/crates/rtk-mcp-agy`) to intercept Antigravity tool calls and optimize them using `rtk rewrite`.
 - **Why it exists:** To transparently rewrite shell commands through `rtk rewrite`, saving tokens by leveraging token-optimized CLI binaries.
 - **Who it is for:** The Antigravity (agy) agent.
-- **Key constraints:** Antigravity’s `PreToolUse` hook schema lacks a way to modify tool arguments. Thus, we must use an MCP Server proxy alongside a `PreInvocation` hook injection to force the model to use the optimized tool.
+- **Key constraints:** Antigravity's `PreToolUse` hook schema lacks a way to modify tool arguments. Thus, we must use an MCP Server proxy alongside a `PreInvocation` hook injection to force the model to use the optimized tool.
 - **Explicit non-goals:** Not implementing the `rtk` core logic itself, and not targeting other agents.
 
 ## Assumptions
 1. The target tool to replace is `run_command`.
-2. Antigravity supports configuring hooks in `~/.gemini/config/hooks.json`.
+2. Antigravity supports configuring hooks in `~/.antigravity/config/hooks.json`.
 3. The hook must execute in milliseconds to avoid latency.
 
 ## Decision Log
@@ -46,10 +46,10 @@ When Antigravity starts its execution loop, the `PreInvocation` hook fires and o
 ```
 
 **Configuration:**
-In `~/.gemini/config/hooks.json` (or workspace equivalent):
+In `~/.antigravity/config/hooks.json` (or workspace equivalent):
 ```json
 {
-  "rtk-gemini-hook": {
+  "rtk-agy-hook": {
     "PreInvocation": [
       {
         "type": "command",

@@ -1,4 +1,4 @@
-# qwen-bridge — RTK Command Rewriter Hook
+# rtk-mcp-qwen — RTK Command Rewriter Hook
 
 A Qwen Code extension that installs a **PreToolUse hook** to intercept
 `run_shell_command` tool calls and rewrite the command via the external
@@ -14,7 +14,7 @@ command passes through unchanged (fail-open).
 ## Structure
 
 ```
-qwen/bridge/
+qwen/rtk-mcp-qwen/
 ├── qwen-extension.json   # Extension manifest with PreToolUse hook wiring
 ├── Cargo.toml            # Rust workspace crate
 ├── src/
@@ -96,5 +96,5 @@ The `rtk` binary must be on your `PATH`. Override by setting `RTK_BIN`:
 ## Linking
 
 ```bash
-qwen extensions link ./qwen/bridge
+qwen extensions link ./qwen/rtk-mcp-qwen
 ```

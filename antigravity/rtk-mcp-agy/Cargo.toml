@@ -1,5 +1,5 @@
 [package]
-name = "gemini"
+name = "rtk-mcp-agy"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

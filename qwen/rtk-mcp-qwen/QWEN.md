@@ -1,4 +1,4 @@
-# Qwen Bridge — RTK Command Rewriter
+# rtk-mcp-qwen — RTK Command Rewriter
 
 This extension installs a **PreToolUse hook** that intercepts `run_shell_command`
 tool calls and rewrites the command via the external `rtk` CLI before execution.
