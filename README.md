@@ -19,6 +19,7 @@ aiplugins/
 ├── antigravity/   # Plugins specifically for Antigravity
 ├── qwen/          # Plugins specifically for Qwen
 ├── shared/        # Shared resources or core functionality across plugins
+├── scripts/       # Repository checks run by CI and `just check`
 └── README.md      # Project overview
 ```
 
