@@ -23,3 +23,14 @@ serde_json = { workspace = true }
 # request, one response, in order — so it is now a plain `fn main`.
 #
 # No tracing either: it was declared but never used.
+
+[package.metadata.release]
+# cargo-release bumps the version in Cargo.toml, but the plugin manifest carries
+# it too. Rewrite it in the same commit so the two can never drift.
+#
+# Without this the manifest silently froze while the binaries moved on — the
+# same defect this crate already shipped once in its MCP handshake, where a
+# hardcoded "0.1.0" was still being announced at 0.1.5.
+pre-release-replacements = [
+  { file = "plugin.json", search = '"version": "[0-9]+\.[0-9]+\.[0-9]+"', replace = '"version": "{{version}}"', exactly = 1 },
+]
