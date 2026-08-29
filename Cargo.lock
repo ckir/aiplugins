@@ -497,16 +497,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "qwen-bridge"
-version = "0.2.0"
-dependencies = [
- "serde",
- "serde_json",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "qwen-example"
 version = "0.2.0"
 dependencies = [
@@ -625,6 +615,16 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "rtk-mcp-qwen"
+version = "0.2.0"
+dependencies = [
+ "serde",
+ "serde_json",
  "tracing",
  "tracing-subscriber",
 ]

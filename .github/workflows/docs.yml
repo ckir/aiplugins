@@ -40,7 +40,7 @@ jobs:
         # Cargo puts docs in target/doc, but without a root index.html.
         # This redirects the root GitHub Pages URL to your main crate's docs.
         run: |
-          echo '<meta http-equiv="refresh" content="0; url=qwen_bridge/index.html">' > target/doc/index.html
+          echo '<meta http-equiv="refresh" content="0; url=rtk_mcp_qwen/index.html">' > target/doc/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v6

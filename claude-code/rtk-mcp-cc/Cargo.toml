@@ -21,7 +21,7 @@ path = "src/bin/mcp.rs"
 # Test fixture: a fake `rtk` the e2e tests point RTK_BIN at, so the suite runs
 # on a machine (or CI runner) that has no real rtk installed.
 #
-# The `-cc` suffix is load-bearing. `qwen-bridge` already ships a fixture named
+# The `-cc` suffix is load-bearing. `rtk-mcp-qwen` already ships a fixture named
 # `mock-rtk`, and two bin targets with the same name in one workspace write to
 # the same `target/debug/mock-rtk.exe` — so a workspace-wide build silently
 # leaves whichever compiled last, and `CARGO_BIN_EXE_mock-rtk` then resolves to

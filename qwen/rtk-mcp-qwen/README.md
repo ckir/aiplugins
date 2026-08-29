@@ -16,24 +16,24 @@ command passes through unchanged (fail-open).
 ### From release artifacts (recommended)
 
 Download the latest release from <https://github.com/ckir/aiplugins/releases>
-and extract the `qwen-bridge` archive for your platform:
+and extract the `rtk-mcp-qwen` archive for your platform:
 
 **Windows (x86_64):**
 ```powershell
-curl -LO https://github.com/ckir/aiplugins/releases/latest/download/qwen-bridge-x86_64-pc-windows-msvc.zip
-Expand-Archive qwen-bridge-x86_64-pc-windows-msvc.zip -DestinationPath qwen-bridge
+curl -LO https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-x86_64-pc-windows-msvc.zip
+Expand-Archive rtk-mcp-qwen-x86_64-pc-windows-msvc.zip -DestinationPath rtk-mcp-qwen
 ```
 
 **macOS (x86_64 / Apple Silicon):**
 ```bash
-curl -LO https://github.com/ckir/aiplugins/releases/latest/download/qwen-bridge-$(uname -m)-apple-darwin.tar.xz
-tar xf qwen-bridge-*.tar.xz
+curl -LO https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-$(uname -m)-apple-darwin.tar.xz
+tar xf rtk-mcp-qwen-*.tar.xz
 ```
 
 **Linux (x86_64 / aarch64):**
 ```bash
-curl -LO https://github.com/ckir/aiplugins/releases/latest/download/qwen-bridge-$(uname -m)-unknown-linux-gnu.tar.xz
-tar xf qwen-bridge-*.tar.xz
+curl -LO https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-$(uname -m)-unknown-linux-gnu.tar.xz
+tar xf rtk-mcp-qwen-*.tar.xz
 ```
 
 Then place the binary in your `PATH` (e.g. `~/.local/bin`, `~/bin`, or `/usr/local/bin`):
@@ -63,7 +63,7 @@ rtk-mcp-qwen --version
 ### Building from source
 
 ```bash
-cargo build -p qwen-bridge --bin rtk-mcp-qwen --release
+cargo build -p rtk-mcp-qwen --bin rtk-mcp-qwen --release
 ```
 
 The binary will be at `target/release/rtk-mcp-qwen`.
@@ -127,7 +127,7 @@ rtk takes one variable rather than three.
       "hooks": [{
         "type": "command",
         "command": "cargo",
-        "args": ["run", "-p", "qwen-bridge", "--bin", "rtk-mcp-qwen", "--quiet"],
+        "args": ["run", "-p", "rtk-mcp-qwen", "--bin", "rtk-mcp-qwen", "--quiet"],
         "cwd": "${extensionPath}${/}..${/}..",
         "env": { "RTK_BIN": "/opt/rtk/bin/rtk" },
         "name": "rtk-command-rewrite",

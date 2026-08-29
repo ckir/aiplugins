@@ -12,7 +12,7 @@
           {
             "type": "command",
             "command": "cargo",
-            "args": ["run", "-p", "qwen-bridge", "--bin", "rtk-mcp-qwen", "--quiet"],
+            "args": ["run", "-p", "rtk-mcp-qwen", "--bin", "rtk-mcp-qwen", "--quiet"],
             "cwd": "${extensionPath}${/}..${/}..",
             "name": "rtk-command-rewrite",
             "timeout": 10000
