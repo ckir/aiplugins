@@ -26,5 +26,18 @@ target
 # leftover prompts, not configuration. The rest of .qwen/ stays tracked.
 .qwen/tmp/
 
+# Per-developer Claude Code state, not shared configuration:
+#   settings.local.json  — which plugins this developer has enabled
+#   *.local.md           — per-project plugin settings, the convention both
+#                          claude-code/example and claude-code/rtk-mcp-cc
+#                          document ("belongs in .gitignore") but nothing here
+#                          previously enforced
+#
+# settings.local.json is also covered by a global ignore on at least one
+# machine, which is exactly why it needs to be stated here too: a rule that
+# lives in one developer's ~/.config/git/ignore protects nobody else.
+.claude/settings.local.json
+.claude/*.local.md
+
 # Release / Dist
 dist/
