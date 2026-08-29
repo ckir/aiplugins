@@ -71,6 +71,26 @@ impl QwenOutput {
     }
 }
 
+/// The rtk executable used when `RTK_BIN` says nothing.
+pub const DEFAULT_RTK_BIN: &str = "rtk";
+
+/// Decide which rtk executable to invoke.
+///
+/// A blank value counts as unset. `RTK_BIN=` is how a shell commonly spells
+/// "clear this", and `env::var` reports it as `Ok("")` rather than an error —
+/// so taking it literally means trying to spawn the empty string, which fails
+/// with a confusing OS error instead of quietly using rtk from `PATH`.
+///
+/// The variable is deliberately un-prefixed: the sibling `rtk-mcp-agy` and
+/// `rtk-mcp-cc` plugins honour the same one, and all three resolve it the same
+/// way, so relocating rtk takes one variable rather than three.
+pub fn resolve_rtk_bin(override_value: Option<String>) -> String {
+    override_value
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| DEFAULT_RTK_BIN.to_string())
+}
+
 /// Process a single hook input and return the output.
 ///
 /// If `rtk_rewrite_fn` returns Some, the command is rewritten.
@@ -105,6 +125,33 @@ pub fn process_hook(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_rtk_bin_defaults_to_the_path_lookup() {
+        assert_eq!(resolve_rtk_bin(None), DEFAULT_RTK_BIN);
+    }
+
+    #[test]
+    fn test_rtk_bin_honours_an_override() {
+        assert_eq!(
+            resolve_rtk_bin(Some("/opt/rtk/bin/rtk".to_string())),
+            "/opt/rtk/bin/rtk"
+        );
+        assert_eq!(resolve_rtk_bin(Some("  rtk-dev  ".to_string())), "rtk-dev");
+    }
+
+    #[test]
+    fn test_blank_rtk_bin_does_not_erase_the_default() {
+        // `env::var` returns Ok("") for `RTK_BIN=`, so without this the hook
+        // would try to spawn the empty string rather than fall back to PATH.
+        for blank in ["", "   ", "\t", "\n"] {
+            assert_eq!(
+                resolve_rtk_bin(Some(blank.to_string())),
+                DEFAULT_RTK_BIN,
+                "blank value {blank:?} must count as unset"
+            );
+        }
+    }
 
     #[test]
     fn test_pass_through_output() {
@@ -197,6 +244,46 @@ mod tests {
         assert_eq!(
             result.hook_specific_output.permission_decision_reason,
             "No RTK rewrite available for: ls"
+        );
+    }
+
+    /// The keys actually emitted under `hook_specific_output`.
+    fn emitted_fields(output: &QwenOutput) -> serde_json::Map<String, serde_json::Value> {
+        let json = output.to_json().expect("serialize");
+        let value: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        value["hook_specific_output"]
+            .as_object()
+            .expect("hook_specific_output object")
+            .clone()
+    }
+
+    #[test]
+    fn test_pass_through_omits_updated_input_from_the_wire() {
+        // `skip_serializing_if = "Option::is_none"` is a wire contract: a
+        // pass-through must omit the key, not send `"updated_input": null`.
+        //
+        // The roundtrip tests below cannot check this. `Option` deserializes a
+        // missing key and an explicit null identically, so serialize →
+        // deserialize → compare stays equal whether or not the attribute is
+        // there. Only the emitted keys reveal it.
+        let fields = emitted_fields(&QwenOutput::pass_through("reason"));
+        assert!(!fields.contains_key("updated_input"), "got: {fields:?}");
+        // The three fields that must always be present.
+        for key in [
+            "hook_event_name",
+            "permission_decision",
+            "permission_decision_reason",
+        ] {
+            assert!(fields.contains_key(key), "missing {key}: {fields:?}");
+        }
+    }
+
+    #[test]
+    fn test_rewrite_includes_updated_input_on_the_wire() {
+        let fields = emitted_fields(&QwenOutput::rewritten("ls", "ls -la"));
+        assert_eq!(
+            fields["updated_input"]["command"], "ls -la",
+            "got: {fields:?}"
         );
     }
 

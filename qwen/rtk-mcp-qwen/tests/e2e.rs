@@ -49,6 +49,23 @@ fn assert_json_decision(stdout: &str, decision: &str, reason_contains: &str) -> 
     json
 }
 
+/// Assert a decision leaves the command untouched.
+///
+/// The key must be *absent*, not null. `updated_input` is annotated
+/// `skip_serializing_if = "Option::is_none"`, and a serialize/deserialize
+/// roundtrip cannot verify that: `Option` reads missing and null identically,
+/// so the roundtrip stays equal either way. Checking the emitted keys is the
+/// only thing that pins it, and this is the wire the agent actually reads.
+fn assert_no_rewrite(json: &serde_json::Value) {
+    let fields = json["hook_specific_output"]
+        .as_object()
+        .expect("hook_specific_output object");
+    assert!(
+        !fields.contains_key("updated_input"),
+        "a pass-through must omit updated_input entirely, not send null; got: {json}"
+    );
+}
+
 #[test]
 fn test_e2e_empty_input() {
     let (stdout, _stderr, status) = run_bridge("   \n\t", false);
@@ -58,10 +75,16 @@ fn test_e2e_empty_input() {
 
 #[test]
 fn test_e2e_invalid_json() {
-    let (stdout, stderr, status) = run_bridge("this is not json", false);
+    let (stdout, _stderr, status) = run_bridge("this is not json", false);
     assert!(status.success());
-    assert_json_decision(&stdout, "allow", "JSON parse error");
-    assert!(stderr.contains("Failed to read stdin") || stderr.is_empty());
+    let json = assert_json_decision(&stdout, "allow", "JSON parse error");
+
+    // What actually matters on an unreadable payload: the command must be left
+    // alone. The previous assertion here was `stderr.contains("Failed to read
+    // stdin") || stderr.is_empty()` — nothing ever writes that message on a
+    // parse error, so the disjunction always passed on its second half and
+    // asserted nothing at all.
+    assert_no_rewrite(&json);
 }
 
 #[test]
@@ -120,10 +143,32 @@ fn test_e2e_rtk_empty_output() {
 }
 
 #[test]
-fn test_e2e_rtk_bypass_code_3() {
+fn test_e2e_rtk_accepts_a_rewrite_on_exit_code_3() {
+    // Exit 3 is a success code for rtk, like 0: a rewrite on stdout must be
+    // applied. This is the assertion that actually pins the `code != Some(3)`
+    // branch in rtk_rewrite — deleting that branch makes this test fail.
+    //
+    // Its predecessor did not: it used a mock that exited 3 with *no* output,
+    // so the None came from the empty-stdout branch and the special case could
+    // be removed with the whole suite still green.
     let input =
-        r#"{"tool_name": "run_shell_command", "tool_input": {"command": "passthrough_code_3"}}"#;
+        r#"{"tool_name": "run_shell_command", "tool_input": {"command": "code_3_with_rewrite"}}"#;
     let (stdout, _stderr, status) = run_bridge(input, true);
     assert!(status.success());
-    assert_json_decision(&stdout, "allow", "No RTK rewrite available");
+    let json = assert_json_decision(&stdout, "allow", "RTK rewrite applied");
+    assert_eq!(
+        json["hook_specific_output"]["updated_input"]["command"],
+        "rtk rewritten-on-code-3"
+    );
+}
+
+#[test]
+fn test_e2e_rtk_exit_code_3_without_output_is_a_pass_through() {
+    // The other half of the pair: a success code carrying nothing to apply.
+    let input =
+        r#"{"tool_name": "run_shell_command", "tool_input": {"command": "code_3_no_output"}}"#;
+    let (stdout, _stderr, status) = run_bridge(input, true);
+    assert!(status.success());
+    let json = assert_json_decision(&stdout, "allow", "No RTK rewrite available");
+    assert_no_rewrite(&json);
 }

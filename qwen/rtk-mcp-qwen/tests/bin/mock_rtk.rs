@@ -20,8 +20,17 @@ fn main() {
                 // Print nothing, exit success
                 exit(0);
             }
-            "passthrough_code_3" => {
-                // code 3 means RTK decided not to rewrite, and printed nothing or we just ignore it
+            // Exit 3 is a *success* code for rtk, equivalent to 0: the rewritten
+            // command is on stdout. The two cases below are deliberately split,
+            // because collapsing them is what previously hid the special case —
+            // a code-3 exit with no output returns None through the
+            // empty-stdout branch, so it looks identical to a code-0 exit with
+            // no output and proves nothing about code 3 at all.
+            "code_3_with_rewrite" => {
+                print!("rtk rewritten-on-code-3");
+                exit(3);
+            }
+            "code_3_no_output" => {
                 eprintln!("rtk bypassed");
                 exit(3);
             }

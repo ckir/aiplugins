@@ -114,7 +114,10 @@ qwen/rtk-mcp-qwen/
 
 ## Configuration
 
-The `rtk` binary must be on your `PATH`. Override by setting `RTK_BIN`:
+The `rtk` binary must be on your `PATH`. Override by setting `RTK_BIN`. A blank
+value (`RTK_BIN=`) counts as unset and falls back to `rtk` on `PATH` — the same
+resolution the sibling `rtk-mcp-agy` and `rtk-mcp-cc` plugins use, so relocating
+rtk takes one variable rather than three.
 
 ```json
 {

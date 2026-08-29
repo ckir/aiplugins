@@ -1,4 +1,4 @@
-use qwen_bridge::{process_hook, QwenOutput};
+use qwen_bridge::{process_hook, resolve_rtk_bin, QwenOutput};
 use std::env;
 use std::io::{self, Read};
 use std::process::Command;
@@ -52,7 +52,7 @@ fn main() {
 }
 
 fn rtk_rewrite(command: &str) -> Option<String> {
-    let rtk_bin = env::var("RTK_BIN").unwrap_or_else(|_| "rtk".to_string());
+    let rtk_bin = resolve_rtk_bin(env::var("RTK_BIN").ok());
     let output = match Command::new(&rtk_bin).arg("rewrite").arg(command).output() {
         Ok(o) => o,
         Err(e) => {
