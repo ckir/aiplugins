@@ -11,17 +11,19 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  check:
-    name: Check, Lint & Test
+  # Formatting and lints are platform-independent, so they run once rather than
+  # once per OS in the test matrix below.
+  lint:
+    name: Format & Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
+      - uses: actions/checkout@v7
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-          
+
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
@@ -30,18 +32,60 @@ jobs:
 
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-        
+
+  test:
+    # The matrix is not redundancy. This workspace runs external programs whose
+    # availability is platform-specific — `rtk-mcp-agy` executes commands through
+    # `pwsh` on Windows and `sh` everywhere else — and a Linux-only run leaves
+    # the Windows branch of that choice never actually executed. The resolver
+    # logic is unit-tested for both platforms from any host; this covers the
+    # spawning it cannot.
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One platform failing should not hide the result on the others: which
+      # platforms fail is the most useful part of a portability failure.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
-        
+
       - name: Run tests
         run: cargo nextest run --workspace
+
+  wiring:
+    name: Plugin Wiring
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      # Confirms every binary named in a plugin's hooks.json / .mcp.json is a
+      # [[bin]] target this workspace builds. Those are plain strings that no
+      # compiler or test validates.
+      - name: Check plugin wiring
+        run: bash scripts/check-plugin-wiring.sh
 
   deny:
     name: Dependency Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install cargo-deny
         uses: taiki-e/install-action@cargo-deny
       - name: Run cargo deny
@@ -51,6 +95,6 @@ jobs:
     name: Spell Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check for spelling errors
-        uses: crate-ci/typos@master
+        uses: crate-ci/typos@v1
