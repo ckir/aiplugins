@@ -13,60 +13,42 @@ command passes through unchanged (fail-open).
 
 ## Installation
 
-### From release artifacts (recommended)
-
-Download the latest release from <https://github.com/ckir/aiplugins/releases>
-and extract the `rtk-mcp-qwen` archive for your platform:
-
-**Windows (x86_64):**
-```powershell
-curl -LO https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-x86_64-pc-windows-msvc.zip
-Expand-Archive rtk-mcp-qwen-x86_64-pc-windows-msvc.zip -DestinationPath rtk-mcp-qwen
-```
-
-**macOS (x86_64 / Apple Silicon):**
-```bash
-curl -LO https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-$(uname -m)-apple-darwin.tar.xz
-tar xf rtk-mcp-qwen-*.tar.xz
-```
-
-**Linux (x86_64 / aarch64):**
-```bash
-curl -LO https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-$(uname -m)-unknown-linux-gnu.tar.xz
-tar xf rtk-mcp-qwen-*.tar.xz
-```
-
-Then place the binary in your `PATH` (e.g. `~/.local/bin`, `~/bin`, or `/usr/local/bin`):
+### Via Qwen Code CLI (recommended)
 
 ```bash
-mkdir -p ~/.local/bin
-cp rtk-mcp-qwen* ~/.local/bin/   # add the platform-specific binary
-chmod +x ~/.local/bin/rtk-mcp-qwen
+qwen extensions install https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-x86_64-pc-windows-msvc.zip
 ```
 
-Verify the installation:
+Or for other platforms:
 
 ```bash
-rtk-mcp-qwen --version
-rtk-mcp-qwen --help
-```
+# Linux
+qwen extensions install https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-x86_64-unknown-linux-gnu.tar.xz
 
-### Updating
-
-To update, simply download the latest release again and replace the binary
-in your `PATH`. Check your current version first:
-
-```bash
-rtk-mcp-qwen --version
+# macOS
+qwen extensions install https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-x86_64-apple-darwin.tar.xz
 ```
 
 ### Building from source
 
 ```bash
-cargo build -p rtk-mcp-qwen --bin rtk-mcp-qwen --release
+git clone https://github.com/ckir/aiplugins.git
+cd aiplugins
+cargo build -p rtk-mcp-qwen --release
+qwen extensions link ./qwen/rtk-mcp-qwen
 ```
 
-The binary will be at `target/release/rtk-mcp-qwen`.
+### Updating
+
+```bash
+qwen extensions update rtk-mcp-qwen
+```
+
+Check your current version:
+
+```bash
+qwen extensions list | grep rtk
+```
 
 ## Structure
 
