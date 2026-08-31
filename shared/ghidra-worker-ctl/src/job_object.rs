@@ -182,7 +182,7 @@ mod tests {
 
 #[cfg(all(test, unix))]
 mod tests {
-    use super::*;
+    use super::unix_imp::ProcessGroupGuard;
     use std::process::Command;
     use std::time::Duration;
 
