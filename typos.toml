@@ -9,3 +9,13 @@ extend-ignore-re = [
 qwen = "qwen"
 rtk = "rtk"
 agy = "agy"
+
+# Ported Ghidra worker/test vocabulary. Mapping a word to itself accepts it.
+# `pn` is a Java local (parameter name) in GhidraMcpWorker.java; `unparseable`
+# is the spelling the ported code and its test names already use, and renaming
+# a test to satisfy a spellchecker would break the link to what it pins.
+pn = "pn"
+unparseable = "unparseable"
+# The ported code hyphenates this prefix throughout ("mis-read", "mis-launched",
+# "mis-handled"); typos splits on the hyphen and sees a bare "mis".
+mis = "mis"

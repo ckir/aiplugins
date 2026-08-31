@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "re-ghidra-mcp-cc": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/re-ghidra-cc-mcp",
+      "args": ["serve"]
+    }
+  }
+}

@@ -1,0 +1,5 @@
+# Built plugin binaries, produced by `just build-re-ghidra-mcp-cc`.
+#
+# The leading slash is load-bearing: a bare `bin/` would also match `src/bin/`,
+# which is this crate's binary *source* and must be committed.
+/bin/

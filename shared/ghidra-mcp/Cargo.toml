@@ -1,0 +1,44 @@
+[package]
+name = "ghidra-mcp"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish = false
+
+# Library only. Each agent's plugin owns its own thin binary and dispatches into
+# `ghidra_mcp::cli`, so the server, the worker asset and the driver skill have
+# exactly one home no matter how many agents front them.
+[lib]
+name = "ghidra_mcp"
+path = "src/lib.rs"
+
+[dependencies]
+ghidra-ipc = { path = "../ghidra-ipc" }
+ghidra-worker-ctl = { path = "../ghidra-worker-ctl" }
+lru = { workspace = true }
+rmcp = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-appender = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# The log file is created owner-only (`logging.rs`), which needs the Win32 ACL
+# API. Non-Windows falls back to the umask default.
+[target.'cfg(windows)'.dependencies.windows]
+workspace = true
+features = ["Win32_Security_Authorization"]
+
+[dev-dependencies]
+# The protocol test drives this crate's own server with rmcp's in-process
+# client, so the MCP handshake and tool dispatch are exercised for real.
+rmcp = { workspace = true, features = ["client"] }
+uuid = { workspace = true }

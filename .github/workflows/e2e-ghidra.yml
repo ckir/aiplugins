@@ -1,0 +1,142 @@
+name: Live Ghidra E2E
+
+# The ~60 tests in `shared/ghidra-mcp/tests/` that drive a real headless Ghidra
+# JVM. They are gated at RUNTIME on GHIDRA_MCP_E2E rather than with `#[ignore]`,
+# so in the ordinary CI matrix they early-return and pass — which is exactly
+# what keeps ubuntu/macos runners green without a Ghidra install. This workflow
+# is the only place they actually execute.
+#
+# Windows only, and not by preference: the worker JVM's lifetime is bound to a
+# Windows Job Object (`shared/ghidra-worker-ctl/src/job_object.rs`), which has no
+# non-Windows equivalent. The crate compiles everywhere via a `#[cfg(not(windows))]`
+# stub; only the guarantee is Windows-specific.
+#
+# Deliberately NOT on `pull_request`: this job downloads ~400 MB of Ghidra, a
+# JDK, and builds and analyzes a fixture, so it is far too slow and too
+# externally-dependent to sit in front of every PR. It runs weekly and on
+# demand; a break shows up as a red scheduled run, not a blocked merge.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Mondays 04:00 UTC. Nothing here changes daily; a weekly signal is enough
+    # to catch a Ghidra release or a runner-image change breaking the boot path.
+    - cron: "0 4 * * 1"
+
+env:
+  CARGO_TERM_COLOR: always
+  GHIDRA_VERSION: "12.1.2"
+
+jobs:
+  e2e:
+    name: Live Ghidra E2E (windows)
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Ghidra 12.1.2 declares application.java.min=21. An older JDK fails at
+      # JVM start with a message that never mentions the version.
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
+      # The release asset carries a build date in its filename
+      # (ghidra_<ver>_PUBLIC_<yyyymmdd>.zip), so it cannot be hardcoded without
+      # going stale. Resolve it from the API and FAIL LOUDLY if no asset
+      # matches, rather than silently downloading nothing and reporting a
+      # confusing error three steps later.
+      - name: Install Ghidra ${{ env.GHIDRA_VERSION }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tag = "Ghidra_${env:GHIDRA_VERSION}_build"
+          $headers = @{
+            Authorization = "Bearer ${{ secrets.GITHUB_TOKEN }}"
+            "User-Agent"  = "aiplugins-ci"
+          }
+          $release = Invoke-RestMethod -Headers $headers `
+            "https://api.github.com/repos/NationalSecurityAgency/ghidra/releases/tags/$tag"
+          $asset = $release.assets |
+            Where-Object { $_.name -like "ghidra_${env:GHIDRA_VERSION}_PUBLIC_*.zip" } |
+            Select-Object -First 1
+          if (-not $asset) {
+            Write-Error "No ghidra_${env:GHIDRA_VERSION}_PUBLIC_*.zip asset on release tag '$tag'. Assets: $($release.assets.name -join ', ')"
+          }
+          Write-Host "Downloading $($asset.name) ($([math]::Round($asset.size / 1MB)) MB)"
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile ghidra.zip
+          Expand-Archive -Path ghidra.zip -DestinationPath "$env:RUNNER_TEMP\ghidra" -Force
+
+          # The zip contains a single versioned top-level directory whose exact
+          # name includes the build date; discover it rather than assume it.
+          $root = (Get-ChildItem "$env:RUNNER_TEMP\ghidra" -Directory | Select-Object -First 1).FullName
+          if (-not (Test-Path "$root\support\analyzeHeadless.bat")) {
+            Write-Error "Extracted '$root' has no support/analyzeHeadless.bat — layout changed."
+          }
+          "GHIDRA_INSTALL_DIR=$root" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "GHIDRA_INSTALL_DIR=$root"
+
+      # Built with debug info on purpose: Ghidra's datatype manager only sees
+      # `Rect` and `Color` if the compiler emitted them, and it only emits a
+      # type that is actually used. See shared/ghidra-mcp/tests/fixtures/README.md.
+      - name: Build the fixture program
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $fixtureDir = "$env:RUNNER_TEMP\ghidra-mcp-fix"
+          New-Item -ItemType Directory -Force -Path $fixtureDir | Out-Null
+          clang --version
+          clang -g shared/ghidra-mcp/tests/fixtures/fixture.c -o "$fixtureDir\fixture.exe"
+          if (-not (Test-Path "$fixtureDir\fixture.exe")) { Write-Error "fixture.exe was not produced" }
+          "GHIDRA_MCP_FIXTURE_PROJECT_DIR=$fixtureDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      # Import and fully auto-analyze, then let analyzeHeadless exit — the tests
+      # ATTACH to a closed, analyzed project. A project still held open cannot be
+      # attached: they collide on Ghidra's project.lock.
+      - name: Import and analyze the fixture project
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $fixtureDir = $env:GHIDRA_MCP_FIXTURE_PROJECT_DIR
+          & "$env:GHIDRA_INSTALL_DIR\support\analyzeHeadless.bat" `
+            $fixtureDir fixtureproj -import "$fixtureDir\fixture.exe" -overwrite
+          if ($LASTEXITCODE -ne 0) { Write-Error "analyzeHeadless exited $LASTEXITCODE" }
+          if (-not (Test-Path "$fixtureDir\fixtureproj.gpr")) {
+            Write-Error "analyzeHeadless produced no fixtureproj.gpr in $fixtureDir"
+          }
+          # A lock left behind by the import would make every attach fail.
+          Get-ChildItem "$fixtureDir" -Filter "fixtureproj.lock*" -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Host "Removing stale lock $($_.Name)"; Remove-Item $_.FullName -Force }
+
+      # -j1 is not a performance choice: one Ghidra project supports ONE live
+      # worker, and parallel test binaries collide on project.lock.
+      - name: Run the live suite
+        shell: pwsh
+        env:
+          GHIDRA_MCP_E2E: "1"
+          GHIDRA_MCP_FIXTURE_PROJECT_NAME: fixtureproj
+          GHIDRA_MCP_FIXTURE_PROGRAM: /fixture.exe
+          GHIDRA_MCP_FIXTURE_FUNCTION: compute
+        run: cargo nextest run -p ghidra-mcp -j1
+
+      # The worker log is where a boot failure explains itself; the test output
+      # only shows the timeout it caused.
+      - name: Upload worker logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghidra-worker-logs
+          path: ~/.ghidra-mcp/logs/
+          if-no-files-found: ignore
