@@ -1,0 +1,11 @@
+{
+  "re-ghidra-preflight": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "re-ghidra-agy-hook",
+        "timeout": 10
+      }
+    ]
+  }
+}
