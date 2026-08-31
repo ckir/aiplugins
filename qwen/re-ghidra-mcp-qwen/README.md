@@ -65,8 +65,8 @@ You supply these; nothing here bundles them.
 
 | Platform | Status |
 |---|---|
-| Windows | Supported. |
-| Linux / macOS | Builds and unit-tests, but does not run. The worker JVM's lifetime is bound to a Windows Job Object (`shared/ghidra-worker-ctl/src/job_object.rs`), which has no non-Windows equivalent; the crate carries a `#[cfg(not(windows))]` stub so the workspace still compiles and the 3-OS CI matrix stays meaningful. |
+| Windows | Supported. The worker JVM is bound to a Windows Job Object for cleanup. |
+| Linux / macOS | Supported. The worker JVM runs in a Unix process group (via `setsid()`) and is killed via `SIGKILL` to the process group on host exit. |
 
 ## Building
 

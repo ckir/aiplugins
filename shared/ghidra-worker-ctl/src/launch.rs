@@ -1,7 +1,7 @@
 //! Spawn the headless launcher and shield host stdout (spike D4). Both child pipes are drained on
 //! dedicated threads into the host's STDERR so ~16 KB of Ghidra log spam per run never contaminates
-//! host stdout (reserved for MCP JSON-RPC, M1). The child is wrapped in a JobObject so the whole
-//! host->cmd.exe->java.exe tree dies with the host.
+//! host stdout (reserved for MCP JSON-RPC, M1). The child is wrapped in a kill-guard (Windows Job
+//! Object or Unix process group) so the whole host->shell->java.exe tree dies with the host.
 
 use crate::job_object::JobObject;
 use std::io::{self, BufRead, BufReader};
@@ -9,17 +9,18 @@ use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::thread::JoinHandle;
 
-/// A spawned worker process: the child, its kill-guard job, and the two pipe-drain threads. Drop
-/// order (struct fields drop top-to-bottom) closes the job last, but KILL_ON_JOB_CLOSE plus the
-/// child's own exit make teardown robust either way.
+/// A spawned worker process: the child, its kill-guard, and the two pipe-drain threads. Drop
+/// order (struct fields drop top-to-bottom) closes the guard last, but the kill mechanism
+/// (KILL_ON_JOB_CLOSE or SIGKILL to process group) plus the child's own exit make teardown robust.
 pub struct WorkerProcess {
     pub child: Child,
-    _job: JobObject,
+    _guard: JobObject,
     _drains: Vec<JoinHandle<()>>,
 }
 
 impl WorkerProcess {
-    /// Spawn `program args…`, assign to a fresh JobObject, and drain stdout+stderr to host stderr.
+    /// Spawn `program args…`, assign to a fresh kill-guard (Job Object on Windows, process group
+    /// on Unix), and drain stdout+stderr to host stderr.
     /// `max_heap` (e.g. "2G") is forwarded to Ghidra via the MAXMEM env var if set.
     pub fn spawn(program: &Path, args: &[String], max_heap: Option<&str>) -> io::Result<Self> {
         let mut cmd = Command::new(program);
@@ -31,16 +32,33 @@ impl WorkerProcess {
             // Ghidra's launcher honors MAXMEM (e.g. "2G") for the JVM -Xmx.
             cmd.env("MAXMEM", heap);
         }
-        // Create the kill-guard BEFORE spawning: if job creation fails we never launch a JVM we
+
+        // Create the kill-guard BEFORE spawning: if guard creation fails we never launch a JVM we
         // couldn't reap. And if `assign` fails AFTER spawn, kill the child explicitly — dropping a
         // std::process::Child does NOT kill it, so a bare `?` there would orphan the Ghidra JVM
         // permanently (agy panel R1).
-        let job = JobObject::new()?;
+        #[cfg(windows)]
+        let guard = JobObject::new()?;
+
+        #[cfg(unix)]
+        let mut guard = JobObject::new()?;
+
+        // On Unix, configure the command to create a new process group before spawning.
+        #[cfg(unix)]
+        guard.configure_command(&mut cmd);
+
         let mut child = cmd.spawn()?;
-        if let Err(e) = job.assign(&child) {
+
+        // On Windows, assign the child to the Job Object after spawning.
+        #[cfg(windows)]
+        if let Err(e) = guard.assign(&child) {
             let _ = child.kill();
             return Err(e);
         }
+
+        // On Unix, record the child PID for process group cleanup on drop.
+        #[cfg(unix)]
+        guard.assign(&child);
 
         let mut drains = Vec::new();
         if let Some(out) = child.stdout.take() {
@@ -52,7 +70,7 @@ impl WorkerProcess {
 
         Ok(WorkerProcess {
             child,
-            _job: job,
+            _guard: guard,
             _drains: drains,
         })
     }
