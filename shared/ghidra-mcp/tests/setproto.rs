@@ -20,7 +20,9 @@ use std::sync::Arc;
 //   main        ram:140001120  int  __cdecl main(void)
 //   g_rect    ram:140075000  Rect global (a NON-function data address — NOT_A_FUNCTION oracle, writesurface.rs:19)
 const P_FN: &str = "add_two";
-const D_RECT: &str = "ram:140075000"; // g_rect — a data address, not a function
+// `addrs.rect` (the g_rect global, a NON-function data address used as the NOT_A_FUNCTION
+// oracle) is discovered at runtime by `fixture_addrs()`; see common/mod.rs. The addresses
+// listed above are illustrative of one build, NOT values this suite depends on.
 
 async fn set_prototype_call(
     state: &Arc<ServerState>,
@@ -275,10 +277,11 @@ async fn set_prototype_boundaries() {
         return;
     }
     let (_dir, state) = fixture_state_ephemeral();
+    let addrs = fixture_addrs(&state).await;
     // (a) non-function address -> NOT_A_FUNCTION. g_rect is a data address.
     let e_nf = set_prototype_call(
         &state,
-        D_RECT,
+        &addrs.rect,
         "int",
         "__cdecl",
         serde_json::json!([]),

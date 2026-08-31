@@ -133,3 +133,179 @@ fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result
     }
     Ok(())
 }
+
+// ── Fixture address discovery ──────────────────────────────────────────
+//
+// These addresses used to be hardcoded constants, "discovered against the
+// ghidra-mcp-fix build". That made them properties of ONE historical binary:
+// a different compiler lays the data out differently, and the suite then fails
+// in its SETUP with an error that describes the fixture rather than the code
+// under test. It cost a full CI cycle to work out that
+// `set_datatype ... INVALID_PARAMS: address 140075028 is inside a defined data
+// unit starting at 1400742a0` meant "your fixture moved", not "set_datatype is
+// broken".
+//
+// So derive them with the same tools the suite is testing. The derivation is
+// exactly the one the old comments documented by hand — this just runs it.
+
+/// Addresses the write suites need, resolved against the live program.
+#[derive(Debug, Clone)]
+pub struct FixtureAddrs {
+    /// The `g_rect` global — a data address, used as the NOT_A_FUNCTION oracle.
+    pub rect: String,
+    /// The `https://example.test/beacon` string literal `g_banner` points to.
+    pub string_lit: String,
+    /// Start of an undefined gap in writable data, with at least 8 free bytes.
+    pub neigh: String,
+    /// `neigh + 4` — the neighbour whose definition must block an 8-byte type at `neigh`.
+    pub neigh_next: String,
+    /// `neigh + 1` — an offcut, i.e. an address mid-unit once a 4-byte type sits at `neigh`.
+    pub neigh_offcut: String,
+}
+
+/// Discovered once per test process. Every test copies the SAME source project,
+/// so the addresses are identical across the ephemeral copies — and discovery
+/// costs a handful of RPCs, which is not something to repeat 12 times.
+static FIXTURE_ADDRS: tokio::sync::OnceCell<FixtureAddrs> = tokio::sync::OnceCell::const_new();
+
+/// Resolve the fixture's addresses. Call at the START of a test, before it
+/// defines anything — discovery needs the pristine layout.
+pub async fn fixture_addrs(state: &Arc<ServerState>) -> &'static FixtureAddrs {
+    FIXTURE_ADDRS
+        .get_or_init(|| async { discover_addrs(state).await })
+        .await
+}
+
+async fn discover_addrs(state: &Arc<ServerState>) -> FixtureAddrs {
+    let rect = data_item_address(state, "g_rect").await;
+    let string_lit = banner_string_address(state).await;
+    let neigh = undefined_gap_address(state, &rect).await;
+    FixtureAddrs {
+        neigh_next: offset_address(&neigh, 4),
+        neigh_offcut: offset_address(&neigh, 1),
+        rect,
+        string_lit,
+        neigh,
+    }
+}
+
+/// Address of a named global, via `list_data_items`.
+async fn data_item_address(state: &Arc<ServerState>, name: &str) -> String {
+    let v = call_when_warm(
+        state,
+        "list_data_items",
+        "",
+        "list_data_items",
+        serde_json::json!({ "filter": name }),
+    )
+    .await
+    .unwrap_or_else(|e| panic!("list_data_items(filter={name}) failed: {e:?}"));
+    v["data"]
+        .as_array()
+        .unwrap_or_else(|| panic!("list_data_items returned no `data` array: {v:?}"))
+        .iter()
+        .find(|d| d["name"].as_str() == Some(name))
+        .and_then(|d| d["address"].as_str())
+        .unwrap_or_else(|| {
+            panic!("no data item named `{name}` in the fixture — is the project analyzed? {v:?}")
+        })
+        .to_string()
+}
+
+/// Address of the banner string literal, via `list_strings`.
+async fn banner_string_address(state: &Arc<ServerState>) -> String {
+    let v = call_when_warm(
+        state,
+        "list_strings",
+        "",
+        "list_strings",
+        serde_json::json!({ "filter": "https?://.*", "regex": true }),
+    )
+    .await
+    .expect("list_strings failed");
+    v["strings"]
+        .as_array()
+        .unwrap_or_else(|| panic!("list_strings returned no `strings` array: {v:?}"))
+        .iter()
+        .find(|s| {
+            s["value"]
+                .as_str()
+                .is_some_and(|t| t.contains("example.test"))
+        })
+        .and_then(|s| s["address"].as_str())
+        .unwrap_or_else(|| panic!("the fixture's banner string literal is missing: {v:?}"))
+        .to_string()
+}
+
+/// Find an 8-byte run of UNDEFINED bytes in the writable data the globals live in.
+///
+/// Anchored on `g_rect` and scanning forward rather than sweeping the whole
+/// program: the fixture's globals cluster together, and the gap the old constant
+/// pointed at was 0x28 past `g_rect`. `describe_address` omits `data_type`
+/// entirely for an undefined address — that absence is the oracle, and it is the
+/// same one the original hand-derivation used.
+async fn undefined_gap_address(state: &Arc<ServerState>, anchor: &str) -> String {
+    const STRIDE: u64 = 8; // candidates stay 8-aligned so an 8-byte type could fit
+    const MAX_STEPS: u64 = 128; // 1 KiB past the anchor; the gap sat ~0x28 in
+    for step in 0..MAX_STEPS {
+        let candidate = offset_address(anchor, step * STRIDE);
+        let next = offset_address(&candidate, 4);
+        if is_undefined(state, &candidate).await && is_undefined(state, &next).await {
+            return candidate;
+        }
+    }
+    panic!(
+        "no 8-byte undefined gap within {} bytes of {anchor}. The fixture's data layout changed \
+         enough that the write suite has nowhere neutral to scribble; rebuild the fixture, or \
+         widen the scan.",
+        MAX_STEPS * STRIDE
+    );
+}
+
+/// True when `address` is mapped but carries no defined data unit.
+async fn is_undefined(state: &Arc<ServerState>, address: &str) -> bool {
+    let v = call_when_warm(
+        state,
+        "describe_address",
+        address,
+        "describe_address",
+        serde_json::json!({ "address": address }),
+    )
+    .await
+    .unwrap_or_else(|e| panic!("describe_address({address}) failed: {e:?}"));
+    // Must be inside the image: an unmapped address is "undefined" in the sense
+    // of having no data_type, but writing there is a different error entirely.
+    v["mapped"].as_bool() == Some(true) && v.get("data_type").is_none_or(|t| t.is_null())
+}
+
+/// Add a byte offset to a `ram:<hex>` address, preserving the space prefix.
+///
+/// Addresses come back as `ram:140075028`; the arithmetic the old constants did
+/// in comments (`// D_NEIGH + 4`) has to happen for real now.
+pub fn offset_address(address: &str, delta: u64) -> String {
+    let (space, hex) = address
+        .rsplit_once(':')
+        .unwrap_or_else(|| panic!("address `{address}` has no `<space>:` prefix"));
+    let base = u64::from_str_radix(hex, 16)
+        .unwrap_or_else(|e| panic!("address `{address}` has a non-hex offset: {e}"));
+    format!("{space}:{:x}", base + delta)
+}
+
+#[cfg(test)]
+mod addr_tests {
+    use super::offset_address;
+
+    #[test]
+    fn offsets_preserve_the_space_prefix_and_stay_hex() {
+        assert_eq!(offset_address("ram:140075028", 4), "ram:14007502c");
+        assert_eq!(offset_address("ram:140075028", 1), "ram:140075029");
+        assert_eq!(offset_address("ram:140075028", 0), "ram:140075028");
+    }
+
+    /// Carrying across a nibble boundary is where a naive string edit would break.
+    #[test]
+    fn offsets_carry_correctly() {
+        assert_eq!(offset_address("ram:1400750ff", 1), "ram:140075100");
+        assert_eq!(offset_address("ram:14007502c", 4), "ram:140075030");
+    }
+}
