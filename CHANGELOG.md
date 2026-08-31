@@ -1,3 +1,12 @@
+## [0.4.0] - 2026-08-31
+
+### 🚀 Features
+
+- *(ghidra-worker-ctl)* Implement Linux/macOS JVM lifecycle via process groups (#12)
+  - Unix process group kill-guard replaces Windows-only Job Object
+  - `setsid()` + `SIGKILL` to process group ensures clean JVM teardown on Linux/macOS
+  - Cross-platform compilation verified for Windows, Linux, and macOS
+
 ## [0.3.0] - 2026-08-31
 
 ### 🚀 Features
