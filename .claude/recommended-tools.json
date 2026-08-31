@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Ghidra 12.1.2",
+    "why": "shared/ghidra-mcp drives a real headless Ghidra JVM. Without a local install the ~60 live tests (`just test-live-ghidra`) can only be run in CI, which turns every diagnosis into a push-and-wait loop. Set GHIDRA_INSTALL_DIR to the install root.",
+    "install": "Download ghidra_12.1.2_PUBLIC from https://github.com/NationalSecurityAgency/ghidra/releases/tag/Ghidra_12.1.2_build, unzip it, and set GHIDRA_INSTALL_DIR to the extracted root (the directory containing support/ and ghidraRun).",
+    "in_path": "ghidraRun"
+  },
+  {
+    "name": "JDK 21",
+    "why": "Ghidra 12.1.2 declares application.java.min=21; an older JDK fails at JVM start with a message that never mentions the version.",
+    "install": "winget install EclipseAdoptium.Temurin.21.JDK",
+    "in_path": "java"
+  },
+  {
+    "name": "clang",
+    "why": "Builds the live-test fixture program (shared/ghidra-mcp/tests/fixtures/fixture.c) with debug info, so Ghidra's datatype manager sees the named Rect/Color types the read tests assert on.",
+    "install": "winget install LLVM.LLVM",
+    "in_path": "clang"
+  }
+]

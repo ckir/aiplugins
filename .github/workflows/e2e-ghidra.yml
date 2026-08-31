@@ -26,6 +26,14 @@ on:
 env:
   CARGO_TERM_COLOR: always
   GHIDRA_VERSION: "12.1.2"
+  # Pinned, not "whatever the runner ships". The fixture's asserted facts are
+  # properties of the COMPILED program, so the compiler is part of the fixture.
+  # Measured: with the runner's own clang 20.1.8, get_xrefs on `add_two`
+  # attributed the caller to `add_two` instead of `compute` and
+  # get_xrefs_to_add_two_includes_compute_caller failed; the same fixture built
+  # with 22.1.0 passes. Letting GitHub choose the compiler means a runner-image
+  # bump can silently invalidate the fixture, which reads as a product bug.
+  LLVM_VERSION: "22.1.0"
 
 jobs:
   e2e:
@@ -43,6 +51,24 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+
+      # windows-latest ships its own LLVM, and which one changes with the image.
+      # --force --allow-downgrade because the preinstalled version is usually
+      # NEWER, and choco would otherwise decline to replace it.
+      - name: Install pinned LLVM ${{ env.LLVM_VERSION }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          choco install llvm --version=$env:LLVM_VERSION -y --no-progress --force --allow-downgrade
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "choco could not install llvm $env:LLVM_VERSION. If that version has been delisted, pick another and re-verify the fixture assertions against it before pinning."
+          }
+          $llvmBin = "C:\Program Files\LLVM\bin"
+          if (-not (Test-Path "$llvmBin\clang.exe")) {
+            Write-Error "LLVM installed but $llvmBin\clang.exe is missing."
+          }
+          # Prepend, so this clang wins over the image's own for later steps.
+          $llvmBin | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -95,11 +121,29 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
+
+          # Refuse to build with anything but the pinned compiler. Falling back
+          # to the runner's clang is exactly the silent drift this pin exists to
+          # stop, so a mismatch is a hard failure rather than a warning.
+          $version = (clang --version | Select-Object -First 1)
+          Write-Host $version
+          if ($version -notmatch [regex]::Escape($env:LLVM_VERSION)) {
+            Write-Error "PATH resolves to '$version' but the fixture must be built with clang $env:LLVM_VERSION."
+          }
+
           $fixtureDir = "$env:RUNNER_TEMP\ghidra-mcp-fix"
           New-Item -ItemType Directory -Force -Path $fixtureDir | Out-Null
-          clang --version
           clang -g shared/ghidra-mcp/tests/fixtures/fixture.c -o "$fixtureDir\fixture.exe"
           if (-not (Test-Path "$fixtureDir\fixture.exe")) { Write-Error "fixture.exe was not produced" }
+
+          # The PDB is not optional. add_two, mul, compute and locals_demo are
+          # internal symbols with no COFF entry — Ghidra recovers those names
+          # ONLY from the PDB, and without it every read test fails as
+          # SYMBOL_NOT_FOUND rather than as anything that names the real cause.
+          # (Observed while reproducing this suite locally.)
+          if (-not (Test-Path "$fixtureDir\fixture.pdb")) {
+            Write-Error "clang produced no fixture.pdb beside fixture.exe; Ghidra cannot recover the fixture's internal symbol names without it."
+          }
           "GHIDRA_MCP_FIXTURE_PROJECT_DIR=$fixtureDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       # Import and fully auto-analyze, then let analyzeHeadless exit — the tests
@@ -110,11 +154,21 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $fixtureDir = $env:GHIDRA_MCP_FIXTURE_PROJECT_DIR
+          $importLog = "$fixtureDir\import.log"
           & "$env:GHIDRA_INSTALL_DIR\support\analyzeHeadless.bat" `
-            $fixtureDir fixtureproj -import "$fixtureDir\fixture.exe" -overwrite
+            $fixtureDir fixtureproj -import "$fixtureDir\fixture.exe" -overwrite `
+            *>&1 | Tee-Object -FilePath $importLog
           if ($LASTEXITCODE -ne 0) { Write-Error "analyzeHeadless exited $LASTEXITCODE" }
           if (-not (Test-Path "$fixtureDir\fixtureproj.gpr")) {
             Write-Error "analyzeHeadless produced no fixtureproj.gpr in $fixtureDir"
+          }
+
+          # analyzeHeadless reports success even when it silently skipped the
+          # PDB, and the resulting project then fails every read test with
+          # SYMBOL_NOT_FOUND — a failure that points nowhere near its cause.
+          # Assert the applicator actually ran.
+          if (-not (Select-String -Path $importLog -Pattern "PDB analyzer parsing file" -Quiet)) {
+            Write-Error "Ghidra never parsed fixture.pdb; the project has no recovered symbol names and every read test would fail as SYMBOL_NOT_FOUND. See the uploaded import log."
           }
           # A lock left behind by the import would make every attach fail.
           Get-ChildItem "$fixtureDir" -Filter "fixtureproj.lock*" -ErrorAction SilentlyContinue |
@@ -139,4 +193,16 @@ jobs:
         with:
           name: ghidra-worker-logs
           path: ~/.ghidra-mcp/logs/
+          if-no-files-found: ignore
+
+      # The analyzeHeadless log says whether the PDB applied and which symbols
+      # it recovered. Without it, a fixture-provenance failure is indistinguishable
+      # from a product bug — which is how a compiler-version change first
+      # presented itself here.
+      - name: Upload fixture import log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghidra-fixture-import-log
+          path: ${{ env.GHIDRA_MCP_FIXTURE_PROJECT_DIR }}/import.log
           if-no-files-found: ignore
