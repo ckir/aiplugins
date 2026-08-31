@@ -818,6 +818,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "re-ghidra-mcp-agy"
+version = "0.2.1"
+dependencies = [
+ "ghidra-mcp",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "re-ghidra-mcp-cc"
 version = "0.2.1"
 dependencies = [
