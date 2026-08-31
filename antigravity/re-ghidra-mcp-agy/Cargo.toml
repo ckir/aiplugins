@@ -1,0 +1,31 @@
+[package]
+name = "re-ghidra-mcp-agy"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+[[bin]]
+name = "re-ghidra-agy-mcp"
+path = "src/bin/mcp.rs"
+
+[[bin]]
+name = "re-ghidra-agy-hook"
+path = "src/bin/hook.rs"
+
+[dependencies]
+ghidra-mcp = { path = "../../shared/ghidra-mcp" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+
+[package.metadata.release]
+pre-release-replacements = [
+  { file = "plugin.json", search = '"version": "[0-9]+\.[0-9]+\.[0-9]+"', replace = '"version": "{{version}}"', exactly = 1 },
+]
+
+[package.metadata.dist.binaries]
+"*" = ["re-ghidra-agy-mcp", "re-ghidra-agy-hook"]
