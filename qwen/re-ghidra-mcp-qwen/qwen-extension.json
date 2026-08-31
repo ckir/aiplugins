@@ -1,0 +1,57 @@
+{
+  "name": "re-ghidra-mcp-qwen",
+  "version": "0.2.1",
+  "displayName": "re-ghidra-mcp-qwen — Ghidra MCP for Qwen Code",
+  "description": "Drive a persistent headless Ghidra JVM from Qwen Code: 19 reverse-engineering tools over MCP — decompile, navigate and search a program, plus durable rename/comment/set-datatype/set-prototype/set-local writes saved to the project.",
+  "contextFileName": "QWEN.md",
+  "mcpServers": {
+    "re-ghidra-mcp-qwen": {
+      "command": "cargo",
+      "args": ["run", "-p", "re-ghidra-mcp-qwen", "--bin", "re-ghidra-qwen-mcp", "--", "serve"],
+      "cwd": "${extensionPath}${/}..${/}.."
+    }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cargo",
+            "args": ["run", "-p", "re-ghidra-mcp-qwen", "--bin", "re-ghidra-qwen-hook", "--quiet"],
+            "cwd": "${extensionPath}${/}..${/}..",
+            "name": "re-ghidra-qwen-preflight",
+            "timeout": 10000
+          }
+        ]
+      },
+      {
+        "matcher": "resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cargo",
+            "args": ["run", "-p", "re-ghidra-mcp-qwen", "--bin", "re-ghidra-qwen-hook", "--quiet"],
+            "cwd": "${extensionPath}${/}..${/}..",
+            "name": "re-ghidra-qwen-preflight",
+            "timeout": 10000
+          }
+        ]
+      },
+      {
+        "matcher": "clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cargo",
+            "args": ["run", "-p", "re-ghidra-mcp-qwen", "--bin", "re-ghidra-qwen-hook", "--quiet"],
+            "cwd": "${extensionPath}${/}..${/}..",
+            "name": "re-ghidra-qwen-preflight",
+            "timeout": 10000
+          }
+        ]
+      }
+    ]
+  }
+}
