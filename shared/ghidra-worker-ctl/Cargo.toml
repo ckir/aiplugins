@@ -21,3 +21,7 @@ uuid = { workspace = true }
 # everywhere; only the lifecycle guarantee is Windows-only.
 [target.'cfg(windows)'.dependencies]
 windows = { workspace = true }
+
+# Unix: process group kill-guard replaces the Job Object on Linux/macOS.
+[target.'cfg(unix)'.dependencies]
+nix = { workspace = true }

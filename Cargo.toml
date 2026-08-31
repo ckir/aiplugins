@@ -45,6 +45,9 @@ windows = { version = "0.62", features = [
     "Win32_Security",
 ] }
 
+# Unix-only. Process group management for the worker lifecycle on Linux/macOS.
+nix = { version = "0.29", features = ["process", "signal"] }
+
 # Dev-only.
 insta = { version = "1", features = ["json"] }
 proptest = "1"

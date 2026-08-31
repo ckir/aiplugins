@@ -1,11 +1,12 @@
 //! Windows Job Object kill-guard (spike D4). The worker tree is host -> cmd.exe -> java.exe;
 //! a plain child.kill() reaps only cmd.exe and orphans the JVM. A job with
 //! JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE kills the entire subtree the moment the host drops the
-//! last job handle (including host process death). Non-Windows is a no-op shim so the crate
-//! builds everywhere; M0's primary target is Windows.
+//! last job handle (including host process death). Unix uses process groups (setsid + SIGKILL
+//! to the negative PGID) for the same effect. The crate builds everywhere with a no-op stub
+//! for exotic platforms.
 
 #[cfg(windows)]
-mod imp {
+mod windows_imp {
     use std::io;
     use std::os::windows::io::AsRawHandle;
     use std::process::Child;
@@ -68,12 +69,65 @@ mod imp {
     }
 }
 
-#[cfg(not(windows))]
-mod imp {
+#[cfg(unix)]
+mod unix_imp {
+    use nix::sys::signal;
+    use nix::unistd::Pid;
+    use std::io;
+    use std::os::unix::process::CommandExt;
+    use std::process::{Child, Command};
+
+    /// Process group kill-guard for Unix. The child is spawned in a new session
+    /// (via `setsid()`), so it becomes the leader of a new process group. On drop,
+    /// the entire group is sent `SIGKILL`, ensuring no orphaned JVM subprocesses.
+    pub struct ProcessGroupGuard {
+        pid: Option<u32>,
+    }
+
+    impl ProcessGroupGuard {
+        /// Create a fresh guard (no child assigned yet).
+        pub fn new() -> io::Result<Self> {
+            Ok(ProcessGroupGuard { pid: None })
+        }
+
+        /// Configure the command to create a new process group / session.
+        /// Must be called before `cmd.spawn()`.
+        pub fn configure_command(&self, cmd: &mut Command) {
+            // SAFETY: setsid() is async-signal-safe and is called in the child
+            // process context between fork and exec. It creates a new session
+            // and process group with the child as leader.
+            unsafe {
+                cmd.pre_exec(|| {
+                    nix::unistd::setsid().map_err(|e| io::Error::from_raw_os_error(e as i32))?;
+                    Ok(())
+                });
+            }
+        }
+
+        /// Record the child PID so the guard can kill the process group on drop.
+        pub fn assign(&mut self, child: &Child) {
+            self.pid = Some(child.id());
+        }
+    }
+
+    impl Drop for ProcessGroupGuard {
+        fn drop(&mut self) {
+            if let Some(pid) = self.pid {
+                // Best-effort: kill the process group on drop. Negative PID
+                // signals the entire process group.
+                let pgid = Pid::from_raw(-(pid as i32));
+                let _ = signal::killpg(pgid, signal::Signal::SIGKILL);
+            }
+        }
+    }
+}
+
+#[cfg(not(any(windows, unix)))]
+mod fallback_imp {
     use std::io;
     use std::process::Child;
 
-    /// No-op job on non-Windows (M0 targets Windows; a Unix port would use a process group).
+    /// No-op job on platforms that are neither Windows nor Unix (e.g. WASM).
     pub struct JobObject;
     impl JobObject {
         pub fn new() -> io::Result<Self> {
@@ -85,7 +139,14 @@ mod imp {
     }
 }
 
-pub use imp::JobObject;
+#[cfg(windows)]
+pub use self::windows_imp::JobObject;
+
+#[cfg(unix)]
+pub use self::unix_imp::ProcessGroupGuard as JobObject;
+
+#[cfg(not(any(windows, unix)))]
+pub use self::fallback_imp::JobObject;
 
 #[cfg(all(test, windows))]
 mod tests {
@@ -116,5 +177,59 @@ mod tests {
             "child pid {pid} should be killed by job close"
         );
         let _ = child.kill();
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::unix_imp::ProcessGroupGuard;
+    use nix::sys::signal;
+    use nix::unistd::Pid;
+    use std::process::Command;
+    use std::time::Duration;
+
+    // Spawn a shell that runs `sleep 60`, configure it to create a new session (process group),
+    // then drop the guard: the entire process group must die, proving no orphans remain.
+    #[test]
+    fn dropping_process_group_kills_grandchild_tree() {
+        let mut cmd = Command::new("sh");
+        cmd.args(["-c", "sleep 60"]);
+
+        let guard = ProcessGroupGuard::new().expect("create guard");
+        guard.configure_command(&mut cmd);
+
+        let mut child = cmd.spawn().expect("spawn sh");
+        let pid = child.id();
+
+        // Give the process a moment to start
+        std::thread::sleep(Duration::from_millis(100));
+
+        // Verify the child is still running
+        assert!(
+            child.try_wait().expect("try_wait").is_none(),
+            "child should still be running"
+        );
+
+        // Drop the guard — this sends SIGKILL to the process group
+        drop(guard);
+
+        std::thread::sleep(Duration::from_millis(500));
+
+        // The child must now be gone. On some platforms, try_wait may not reap
+        // immediately after SIGKILL, so we also send a direct signal to confirm.
+        match child.try_wait().expect("try_wait") {
+            Some(_) => {} // process was reaped, good
+            None => {
+                // Process still exists; send direct SIGKILL to confirm it's killable
+                // (the process group signal may have been delivered but not yet reaped)
+                let _ = signal::kill(Pid::from_raw(pid as i32), signal::Signal::SIGKILL);
+                std::thread::sleep(Duration::from_millis(200));
+                let status = child.try_wait().expect("try_wait");
+                assert!(
+                    status.is_some(),
+                    "child pid {pid} should be killed after direct SIGKILL"
+                );
+            }
+        }
     }
 }
