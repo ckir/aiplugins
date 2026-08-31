@@ -11,9 +11,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cargo",
-            "args": ["run", "-p", "rtk-mcp-qwen", "--bin", "rtk-mcp-qwen", "--quiet"],
-            "cwd": "${extensionPath}${/}..${/}..",
+            "command": "${extensionPath}${/}bin${/}rtk-mcp-qwen",
+            "args": [],
             "name": "rtk-command-rewrite",
             "timeout": 10000
           }

@@ -1,14 +1,13 @@
 {
   "name": "re-ghidra-mcp-qwen",
-  "version": "0.2.1",
+  "version": "0.4.0",
   "displayName": "re-ghidra-mcp-qwen — Ghidra MCP for Qwen Code",
   "description": "Drive a persistent headless Ghidra JVM from Qwen Code: 19 reverse-engineering tools over MCP — decompile, navigate and search a program, plus durable rename/comment/set-datatype/set-prototype/set-local writes saved to the project.",
   "contextFileName": "QWEN.md",
   "mcpServers": {
     "re-ghidra-mcp-qwen": {
-      "command": "cargo",
-      "args": ["run", "-p", "re-ghidra-mcp-qwen", "--bin", "re-ghidra-qwen-mcp", "--", "serve"],
-      "cwd": "${extensionPath}${/}..${/}.."
+      "command": "${extensionPath}${/}bin${/}re-ghidra-qwen-mcp",
+      "args": ["serve"]
     }
   },
   "hooks": {
@@ -18,9 +17,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cargo",
-            "args": ["run", "-p", "re-ghidra-mcp-qwen", "--bin", "re-ghidra-qwen-hook", "--quiet"],
-            "cwd": "${extensionPath}${/}..${/}..",
+            "command": "${extensionPath}${/}bin${/}re-ghidra-qwen-hook",
+            "args": [],
             "name": "re-ghidra-qwen-preflight",
             "timeout": 10000
           }
@@ -31,9 +29,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cargo",
-            "args": ["run", "-p", "re-ghidra-mcp-qwen", "--bin", "re-ghidra-qwen-hook", "--quiet"],
-            "cwd": "${extensionPath}${/}..${/}..",
+            "command": "${extensionPath}${/}bin${/}re-ghidra-qwen-hook",
+            "args": [],
             "name": "re-ghidra-qwen-preflight",
             "timeout": 10000
           }
@@ -44,9 +41,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cargo",
-            "args": ["run", "-p", "re-ghidra-mcp-qwen", "--bin", "re-ghidra-qwen-hook", "--quiet"],
-            "cwd": "${extensionPath}${/}..${/}..",
+            "command": "${extensionPath}${/}bin${/}re-ghidra-qwen-hook",
+            "args": [],
             "name": "re-ghidra-qwen-preflight",
             "timeout": 10000
           }
