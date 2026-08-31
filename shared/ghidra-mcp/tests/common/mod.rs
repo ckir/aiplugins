@@ -21,6 +21,21 @@ pub fn enabled() -> bool {
 /// Build ServerState from the fixture env (same vars as boot_e2e.rs). `bootstrap_program` is the BARE
 /// leaf of the fixture program VFS path; `bootstrap_program_path` is the full `/`-path.
 pub fn fixture_state() -> Arc<ServerState> {
+    fixture_state_tuned(|_| {})
+}
+
+/// `fixture_state()` with a chance to adjust the resolved config first.
+///
+/// Exists so a test can pin a TIMING property instead of inheriting one from
+/// whatever machine it runs on. `wait_until_ready` only reports WORKER_WARMING
+/// once a boot outruns `warming_deadline` (8 s by default), so asserting that a
+/// cold call sees WORKER_WARMING is really asserting "this machine takes more
+/// than 8 s to boot a JVM" — true on a developer laptop, intermittently false on
+/// a CI runner. Shrinking the deadline makes the same assertion deterministic
+/// everywhere.
+pub fn fixture_state_tuned(
+    tune: impl FnOnce(&mut ghidra_mcp::config::ServerConfig),
+) -> Arc<ServerState> {
     let program = env("GHIDRA_MCP_FIXTURE_PROGRAM")
         .expect("GHIDRA_MCP_FIXTURE_PROGRAM (VFS path e.g. /add.exe)");
     let bare = program.rsplit('/').next().unwrap().to_string();
@@ -32,7 +47,8 @@ pub fn fixture_state() -> Arc<ServerState> {
         bootstrap_program_path: Some(program),
         max_heap: None,
     };
-    let cfg = raw.resolve().expect("fixture config resolves");
+    let mut cfg = raw.resolve().expect("fixture config resolves");
+    tune(&mut cfg);
     Arc::new(ServerState::new(cfg, versioned_script_dir()))
 }
 

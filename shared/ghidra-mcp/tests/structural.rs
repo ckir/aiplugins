@@ -2,7 +2,7 @@
 //! check runs without Ghidra.
 
 mod common;
-use common::{call_when_warm, enabled, fixture_state};
+use common::{call_when_warm, enabled, fixture_state, fixture_state_tuned};
 use ghidra_ipc::error::ErrorCode;
 use ghidra_mcp::execute::call_worker;
 use ghidra_mcp::state::{check_worker_version, EXPECTED_WORKER_VERSION};
@@ -24,7 +24,13 @@ async fn cold_call_returns_worker_warming_then_succeeds() {
     if !enabled() {
         return;
     }
-    let state = fixture_state();
+    // A 1 ms budget instead of the 8 s default. `wait_until_ready` only reports
+    // WORKER_WARMING once a boot outruns `warming_deadline`, so with the default
+    // this test asserts "this machine needs more than 8 s to boot a JVM" — true
+    // on a laptop, intermittently false on a CI runner, and it flaked exactly
+    // that way. No JVM boots in a millisecond, so the WORKER_WARMING path is now
+    // forced on every machine, and the test asserts behaviour rather than speed.
+    let state = fixture_state_tuned(|c| c.warming_deadline = std::time::Duration::from_millis(1));
     state.start_warmup().await;
     let mut saw_warming = false;
     for _ in 0..60 {
