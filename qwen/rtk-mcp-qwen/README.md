@@ -16,17 +16,17 @@ command passes through unchanged (fail-open).
 ### Via Qwen Code CLI (recommended)
 
 ```bash
-qwen extensions install https://github.com/ckir/aiplugins/releases/download/v0.5.0/rtk-mcp-qwen-x86_64-pc-windows-msvc.zip
+qwen extensions install https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-x86_64-pc-windows-msvc.zip
 ```
 
 Or for other platforms:
 
 ```bash
 # Linux
-qwen extensions install https://github.com/ckir/aiplugins/releases/download/v0.5.0/rtk-mcp-qwen-x86_64-unknown-linux-gnu.tar.xz
+qwen extensions install https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-x86_64-unknown-linux-gnu.tar.xz
 
 # macOS
-qwen extensions install https://github.com/ckir/aiplugins/releases/download/v0.5.0/rtk-mcp-qwen-x86_64-apple-darwin.tar.xz
+qwen extensions install https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-x86_64-apple-darwin.tar.xz
 ```
 
 ### Building from source
