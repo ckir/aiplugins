@@ -52,6 +52,45 @@ in the GUI, then closed. It does not import or analyze binaries itself.
 > restoring a backup. Copy a project you care about before letting an agent
 > write to it.
 
+## Installation
+
+### Via Qwen Code CLI (recommended)
+
+```bash
+qwen extensions install https://github.com/ckir/aiplugins/releases/download/v0.5.0/re-ghidra-mcp-qwen-x86_64-pc-windows-msvc.zip
+```
+
+Or for other platforms:
+
+```bash
+# Linux
+qwen extensions install https://github.com/ckir/aiplugins/releases/download/v0.5.0/re-ghidra-mcp-qwen-x86_64-unknown-linux-gnu.tar.xz
+
+# macOS
+qwen extensions install https://github.com/ckir/aiplugins/releases/download/v0.5.0/re-ghidra-mcp-qwen-x86_64-apple-darwin.tar.xz
+```
+
+### Building from source
+
+```bash
+git clone https://github.com/ckir/aiplugins.git
+cd aiplugins
+cargo build -p re-ghidra-mcp-qwen --release
+qwen extensions link ./qwen/re-ghidra-mcp-qwen
+```
+
+### Updating
+
+```bash
+qwen extensions update re-ghidra-mcp-qwen
+```
+
+Check your current version:
+
+```bash
+qwen extensions list | grep re-ghidra
+```
+
 ## Prerequisites
 
 You supply these; nothing here bundles them.
