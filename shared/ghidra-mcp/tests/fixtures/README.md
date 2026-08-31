@@ -21,6 +21,18 @@ Build it locally (NOT committed — Ghidra projects are bulky/binary):
 
        clang -g fixture.c -o fixture.exe
 
+   **The compiler is part of the fixture.** Every assertion below is a property of the COMPILED
+   program, not of `fixture.c`, so a different clang can invalidate them. Measured: built with clang
+   20.1.8, `get_xrefs(target:"add_two", direction:"to")` attributed the caller to `add_two` instead of
+   `compute` and `get_xrefs_to_add_two_includes_compute_caller` failed; the same source built with
+   22.1.0 passes. `.github/workflows/e2e-ghidra.yml` pins `LLVM_VERSION` for exactly this reason —
+   match it locally, and if you change it, re-verify the table below rather than assuming it holds.
+
+   Keep `fixture.pdb` **next to `fixture.exe`** when you import. `add_two`, `mul`, `compute` and
+   `locals_demo` are internal symbols with no COFF entry, so Ghidra recovers their names only from the
+   PDB. Import without it and every read test fails as `SYMBOL_NOT_FOUND`, which points nowhere near
+   the real cause.
+
 2. Import + analyze it headless into a throwaway project:
 
        "$GHIDRA_INSTALL_DIR/support/analyzeHeadless" <fixtureDir> fixtureproj \
