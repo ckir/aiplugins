@@ -5,31 +5,28 @@ use common::*;
 use ghidra_mcp::state::ServerState;
 use std::sync::Arc;
 
-// Fixture addresses discovered (Task 8) against the ghidra-mcp-fix build, via a temporary `_discover`
-// test that dumped list_data_items / list_strings / list_segments / inspect_function(api_entry,main)
-// and then describe_address probes, all run live against real Ghidra 12.1.2. Provenance:
+// Fixture addresses are DISCOVERED AT RUNTIME by `fixture_addrs()` (common/mod.rs), not hardcoded.
 //
-//   inspect_function(api_entry).data_refs -> { "address": "ram:140062000" -> the string literal
-//     "https://example.test/beacon" is what g_banner (the char* global at ram:140075018, itself a
-//     data_ref of api_entry) POINTS TO. list_strings shows it as
-//     { "address": "ram:140062000", "encoding": "TerminatedCString", "length": 28,
-//       "value": "https://example.test/beacon" } — a distinct (legacy) type from Ghidra's built-in
-//     "string", so set_datatype(.., "string") is expected to apply (not already_applied).
+// They used to be constants derived by hand against one historical build of the fixture. That made
+// them properties of a specific binary rather than of `fixture.c`: a different compiler moves the
+// data, and this suite then fails in its SETUP with an error describing the fixture instead of the
+// code under test. Exactly that happened - `set_datatype ... INVALID_PARAMS: address 140075028 is
+// inside a defined data unit starting at 1400742a0`, which reads like a set_datatype bug and is not.
 //
-//   list_data_items(filter=g_rect)   -> { "address": "ram:140075000", "data_type": "Rect",   "size": 16 }
-//   list_data_items(filter=g_color)  -> { "address": "ram:140075010", "data_type": "Color",  "size": 4  }
-//   list_data_items(filter=g_banner) -> { "address": "ram:140075018", "data_type": "char *", "size": 8  }
-//   describe_address(ram:140075020) -> defined uint  "__scrt_native_dllmain_reason"
-//   describe_address(ram:140075024) -> defined int   "__scrt_default_matherr" (ends at 0x28)
-//   describe_address(ram:140075028) -> NO data_type field => genuinely UNDEFINED
-//   describe_address(ram:140075030) -> NO data_type field => genuinely UNDEFINED
-//   describe_address(ram:140075040) -> defined ulong64 "__security_cookie" (starts at 0x40)
-//   => ram:140075028..0x3f is a 24-byte undefined gap in the initialized, writable, non-code .data
-//     segment, comfortably clear of g_rect/g_color/g_banner (0x00-0x20) and __security_cookie (0x40).
-const D_STRING: &str = "ram:140062000";
-const D_NEIGH: &str = "ram:140075028";
-const D_NEIGH_NEXT: &str = "ram:14007502c"; // D_NEIGH + 4
-const D_NEIGH_OFFCUT: &str = "ram:140075029"; // D_NEIGH + 1
+// The derivation is unchanged, it just runs now instead of being recorded in a comment:
+//
+//   addrs.string_lit  list_strings(filter="https?://.*", regex) -> the "https://example.test/beacon"
+//                 literal that g_banner (a char* global) points at. Ghidra types it as a legacy
+//                 TerminatedCString, distinct from its built-in "string", so set_datatype(.., "string")
+//                 is expected to APPLY rather than report already_applied.
+//   addrs.rect        list_data_items(filter="g_rect") -> the Rect global. A data address, which is the
+//                 NOT_A_FUNCTION oracle for set_prototype.
+//   addrs.neigh       the first 8-byte run of UNDEFINED bytes at or after g_rect, found by scanning
+//                 describe_address forward. `describe_address` omits `data_type` entirely for an
+//                 undefined address, and that absence is the oracle. Needs 8 free bytes so an
+//                 8-byte type can be attempted across addrs.neigh/addrs.neigh_next.
+//   addrs.neigh_next  addrs.neigh + 4 - the neighbour whose definition must block a `double` at addrs.neigh.
+//   addrs.neigh_offcut  addrs.neigh + 1 - mid-unit once a 4-byte type sits at addrs.neigh.
 
 async fn comment_call(
     state: &Arc<ServerState>,
@@ -128,14 +125,15 @@ async fn comment_offcut_is_rejected() {
         return;
     }
     let (_dir, state) = fixture_state_ephemeral();
-    set_datatype_call(&state, D_NEIGH, "int", None)
+    let addrs = fixture_addrs(&state).await;
+    set_datatype_call(&state, &addrs.neigh, "int", None)
         .await
         .expect("define 4-byte int");
-    let err = comment_call(&state, D_NEIGH_OFFCUT, "eol", "ghost", None)
+    let err = comment_call(&state, &addrs.neigh_offcut, "eol", "ghost", None)
         .await
         .unwrap_err();
     assert_eq!(err["error"]["code"], "INVALID_PARAMS");
-    let ok = comment_call(&state, D_NEIGH, "eol", "real", None)
+    let ok = comment_call(&state, &addrs.neigh, "eol", "real", None)
         .await
         .expect("at-start ok");
     assert_eq!(ok["status"], "set");
@@ -147,7 +145,8 @@ async fn set_datatype_string_persists() {
         return;
     }
     let (dir, state) = fixture_state_ephemeral();
-    let s = set_datatype_call(&state, D_STRING, "string", None)
+    let addrs = fixture_addrs(&state).await;
+    let s = set_datatype_call(&state, &addrs.string_lit, "string", None)
         .await
         .expect("string set");
     assert_eq!(s["status"], "set");
@@ -157,7 +156,7 @@ async fn set_datatype_string_persists() {
     );
     drop(state);
     let state2 = fixture_state_at(&dir.path);
-    let again = set_datatype_call(&state2, D_STRING, "string", None)
+    let again = set_datatype_call(&state2, &addrs.string_lit, "string", None)
         .await
         .expect("persisted");
     assert_eq!(
@@ -172,11 +171,12 @@ async fn set_datatype_identical_twice_is_idempotent() {
         return;
     }
     let (_dir, state) = fixture_state_ephemeral();
-    let a = set_datatype_call(&state, D_NEIGH, "int", None)
+    let addrs = fixture_addrs(&state).await;
+    let a = set_datatype_call(&state, &addrs.neigh, "int", None)
         .await
         .expect("set");
     assert!(a["status"] == "set" || a["status"] == "already_applied");
-    let b = set_datatype_call(&state, D_NEIGH, "int", None)
+    let b = set_datatype_call(&state, &addrs.neigh, "int", None)
         .await
         .expect("noop");
     assert_eq!(b["status"], "already_applied");
@@ -188,7 +188,8 @@ async fn set_datatype_negative_oracles() {
         return;
     }
     let (_dir, state) = fixture_state_ephemeral();
-    let nf = set_datatype_call(&state, D_NEIGH, "NoSuchType_zzz", None)
+    let addrs = fixture_addrs(&state).await;
+    let nf = set_datatype_call(&state, &addrs.neigh, "NoSuchType_zzz", None)
         .await
         .unwrap_err();
     assert_eq!(nf["error"]["code"], "DATATYPE_NOT_FOUND");
@@ -208,20 +209,21 @@ async fn set_datatype_does_not_delete_following_neighbour() {
         return;
     }
     let (_dir, state) = fixture_state_ephemeral();
+    let addrs = fixture_addrs(&state).await;
     // "byte" is AMBIGUOUS in this fixture (Ghidra builtin /byte vs the PDB's /fixture.pdb/std/byte) —
     // a fixture-data adjustment (not a contract change): use "undefined1", Ghidra's unambiguous
     // built-in 1-byte type, for staging the two adjacent single-byte units.
-    set_datatype_call(&state, D_NEIGH, "undefined1", None)
+    set_datatype_call(&state, &addrs.neigh, "undefined1", None)
         .await
         .expect("neigh defined");
-    set_datatype_call(&state, D_NEIGH_NEXT, "undefined1", None)
+    set_datatype_call(&state, &addrs.neigh_next, "undefined1", None)
         .await
         .expect("neighbour defined");
-    let err = set_datatype_call(&state, D_NEIGH, "double", None)
+    let err = set_datatype_call(&state, &addrs.neigh, "double", None)
         .await
         .unwrap_err();
     assert_eq!(err["error"]["code"], "INVALID_PARAMS");
-    let neigh = set_datatype_call(&state, D_NEIGH_NEXT, "undefined1", None)
+    let neigh = set_datatype_call(&state, &addrs.neigh_next, "undefined1", None)
         .await
         .expect("neighbour survived");
     assert_eq!(
@@ -236,16 +238,17 @@ async fn set_datatype_clear_sentinel_roundtrip() {
         return;
     }
     let (_dir, state) = fixture_state_ephemeral();
-    set_datatype_call(&state, D_NEIGH, "int", None)
+    let addrs = fixture_addrs(&state).await;
+    set_datatype_call(&state, &addrs.neigh, "int", None)
         .await
         .expect("define");
-    let cl = set_datatype_call(&state, D_NEIGH, "undefined", None)
+    let cl = set_datatype_call(&state, &addrs.neigh, "undefined", None)
         .await
         .expect("clear");
     assert_eq!(cl["status"], "cleared");
     assert_eq!(cl["datatype"], "undefined");
     assert!(cl["previous_datatype"].as_str().is_some());
-    let again = set_datatype_call(&state, D_NEIGH, "undefined", None)
+    let again = set_datatype_call(&state, &addrs.neigh, "undefined", None)
         .await
         .expect("noop");
     assert_eq!(again["status"], "already_applied");
@@ -257,22 +260,23 @@ async fn set_datatype_expected_undefined_guard_and_offcut_reject() {
         return;
     }
     let (_dir, state) = fixture_state_ephemeral();
-    set_datatype_call(&state, D_NEIGH, "int", None)
+    let addrs = fixture_addrs(&state).await;
+    set_datatype_call(&state, &addrs.neigh, "int", None)
         .await
         .expect("define");
-    set_datatype_call(&state, D_NEIGH, "undefined", None)
+    set_datatype_call(&state, &addrs.neigh, "undefined", None)
         .await
         .expect("clear");
-    let ok = set_datatype_call(&state, D_NEIGH, "int", Some("undefined"))
+    let ok = set_datatype_call(&state, &addrs.neigh, "int", Some("undefined"))
         .await
         .expect("guard ok on undefined");
     assert_eq!(ok["status"], "set");
-    let conflict = set_datatype_call(&state, D_NEIGH, "char", Some("undefined"))
+    let conflict = set_datatype_call(&state, &addrs.neigh, "char", Some("undefined"))
         .await
         .unwrap_err();
     assert_eq!(conflict["error"]["code"], "STATE_CONFLICT");
     assert_eq!(conflict["error"]["details"]["actual"], "int");
-    let err = set_datatype_call(&state, D_NEIGH_OFFCUT, "byte", None)
+    let err = set_datatype_call(&state, &addrs.neigh_offcut, "byte", None)
         .await
         .unwrap_err();
     assert_eq!(err["error"]["code"], "INVALID_PARAMS");
