@@ -1,0 +1,35 @@
+[package]
+name = "re-ghidra-mcp-qwen"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+# The MCP server Qwen Code launches via qwen-extension.json mcpServers.
+# A thin front end: argv in, `ghidra_mcp::cli::dispatch` out.
+[[bin]]
+name = "re-ghidra-qwen-mcp"
+path = "src/main.rs"
+
+# The SessionStart hook referenced from qwen-extension.json.
+[[bin]]
+name = "re-ghidra-qwen-hook"
+path = "src/bin/hook.rs"
+
+[dependencies]
+ghidra-mcp = { path = "../../shared/ghidra-mcp" }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+
+[package.metadata.release]
+# cargo-release bumps the version in Cargo.toml, but the plugin manifest carries
+# it too. Rewrite it in the same commit so the two can never drift.
+pre-release-replacements = [
+  { file = "qwen-extension.json", search = '"version": "[0-9]+\.[0-9]+\.[0-9]+"', replace = '"version": "{{version}}"', exactly = 1 },
+]
+
+[package.metadata.dist.binaries]
+"*" = ["re-ghidra-qwen-mcp", "re-ghidra-qwen-hook"]
