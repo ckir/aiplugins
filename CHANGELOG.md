@@ -1,3 +1,12 @@
+## [0.5.0] - 2026-09-01
+
+### 🔧 Fixes
+
+- *(qwen)* Switch extension manifests to use pre-built binaries from release artifacts (#14)
+  - `re-ghidra-mcp-qwen`: version 0.2.1 → 0.5.0, uses `${extensionPath}/bin/re-ghidra-qwen-mcp`
+  - `rtk-mcp-qwen`: uses `${extensionPath}/bin/rtk-mcp-qwen`
+  - Extensions now installable via `qwen extensions install` without requiring `cargo`
+
 ## [0.4.0] - 2026-08-31
 
 ### 🚀 Features
