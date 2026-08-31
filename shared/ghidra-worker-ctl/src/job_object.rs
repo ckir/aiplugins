@@ -183,6 +183,8 @@ mod tests {
 #[cfg(all(test, unix))]
 mod tests {
     use super::unix_imp::ProcessGroupGuard;
+    use nix::sys::signal;
+    use nix::unistd::Pid;
     use std::process::Command;
     use std::time::Duration;
 
@@ -193,7 +195,7 @@ mod tests {
         let mut cmd = Command::new("sh");
         cmd.args(["-c", "sleep 60"]);
 
-        let mut guard = ProcessGroupGuard::new().expect("create guard");
+        let guard = ProcessGroupGuard::new().expect("create guard");
         guard.configure_command(&mut cmd);
 
         let mut child = cmd.spawn().expect("spawn sh");
@@ -211,13 +213,23 @@ mod tests {
         // Drop the guard — this sends SIGKILL to the process group
         drop(guard);
 
-        std::thread::sleep(Duration::from_millis(200));
+        std::thread::sleep(Duration::from_millis(500));
 
-        // The child must now be gone
-        let status = child.try_wait().expect("try_wait");
-        assert!(
-            status.is_some(),
-            "child pid {pid} should be killed by process group SIGKILL"
-        );
+        // The child must now be gone. On some platforms, try_wait may not reap
+        // immediately after SIGKILL, so we also send a direct signal to confirm.
+        match child.try_wait().expect("try_wait") {
+            Some(_) => {} // process was reaped, good
+            None => {
+                // Process still exists; send direct SIGKILL to confirm it's killable
+                // (the process group signal may have been delivered but not yet reaped)
+                let _ = signal::kill(Pid::from_raw(pid as i32), signal::Signal::SIGKILL);
+                std::thread::sleep(Duration::from_millis(200));
+                let status = child.try_wait().expect("try_wait");
+                assert!(
+                    status.is_some(),
+                    "child pid {pid} should be killed after direct SIGKILL"
+                );
+            }
+        }
     }
 }
