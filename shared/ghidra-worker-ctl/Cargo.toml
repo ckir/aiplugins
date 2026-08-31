@@ -1,0 +1,23 @@
+[package]
+name = "ghidra-worker-ctl"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish = false
+
+[dependencies]
+ghidra-ipc = { path = "../ghidra-ipc" }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true }
+
+# The worker JVM is held in a Windows Job Object so it dies with its parent.
+# `job_object.rs` carries a `#[cfg(not(windows))]` stub, so the crate compiles
+# everywhere; only the lifecycle guarantee is Windows-only.
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true }

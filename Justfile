@@ -75,6 +75,43 @@ build-rtk-mcp-cc:
     done
     @echo "Plugin binaries staged in claude-code/rtk-mcp-cc/bin/"
 
+# Build the re-ghidra-mcp-cc Claude Code plugin's binaries into its bin/ directory.
+# Windows developers run this locally; CI produces the other platforms.
+build-re-ghidra-mcp-cc:
+    cargo build -p re-ghidra-mcp-cc --release --bin re-ghidra-cc-mcp --bin re-ghidra-cc-hook
+    mkdir -p claude-code/re-ghidra-mcp-cc/bin
+    for b in re-ghidra-cc-mcp re-ghidra-cc-hook; do \
+        if [ -f "target/release/$b.exe" ]; then \
+            cp "target/release/$b.exe" claude-code/re-ghidra-mcp-cc/bin/; \
+        else \
+            cp "target/release/$b" claude-code/re-ghidra-mcp-cc/bin/; \
+        fi; \
+    done
+    @echo "Plugin binaries staged in claude-code/re-ghidra-mcp-cc/bin/"
+
+# Regenerate the plugin's committed copy of the ghidra-re-driver skill from the
+# binary that embeds it.
+#
+# The canonical skill lives at shared/ghidra-mcp/skill/SKILL.md and is compiled
+# into every agent plugin's binary. Editing a plugin's copy directly is a
+# mistake the emit test catches; this is how you propagate a canonical edit.
+emit-ghidra-skill: build-re-ghidra-mcp-cc
+    ./claude-code/re-ghidra-mcp-cc/bin/re-ghidra-cc-mcp emit-skill \
+        > claude-code/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md
+    @echo "Regenerated claude-code/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md"
+
+# Run the live Ghidra suite. Needs a real Ghidra 12.1.2 + JDK 21 and an analyzed
+# fixture project; see shared/ghidra-mcp/tests/fixtures/README.md to build one.
+#
+# These ~60 tests are gated at RUNTIME on GHIDRA_MCP_E2E, not with #[ignore]:
+# without the variable they early-return and pass, which is what keeps the
+# 3-OS CI matrix green on runners that have no Ghidra.
+#
+# -j1 is not a performance choice. One Ghidra project supports ONE live worker;
+# parallel test binaries collide on Ghidra's project.lock.
+test-live-ghidra:
+    GHIDRA_MCP_E2E=1 cargo nextest run -p ghidra-mcp -j1
+
 # Remove ORPHANED executables that cargo leaves behind, without discarding the
 # whole build cache.
 #
@@ -137,5 +174,5 @@ clean-stale:
 # full rebuild.
 clean:
     cargo clean
-    rm -rf claude-code/example/bin claude-code/rtk-mcp-cc/bin
+    rm -rf claude-code/example/bin claude-code/rtk-mcp-cc/bin claude-code/re-ghidra-mcp-cc/bin
     @echo "Removed target/ and staged plugin binaries."

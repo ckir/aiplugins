@@ -1,0 +1,37 @@
+{
+  "description": "SessionStart preflight. Checks that GHIDRA_INSTALL_DIR is set and really is a Ghidra install root, that a JDK 21+ is on PATH, and that a Ghidra project is configured — the four environmental failures that would otherwise surface only as an opaque error on the first tool call. Silent when everything is in order, and never blocks: it always exits 0. Registered per source rather than with a wildcard so it does not re-report after every context compaction.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/re-ghidra-cc-hook",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/re-ghidra-cc-hook",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/re-ghidra-cc-hook",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
