@@ -161,6 +161,20 @@ the tools are present with `/mcp`.
   is fixed — there is no `RUST_LOG`.
 - **A boot that hangs rather than fails** is usually endpoint protection or a
   firewall blocking the worker's loopback bind.
+- **`PROJECT_LOCKED` after a session ended is expected, not corruption.** The
+  worker JVM is bound to a Windows Job Object (a process group elsewhere) so it
+  cannot outlive its parent, so ending a session, disabling the plugin or
+  reloading plugins kills it outright and Ghidra never releases its lock. The
+  next server to attach finds `<project>.lock` beside the `.gpr` and refuses.
+  The lock carries a hostname and a timestamp but **no PID**, so nothing can
+  prove it stale — which is why the server never reclaims one and neither should
+  an agent. Confirm no `java`, `javaw`, `ghidraRun` or `re-ghidra-cc-mcp` is
+  running, then delete `<project>.lock` and `<project>.lock~` yourself.
+- **A worker log can belong to somebody else.** Every server that ran writes
+  into the same directory, and a healthy connection ends with
+  `input stream terminated` / `quit_reason=Closed` — which reads exactly like
+  the crash you are hunting. Match `client_info` and the timestamp to the
+  session you are diagnosing before concluding anything from a log line.
 - **Hook and MCP changes need a restart.** Both are loaded at session start and
   cannot be hot-swapped.
 - **The preflight deliberately does not run after a context compaction.**
