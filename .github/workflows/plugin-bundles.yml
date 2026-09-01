@@ -16,15 +16,22 @@ name: Plugin Bundles
 # binaries whose exec bits have to survive the zip, and only a unix-made zip
 # entry can record them. scripts/bundle-plugin.sh refuses to run anywhere else.
 
+# Deliberately NOT `release: published`. dist's announce job creates the release
+# with the default GITHUB_TOKEN, and GitHub does not let a token-created release
+# (or tag push) trigger another workflow — the run just never happens, with
+# nothing anywhere to say why. v0.6.0 shipped without its bundles for exactly
+# that reason. `workflow_run` is the supported way to chain onto another
+# workflow, and it always runs the copy of this file on the default branch.
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
   # Backfill a release that predates this workflow, or re-cut bundles after a
   # fix to the bundling script.
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to bundle (e.g. v0.5.0)"
+        description: "Release tag to bundle (e.g. v0.6.0)"
         required: true
 
 permissions:
@@ -33,9 +40,16 @@ permissions:
 jobs:
   bundle:
     name: Bundle & upload
+    # Release runs on pull_request too, where there is no release to add
+    # anything to. Only a successful tag push produced one.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      startsWith(github.event.workflow_run.head_branch, 'v'))
     runs-on: ubuntu-latest
     env:
-      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      TAG: ${{ inputs.tag || github.event.workflow_run.head_branch }}
       GH_TOKEN: ${{ github.token }}
     steps:
       # The plugin tree has to come from the same commit as the binaries on the
@@ -43,7 +57,7 @@ jobs:
       # another.
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.release.tag_name || inputs.tag }}
+          ref: ${{ inputs.tag || github.event.workflow_run.head_branch }}
 
       # Only tags cut after this workflow landed carry the bundling script, and
       # "No such file or directory" three steps later is a poor way to learn it.
