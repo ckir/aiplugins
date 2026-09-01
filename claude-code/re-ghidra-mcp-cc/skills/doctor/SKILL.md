@@ -71,6 +71,28 @@ If `analyzeHeadless` is missing, the directory is not a Ghidra install root. If
 neither source supplies a value, setting `GHIDRA_INSTALL_DIR` machine-wide is
 usually right, since it is the same for every project on the machine.
 
+**If you search the disk for it, say how far you looked.** An unset variable
+means "not configured", never "not installed", and a bounded search that comes
+back empty proves only that the limit was too shallow. A real install sat at
+`C:\Users\user\Development\Java\ghidra_12.1.2_PUBLIC` — five levels down, past a
+`-Depth 3` sweep from `C:\` that duly reported nothing and read as *Ghidra is
+missing*. Search where installs actually land, and report the bound with the
+result:
+
+```powershell
+$roots = @("$env:USERPROFILE\Development", "$env:USERPROFILE", "$env:LOCALAPPDATA",
+           "C:\Program Files", "C:\Tools", "C:\")
+foreach ($r in $roots) {
+    if (Test-Path $r) {
+        Get-ChildItem $r -Filter "ghidra*" -Directory -Depth 5 -ErrorAction SilentlyContinue |
+            Select-Object -ExpandProperty FullName
+    }
+}
+```
+
+Then ask the user rather than concluding: they know whether they have Ghidra,
+and one question beats a wrong verdict.
+
 **Version:** this plugin targets Ghidra **12.1.2**.
 
 ```powershell
@@ -153,6 +175,25 @@ no PID and no owner token, so *nothing* can prove it stale, which is exactly why
 the server itself never parses, reclaims, or deletes it either. If the user
 confirms nothing is holding it, removing it is their call to make, not yours.
 
+### A stale lock is the normal cost of a session ending
+
+Expect this rather than treating it as corruption. The worker JVM is held in a
+Windows Job Object (a Unix process group elsewhere) precisely so it cannot
+outlive its parent — and a session that ends, a plugin that is disabled, or a
+`/reload-plugins` kills it outright. Ghidra never gets to release the lock, so
+the next server to attach finds one and reports `PROJECT_LOCKED`.
+
+Gather what can be gathered, then hand the decision over:
+
+```powershell
+Get-Content "$env:GHIDRA_MCP_PROJECT_DIR\$env:GHIDRA_MCP_PROJECT_NAME.lock"
+Get-Process -Name java,javaw,ghidraRun,re-ghidra-cc-mcp -ErrorAction SilentlyContinue
+```
+
+The lock names a hostname and a timestamp. No live JVM, no live server, and a
+timestamp matching a session the user remembers closing is a strong case — and
+still only a case. Say which of those you checked, and let the user delete it.
+
 ## Reporting
 
 Finish with a short verdict, not a transcript:
@@ -176,6 +217,24 @@ Get-ChildItem "$env:USERPROFILE\.ghidra-mcp\logs\" | Sort-Object LastWriteTime -
 ```
 
 Log verbosity is fixed — there is no `RUST_LOG` for it.
+
+**Check whose connection you are reading.** The log directory collects every
+server that ran, including probes and other workspaces, and each connection
+records the client that opened it:
+
+```
+INFO rmcp::service: Service initialized as server
+     client_info: Implementation { name: "probe", version: "0" }
+INFO rmcp::service: input stream terminated
+INFO rmcp::service: serve finished quit_reason=Closed
+```
+
+That is a **healthy** session: a client connected, finished, and closed the
+pipe. Read as evidence about a failing session it says the opposite of the
+truth — and `quit_reason=Closed` invites exactly that misreading, since it looks
+like the crash you came to find. Match `client_info` and the timestamp to the
+session under diagnosis before drawing anything from a log line; a name like
+`probe` is somebody testing the binary by hand, not the session that failed.
 
 Two environmental causes worth naming if the log shows a boot that **hangs**
 rather than fails: endpoint protection or a firewall blocking the worker's
