@@ -133,16 +133,24 @@ bundle-plugins tag:
         bash scripts/bundle-plugin.sh "$name" target/plugin-assets target/plugin-bundles
     done
 
-# Regenerate the plugin's committed copy of the ghidra-re-driver skill from the
-# binary that embeds it.
+# Regenerate EVERY plugin's committed copy of the ghidra-re-driver skill from
+# the binary that embeds it.
 #
 # The canonical skill lives at shared/ghidra-mcp/skill/SKILL.md and is compiled
 # into every agent plugin's binary. Editing a plugin's copy directly is a
 # mistake the emit test catches; this is how you propagate a canonical edit.
+#
+# Every copy, not just the Claude Code one. This recipe used to regenerate that
+# single front, so a canonical edit left the qwen copy stale — green locally
+# under `-p re-ghidra-mcp-cc`, and caught only by the workspace run in CI, as
+# re-ghidra-mcp-qwen::skill_emit.
 emit-ghidra-skill: build-re-ghidra-mcp-cc
+    cargo build -p re-ghidra-mcp-qwen --release --bin re-ghidra-qwen-mcp
     ./claude-code/re-ghidra-mcp-cc/bin/re-ghidra-cc-mcp emit-skill \
         > claude-code/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md
-    @echo "Regenerated claude-code/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md"
+    ./target/release/re-ghidra-qwen-mcp emit-skill \
+        > qwen/re-ghidra-mcp-qwen/skills/ghidra-re-driver/SKILL.md
+    @echo "Regenerated the committed ghidra-re-driver skill copies (claude-code, qwen)"
 
 # Run the live Ghidra suite. Needs a real Ghidra 12.1.2 + JDK 21 and an analyzed
 # fixture project; see shared/ghidra-mcp/tests/fixtures/README.md to build one.
