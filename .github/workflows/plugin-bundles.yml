@@ -127,8 +127,13 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
+          # mkdir -p first: unzip -d creates only the LAST path component, so
+          # extracting into extracted/<name> fails while extracted/ does not yet
+          # exist. Expand-Archive creates parents, which is why only the unix
+          # legs of this job failed.
           for zip in bundles/*-plugin.zip; do
             name=$(basename "$zip" -plugin.zip)
+            mkdir -p "extracted/$name"
             unzip -q "$zip" -d "extracted/$name"
           done
 

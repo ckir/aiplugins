@@ -155,4 +155,8 @@ if [ "$failures" -gt 0 ]; then
     exit 1
 fi
 
-echo "Probed $checked entry point route(s) in $(basename "$root")${version:+ $version}, all sound."
+# The plugin's own name, not `basename "$root"`: an installed plugin lives in a
+# directory named after its VERSION, so that read "in 0.6.1 0.6.1".
+label=$(jq -r '.name // ""' "$manifest" 2>/dev/null | tr -d '\r')
+[ -n "$label" ] || label=$(basename "$root")
+echo "Probed $checked entry point route(s) in $label${version:+ $version}, all sound."
