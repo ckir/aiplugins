@@ -19,3 +19,6 @@ unparseable = "unparseable"
 # The ported code hyphenates this prefix throughout ("mis-read", "mis-launched",
 # "mis-handled"); typos splits on the hyphen and sees a bare "mis".
 mis = "mis"
+# `unx` is zipinfo's own host-system column for a unix-made zip entry, matched
+# literally by scripts/bundle-plugin.sh. It is output, not prose.
+unx = "unx"

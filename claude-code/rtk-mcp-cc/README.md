@@ -77,9 +77,23 @@ which is gitignored. Release builds for all platforms come from CI via
 
 ## Installing
 
-Point Claude Code at the plugin directory:
+This repository is a Claude Code marketplace, so the plugin installs like any
+other — no clone, no build:
 
 ```bash
+claude plugin marketplace add ckir/aiplugins
+claude plugin install rtk-mcp-cc@aiplugins
+```
+
+That fetches `rtk-mcp-cc-plugin.zip` from the latest release, which carries the
+binaries for every supported platform: Windows x64, and Linux and macOS on both
+x86_64 and aarch64. Nothing is compiled at install time.
+
+To run the working copy instead — what you want while changing the plugin —
+build the binaries first and point Claude Code at the directory:
+
+```bash
+just build-rtk-mcp-cc
 claude --plugin-dir claude-code/rtk-mcp-cc
 ```
 

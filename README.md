@@ -9,12 +9,28 @@ Initially, this marketplace provides and supports plugins for the following agen
 - **Antigravity**
 - **Qwen**
 
+## Installing
+
+This repository is itself a Claude Code marketplace:
+
+```bash
+claude plugin marketplace add ckir/aiplugins
+```
+
+Each plugin's own README then carries its `claude plugin install` line, along
+with the prerequisites that plugin needs. The entries resolve to plugin zips on
+the latest release that already contain the binaries for Windows x64 plus Linux
+and macOS on x86_64 and aarch64, so nothing is cloned, built, or compiled at
+install time. The Antigravity and Qwen plugins install through their own agents'
+mechanisms — again, see their READMEs.
+
 ## Repository Structure
 
 This repository is structured as a monorepo. It will contain specialized packages, shared resources, and individual plugins tailored to the agents they support.
 
 ```text
 aiplugins/
+├── .claude-plugin/  # marketplace.json — what `claude plugin marketplace add` reads
 ├── claude-code/   # Plugins specifically for Claude Code
 ├── antigravity/   # Plugins specifically for Antigravity
 ├── qwen/          # Plugins specifically for Qwen

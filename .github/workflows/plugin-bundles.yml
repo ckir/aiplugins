@@ -1,0 +1,81 @@
+name: Plugin Bundles
+
+# Publish the installable Claude Code plugin zips.
+#
+# dist's own release job uploads per-target archives of the binaries — that is
+# what a `cargo install`-shaped consumer wants, and it is not a plugin: no
+# manifest, no skills, no hooks.json. `claude plugin install` fetches ONE zip per
+# marketplace entry and extracts it as the plugin directory, so the marketplace
+# needs an asset that is the whole plugin, every platform at once.
+#
+# This job assembles that asset from the archives dist has already published on
+# the release, and adds it to the same release. It deliberately lives outside
+# .github/workflows/release.yml, which dist regenerates.
+#
+# Linux is not incidental: the bundles carry a /bin/sh dispatcher and unix
+# binaries whose exec bits have to survive the zip, and only a unix-made zip
+# entry can record them. scripts/bundle-plugin.sh refuses to run anywhere else.
+
+on:
+  release:
+    types: [published]
+  # Backfill a release that predates this workflow, or re-cut bundles after a
+  # fix to the bundling script.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to bundle (e.g. v0.5.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    name: Bundle & upload
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      # The plugin tree has to come from the same commit as the binaries on the
+      # release, or the bundle ships a manifest for one version and binaries for
+      # another.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
+      # Only tags cut after this workflow landed carry the bundling script, and
+      # "No such file or directory" three steps later is a poor way to learn it.
+      - name: Confirm the tag can be bundled
+        run: |
+          test -f scripts/bundle-plugin.sh || {
+            echo "Tag $TAG predates scripts/bundle-plugin.sh — bundles exist from the next release onward." >&2
+            exit 1
+          }
+
+      - name: Determine plugins to bundle
+        id: plugins
+        run: |
+          names=$(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr '\n' ' ')
+          [ -n "$names" ] || { echo "marketplace lists no plugins"; exit 1; }
+          echo "names=$names" >> "$GITHUB_OUTPUT"
+
+      - name: Download per-target archives from the release
+        run: |
+          mkdir -p assets
+          for name in ${{ steps.plugins.outputs.names }}; do
+            gh release download "$TAG" -D assets \
+              -p "$name-*.tar.xz" -p "$name-*.zip" --clobber
+          done
+          ls -la assets
+
+      - name: Assemble plugin bundles
+        run: |
+          for name in ${{ steps.plugins.outputs.names }}; do
+            bash scripts/bundle-plugin.sh "$name" assets bundles
+          done
+
+      - name: Upload bundles to the release
+        run: |
+          gh release upload "$TAG" bundles/*-plugin.zip --clobber

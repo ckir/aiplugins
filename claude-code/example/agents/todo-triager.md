@@ -1,24 +1,25 @@
 ---
 name: todo-triager
-description: Use this agent to triage a codebase's TODO/FIXME/HACK markers into a prioritized, owner-assigned plan. Trigger when the user asks to triage, prioritize, clean up, or make sense of the TODOs or deferred work in a project, or when a marker list is long enough that it needs grouping rather than listing.
+description: |-
+  Use this agent to triage a codebase's TODO/FIXME/HACK markers into a prioritized, owner-assigned plan. Trigger when the user asks to triage, prioritize, clean up, or make sense of the TODOs or deferred work in a project, or when a marker list is long enough that it needs grouping rather than listing.
 
-<example>
-Context: The user wants their marker backlog made actionable.
-user: "We have TODOs scattered everywhere. Can you make sense of them?"
-assistant: "I'll use the todo-triager agent to scan and triage them into a prioritized plan."
-<commentary>
-The user wants judgement applied to a marker backlog, not a listing, so the triager is the right tool.
-</commentary>
-</example>
+  <example>
+  Context: The user wants their marker backlog made actionable.
+  user: "We have TODOs scattered everywhere. Can you make sense of them?"
+  assistant: "I'll use the todo-triager agent to scan and triage them into a prioritized plan."
+  <commentary>
+  The user wants judgement applied to a marker backlog, not a listing, so the triager is the right tool.
+  </commentary>
+  </example>
 
-<example>
-Context: The user is preparing for a release.
-user: "Before we cut 1.0, which FIXMEs actually matter?"
-assistant: "I'll use the todo-triager agent to separate the release blockers from the rest."
-<commentary>
-This is prioritization of existing markers against a goal — exactly what the triager does.
-</commentary>
-</example>
+  <example>
+  Context: The user is preparing for a release.
+  user: "Before we cut 1.0, which FIXMEs actually matter?"
+  assistant: "I'll use the todo-triager agent to separate the release blockers from the rest."
+  <commentary>
+  This is prioritization of existing markers against a goal — exactly what the triager does.
+  </commentary>
+  </example>
 model: sonnet
 color: yellow
 tools: Read, Glob, Grep

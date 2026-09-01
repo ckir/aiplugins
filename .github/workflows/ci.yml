@@ -81,6 +81,12 @@ jobs:
       - name: Check plugin wiring
         run: bash scripts/check-plugin-wiring.sh
 
+      # Confirms the root marketplace manifest — what `claude plugin
+      # marketplace add` reads — still agrees with the plugins it publishes.
+      # Its every field is a copy of something owned elsewhere.
+      - name: Check marketplace manifest
+        run: bash scripts/check-marketplace.sh
+
   deny:
     name: Dependency Audit
     runs-on: ubuntu-latest
