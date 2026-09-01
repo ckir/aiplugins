@@ -1,5 +1,5 @@
 {
   "name": "re-ghidra-mcp-agy",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "An Antigravity plugin for Ghidra reverse engineering"
 }

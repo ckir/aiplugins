@@ -1,3 +1,14 @@
+## [0.6.4] - 2026-09-01
+
+### ✨ Features
+
+- *(qwen)* Add extension bundle workflow and marketplace manifest (#31)
+  - `scripts/bundle-qwen-extension.sh` assembles a zip with `qwen-extension.json`, cross-platform binaries, and `/bin/sh` dispatchers
+  - `.qwen-plugin/marketplace.json` Qwen marketplace manifest for `rtk-mcp-qwen` and `re-ghidra-mcp-qwen` with `-extension.zip` release URLs
+  - `.github/workflows/qwen-extension-bundles.yml` CI workflow that runs after Release, assembles extension bundles, uploads them to the release, and verifies on all 3 OSes
+  - `scripts/check-qwen-marketplace.sh` consistency checker for the Qwen manifest
+  - `just bundle-qwen` and `just qwen-marketplace` tasks
+
 ## [0.6.3] - 2026-09-01
 
 Documentation only — no code changed. Like 0.6.2, cut as a release because a
