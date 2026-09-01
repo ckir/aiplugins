@@ -54,21 +54,46 @@ in the GUI, then closed. It does not import or analyze binaries itself.
 
 ## Installation
 
-### Via Qwen Code CLI (recommended)
+### Via Qwen Code extension bundle (recommended)
 
 ```bash
-qwen extensions install https://github.com/ckir/aiplugins/releases/latest/download/re-ghidra-mcp-qwen-x86_64-pc-windows-msvc.zip
+qwen extensions install https://github.com/ckir/aiplugins/releases/latest/download/re-ghidra-mcp-qwen-extension.zip
 ```
 
-Or for other platforms:
+> **Note:** As of Qwen Code v0.22.3, `qwen extensions install` from an archive
+> URL may exit silently without installing (tracked in
+> [QwenLM/qwen-code#10741](https://github.com/QwenLM/qwen-code/issues/10741)).
+> If that happens, use the manual install below.
 
-```bash
-# Linux
-qwen extensions install https://github.com/ckir/aiplugins/releases/latest/download/re-ghidra-mcp-qwen-x86_64-unknown-linux-gnu.tar.xz
+### Manual install (workaround)
 
-# macOS
-qwen extensions install https://github.com/ckir/aiplugins/releases/latest/download/re-ghidra-mcp-qwen-x86_64-apple-darwin.tar.xz
-```
+1. Download the extension bundle:
+
+   ```
+   https://github.com/ckir/aiplugins/releases/latest/download/re-ghidra-mcp-qwen-extension.zip
+   ```
+
+2. Extract it to your Qwen extensions directory:
+
+   ```bash
+   # Linux / macOS
+   mkdir -p ~/.qwen/extensions/re-ghidra-mcp-qwen
+   unzip re-ghidra-mcp-qwen-extension.zip -d ~/.qwen/extensions/re-ghidra-mcp-qwen/
+   ```
+
+   ```powershell
+   # Windows (PowerShell)
+   New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.qwen\extensions\re-ghidra-mcp-qwen"
+   Expand-Archive -Path re-ghidra-mcp-qwen-extension.zip -DestinationPath "$env:USERPROFILE\.qwen\extensions\re-ghidra-mcp-qwen" -Force
+   ```
+
+3. Verify it was detected:
+
+   ```bash
+   qwen extensions list
+   ```
+
+   You should see `re-ghidra-mcp-qwen` listed and enabled.
 
 ### Building from source
 

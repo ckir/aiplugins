@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "agy-example"
-version = "0.6.3"
+version = "0.6.4"
 
 [[package]]
 name = "aho-corasick"
@@ -126,7 +126,7 @@ dependencies = [
 
 [[package]]
 name = "claude-example"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "anyhow",
  "rmcp",
@@ -414,7 +414,7 @@ dependencies = [
 
 [[package]]
 name = "ghidra-ipc"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "insta",
  "proptest",
@@ -425,7 +425,7 @@ dependencies = [
 
 [[package]]
 name = "ghidra-mcp"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "ghidra-ipc",
  "ghidra-worker-ctl",
@@ -446,7 +446,7 @@ dependencies = [
 
 [[package]]
 name = "ghidra-worker-ctl"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "ghidra-ipc",
  "nix 0.29.0",
@@ -771,7 +771,7 @@ dependencies = [
 
 [[package]]
 name = "qwen-example"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "anyhow",
  "serde",
@@ -832,7 +832,7 @@ dependencies = [
 
 [[package]]
 name = "re-ghidra-mcp-agy"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "ghidra-mcp",
  "serde",
@@ -842,7 +842,7 @@ dependencies = [
 
 [[package]]
 name = "re-ghidra-mcp-cc"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "ghidra-mcp",
  "serde_json",
@@ -851,7 +851,7 @@ dependencies = [
 
 [[package]]
 name = "re-ghidra-mcp-qwen"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "ghidra-mcp",
  "serde_json",
@@ -944,7 +944,7 @@ dependencies = [
 
 [[package]]
 name = "rtk-mcp-agy"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "serde",
  "serde_json",
@@ -952,7 +952,7 @@ dependencies = [
 
 [[package]]
 name = "rtk-mcp-cc"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "anyhow",
  "rmcp",
@@ -966,7 +966,7 @@ dependencies = [
 
 [[package]]
 name = "rtk-mcp-qwen"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "serde",
  "serde_json",
