@@ -87,12 +87,29 @@ platforms come from CI via `cargo-dist`.
 
 ## Installing
 
+This repository is a Claude Code marketplace, so the plugin installs like any
+other — no clone, no build:
+
 ```bash
+claude plugin marketplace add ckir/aiplugins
+claude plugin install re-ghidra-mcp-cc@aiplugins
+```
+
+That fetches `re-ghidra-mcp-cc-plugin.zip` from the latest release, which
+carries the binaries for every supported platform: Windows x64, and Linux and
+macOS on both x86_64 and aarch64. Nothing is compiled at install time — Ghidra
+and the JDK above are still yours to supply.
+
+To run the working copy instead — what you want while changing the plugin —
+build the binaries first and point Claude Code at the directory:
+
+```bash
+just build-re-ghidra-mcp-cc
 claude --plugin-dir claude-code/re-ghidra-mcp-cc
 ```
 
-Then configure the project — see `examples/re-ghidra-mcp-cc.local.md` and copy
-it to `.claude/re-ghidra-mcp-cc.local.md`.
+Either way, configure the project next — see `examples/re-ghidra-mcp-cc.local.md`
+and copy it to `.claude/re-ghidra-mcp-cc.local.md`.
 
 ## Configuration
 

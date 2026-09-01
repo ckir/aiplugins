@@ -44,8 +44,14 @@ spellcheck:
 wiring:
     bash scripts/check-plugin-wiring.sh
 
+# Verify the root marketplace manifest still matches the plugins it publishes.
+# Every field in it is a copy of something owned elsewhere, and a stale copy
+# installs happily while advertising — or fetching — the wrong thing.
+marketplace:
+    bash scripts/check-marketplace.sh
+
 # Run all pre-flight checks (what CI and lefthook would run)
-check: fmt lint test deny spellcheck wiring
+check: fmt lint test deny spellcheck wiring marketplace
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
@@ -88,6 +94,27 @@ build-re-ghidra-mcp-cc:
         fi; \
     done
     @echo "Plugin binaries staged in claude-code/re-ghidra-mcp-cc/bin/"
+
+# Assemble the installable plugin zips for a published release, the same way
+# .github/workflows/plugin-bundles.yml does — for testing a change to the
+# bundling before tagging, or for rebuilding an asset by hand.
+#
+# Unix only: the bundles carry exec bits that a Windows zip cannot record, and
+# MSYS resolves `bin/foo` to `bin/foo.exe` and would overwrite the binary with
+# the dispatcher. On a Windows machine run this from WSL.
+bundle-plugins tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    names=$(jq -r '.plugins[].name' .claude-plugin/marketplace.json)
+    rm -rf target/plugin-assets target/plugin-bundles
+    mkdir -p target/plugin-assets
+    for name in $names; do
+        gh release download "{{ tag }}" -D target/plugin-assets \
+            -p "$name-*.tar.xz" -p "$name-*.zip" --clobber
+    done
+    for name in $names; do
+        bash scripts/bundle-plugin.sh "$name" target/plugin-assets target/plugin-bundles
+    done
 
 # Regenerate the plugin's committed copy of the ghidra-re-driver skill from the
 # binary that embeds it.

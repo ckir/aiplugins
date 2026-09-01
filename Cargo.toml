@@ -13,7 +13,7 @@ edition = "2021"
 authors = ["AI Plugins Marketplace Contributors"]
 license = "PolyForm-Noncommercial-1.0.0"
 description = "AI Plugins and Bridges for Qwen, Claude, and Antigravity"
-repository = "https://github.com/aiplugins/aiplugins"
+repository = "https://github.com/ckir/aiplugins"
 readme = "README.md"
 
 [workspace.dependencies]

@@ -1,33 +1,34 @@
 ---
 name: re-analyst
-description: Use this agent to sweep an attached Ghidra program's unnamed functions and apply names, prototypes and comments to them autonomously. Trigger when the user asks to name, label, annotate, clean up, or "make sense of" the FUN_/SUB_/undefined functions in a binary, or asks for a first pass over a freshly analyzed program. Do NOT trigger for a single named function the user is already reading — that is ordinary tool use, not a sweep.
+description: |-
+  Use this agent to sweep an attached Ghidra program's unnamed functions and apply names, prototypes and comments to them autonomously. Trigger when the user asks to name, label, annotate, clean up, or "make sense of" the FUN_/SUB_/undefined functions in a binary, or asks for a first pass over a freshly analyzed program. Do NOT trigger for a single named function the user is already reading — that is ordinary tool use, not a sweep.
 
-<example>
-Context: The user has just attached a freshly analyzed binary.
-user: "This thing is all FUN_00401230. Can you go through and name what you can?"
-assistant: "I'll use the re-analyst agent to sweep the unnamed functions and apply names."
-<commentary>
-A bulk naming pass over many functions is exactly the sweep this agent exists for.
-</commentary>
-</example>
+  <example>
+  Context: The user has just attached a freshly analyzed binary.
+  user: "This thing is all FUN_00401230. Can you go through and name what you can?"
+  assistant: "I'll use the re-analyst agent to sweep the unnamed functions and apply names."
+  <commentary>
+  A bulk naming pass over many functions is exactly the sweep this agent exists for.
+  </commentary>
+  </example>
 
-<example>
-Context: The user wants an annotated starting point before reading the binary themselves.
-user: "Do a first pass on crackme.exe so I'm not staring at raw decompiler output."
-assistant: "I'll use the re-analyst agent to name and annotate what it can identify first."
-<commentary>
-"First pass" over a whole program is a sweep; the user wants the result applied, not a report.
-</commentary>
-</example>
+  <example>
+  Context: The user wants an annotated starting point before reading the binary themselves.
+  user: "Do a first pass on crackme.exe so I'm not staring at raw decompiler output."
+  assistant: "I'll use the re-analyst agent to name and annotate what it can identify first."
+  <commentary>
+  "First pass" over a whole program is a sweep; the user wants the result applied, not a report.
+  </commentary>
+  </example>
 
-<example>
-Context: The user is reading one specific function.
-user: "What does FUN_004013a0 do?"
-assistant: "Let me inspect that function directly."
-<commentary>
-One function, no sweep. Answer with the tools directly rather than dispatching the agent.
-</commentary>
-</example>
+  <example>
+  Context: The user is reading one specific function.
+  user: "What does FUN_004013a0 do?"
+  assistant: "Let me inspect that function directly."
+  <commentary>
+  One function, no sweep. Answer with the tools directly rather than dispatching the agent.
+  </commentary>
+  </example>
 model: inherit
 color: magenta
 tools: mcp__re-ghidra-mcp-cc__list_project_programs, mcp__re-ghidra-mcp-cc__attach_program, mcp__re-ghidra-mcp-cc__inspect_function, mcp__re-ghidra-mcp-cc__find_functions, mcp__re-ghidra-mcp-cc__list_symbols, mcp__re-ghidra-mcp-cc__list_strings, mcp__re-ghidra-mcp-cc__list_data_items, mcp__re-ghidra-mcp-cc__list_segments, mcp__re-ghidra-mcp-cc__resolve_symbol, mcp__re-ghidra-mcp-cc__describe_address, mcp__re-ghidra-mcp-cc__get_xrefs, mcp__re-ghidra-mcp-cc__get_disassembly, mcp__re-ghidra-mcp-cc__read_bytes, mcp__re-ghidra-mcp-cc__get_datatype, mcp__re-ghidra-mcp-cc__rename, mcp__re-ghidra-mcp-cc__comment, mcp__re-ghidra-mcp-cc__set_datatype, mcp__re-ghidra-mcp-cc__set_prototype, mcp__re-ghidra-mcp-cc__set_local
