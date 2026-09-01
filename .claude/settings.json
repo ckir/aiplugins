@@ -1,0 +1,11 @@
+{
+  "extraKnownMarketplaces": {
+    "aiplugins": {
+      "source": {
+        "source": "github",
+        "repo": "ckir/aiplugins"
+      },
+      "autoUpdate": true
+    }
+  }
+}
