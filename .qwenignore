@@ -1,0 +1,24 @@
+# Build Artifacts
+target/
+dist/
+
+# Rust Specific
+**/*.rs.bk
+*.pdb
+**/mutants.out*/
+
+# Agent Caches & Metadata
+.serena/
+.claude-profile
+.claude/settings.local.json
+.claude/*.local.md
+
+# Per-session scratch written by the Qwen CLI
+.qwen/tmp/
+
+# Per-developer Qwen settings
+.qwen/*.local.md
+
+# IDEs
+.idea/
+.vscode/
