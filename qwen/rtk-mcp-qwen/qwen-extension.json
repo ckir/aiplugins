@@ -1,6 +1,6 @@
 {
   "name": "rtk-mcp-qwen",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "displayName": "RTK MCP Qwen — RTK Command Rewriter",
   "description": "PreToolUse hook that rewrites run_shell_command invocations via the rtk CLI before execution.",
   "contextFileName": "QWEN.md",

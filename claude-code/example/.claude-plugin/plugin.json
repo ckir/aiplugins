@@ -1,6 +1,6 @@
 {
   "name": "claude-example",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Reference Claude Code plugin implemented in Rust: an MCP server, a PostToolUse hook, skills, an agent, and project settings, all backed by a tested crate.",
   "author": {
     "name": "AI Plugins Marketplace Contributors"
