@@ -100,7 +100,7 @@ binaries=$(
         ([.. | objects | .command? // empty] | .[] | select(type == "string" and contains("bin")))
         | select(contains("extensionPath") or contains("${extensionPath}"))
     ' "$src/qwen-extension.json" |
-    sed 's#.*/bin/##; s#\.exe$##' |
+    sed 's#.*\${/}##; s#\.exe$##' |
     tr -d '\r' |
     sort -u
 )
