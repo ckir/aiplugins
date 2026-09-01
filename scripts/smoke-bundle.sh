@@ -66,13 +66,13 @@ stage="$repo/target/smoke/$plugin"
 rm -rf "$stage"
 mkdir -p "$stage/bin"
 
-tar --force-local -c -C "$src" \
+tar -c -C "$src" \
     --exclude=./bin \
     --exclude=./src \
     --exclude=./tests \
     --exclude=./Cargo.toml \
     --exclude=./.gitignore \
-    . | tar --force-local -x -C "$stage"
+    . | tar -x -C "$stage"
 
 # Order matters, and only on Windows. MSYS resolves a path with no extension to
 # a sibling .exe, so writing `bin/<name>` AFTER staging `bin/<name>.exe` opens

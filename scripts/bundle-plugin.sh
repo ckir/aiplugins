@@ -120,13 +120,13 @@ mkdir -p "$stage/bin"
 # Copy the plugin tree, minus what only the build needs. Excluding, rather than
 # listing what to include, means a component directory added later — commands/,
 # monitors/, .lsp.json — ships without anyone remembering to edit this script.
-tar --force-local -c -C "$src" \
+tar -c -C "$src" \
     --exclude=./bin \
     --exclude=./src \
     --exclude=./tests \
     --exclude=./Cargo.toml \
     --exclude=./.gitignore \
-    . | tar --force-local -x -C "$stage"
+    . | tar -x -C "$stage"
 
 # The plugin directories carry no LICENSE of their own; the repo's applies.
 cp "$repo/LICENSE" "$stage/LICENSE"
@@ -160,7 +160,7 @@ for target in $targets; do
             ;;
         *)
             # dist's unix tarballs wrap everything in one <plugin>-<target>/ dir.
-            tar --force-local -xf "$archive" -C "$extract"
+            tar -xf "$archive" -C "$extract"
             root="$extract/$plugin-$target"
             [ -d "$root" ] || {
                 echo "ERROR: $(basename "$archive") has no $plugin-$target/ directory" >&2
