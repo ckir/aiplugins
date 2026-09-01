@@ -1,3 +1,20 @@
+## [0.6.0] - 2026-09-01
+
+### 🚀 Features
+
+- *(claude-code)* Publish the plugins through a repo marketplace (#18)
+  - The repository root is now the `aiplugins` marketplace: `claude plugin marketplace add ckir/aiplugins`, then `claude plugin install <plugin>@aiplugins`
+  - Each release carries `<plugin>-plugin.zip`, a bundle holding the binaries for Windows x64 plus Linux and macOS on x86_64 and aarch64, so nothing is cloned or compiled at install time
+  - `scripts/bundle-plugin.sh` + `.github/workflows/plugin-bundles.yml` build and attach those bundles; `scripts/check-marketplace.sh` guards the manifest against drift, in `just check` and CI
+
+### 🔧 Fixes
+
+- *(claude-code)* Sync the plugin manifests, which sat three releases behind at 0.2.1, and point `homepage`/`repository` at `ckir/aiplugins` rather than a repository that does not exist (#18)
+- *(claude-code)* Repair the agent frontmatter in `re-analyst` and `todo-triager` (#18)
+  - The `<example>` blocks sat between frontmatter keys as bare text, which is not valid YAML
+  - `tools`, `model` and `color` were silently dropped at load; the agents ran with only their filename
+- *(antigravity)* Sync the plugin manifest versions to the workspace version
+
 ## [0.5.0] - 2026-09-01
 
 ### 🔧 Fixes
