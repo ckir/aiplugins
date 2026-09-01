@@ -63,7 +63,7 @@ dispatch:
 smoke:
     #!/usr/bin/env bash
     set -euo pipefail
-    for plugin in $(jq -r '.plugins[].name' .claude-plugin/marketplace.json); do
+    for plugin in $(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r'); do
         bash scripts/smoke-bundle.sh "$plugin"
     done
 
@@ -122,7 +122,7 @@ build-re-ghidra-mcp-cc:
 bundle-plugins tag:
     #!/usr/bin/env bash
     set -euo pipefail
-    names=$(jq -r '.plugins[].name' .claude-plugin/marketplace.json)
+    names=$(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r')
     rm -rf target/plugin-assets target/plugin-bundles
     mkdir -p target/plugin-assets
     for name in $names; do

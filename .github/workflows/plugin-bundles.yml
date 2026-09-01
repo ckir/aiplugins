@@ -71,7 +71,7 @@ jobs:
       - name: Determine plugins to bundle
         id: plugins
         run: |
-          names=$(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr '\n' ' ')
+          names=$(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r' | tr '\n' ' ')
           [ -n "$names" ] || { echo "marketplace lists no plugins"; exit 1; }
           echo "names=$names" >> "$GITHUB_OUTPUT"
 
@@ -118,7 +118,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p bundles
-          for plugin in $(jq -r '.plugins[].name' .claude-plugin/marketplace.json); do
+          for plugin in $(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r'); do
             gh release download "$TAG" -D bundles -p "$plugin-plugin.zip" --clobber
           done
           ls -la bundles

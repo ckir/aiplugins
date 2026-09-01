@@ -99,13 +99,19 @@ judge() {
         failures=$((failures + 1))
         return
     fi
-    if [ -n "$output" ] && [ -n "$version" ]; then
-        if [ "$output" != "$name $version" ]; then
-            echo "  FAIL  $name via $route: reported '$output', manifest says '$name $version'" >&2
-            failures=$((failures + 1))
-            return
-        fi
-    fi
+    # Only a binary that answers --version with a version line gets its version
+    # checked. `re-ghidra-cc-hook` has no --version: it reads stdin and replies
+    # with its SessionStart preflight, which is a perfectly good sign of life and
+    # not a version claim to hold against the manifest.
+    case $output in
+        "$name "*)
+            if [ -n "$version" ] && [ "$output" != "$name $version" ]; then
+                echo "  FAIL  $name via $route: reported '$output', manifest says '$name $version'" >&2
+                failures=$((failures + 1))
+                return
+            fi
+            ;;
+    esac
     echo "  ok    $name via $route${output:+ -> $output}"
 }
 

@@ -122,7 +122,9 @@ jobs:
       - name: Assemble and probe each plugin
         shell: bash
         run: |
-          for plugin in $(jq -r '.plugins[].name' .claude-plugin/marketplace.json); do
+          # tr -d: the jq on the Windows image writes CRLF, and a plugin name
+          # with a carriage return attached makes every path built from it wrong.
+          for plugin in $(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r'); do
             bash scripts/smoke-bundle.sh "$plugin"
           done
 

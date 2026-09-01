@@ -19,7 +19,9 @@ if [ "$#" -ne 1 ]; then
     exit 2
 fi
 
-plugin=$1
+# The jq on a Windows PATH writes CRLF, so a plugin name piped in from one
+# arrives with a carriage return attached and every path built from it is wrong.
+plugin=$(printf '%s' "$1" | tr -d '\r')
 repo=$(cd "$(dirname "$0")/.." && pwd)
 src="$repo/claude-code/$plugin"
 
@@ -48,7 +50,7 @@ binaries=$(
     exit 1
 }
 
-host=$(rustc -vV | sed -n 's/^host: //p')
+host=$(rustc -vV | sed -n 's/^host: //p' | tr -d '\r')
 [ -n "$host" ] || {
     echo "ERROR: could not read the host triple from rustc -vV." >&2
     exit 1
