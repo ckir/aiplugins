@@ -1,0 +1,11 @@
+# Shell scripts keep LF endings even in a Windows checkout.
+#
+# scripts/bundle-plugin.sh is meant to be run from WSL on a Windows machine —
+# it refuses to run under MSYS — and WSL's bash reads a CRLF `set -euo pipefail`
+# as `pipefail\r`, an invalid option name. The scripts are also run verbatim by
+# CI on Linux.
+*.sh text eol=lf
+
+# The dispatcher template is copied verbatim into bundles as a POSIX sh script,
+# where a CRLF shebang line is "bad interpreter" on Linux and macOS.
+*.sh.in text eol=lf

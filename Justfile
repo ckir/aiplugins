@@ -50,8 +50,25 @@ wiring:
 marketplace:
     bash scripts/check-marketplace.sh
 
+# Drive every branch of the dispatcher shipped as bin/<name> in a plugin bundle.
+# Any one machine exercises exactly one branch of it, so the platform is faked;
+# the Git Bash branch shipped broken in 0.6.0 for want of this.
+dispatch:
+    bash scripts/check-bundle-dispatch.sh
+
+# Assemble a host-only bundle for each Claude Code plugin and start its entry
+# points both ways Claude Code does — spawned directly, and through a shell.
+# Those two routes resolve bin/<name> differently on Windows, and only running
+# the assembled thing covers both.
+smoke:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for plugin in $(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r'); do
+        bash scripts/smoke-bundle.sh "$plugin"
+    done
+
 # Run all pre-flight checks (what CI and lefthook would run)
-check: fmt lint test deny spellcheck wiring marketplace
+check: fmt lint test deny spellcheck wiring marketplace dispatch smoke
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
@@ -105,7 +122,7 @@ build-re-ghidra-mcp-cc:
 bundle-plugins tag:
     #!/usr/bin/env bash
     set -euo pipefail
-    names=$(jq -r '.plugins[].name' .claude-plugin/marketplace.json)
+    names=$(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r')
     rm -rf target/plugin-assets target/plugin-bundles
     mkdir -p target/plugin-assets
     for name in $names; do

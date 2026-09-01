@@ -87,6 +87,47 @@ jobs:
       - name: Check marketplace manifest
         run: bash scripts/check-marketplace.sh
 
+      # The dispatcher shipped as bin/<name> in every plugin bundle picks the
+      # binary for the running platform, so any one machine covers exactly one
+      # of its branches. This fakes the rest.
+      - name: Check plugin bin dispatcher
+        run: bash scripts/check-bundle-dispatch.sh
+
+  # A plugin's entry points are reached two ways — an MCP server spawned
+  # directly, and a hook that runs through a shell — and on Windows those two
+  # routes resolve `bin/<name>` differently. Nothing here used to assemble a
+  # plugin and start it, which is how 0.6.0 shipped a dispatcher that refused
+  # MINGW: green on the direct route, fatal on the Git Bash one.
+  #
+  # This stages a host-only bundle from debug binaries and runs both routes, on
+  # a real machine of each OS.
+  bundle-smoke:
+    name: Bundle Smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      # `shell: bash` on windows-latest is Git Bash — the very shell whose
+      # resolution of an extensionless path this job exists to cover.
+      - name: Assemble and probe each plugin
+        shell: bash
+        run: |
+          # tr -d: the jq on the Windows image writes CRLF, and a plugin name
+          # with a carriage return attached makes every path built from it wrong.
+          for plugin in $(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r'); do
+            bash scripts/smoke-bundle.sh "$plugin"
+          done
+
   deny:
     name: Dependency Audit
     runs-on: ubuntu-latest

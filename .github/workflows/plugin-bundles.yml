@@ -71,7 +71,7 @@ jobs:
       - name: Determine plugins to bundle
         id: plugins
         run: |
-          names=$(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr '\n' ' ')
+          names=$(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r' | tr '\n' ' ')
           [ -n "$names" ] || { echo "marketplace lists no plugins"; exit 1; }
           echo "names=$names" >> "$GITHUB_OUTPUT"
 
@@ -93,3 +93,62 @@ jobs:
       - name: Upload bundles to the release
         run: |
           gh release upload "$TAG" bundles/*-plugin.zip --clobber
+
+  # Everything above ran on Linux, against a tree this workflow assembled. This
+  # downloads what was actually published, extracts it the way an install does,
+  # and starts the entry points on each OS — so "the zip we published works"
+  # rests on the published zip rather than on the staging tree it came from.
+  verify:
+    name: Verify published bundle (${{ matrix.os }})
+    needs: bundle
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    env:
+      TAG: ${{ inputs.tag || github.event.workflow_run.head_branch }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.event.workflow_run.head_branch }}
+
+      - name: Download the published bundles
+        shell: bash
+        run: |
+          mkdir -p bundles
+          for plugin in $(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r'); do
+            gh release download "$TAG" -D bundles -p "$plugin-plugin.zip" --clobber
+          done
+          ls -la bundles
+
+      - name: Extract
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          for zip in bundles/*-plugin.zip; do
+            name=$(basename "$zip" -plugin.zip)
+            unzip -q "$zip" -d "extracted/$name"
+          done
+
+      # Expand-Archive, not unzip: under MSYS a path with no extension resolves
+      # to its sibling .exe, so `unzip` prompts to overwrite bin/<name>.exe when
+      # it reaches bin/<name>. The host's own extractor has no such magic, and
+      # neither does this one.
+      - name: Extract (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          foreach ($zip in Get-ChildItem bundles\*-plugin.zip) {
+            $name = $zip.Name -replace '-plugin\.zip$', ''
+            Expand-Archive -Path $zip.FullName -DestinationPath "extracted\$name"
+          }
+
+      - name: Start the entry points
+        shell: bash
+        run: |
+          for dir in extracted/*/; do
+            bash scripts/probe-plugin-bin.sh "$dir"
+          done
