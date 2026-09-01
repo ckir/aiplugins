@@ -1,3 +1,20 @@
+## [0.6.1] - 2026-09-01
+
+### 🔧 Fixes
+
+- *(claude-code)* Dispatch to the `.exe` when a bundled hook runs under Git Bash (#21)
+  - A hook declared without `args` runs through a shell; where Git Bash is installed that shell executes the extensionless dispatcher rather than the sibling `.exe`, and 0.6.0's dispatcher rejected `MINGW64_NT` outright
+  - The `SessionStart` hook failed with `unsupported operating system MINGW64_NT-10.0-26200`; MCP servers were unaffected, because a direct spawn resolves the `.exe`
+  - Fixed for `MINGW*`, `MSYS*` and `CYGWIN*`; the bundles in 0.6.0 carry the broken dispatcher and are superseded by this release
+- *(ci)* Remove `--force-local` from the bundling scripts, which macOS's bsdtar does not accept (#21)
+
+### 🧪 Testing
+
+- *(ci)* Start the assembled plugins, on every PR and after every release (#21)
+  - `Bundle Smoke` stages a host-only bundle on ubuntu, windows and macOS and starts each entry point by BOTH routes Claude Code uses — through a shell, and spawned directly
+  - `plugin-bundles.yml` gains a `verify` job that downloads the published zips and starts them on all three platforms
+  - `scripts/check-bundle-dispatch.sh` drives all ten branches of the bin dispatcher with `uname` stubbed, since any one machine exercises only one of them
+
 ## [0.6.0] - 2026-09-01
 
 ### 🚀 Features
