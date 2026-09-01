@@ -1,5 +1,5 @@
 {
   "name": "rtk-mcp-agy",
-  "version": "0.2.1",
+  "version": "0.6.0",
   "description": "An Antigravity hook integration for rtk (Rust Token Killer)"
 }
