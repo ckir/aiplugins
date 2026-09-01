@@ -17,6 +17,9 @@ This repository is itself a Claude Code marketplace:
 claude plugin marketplace add ckir/aiplugins
 ```
 
+Working inside a clone of this repository, skip that step: `.claude/settings.json`
+declares the marketplace, so `claude plugin install` resolves it already.
+
 Each plugin's own README then carries its `claude plugin install` line, along
 with the prerequisites that plugin needs. The entries resolve to plugin zips on
 the latest release that already contain the binaries for Windows x64 plus Linux

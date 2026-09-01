@@ -95,6 +95,9 @@ claude plugin marketplace add ckir/aiplugins
 claude plugin install re-ghidra-mcp-cc@aiplugins
 ```
 
+Working inside a clone of this repository, skip the first line: `.claude/settings.json`
+declares the marketplace already.
+
 That fetches `re-ghidra-mcp-cc-plugin.zip` from the latest release, which
 carries the binaries for every supported platform: Windows x64, and Linux and
 macOS on both x86_64 and aarch64. Nothing is compiled at install time — Ghidra
