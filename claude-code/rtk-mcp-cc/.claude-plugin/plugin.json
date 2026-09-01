@@ -1,6 +1,6 @@
 {
   "name": "rtk-mcp-cc",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Claude Code integration for rtk (Rust Token Killer): a PreToolUse hook that transparently rewrites Bash/PowerShell commands through rtk for 60-90% token savings, plus rtk analytics as MCP tools.",
   "author": {
     "name": "AI Plugins Marketplace Contributors"

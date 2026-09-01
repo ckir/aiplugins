@@ -120,7 +120,15 @@ for name in $names; do
     #
     # stdin comes from /dev/null in both routes: a hook reads stdin, and one that
     # blocked waiting for input would hang the run rather than fail it.
-    output=$("$root/bin/$name" --version < /dev/null 2>&1 | head -n 1 | tr -d '\r') && status=0 || status=$?
+    #
+    # The whole output is captured and trimmed afterwards, never piped through
+    # `head`: `re-ghidra-cc-mcp --version` prints its version and then three
+    # lines of usage, and a reader that closes after the first line leaves the
+    # writer with EPIPE — which Rust turns into a panic and exit 101. That is a
+    # race between the two processes, so it failed only on macOS, and only
+    # sometimes.
+    raw=$("$root/bin/$name" --version < /dev/null 2>&1) && status=0 || status=$?
+    output=$(printf '%s\n' "$raw" | sed -n '1p' | tr -d '\r')
     judge shell "$name" "$status" "$output"
 
     # Route 2: spawned directly, no shell — how an MCP server is started.
@@ -129,14 +137,15 @@ for name in $names; do
     # before the bare name and so reaches the real binary. Python's CreateProcess
     # call finds the extensionless dispatcher instead and dies with WinError 193,
     # which would make this probe test python rather than the packaging.
-    output=$("$node" -e '
+    raw=$("$node" -e '
 const { spawnSync } = require("child_process");
 const r = spawnSync(process.argv[1], ["--version"], { encoding: "utf8", input: "" });
 if (r.error) { console.error(r.error.code || String(r.error)); process.exit(1); }
 const line = ((r.stdout || "") + (r.stderr || "")).split(/\r?\n/).find((l) => l.trim()) || "";
 process.stdout.write(line);
 process.exit(r.status === null ? 1 : r.status);
-' "$(native_path "$root/bin/$name")" 2>&1 | tail -n 1 | tr -d '\r') && status=0 || status=$?
+' "$(native_path "$root/bin/$name")" 2>&1) && status=0 || status=$?
+    output=$(printf '%s\n' "$raw" | sed -n '$p' | tr -d '\r')
     judge direct "$name" "$status" "$output"
 done
 
