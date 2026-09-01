@@ -87,6 +87,12 @@ jobs:
       - name: Check marketplace manifest
         run: bash scripts/check-marketplace.sh
 
+      # The dispatcher shipped as bin/<name> in every plugin bundle picks the
+      # binary for the running platform, so any one machine covers exactly one
+      # of its branches. This fakes the rest.
+      - name: Check plugin bin dispatcher
+        run: bash scripts/check-bundle-dispatch.sh
+
   deny:
     name: Dependency Audit
     runs-on: ubuntu-latest

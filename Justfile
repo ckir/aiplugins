@@ -50,8 +50,14 @@ wiring:
 marketplace:
     bash scripts/check-marketplace.sh
 
+# Drive every branch of the dispatcher shipped as bin/<name> in a plugin bundle.
+# Any one machine exercises exactly one branch of it, so the platform is faked;
+# the Git Bash branch shipped broken in 0.6.0 for want of this.
+dispatch:
+    bash scripts/check-bundle-dispatch.sh
+
 # Run all pre-flight checks (what CI and lefthook would run)
-check: fmt lint test deny spellcheck wiring marketplace
+check: fmt lint test deny spellcheck wiring marketplace dispatch
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
