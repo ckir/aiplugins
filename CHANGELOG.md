@@ -1,3 +1,23 @@
+## [0.6.3] - 2026-09-01
+
+Documentation only — no code changed. Like 0.6.2, cut as a release because a
+plugin's skills ship inside its bundle, and this one is read by an agent
+mid-analysis.
+
+### 📚 Documentation
+
+- *(ghidra)* Explain why an empty `get_xrefs` is a fact rather than a verdict, and why Rust binaries produce that result systematically (#28)
+  - Establish the difference with a control: the same call against something known to be referenced
+  - Rust `&str` constants carry their length at the use site, so literals sit in `.rdata` with no NUL separators; Ghidra's analyser defines an item only where a NUL falls, leaving some literals undefined and others with boundaries that fuse neighbours or start mid-word
+  - References attach to a defined item's start, so the address where a substring begins usually has none
+  - `describe_address` is the tool that explains the gap, and catches an address computed wrongly in the first place
+  - Names the self-referential fixture hazard: analysing the analysing tool's own binary puts its live diagnostics in `.rdata`, where a string result reads exactly like an error message
+
+### 🔧 Fixes
+
+- *(build)* `just emit-ghidra-skill` now regenerates every plugin's committed copy of the canonical skill, not only the Claude Code one (#28)
+  - The canonical skill is compiled into every agent's binary; emitting one front left the qwen copy stale, invisible to a package-scoped test run and caught only by the workspace run in CI
+
 ## [0.6.2] - 2026-09-01
 
 Documentation only — no code changed. Cut as a release because a plugin's
