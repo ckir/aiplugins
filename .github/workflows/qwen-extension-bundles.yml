@@ -1,0 +1,164 @@
+name: Qwen Extension Bundles
+
+# Publish the installable Qwen Code extension zips.
+#
+# dist's own release job uploads per-target archives of the binaries — that is
+# what a `cargo install`-shaped consumer wants, and it is not an extension: no
+# manifest, no skills, no hooks. `qwen extensions install` fetches ONE zip per
+# entry and extracts it as the extension directory, so the marketplace needs an
+# asset that is the whole extension, every platform at once.
+#
+# This job assembles that asset from the archives dist has already published on
+# the release, and adds it to the same release. It deliberately lives outside
+# .github/workflows/release.yml, which dist regenerates.
+#
+# Linux is not incidental: the bundles carry a /bin/sh dispatcher and unix
+# binaries whose exec bits have to survive the zip, and only a unix-made zip
+# entry can record them. scripts/bundle-qwen-extension.sh refuses to run
+# anywhere else.
+
+# Deliberately NOT `release: published`. dist's announce job creates the release
+# with the default GITHUB_TOKEN, and GitHub does not let a token-created release
+# (or tag push) trigger another workflow — the run just never happens, with
+# nothing anywhere to say why. v0.6.0 shipped without its bundles for exactly
+# that reason. `workflow_run` is the supported way to chain onto another
+# workflow, and it always runs the copy of this file on the default branch.
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  # Backfill a release that predates this workflow, or re-cut bundles after a
+  # fix to the bundling script.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to bundle (e.g. v0.6.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    name: Bundle & upload
+    # Release runs on pull_request too, where there is no release to add
+    # anything to. Only a successful tag push produced one.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      startsWith(github.event.workflow_run.head_branch, 'v'))
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.event.workflow_run.head_branch }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      # The extension tree has to come from the same commit as the binaries on
+      # the release, or the bundle ships a manifest for one version and binaries
+      # for another.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.event.workflow_run.head_branch }}
+
+      # Only tags cut after this workflow landed carry the bundling script, and
+      # "No such file or directory" three steps later is a poor way to learn it.
+      - name: Confirm the tag can be bundled
+        run: |
+          test -f scripts/bundle-qwen-extension.sh || {
+            echo "Tag $TAG predates scripts/bundle-qwen-extension.sh — bundles exist from the next release onward." >&2
+            exit 1
+          }
+
+      - name: Determine extensions to bundle
+        id: extensions
+        run: |
+          names=$(jq -r '.plugins[].name' .qwen-plugin/marketplace.json | tr -d '\r' | tr '\n' ' ')
+          [ -n "$names" ] || { echo "marketplace lists no extensions"; exit 1; }
+          echo "names=$names" >> "$GITHUB_OUTPUT"
+
+      - name: Download per-target archives from the release
+        run: |
+          mkdir -p assets
+          for name in ${{ steps.extensions.outputs.names }}; do
+            gh release download "$TAG" -D assets \
+              -p "$name-*.tar.xz" -p "$name-*.zip" --clobber
+          done
+          ls -la assets
+
+      - name: Assemble Qwen extension bundles
+        run: |
+          for name in ${{ steps.extensions.outputs.names }}; do
+            bash scripts/bundle-qwen-extension.sh "$name" assets bundles
+          done
+
+      - name: Upload bundles to the release
+        run: |
+          gh release upload "$TAG" bundles/*-extension.zip --clobber
+
+  # Everything above ran on Linux, against a tree this workflow assembled. This
+  # downloads what was actually published, extracts it the way an install does,
+  # and starts the entry points on each OS — so "the zip we published works"
+  # rests on the published zip rather than on the staging tree it came from.
+  verify:
+    name: Verify published Qwen bundle (${{ matrix.os }})
+    needs: bundle
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    env:
+      TAG: ${{ inputs.tag || github.event.workflow_run.head_branch }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.event.workflow_run.head_branch }}
+
+      - name: Download the published bundles
+        shell: bash
+        run: |
+          mkdir -p bundles
+          for ext in $(jq -r '.plugins[].name' .qwen-plugin/marketplace.json | tr -d '\r'); do
+            gh release download "$TAG" -D bundles -p "$ext-extension.zip" --clobber
+          done
+          ls -la bundles
+
+      - name: Extract
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          # mkdir -p first: unzip -d creates only the LAST path component, so
+          # extracting into extracted/<name> fails while extracted/ does not yet
+          # exist. Expand-Archive creates parents, which is why only the unix
+          # legs of this job failed.
+          for zip in bundles/*-extension.zip; do
+            name=$(basename "$zip" -extension.zip)
+            mkdir -p "extracted/$name"
+            unzip -q "$zip" -d "extracted/$name"
+          done
+
+      # Expand-Archive, not unzip: under MSYS a path with no extension resolves
+      # to its sibling .exe, so `unzip` prompts to overwrite bin/<name>.exe when
+      # it reaches bin/<name>. The host's own extractor has no such magic, and
+      # neither does this one.
+      - name: Extract (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          foreach ($zip in Get-ChildItem bundles\*-extension.zip) {
+            $name = $zip.Name -replace '-extension\.zip$', ''
+            Expand-Archive -Path $zip.FullName -DestinationPath "extracted\$name"
+          }
+
+      - name: Verify manifest exists
+        shell: bash
+        run: |
+          for dir in extracted/*/; do
+            if [ ! -f "$dir/qwen-extension.json" ]; then
+              echo "ERROR: $dir/qwen-extension.json is missing from the bundle" >&2
+              exit 1
+            fi
+            echo "  ok    $dir/qwen-extension.json exists"
+          done

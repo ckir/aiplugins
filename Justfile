@@ -50,6 +50,10 @@ wiring:
 marketplace:
     bash scripts/check-marketplace.sh
 
+# Verify the Qwen marketplace manifest still matches the extensions it publishes.
+qwen-marketplace:
+    bash scripts/check-qwen-marketplace.sh
+
 # Drive every branch of the dispatcher shipped as bin/<name> in a plugin bundle.
 # Any one machine exercises exactly one branch of it, so the platform is faked;
 # the Git Bash branch shipped broken in 0.6.0 for want of this.
@@ -131,6 +135,26 @@ bundle-plugins tag:
     done
     for name in $names; do
         bash scripts/bundle-plugin.sh "$name" target/plugin-assets target/plugin-bundles
+    done
+
+# Assemble the installable Qwen extension zips for a published release, the same
+# way .github/workflows/qwen-extension-bundles.yml does.
+#
+# Unix only: the bundles carry exec bits that a Windows zip cannot record, and
+# MSYS resolves `bin/foo` to `bin/foo.exe` and would overwrite the binary with
+# the dispatcher. On a Windows machine run this from WSL.
+bundle-qwen tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    names=$(jq -r '.plugins[].name' .qwen-plugin/marketplace.json | tr -d '\r')
+    rm -rf target/qwen-assets target/qwen-bundles
+    mkdir -p target/qwen-assets
+    for name in $names; do
+        gh release download "{{ tag }}" -D target/qwen-assets \
+            -p "$name-*.tar.xz" -p "$name-*.zip" --clobber
+    done
+    for name in $names; do
+        bash scripts/bundle-qwen-extension.sh "$name" target/qwen-assets target/qwen-bundles
     done
 
 # Regenerate EVERY plugin's committed copy of the ghidra-re-driver skill from

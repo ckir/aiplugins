@@ -1,0 +1,56 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "aiplugins-qwen",
+  "owner": {
+    "name": "AI Plugins Marketplace Contributors"
+  },
+  "metadata": {
+    "description": "Qwen Code extensions from the AI Plugins Marketplace monorepo"
+  },
+  "plugins": [
+    {
+      "name": "rtk-mcp-qwen",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-extension.zip"
+      },
+      "description": "Qwen Code integration for rtk (Rust Token Killer): a PreToolUse hook that transparently rewrites Bash/PowerShell commands through rtk for 60-90% token savings, plus rtk analytics as MCP tools.",
+      "author": {
+        "name": "AI Plugins Marketplace Contributors"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/qwen/rtk-mcp-qwen",
+      "license": "PolyForm-Noncommercial-1.0.0",
+      "category": "development",
+      "keywords": [
+        "rtk",
+        "tokens",
+        "hooks",
+        "mcp",
+        "rust",
+        "performance"
+      ]
+    },
+    {
+      "name": "re-ghidra-mcp-qwen",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/latest/download/re-ghidra-mcp-qwen-extension.zip"
+      },
+      "description": "Drive a persistent headless Ghidra JVM from Qwen Code: 19 reverse-engineering tools over MCP — decompile, navigate and search a program, plus durable rename/comment/set-datatype/set-prototype/set-local writes saved to the project.",
+      "author": {
+        "name": "AI Plugins Marketplace Contributors"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/qwen/re-ghidra-mcp-qwen",
+      "license": "PolyForm-Noncommercial-1.0.0",
+      "category": "development",
+      "keywords": [
+        "ghidra",
+        "reverse-engineering",
+        "decompiler",
+        "binary-analysis",
+        "mcp",
+        "rust"
+      ]
+    }
+  ]
+}
