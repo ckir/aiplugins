@@ -1,6 +1,6 @@
 {
   "name": "re-ghidra-mcp-cc",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Drive a persistent headless Ghidra JVM from Claude Code: 19 reverse-engineering tools over MCP — decompile, navigate and search a program, plus durable rename/comment/set-datatype/set-prototype/set-local writes saved to the project.",
   "author": {
     "name": "AI Plugins Marketplace Contributors"

@@ -1,3 +1,20 @@
+## [0.6.2] - 2026-09-01
+
+Documentation only — no code changed. Cut as a release because a plugin's
+README and skills ship inside its bundle, so this is how they reach an
+installed plugin.
+
+### 📚 Documentation
+
+- *(rtk)* Explain the false `No hook installed` notice, and how to silence it (#25)
+  - rtk decides by looking for the literal `rtk hook claude` in Claude Code's `settings.json`, and cannot see a plugin's `hooks.json` — so it reports no hook while the hook is installed and rewriting
+  - A `PreToolUse` entry whose matcher matches no tool name satisfies the check without ever executing: no duplicate hook, no second process per command
+  - Under a Claude Code profile the file rtk reads is `$CLAUDE_CONFIG_DIR/settings.json`, not `~/.claude/settings.json`, and the two disagree
+- *(re-ghidra)* Teach the doctor three things a real diagnostic run got wrong (#26)
+  - A stale project lock is the normal cost of a session ending: the worker JVM is bound to a Job Object so it cannot outlive its parent, and Ghidra never releases the lock. The lock carries no PID, so deleting it stays the user's call
+  - An unset `GHIDRA_INSTALL_DIR` means "not configured", never "not installed" — a `-Depth 3` sweep missed an install at depth 5 and reported no Ghidra
+  - A worker log can belong to another client entirely, and a healthy connection ends `quit_reason=Closed`, which reads exactly like the crash being hunted
+
 ## [0.6.1] - 2026-09-01
 
 ### 🔧 Fixes
