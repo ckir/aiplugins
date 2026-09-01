@@ -179,6 +179,42 @@ find it by a name pattern first.
   returns an exact `total` instruction count). `list_segments` is the one exception: it is not paginated,
   since segment counts are always small.
 
+## An empty result is a fact, not a verdict - and strings lie in Rust binaries
+
+`get_xrefs` returning no rows means one of two things - the target genuinely has no references, or you
+asked about an address nothing references - and a single call cannot tell you which. **Get a control:**
+run the same call against something you know is referenced (a function with callers, an import pointer).
+If the control returns rows, the empty answer is a fact about your target and the tool is fine.
+
+The commonest way to ask about the wrong address is a **string in a Rust binary**, where the miss is
+systematic rather than bad luck:
+
+- Rust `&str` constants carry their length at the use site, so the literals sit in `.rdata` as one run
+  with **no NUL separators**: `GHIDRA_INSTALL_DIRGHIDRA_MCP_PROJECT_DIRGHIDRA_MCP_PROJECT_NAME...`
+- Ghidra's string analyser terminates on NUL, so it defines an item only where a NUL happens to fall.
+  Some literals get no item at all; others get one whose boundaries are wrong, fusing neighbours or
+  starting mid-word. Both of these are real items from one binary:
+  `"mid > lenC:\...\library\alloc\src\collections\btree\node.rs"` (a panic message welded to a source
+  path) and ``"V` but there is no `support/analyzeHeadless` there..."`` (leading `` V` `` is the tail of
+  the *previous* literal).
+- References are recorded against a **defined item's start address**. Ask about the address where your
+  substring begins - which is usually mid-item, or in an undefined region - and you correctly get zero
+  rows while the code uses that text constantly.
+
+So when a string search comes back thin, or its address has no xrefs:
+
+1. `list_strings` with a `filter` may legitimately find nothing though the bytes are in the file. That is
+   the analyser's boundary problem, not proof the string is absent.
+2. `describe_address` on the address you used - it reports what is actually defined there, its type and
+   containing item. This is also how you catch having computed an address wrongly in the first place
+   (a file offset is not a virtual address).
+3. Re-ask `get_xrefs` at the containing item's start.
+
+The same caution applies to any language that packs constants without terminators, and to data the
+analyser never typed. **When the fixture is the analysing tool's own binary**, add one more: its `.rdata`
+holds the very diagnostics the tool prints, so a string result and a live error message read identically.
+Tell them apart by provenance - data has an address and arrives from `list_strings`/`read_bytes`.
+
 ## Judge the decompile before you trust it
 
 Ghidra's output is a *model*, and a wrong model still reads as plausible C. When you see these signals,
