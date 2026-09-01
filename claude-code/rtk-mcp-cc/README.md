@@ -126,10 +126,53 @@ empty stdout and exit 0. Verified against rtk 0.45.0, and pinned by the
 `hook_is_silent_when_there_is_nothing_to_rewrite` test. You will pay one extra
 process spawn per command and gain nothing.
 
-You may also keep seeing `[rtk] /!\ No hook installed — run 'rtk init -g'` on
-stderr after switching: rtk looks for its entry in `settings.json` and cannot
-see the plugin's `hooks.json`. The notice is cosmetic; Claude Code ignores hook
-stderr on a zero exit.
+### `[rtk] /!\ No hook installed` while the hook is installed
+
+You will keep seeing this on stderr after switching:
+
+```console
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+```
+
+rtk decides whether a hook exists by looking for the literal command
+`rtk hook claude` in Claude Code's `settings.json`. This plugin supplies the
+same hook from its own `hooks/hooks.json`, which rtk cannot see — so it reports
+"no hook installed" while the hook is installed and rewriting. The notice is
+wrong rather than merely noisy, and the remedy it proposes is the duplicate
+entry the section above tells you to remove.
+
+Claude Code ignores hook stderr on a zero exit, so nothing breaks. To silence it,
+give rtk the string it is looking for in a hook that can never run:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "RtkHookIsProvidedByThePlugin",
+        "hooks": [{ "type": "command", "command": "rtk hook claude" }]
+      }
+    ]
+  }
+}
+```
+
+A matcher is a regex tested against tool names — `Bash`, `Read`, `Edit` — so
+this one matches nothing and the entry never executes. It exists only to be
+read. rtk stops complaining, the plugin's hook stays the one doing the work, and
+no command pays a second process spawn.
+
+**Put it in the settings file of the config directory Claude Code is actually
+using.** That is `~/.claude/settings.json` for an ordinary install, but
+`$CLAUDE_CONFIG_DIR/settings.json` when Claude Code runs under a profile — and
+under a profile the two disagree: marking only `~/.claude` leaves the plugin's
+MCP tools still reporting the notice, because the rtk they spawn reads the
+profile's file. If it persists, mark both.
+
+This is a workaround, not a fix: it depends on rtk's check being a string search,
+and it lives outside the repository, so a new machine or a new profile needs it
+again. The fix belongs upstream — rtk recognising a plugin-provided hook, or
+offering a switch to turn the notice off.
 
 ## Configuration
 
