@@ -13,27 +13,39 @@ command passes through unchanged (fail-open).
 
 ## Installation
 
-### Via Qwen Code extension bundle (recommended)
+### One-liner install (recommended)
+
+```bash
+# Linux / macOS
+curl -fsSL https://raw.githubusercontent.com/ckir/aiplugins/main/scripts/install-qwen-extension.sh | bash -s -- rtk-mcp-qwen
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/ckir/aiplugins/main/scripts/install-qwen-extension.ps1 -OutFile "$env:TEMP\iqe.ps1"; & "$env:TEMP\iqe.ps1" rtk-mcp-qwen
+```
+
+The script downloads the release bundle, validates it, extracts it to
+`~/.qwen/extensions/rtk-mcp-qwen/`, and verifies with `qwen extensions list`.
+
+### Via `qwen extensions install`
 
 ```bash
 qwen extensions install https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-extension.zip
 ```
 
-> **Note:** As of Qwen Code v0.22.3, `qwen extensions install` from an archive
-> URL may exit silently without installing (tracked in
+> **⚠️ Known issue:** As of Qwen Code v0.22.3, `qwen extensions install` from
+> an archive URL exits silently without installing (tracked in
 > [QwenLM/qwen-code#10741](https://github.com/QwenLM/qwen-code/issues/10741)).
-> If that happens, use the manual install below.
+> Use the one-liner install above until this is fixed.
 
-### Manual install (workaround)
+### Manual install
 
-1. Download the extension bundle for your platform:
+1. Download the extension bundle:
 
    | Platform | URL |
    |---|---|
-   | Windows | https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-extension.zip |
-   | Linux x86_64 | https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-extension.zip |
-   | macOS x86_64 | https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-extension.zip |
-   | macOS aarch64 | https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-extension.zip |
+   | All | https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-extension.zip |
 
 2. Extract it to your Qwen extensions directory:
 
