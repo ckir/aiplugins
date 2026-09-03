@@ -61,7 +61,7 @@ fn measures_re_ghidra_mcp_cc_from_its_own_manifest() {
         "every tool must carry the schema whose size is the thing being measured"
     );
     assert!(
-        !outcome.child_still_running(),
+        outcome.reaped,
         "the probed server must not outlive the probe"
     );
 }

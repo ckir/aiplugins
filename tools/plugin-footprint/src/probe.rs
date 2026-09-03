@@ -76,18 +76,15 @@ pub struct Outcome {
     /// Raw `prompts/list` entries. Empty when the server does not implement it.
     pub prompts: Vec<Value>,
     pub binary: PathBuf,
-    reaped: bool,
-}
-
-impl Outcome {
-    /// Whether the probe failed to observe the server exit.
+    /// Whether the probe observed the server exit.
     ///
-    /// The prober kills the process and then waits for it, so a `false` here
-    /// means the OS confirmed the child is gone — not merely that the pipes were
-    /// dropped and the process left to its own devices.
-    pub fn child_still_running(&self) -> bool {
-        !self.reaped
-    }
+    /// The prober kills the process and then waits for it, so `true` means the
+    /// OS confirmed the child is gone — not merely that the pipes were dropped
+    /// and the process left to its own devices.
+    ///
+    /// Public, like every other field, so that tests can build an `Outcome`
+    /// without this type growing a constructor that exists only for them.
+    pub reaped: bool,
 }
 
 /// Launch `spec`'s server, complete the MCP handshake, and read what it lists.

@@ -168,7 +168,7 @@ fn the_probed_process_does_not_outlive_the_probe() {
 
     assert!(matches!(outcome.status, Status::TimedOut(_)));
     assert!(
-        !outcome.child_still_running(),
+        outcome.reaped,
         "a hung server must be killed, not abandoned"
     );
 }
