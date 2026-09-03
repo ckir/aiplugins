@@ -69,6 +69,34 @@ footprint-regen:
         echo "regenerated docs/footprints/$plugin.json"
     done
 
+# Verify each published plugin's committed footprint against a fresh measurement,
+# then against the thresholds. Requires the plugin binaries; see `footprint-regen`.
+footprint:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Freshness (spec §6). Regenerating and requiring no diff is what makes the
+    # committed document a claim about the world rather than a file that agrees
+    # with itself. `check-qwen-marketplace.sh` keeps its generated manifest
+    # honest exactly this way, on the stated reasoning that nothing fails when a
+    # copy goes stale — it just advertises the wrong thing.
+    just footprint-regen
+    if ! git diff --quiet -- docs/footprints/; then
+        echo "ERROR: the committed footprint documents are stale." >&2
+        echo "A fresh measurement disagrees with what is committed:" >&2
+        git --no-pager diff --stat -- docs/footprints/ >&2
+        echo "Run 'just footprint-regen' and commit the result." >&2
+        exit 1
+    fi
+    # `main`, NOT `HEAD`. Against HEAD the baseline is the developer's own last
+    # commit, so once they have run `footprint-regen` and committed it to satisfy
+    # the freshness check above, the measured delta is zero BY CONSTRUCTION and
+    # the delta cap can never fire locally. `just check` would report green on
+    # exactly the change the cap exists to catch, and CI would be the first to
+    # say otherwise. Comparing against `main` is the local analogue of what CI
+    # does against the base branch.
+    cargo run -q -p plugin-footprint --bin footprint-gate -- \
+        "$(git rev-parse --verify --quiet main >/dev/null && echo main || echo HEAD)"
+
 # Drive every branch of the dispatcher shipped as bin/<name> in a plugin bundle.
 # Any one machine exercises exactly one branch of it, so the platform is faked;
 # the Git Bash branch shipped broken in 0.6.0 for want of this.
@@ -87,7 +115,7 @@ smoke:
     done
 
 # Run all pre-flight checks (what CI and lefthook would run)
-check: fmt lint test deny spellcheck wiring marketplace dispatch smoke
+check: fmt lint test deny spellcheck wiring marketplace dispatch smoke footprint
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
