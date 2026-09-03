@@ -285,9 +285,22 @@ fn serve_without_configuration_still_answers_tools_list() {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    let tools = String::from_utf8_lossy(&out.stdout)
+    // stdout IS the MCP channel, so "empty" is no longer the hygiene property — "nothing but
+    // protocol" is. Parsing leniently and picking out the response we want would silently tolerate a
+    // stray `println!` alongside it, which is exactly the corruption the replaced test caught by
+    // asserting stdout was empty.
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let messages: Vec<serde_json::Value> = stdout
         .lines()
-        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            serde_json::from_str(line)
+                .unwrap_or_else(|e| panic!("non-protocol output on the MCP channel ({e}): {line}"))
+        })
+        .collect();
+
+    let tools = messages
+        .iter()
         .find(|msg| msg["id"] == 2)
         .and_then(|msg| msg["result"]["tools"].as_array().cloned())
         .expect("a tools/list response on stdout");
