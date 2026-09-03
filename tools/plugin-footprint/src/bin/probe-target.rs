@@ -13,6 +13,7 @@
 //!   --die          exit(3) on the first request
 //!   --huge BYTES   pad each tool description to BYTES, to trip the size cap
 //!   --loop-cursor  always return the same cursor, to trip the page cap
+//!   --wrong-key    return the tools under a key nobody asked for
 
 use std::io::{BufRead, Write};
 
@@ -78,8 +79,13 @@ fn main() {
                     .and_then(|c| c.as_str())
                     .and_then(|c| c.parse().ok())
                     .unwrap_or(0);
+                let key = if has("--wrong-key") {
+                    "toolList"
+                } else {
+                    "tools"
+                };
                 let mut result = serde_json::json!({
-                    "tools": [{
+                    key: [{
                         "name": format!("tool_page_{cursor}"),
                         "description": "x".repeat(pad.max(1)),
                         "inputSchema": { "type": "object", "properties": {} }

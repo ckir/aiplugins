@@ -164,11 +164,42 @@ fn the_probed_process_does_not_outlive_the_probe() {
     // Every outcome reaps, including the successful one — the path that runs
     // every time. Nothing in MCP obliges a server to exit on stdin EOF, so a
     // prober that merely drops its pipes leaks one process per plugin per run.
+    let started = std::time::Instant::now();
     let outcome = probe(&target(&["--hang"]), &quick());
+    let elapsed = started.elapsed();
 
     assert!(matches!(outcome.status, Status::TimedOut(_)));
     assert!(
         outcome.reaped,
         "a hung server must be killed, not abandoned"
     );
+
+    // `reaped` alone is a field, and a field can be set. This bound is what
+    // makes the claim mean something: the target sleeps in 60s increments, so
+    // dropping the `kill()` and merely waiting would park here far past this.
+    // Coarse on purpose — it distinguishes "killed" from "waited", and is not a
+    // performance measurement.
+    assert!(
+        elapsed < std::time::Duration::from_secs(20),
+        "the probe should return as soon as it gives up, took {elapsed:?}"
+    );
+}
+
+#[test]
+fn a_result_without_the_expected_array_is_failed_not_an_empty_success() {
+    // The worst outcome this tool can produce is not a crash, it is a WRONG
+    // NUMBER that people trust. A server answering `tools/list` with its tools
+    // under some other key must not read as "this plugin has no tools": that
+    // would sail through the gate as a spectacular footprint reduction and
+    // publish zero for a plugin that costs whatever it costs.
+    let outcome = probe(&target(&["--wrong-key"]), &quick());
+
+    match &outcome.status {
+        Status::Failed(why) => assert!(
+            why.contains("tools"),
+            "the failure must name the method and the key it wanted, got: {why}"
+        ),
+        other => panic!("expected a failure, got: {other:?}"),
+    }
+    assert!(outcome.tools.is_empty());
 }

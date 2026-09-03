@@ -72,6 +72,17 @@ struct RawServer {
     env: BTreeMap<String, String>,
 }
 
+/// Whether `dir` is a plugin directory at all.
+///
+/// A plugin with no `.mcp.json` is legitimate — it may ship only hooks or skills
+/// — so "no servers" cannot distinguish a hooks-only plugin from a mistyped
+/// path. This can. Without it, pointing the tool at the wrong directory produces
+/// a confident `status: ok, bytes: 0`, which is the same false zero the probe
+/// status exists to prevent, arriving one level up.
+pub fn looks_like_a_plugin(dir: &Path) -> bool {
+    dir.join(".claude-plugin").join("plugin.json").is_file()
+}
+
 /// Read `<plugin_dir>/.mcp.json` and resolve every server it declares.
 ///
 /// A plugin with no `.mcp.json` declares no servers, which is not an error — a
@@ -136,21 +147,15 @@ fn resolve(
     // as raw text, so an un-normalised path would differ from the same location
     // written natively.
     let resolved = lexically_normalize(&anchored);
-    let root = lexically_normalize(plugin_dir);
 
-    let escapes = match (&resolved, &root) {
-        (Some(resolved), Some(root)) => !resolved.starts_with(root),
-        // A path that climbs above its own prefix is not inside anything.
-        _ => true,
-    };
-    if escapes {
+    if !is_confined(plugin_dir, &anchored) {
         return Err(ManifestError::CommandEscapesPluginRoot {
             server: name.to_string(),
             command,
             plugin_dir: plugin_dir.to_path_buf(),
         });
     }
-    let resolved = resolved.expect("checked above");
+    let resolved = resolved.expect("confinement rejects a path that cannot normalise");
 
     Ok(ServerSpec {
         name: name.to_string(),
@@ -158,6 +163,47 @@ fn resolve(
         args: raw.args,
         env: raw.env,
     })
+}
+
+/// Whether `command` stays inside `plugin_dir`.
+///
+/// Both sides are made absolute first, and that is the whole point. `Path`'s
+/// `starts_with` returns TRUE for an empty prefix — every path starts with
+/// nothing — and a plugin directory of `.`, `./` or `""` normalises to exactly
+/// that, since `lexically_normalize` drops `CurDir` components. Comparing
+/// against the bare normalised root would therefore confine nothing at all for
+/// `plugin-footprint measure .`, which is an entirely ordinary invocation.
+/// MEASURED: with a root of `.`, `C:/Windows/System32/evil.exe` was accepted.
+///
+/// The absolute forms are used ONLY for this decision. What gets launched, and
+/// what the document records, stays as written — the document's binary path is
+/// repo-relative by design (spec §5) and must not become machine-specific.
+fn is_confined(plugin_dir: &Path, command: &Path) -> bool {
+    let (Some(root), Some(candidate)) = (absolutize(plugin_dir), absolutize(command)) else {
+        // Either side unresolvable, or a path that climbed above its own prefix:
+        // fail closed.
+        return false;
+    };
+    // Defence in depth: a root with no components confines nothing, and must
+    // never be treated as a root even if `absolutize` were to yield one.
+    if root.components().next().is_none() {
+        return false;
+    }
+    candidate.starts_with(&root)
+}
+
+/// A lexically normalised absolute form, resolving a relative path against the
+/// process working directory.
+///
+/// Filesystem-free, like `lexically_normalize`: the command routinely does not
+/// exist yet when this runs.
+fn absolutize(path: &Path) -> Option<PathBuf> {
+    let anchored = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir().ok()?.join(path)
+    };
+    lexically_normalize(&anchored)
 }
 
 /// Resolve `.` and `..` textually, without consulting the filesystem.
@@ -189,4 +235,110 @@ fn lexically_normalize(path: &Path) -> Option<PathBuf> {
         }
     }
     Some(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn raw(command: &str) -> RawServer {
+        RawServer {
+            command: Some(command.to_string()),
+            args: Vec::new(),
+            env: BTreeMap::new(),
+        }
+    }
+
+    fn resolve_for(plugin_dir: &str, command: &str) -> Result<ServerSpec, ManifestError> {
+        let dir = PathBuf::from(plugin_dir);
+        resolve("s", raw(command), &dir, &dir.join(".mcp.json"))
+    }
+
+    /// These exercise `resolve` directly rather than through a fixture on disk,
+    /// so they can use a RELATIVE plugin directory without any test having to
+    /// `set_current_dir` — which is process-global and races the moment the
+    /// harness runs tests on threads.
+    #[test]
+    fn a_directory_that_is_not_a_plugin_is_recognisable() {
+        // The repo root is not a plugin; a plugin directory is.
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .ancestors()
+            .nth(2)
+            .expect("crate sits two levels below the repo root");
+
+        assert!(!looks_like_a_plugin(repo));
+        assert!(looks_like_a_plugin(
+            &repo.join("claude-code").join("re-ghidra-mcp-cc")
+        ));
+    }
+
+    #[test]
+    fn a_relative_plugin_directory_appears_once_not_twice() {
+        // Found by running the tool, not by the suite: substituting the
+        // placeholder already anchors the path, so joining afterwards prepended
+        // the plugin directory a second time. Invisible with an absolute plugin
+        // directory, because the substitution is then absolute too and
+        // `Path::join` replaces rather than appends.
+        let spec = resolve_for("claude-code/x", "${CLAUDE_PLUGIN_ROOT}/bin/s-mcp")
+            .expect("a relative plugin directory resolves");
+
+        assert_eq!(
+            spec.command,
+            Path::new("claude-code/x").join("bin").join("s-mcp")
+        );
+    }
+
+    #[test]
+    fn a_command_without_the_placeholder_is_taken_relative_to_the_plugin() {
+        let spec = resolve_for("claude-code/x", "bin/s-mcp").expect("resolves");
+
+        assert_eq!(
+            spec.command,
+            Path::new("claude-code/x").join("bin").join("s-mcp")
+        );
+    }
+
+    #[test]
+    fn a_plugin_directory_of_dot_still_confines() {
+        // `Path::starts_with` returns true for an empty prefix, and `.`
+        // normalises to empty — so comparing against the bare normalised root
+        // confined nothing at all. `measure .` is an ordinary invocation, which
+        // is what made this reachable.
+        for root in [".", "./", ""] {
+            let err = resolve_for(root, "C:/Windows/System32/evil.exe")
+                .expect_err("an absolute outside command must be refused");
+            assert!(
+                matches!(err, ManifestError::CommandEscapesPluginRoot { .. }),
+                "root {root:?} gave {err}"
+            );
+            let err = resolve_for(root, "/etc/passwd")
+                .expect_err("a unix absolute path must be refused too");
+            assert!(matches!(
+                err,
+                ManifestError::CommandEscapesPluginRoot { .. }
+            ));
+        }
+    }
+
+    #[test]
+    fn a_dot_root_still_accepts_something_genuinely_inside_it() {
+        // The fix must not confine by refusing everything.
+        let spec = resolve_for(".", "${CLAUDE_PLUGIN_ROOT}/bin/s-mcp").expect("resolves");
+
+        assert!(spec.command.ends_with(Path::new("bin").join("s-mcp")));
+    }
+
+    #[test]
+    fn every_occurrence_of_the_placeholder_is_substituted() {
+        // `str::replace` replaces all occurrences; this pins that a second one
+        // cannot survive into a launched command as a literal `${...}`.
+        let spec = resolve_for("plug", "${CLAUDE_PLUGIN_ROOT}/bin/${CLAUDE_PLUGIN_ROOT}x")
+            .expect("resolves");
+
+        assert!(
+            !spec.command.to_string_lossy().contains("${"),
+            "an unsubstituted placeholder would be launched literally: {:?}",
+            spec.command
+        );
+    }
 }

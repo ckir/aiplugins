@@ -9,7 +9,7 @@
 
 use plugin_footprint::canonical::canonical_json;
 use plugin_footprint::document::{build, Tree};
-use plugin_footprint::manifest::read_mcp_servers;
+use plugin_footprint::manifest::{looks_like_a_plugin, read_mcp_servers};
 use plugin_footprint::probe::{probe, Limits, Outcome, Status};
 use std::path::Path;
 use std::process::ExitCode;
@@ -28,6 +28,18 @@ fn main() -> ExitCode {
 }
 
 fn measure(plugin_dir: &Path) -> ExitCode {
+    // Checked before anything is measured. A plugin with no `.mcp.json` is
+    // legitimate — hooks or skills only — so "no servers" cannot tell a
+    // hooks-only plugin from a mistyped path, and the wrong path would otherwise
+    // produce a confident `ok, 0 bytes`.
+    if !looks_like_a_plugin(plugin_dir) {
+        eprintln!(
+            "plugin-footprint: {} is not a plugin directory (no .claude-plugin/plugin.json)",
+            plugin_dir.display()
+        );
+        return ExitCode::from(2);
+    }
+
     let servers = match read_mcp_servers(plugin_dir) {
         Ok(s) => s,
         Err(e) => {
@@ -36,8 +48,22 @@ fn measure(plugin_dir: &Path) -> ExitCode {
         }
     };
 
-    // One document per plugin, so several declared servers are measured together.
-    // Their sources are already namespaced by tool name within the tier.
+    // Refused rather than merged. Merging several servers' tools into one tier
+    // identifies each source by tool name alone, so two servers exposing the
+    // same name would land as two sources with the same id — an ambiguous
+    // document that a reviewer reading a diff cannot attribute. No plugin in
+    // this marketplace declares more than one server today; when one does, the
+    // fix is to qualify source ids by server, and this error says so rather
+    // than quietly producing a shape nobody designed.
+    if servers.len() > 1 {
+        eprintln!(
+            "plugin-footprint: {} declares {} MCP servers; measuring more than one into a single              document needs server-qualified source ids, which is not implemented",
+            plugin_dir.display(),
+            servers.len()
+        );
+        return ExitCode::from(1);
+    }
+
     let mut merged = Outcome {
         status: Status::Ok,
         tools: Vec::new(),
