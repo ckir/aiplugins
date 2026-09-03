@@ -270,6 +270,19 @@ fn ratchet(measured_path: &Path, budgets_path: &Path) -> ExitCode {
         .and_then(|e| e.get("residentBytes"))
         .and_then(serde_json::Value::as_u64);
 
+    // Refused at the point of writing as well as at the point of reading, so a
+    // violating combination cannot be committed and then discovered by a gate
+    // run against it. Fork 2 requires D < H (spec §6 item 5, §8 Fork 2).
+    if delta >= headroom {
+        eprintln!(
+            "plugin-footprint: {} gives {plugin} deltaBytes {delta}, not below headroomBytes \
+             {headroom}. Fork 2 requires D < H: a cap at or above the headroom lets one \
+             change spend the whole allowance the ratchet exists to reclaim.",
+            budgets_path.display()
+        );
+        return ExitCode::from(1);
+    }
+
     // The plugin's OWN headroom drives the hysteresis. Using the default here
     // while writing the per-plugin value would apply a different rule from the
     // one the file states.

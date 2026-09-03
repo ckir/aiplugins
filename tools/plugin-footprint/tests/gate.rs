@@ -344,3 +344,39 @@ fn a_path_that_parses_comes_back_with_its_value() {
         other => panic!("expected Found, got {other:?}"),
     }
 }
+
+#[test]
+fn a_delta_cap_at_or_above_the_headroom_is_refused() {
+    // Fork 2 decided the per-change cap D with `D < H`, and the spec states it
+    // twice (§6 item 5, §8 Fork 2). Nothing enforced it.
+    //
+    // Round 3's own policy-preservation fix is what made this live: `ratchet`
+    // used to rebuild the entry from its constants on every run, so a violating
+    // value could not survive a regeneration. Now it is honoured, which is
+    // right for a policy file — and means the invariant has to be checked
+    // somewhere instead of accidentally reset.
+    //
+    // Why it matters rather than being pedantry: the ratchet reclaims slack
+    // down to `headroom` above the low-water mark. A cap at or above that
+    // headroom lets ONE change spend the entire allowance the ratchet exists to
+    // reclaim, which is precisely the jump §6 says the ceiling is blind to.
+    for bad in [
+        json!({ "x": { "residentBytes": 20000, "headroomBytes": 2000, "deltaBytes": 2000 } }),
+        json!({ "x": { "residentBytes": 20000, "headroomBytes": 2000, "deltaBytes": 5000 } }),
+        json!({ "x": { "residentBytes": 20000, "headroomBytes": 0, "deltaBytes": 0 } }),
+    ] {
+        assert!(
+            matches!(budget_for(&bad, "x"), BudgetLookup::Malformed(_)),
+            "D >= H must be refused: {bad}"
+        );
+    }
+
+    // And the shipped defaults must still be accepted: 500 < 2000.
+    assert!(matches!(
+        budget_for(
+            &json!({ "x": { "residentBytes": 20000, "headroomBytes": 2000, "deltaBytes": 500 } }),
+            "x"
+        ),
+        BudgetLookup::Found(_)
+    ));
+}

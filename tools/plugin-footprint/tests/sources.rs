@@ -264,3 +264,28 @@ fn a_dot_named_directory_cannot_hide_a_source_from_the_measurement() {
     );
     assert_eq!(sources.resident[0].id, ".sneaky");
 }
+
+#[test]
+#[cfg(unix)]
+fn a_filename_that_is_not_utf8_is_refused_rather_than_lossily_collided() {
+    // `to_string_lossy` maps EVERY invalid byte sequence onto U+FFFD, so two
+    // different filenames can arrive as one id. Two sources then share an id and
+    // their relative order comes from `read_dir` rather than from the data,
+    // churning the committed document between machines — and the whole reason
+    // the sort key became (kind, id) was to stop exactly that.
+    //
+    // `document.rs::strip_root` already refuses to compare lossily for this same
+    // reason. Unix-only because Windows filenames cannot hold these bytes.
+    use std::os::unix::ffi::OsStrExt;
+
+    let fx = Fixture::new("notutf8");
+    std::fs::create_dir_all(fx.path().join("agents")).expect("mkdir");
+    let bad = std::ffi::OsStr::from_bytes(b"\xff\xfe.md");
+    std::fs::write(fx.path().join("agents").join(bad), SKILL).expect("write");
+
+    let err = read_file_sources(fx.path()).expect_err("a lossy name must be loud");
+    assert!(
+        err.to_string().contains("UTF-8"),
+        "the error must say why, got: {err}"
+    );
+}
