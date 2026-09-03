@@ -283,3 +283,124 @@ async fn concurrent_calls_all_report_the_config_error_not_server_busy() {
     }
     assert_eq!(state.boot_count(), 0);
 }
+
+// ---- the complete ConfigError surface, enumerated ----
+
+/// A scratch directory that removes itself.
+struct Scratch {
+    dir: std::path::PathBuf,
+}
+
+impl Scratch {
+    fn new(tag: &str) -> Self {
+        let dir = std::env::temp_dir().join(format!(
+            "ghidra-mcp-cfg-{tag}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&dir).expect("create scratch");
+        Self { dir }
+    }
+
+    /// Make this look like a Ghidra install to `RawConfig::resolve`, which checks only that
+    /// `support/analyzeHeadless[.bat]` exists.
+    fn into_ghidra_install(self) -> Self {
+        let support = self.dir.join("support");
+        std::fs::create_dir_all(&support).expect("create support/");
+        let launcher = if cfg!(windows) {
+            "analyzeHeadless.bat"
+        } else {
+            "analyzeHeadless"
+        };
+        std::fs::write(support.join(launcher), "").expect("create launcher");
+        self
+    }
+
+    fn s(&self) -> String {
+        self.dir.to_string_lossy().into_owned()
+    }
+}
+
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        std::fs::remove_dir_all(&self.dir).ok();
+    }
+}
+
+fn code_for(raw: RawConfig) -> ErrorCode {
+    match ServerState::from_raw(raw, versioned_script_dir()).cfg() {
+        Ok(_) => panic!("this configuration must not resolve"),
+        Err(e) => e.error.code,
+    }
+}
+
+/// Every `ConfigError` this resolver can produce, and the code each one reports.
+///
+/// `config_unusable` matches `ConfigError::Missing` on the `field` STRING, so renaming a field in
+/// `config.rs` would silently drop that case into the catch-all and report a Ghidra-install problem
+/// for something that is not one. Nothing else in the build would notice. This enumerates the whole
+/// surface — all four `Missing` fields plus both filesystem variants — so that rename fails loudly.
+#[test]
+fn every_config_error_reports_the_subsystem_that_is_actually_wrong() {
+    let install = Scratch::new("install").into_ghidra_install();
+
+    // 1. ghidra_install_dir absent.
+    assert_eq!(code_for(RawConfig::default()), ErrorCode::GhidraNotFound);
+
+    // 2. project_dir absent.
+    assert_eq!(
+        code_for(RawConfig {
+            ghidra_install_dir: Some(install.s()),
+            ..RawConfig::default()
+        }),
+        ErrorCode::ProjectNotFound
+    );
+
+    // 3. project_name absent.
+    assert_eq!(
+        code_for(RawConfig {
+            ghidra_install_dir: Some(install.s()),
+            project_dir: Some(install.s()),
+            ..RawConfig::default()
+        }),
+        ErrorCode::ProjectNotFound
+    );
+
+    // 4. bootstrap_program absent. Deliberately NOT ProgramNotFound: that code means "the
+    //    program_path you passed is not in the project VFS" (crucible.rs), and giving it a second
+    //    producer would make a bad argument indistinguishable from an unconfigured server.
+    assert_eq!(
+        code_for(RawConfig {
+            ghidra_install_dir: Some(install.s()),
+            project_dir: Some(install.s()),
+            project_name: Some("proj".into()),
+            ..RawConfig::default()
+        }),
+        ErrorCode::ProjectNotFound
+    );
+
+    // 5. NotGhidra: every field present, but the install dir has no launcher.
+    let bare = Scratch::new("bare");
+    assert_eq!(
+        code_for(RawConfig {
+            ghidra_install_dir: Some(bare.s()),
+            project_dir: Some(install.s()),
+            project_name: Some("proj".into()),
+            bootstrap_program: Some("x.exe".into()),
+            ..RawConfig::default()
+        }),
+        ErrorCode::GhidraNotFound
+    );
+
+    // 6. NoProjectDir: install is valid, project dir does not exist.
+    assert_eq!(
+        code_for(RawConfig {
+            ghidra_install_dir: Some(install.s()),
+            project_dir: Some(install.dir.join("nope").to_string_lossy().into_owned()),
+            project_name: Some("proj".into()),
+            bootstrap_program: Some("x.exe".into()),
+            ..RawConfig::default()
+        }),
+        ErrorCode::ProjectNotFound
+    );
+}

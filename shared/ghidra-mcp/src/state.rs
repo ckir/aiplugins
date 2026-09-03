@@ -224,15 +224,17 @@ pub fn check_worker_version(announced: &str) -> Result<(), ErrorEnvelope> {
 fn config_unusable(e: crate::config::ConfigError) -> ErrorEnvelope {
     use crate::config::ConfigError;
     let code = match &e {
+        // `bootstrap_program` belongs here and NOT under `ProgramNotFound`: that code already has one
+        // producer with a precise meaning — the worker's `PROGRAM_NOT_FOUND` wire code
+        // (`ghidra-ipc/src/error_map.rs`), pinned by `tests/crucible.rs` to "the program_path you
+        // passed is not in the project VFS". A second, unrelated producer would leave a client unable
+        // to tell a bad tool argument from an unconfigured server. Which program to bootstrap is part
+        // of the project's configuration, so it reports as a project problem.
         ConfigError::Missing {
-            field: "project_dir" | "project_name",
+            field: "project_dir" | "project_name" | "bootstrap_program",
             ..
         }
         | ConfigError::NoProjectDir(_) => ErrorCode::ProjectNotFound,
-        ConfigError::Missing {
-            field: "bootstrap_program",
-            ..
-        } => ErrorCode::ProgramNotFound,
         ConfigError::Missing { .. } | ConfigError::NotGhidra(_) => ErrorCode::GhidraNotFound,
     };
     ErrorEnvelope::new(code, e.to_string()).with_action(
