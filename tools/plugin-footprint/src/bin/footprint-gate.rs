@@ -2,8 +2,17 @@
 //!
 //! Usage: `footprint-gate <base-ref>` — for example `footprint-gate origin/main`.
 
-use plugin_footprint::gate::{check, Budget, Verdict};
+use plugin_footprint::gate::{budget_for, check, Budget, BudgetLookup, Verdict};
 use std::process::{Command, ExitCode};
+
+/// A plugin with no baseline is measured but not compared, so it needs a budget
+/// that constrains nothing. Named rather than inlined, because "no ceiling" is a
+/// dangerous value and every place that produces it should be greppable.
+const UNCAPPED: Budget = Budget {
+    resident_bytes: u64::MAX,
+    headroom_bytes: 0,
+    delta_bytes: u64::MAX,
+};
 
 /// Where the thresholds live. Read from the BASE REF, never from the working
 /// tree (spec §6.2): CI checks out the pull request, so a budget read from that
@@ -19,9 +28,30 @@ fn main() -> ExitCode {
         return ExitCode::from(2);
     };
 
+    // Checked BEFORE anything else, because every later step degrades silently
+    // without it. MEASURED during the capstone review: run against
+    // `origin/does-not-exist`, this printed "has no budget yet; measuring
+    // without a ceiling" for every plugin and exited 0 — output byte-identical
+    // to a legitimately new plugin. `git show` cannot tell "this ref does not
+    // exist" from "this path is not at that ref", so a mistyped base branch, a
+    // shallow clone, a renamed default branch or a missing `git` turned the gate
+    // off with a green tick.
+    if !resolves(base_ref) {
+        eprintln!(
+            "footprint-gate: {base_ref} does not resolve to a commit, so there is no baseline to \
+             compare against. Refusing to report a pass: an unreadable baseline is not an absent \
+             one. Check the ref, and that the checkout has enough history (fetch-depth: 0)."
+        );
+        return ExitCode::from(1);
+    }
+
     // The plugin list comes from the marketplace manifest, the same source
     // `just smoke` and the bundle-smoke job iterate. Reading it from the working
     // tree is deliberate: a change that ADDS a plugin must have it measured.
+    //
+    // A plugin delisted here drops out of the gate — but not out of CI: measured,
+    // `scripts/check-marketplace.sh` exits 1 with "exists in claude-code/ but is
+    // not listed", and ci.yml runs it in the `wiring` job.
     let plugins = match published_plugins() {
         Ok(plugins) => plugins,
         Err(e) => {
@@ -37,17 +67,26 @@ fn main() -> ExitCode {
     let mut failed = false;
     for plugin in &plugins {
         let budget = match budget_for(&budgets, plugin) {
-            Some(budget) => budget,
-            None => {
+            BudgetLookup::Found(budget) => budget,
+            // Legitimate and common: every plugin looks like this on the run
+            // that introduces it.
+            BudgetLookup::Absent => {
                 println!(
                     "footprint-gate: {plugin} has no budget at {base_ref} yet; \
                      measuring without a ceiling"
                 );
-                Budget {
-                    resident_bytes: u64::MAX,
-                    headroom_bytes: 0,
-                    delta_bytes: u64::MAX,
-                }
+                UNCAPPED
+            }
+            // NOT the same thing. A ceiling that exists and cannot be read is a
+            // failure, not an absence — see `BudgetLookup`.
+            BudgetLookup::Malformed(why) => {
+                eprintln!(
+                    "footprint-gate: {plugin}'s budget at {base_ref} is unreadable ({why}). \
+                     Refusing to measure it without a ceiling: that is how a typo disables the \
+                     gate silently."
+                );
+                failed = true;
+                continue;
             }
         };
         let path = format!("docs/footprints/{plugin}.json");
@@ -115,13 +154,23 @@ fn published_plugins() -> Result<Vec<String>, String> {
         .collect())
 }
 
-fn budget_for(budgets: &serde_json::Value, plugin: &str) -> Option<Budget> {
-    let entry = budgets.get(plugin)?;
-    Some(Budget {
-        resident_bytes: entry.get("residentBytes")?.as_u64()?,
-        headroom_bytes: entry.get("headroomBytes")?.as_u64()?,
-        delta_bytes: entry.get("deltaBytes")?.as_u64()?,
-    })
+/// Whether `base_ref` names a commit that actually exists here.
+///
+/// Separate from `show`, and that separation is the point: `git show
+/// <ref>:<path>` fails identically whether the ref is missing or merely does not
+/// carry that path, and only the second is a legitimate "nothing to compare
+/// against".
+fn resolves(base_ref: &str) -> bool {
+    Command::new("git")
+        .args([
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            &format!("{base_ref}^{{commit}}"),
+        ])
+        .output()
+        .map(|out| out.status.success())
+        .unwrap_or(false)
 }
 
 /// Read a path as it exists at `base_ref`, or `None` when it is not there.

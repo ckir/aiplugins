@@ -94,8 +94,16 @@ footprint:
     # exactly the change the cap exists to catch, and CI would be the first to
     # say otherwise. Comparing against `main` is the local analogue of what CI
     # does against the base branch.
-    cargo run -q -p plugin-footprint --bin footprint-gate -- \
-        "$(git rev-parse --verify --quiet main >/dev/null && echo main || echo HEAD)"
+    #
+    # `origin/main` before falling back to HEAD: a contributor who clones and
+    # runs `git switch -c feat` has no LOCAL `main` at all, only the remote
+    # branch — which is the ordinary case, not an exotic one, so without this
+    # step the cap was vacuous for most first-time contributors.
+    base=main
+    git rev-parse --verify --quiet "$base" >/dev/null 2>&1 || base=origin/main
+    git rev-parse --verify --quiet "$base" >/dev/null 2>&1 || base=HEAD
+    echo "footprint: comparing against $base"
+    cargo run -q -p plugin-footprint --bin footprint-gate -- "$base"
 
 # Drive every branch of the dispatcher shipped as bin/<name> in a plugin bundle.
 # Any one machine exercises exactly one branch of it, so the platform is faked;

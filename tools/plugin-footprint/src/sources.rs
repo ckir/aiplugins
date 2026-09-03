@@ -83,18 +83,21 @@ const LAYOUT: &[Layout] = &[
     Layout {
         dir: "skills",
         nested: true,
+        expected: "skills/<name>/SKILL.md",
         resident_kind: "skill_frontmatter",
         invocation_kind: "skill_body",
     },
     Layout {
         dir: "agents",
         nested: false,
+        expected: "agents/<name>.md",
         resident_kind: "agent_frontmatter",
         invocation_kind: "agent_body",
     },
     Layout {
         dir: "commands",
         nested: false,
+        expected: "commands/<name>.md",
         resident_kind: "command_frontmatter",
         invocation_kind: "command_body",
     },
@@ -104,8 +107,30 @@ struct Layout {
     dir: &'static str,
     /// `true` for `skills/<id>/SKILL.md`, `false` for `<dir>/<id>.md`.
     nested: bool,
+    /// The shape a source in this directory must have, quoted back in the error
+    /// so a contributor is sent to the right file. Every `Malformed` used to say
+    /// `skills/<name>/SKILL.md` whatever the directory, which was harmless only
+    /// while the nested layout was the only one that could produce one.
+    expected: &'static str,
     resident_kind: &'static str,
     invocation_kind: &'static str,
+}
+
+/// Files a human's tools leave behind in any directory they have opened.
+///
+/// Skipped rather than reported, and this is the ONE silent skip this module
+/// tolerates — an OS artifact is neither a source nor a mistake about a source.
+///
+/// MEASURED during the capstone review: a `.DS_Store`, which appears the moment
+/// a macOS developer opens `skills/` in Finder, took the whole measurement down
+/// with "skills/.DS_Store is not where a source belongs". Under `set -e` that
+/// aborts `footprint-regen`, so the CI job fails with an error about a skill
+/// that does not exist. Being loud is right for a source in the wrong shape; it
+/// is hostile for a file that was never a source.
+fn is_os_artifact(name: &str) -> bool {
+    name.starts_with('.')
+        || name.eq_ignore_ascii_case("Thumbs.db")
+        || name.eq_ignore_ascii_case("desktop.ini")
 }
 
 /// Read every file-backed source a plugin contributes.
@@ -177,6 +202,10 @@ fn entries(dir: &Path, layout: &Layout) -> Result<Vec<(String, PathBuf)>, Source
         })?;
         let name = entry.file_name().to_string_lossy().into_owned();
 
+        if is_os_artifact(&name) {
+            continue;
+        }
+
         if layout.nested {
             // A mis-structured skill is an ERROR, not a skip. The loader expects
             // `skills/<name>/SKILL.md`; a `.md` file sitting directly in
@@ -189,12 +218,24 @@ fn entries(dir: &Path, layout: &Layout) -> Result<Vec<(String, PathBuf)>, Source
             if !file.is_file() {
                 return Err(SourceError::Malformed {
                     path: entry.path(),
-                    expected: "skills/<name>/SKILL.md",
+                    expected: layout.expected,
                 });
             }
             found.push((name, file));
         } else if let Some(id) = name.strip_suffix(".md") {
             found.push((id.to_string(), entry.path()));
+        } else {
+            // The flat layouts were the asymmetry. A skill in the wrong shape
+            // was already loud; an agent in the wrong shape was silently
+            // dropped, because anything not ending `.md` simply fell out of the
+            // loop. MEASURED: `agents/re-analyst.md.bak` and a nested
+            // `agents/reviewer/agent.md` both vanished from the measurement with
+            // nothing failing anywhere — the false zero this crate refuses,
+            // arriving through the one directory nobody thought about.
+            return Err(SourceError::Malformed {
+                path: entry.path(),
+                expected: layout.expected,
+            });
         }
     }
     Ok(found)

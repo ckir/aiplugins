@@ -200,3 +200,56 @@ fn a_probe_that_listed_no_tools_reports_only_the_probe_even_when_over_budget() {
     );
     assert!(verdict[0].contains("no tools"), "{verdict:?}");
 }
+
+// --- budget resolution: absent is not the same as unreadable ---
+
+use plugin_footprint::gate::{budget_for, BudgetLookup};
+
+#[test]
+fn a_plugin_with_no_entry_at_the_base_ref_is_absent_not_malformed() {
+    // The legitimate case: a plugin this change adds. Measured, not compared.
+    assert!(matches!(
+        budget_for(&json!({}), "newcomer"),
+        BudgetLookup::Absent
+    ));
+}
+
+#[test]
+fn a_well_formed_entry_is_read() {
+    let budgets =
+        json!({ "x": { "residentBytes": 20000, "headroomBytes": 2000, "deltaBytes": 500 } });
+
+    match budget_for(&budgets, "x") {
+        BudgetLookup::Found(b) => {
+            assert_eq!(b.resident_bytes, 20_000);
+            assert_eq!(b.delta_bytes, 500);
+        }
+        other => panic!("expected a budget, got {other:?}"),
+    }
+}
+
+#[test]
+fn an_entry_that_is_present_but_unreadable_is_malformed_not_absent() {
+    // MEASURED during the capstone review, against a real committed ref: with
+    // `residentBytes` as the STRING "23670" the gate printed "has no budget yet;
+    // measuring without a ceiling" and passed the plugin with no ceiling and no
+    // delta cap, exit 0. A one-character typo in a merged budgets.json silently
+    // disables the gate, and the message reads like normal operation.
+    //
+    // Absent means "nothing to compare against". Unreadable means "the ceiling
+    // exists and this tool cannot see it", and treating the second as the first
+    // is the false-zero rule applied to the gate's own thresholds.
+    for broken in [
+        json!({ "x": { "residentBytes": "23670", "headroomBytes": 2000, "deltaBytes": 500 } }),
+        json!({ "x": { "residentBytes": 23670.5, "headroomBytes": 2000, "deltaBytes": 500 } }),
+        json!({ "x": { "headroomBytes": 2000, "deltaBytes": 500 } }),
+        json!({ "x": { "residentBytes": 23670, "deltaBytes": 500 } }),
+        json!({ "x": { "residentBytes": 23670, "headroomBytes": 2000 } }),
+        json!({ "x": "23670" }),
+    ] {
+        assert!(
+            matches!(budget_for(&broken, "x"), BudgetLookup::Malformed(_)),
+            "must not read as absent: {broken}"
+        );
+    }
+}
