@@ -93,6 +93,60 @@ jobs:
       - name: Check plugin bin dispatcher
         run: bash scripts/check-bundle-dispatch.sh
 
+  # Fork 7a: one job, one OS. A footprint is a property of the schema, not of the
+  # platform, so a matrix would triple the cost to answer the same question — and
+  # it would make "the footprint" an OS-indexed value.
+  #
+  # This is the only job that needs the plugin binaries staged where the
+  # manifests point, so it runs `just build-*` first. `cargo build` alone is not
+  # enough: it writes to `target/`, while `.mcp.json` names
+  # `${CLAUDE_PLUGIN_ROOT}/bin/<name>`, and it is the `just` recipes that copy
+  # them there.
+  footprint:
+    name: Plugin Footprint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The gate compares against the merge base, so the history it needs
+          # must actually be in the checkout.
+          fetch-depth: 0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      # `taiki-e/install-action` is the family this workflow already uses for
+      # nextest and cargo-deny; keeping to it avoids introducing a second way of
+      # putting a tool on PATH.
+      - name: Install just
+        uses: taiki-e/install-action@just
+
+      - name: Build plugin binaries
+        run: |
+          just build-rtk-mcp-cc
+          just build-re-ghidra-mcp-cc
+
+      # Freshness: a committed document that no longer matches a fresh
+      # measurement is caught here, before any threshold is consulted.
+      - name: Verify the committed footprints are not stale
+        run: |
+          just footprint-regen
+          if ! git diff --quiet -- docs/footprints/; then
+            echo "::error::Committed footprint documents are stale. Run 'just footprint-regen' and commit."
+            git --no-pager diff -- docs/footprints/
+            exit 1
+          fi
+
+      # Thresholds, read from the branch being merged INTO (spec §6.2) so a
+      # change cannot raise the ceiling it is judged against.
+      - name: Check footprints against the merge base
+        run: |
+          cargo run -q -p plugin-footprint --bin footprint-gate -- \
+            "origin/${{ github.base_ref || 'main' }}"
+
   # A plugin's entry points are reached two ways — an MCP server spawned
   # directly, and a hook that runs through a shell — and on Windows those two
   # routes resolve `bin/<name>` differently. Nothing here used to assemble a
