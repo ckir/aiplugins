@@ -321,12 +321,29 @@ mod tests {
         // confined nothing at all. `measure .` is an ordinary invocation, which
         // is what made this reachable.
         for root in [".", "./", ""] {
-            let err = resolve_for(root, "C:/Windows/System32/evil.exe")
-                .expect_err("an absolute outside command must be refused");
-            assert!(
-                matches!(err, ManifestError::CommandEscapesPluginRoot { .. }),
-                "root {root:?} gave {err}"
-            );
+            // A drive-prefixed path is only ABSOLUTE on Windows. On Unix,
+            // `C:/Windows/System32/evil.exe` is a perfectly legal RELATIVE name —
+            // a directory called `C:` — so `resolve_for` joins it into the plugin
+            // and accepts it, which is the correct answer there rather than an
+            // escape. Asserting a refusal unconditionally passed on the author's
+            // Windows machine and failed the first time the crate ever ran on
+            // Linux CI, which was this pull request.
+            #[cfg(windows)]
+            {
+                let err = resolve_for(root, "C:/Windows/System32/evil.exe")
+                    .expect_err("an absolute outside command must be refused");
+                assert!(
+                    matches!(err, ManifestError::CommandEscapesPluginRoot { .. }),
+                    "root {root:?} gave {err}"
+                );
+            }
+
+            // This one IS refused everywhere, by two different routes. On Unix
+            // `/etc/passwd` is absolute, so it is never joined to the root. On
+            // Windows `is_absolute` is false — there is no drive prefix — but
+            // `has_root` is true, and `Path::join` then replaces everything after
+            // the prefix, yielding `C:\etc\passwd`. Outside the plugin either
+            // way.
             let err = resolve_for(root, "/etc/passwd")
                 .expect_err("a unix absolute path must be refused too");
             assert!(matches!(

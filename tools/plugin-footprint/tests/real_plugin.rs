@@ -29,20 +29,26 @@ fn repo_root() -> PathBuf {
 fn measures_re_ghidra_mcp_cc_from_its_own_manifest() {
     let plugin = repo_root().join("claude-code").join("re-ghidra-mcp-cc");
 
+    let servers = read_mcp_servers(&plugin).expect("the shipped manifest reads and is confined");
+    assert_eq!(servers.len(), 1, "re-ghidra-mcp-cc declares one MCP server");
+
     // `bin/` is gitignored and produced by `just build-re-ghidra-mcp-cc`. The
     // gate's CI job runs that build first (spec §8, Fork 7), so this
     // precondition is the same one the gate has; locally it can be absent.
-    if !plugin.join("bin").is_dir() {
+    //
+    // The RESOLVED COMMAND, not merely the directory. A working tree shared
+    // between platforms — a Windows checkout opened under WSL — has a `bin/`
+    // full of `.exe` files and no Linux binary, and a directory check then lets
+    // the test run and fail on a probe that never had a chance. MEASURED: that
+    // is exactly how this first failed, and the error blamed the probe.
+    if !servers[0].command.is_file() {
         eprintln!(
-            "SKIP measures_re_ghidra_mcp_cc_from_its_own_manifest: {} has no staged bin/. \
-             Run `just build-re-ghidra-mcp-cc` to exercise it.",
-            plugin.display()
+            "SKIP measures_re_ghidra_mcp_cc_from_its_own_manifest: {} is not built for this \
+             platform. Run `just build-re-ghidra-mcp-cc` to exercise it.",
+            servers[0].command.display()
         );
         return;
     }
-
-    let servers = read_mcp_servers(&plugin).expect("the shipped manifest reads and is confined");
-    assert_eq!(servers.len(), 1, "re-ghidra-mcp-cc declares one MCP server");
 
     let outcome = probe(&servers[0], &Limits::default());
 
