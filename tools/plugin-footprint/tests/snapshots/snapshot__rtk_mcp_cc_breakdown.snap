@@ -4,22 +4,22 @@ expression: value
 ---
 {
   "invocation": {
-    "bytes": 6227,
+    "bytes": 6091,
     "sources": [
       {
-        "bytes": 2594,
+        "bytes": 2539,
         "id": "gain",
         "kind": "skill_body"
       },
       {
-        "bytes": 3633,
+        "bytes": 3552,
         "id": "rtk-policy",
         "kind": "skill_body"
       }
     ]
   },
   "resident": {
-    "bytes": 3696,
+    "bytes": 3690,
     "sources": [
       {
         "bytes": 515,
@@ -42,12 +42,12 @@ expression: value
         "kind": "mcp_tool_schema"
       },
       {
-        "bytes": 401,
+        "bytes": 397,
         "id": "gain",
         "kind": "skill_frontmatter"
       },
       {
-        "bytes": 463,
+        "bytes": 461,
         "id": "rtk-policy",
         "kind": "skill_frontmatter"
       }

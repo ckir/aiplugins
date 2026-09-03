@@ -467,19 +467,28 @@ the `dev` tree at plugin version 0.6.4, both plugins probing `ok`:
 
 | Plugin | Resident bytes | of which MCP | of which files | Invocation bytes |
 |---|---|---|---|---|
-| `rtk-mcp-cc` | 3 696 | 2 832 | 864 | 6 227 |
-| `re-ghidra-mcp-cc` | 21 670 | 18 419 | 3 251 | 37 513 |
+| `rtk-mcp-cc` | 3 690 | 2 832 | 858 | 6 091 |
+| `re-ghidra-mcp-cc` | 21 631 | 18 419 | 3 212 | 36 903 |
 
 Per source, for `re-ghidra-mcp-cc`:
 
 | Source | Resident (frontmatter) | Invocation (body) |
 |---|---|---|
-| `agents/re-analyst.md` | 2 359 | 6 421 |
-| `skills/doctor` | 642 | 11 607 |
-| `skills/ghidra-re-driver` | 250 | 19 485 |
+| `agents/re-analyst.md` | 2 326 | 6 317 |
+| `skills/doctor` | 638 | 11 358 |
+| `skills/ghidra-re-driver` | 248 | 19 228 |
+
+Line endings are normalised to LF before anything is counted. Git stores these
+files with LF and hands a Windows checkout CRLF, so without that the same commit
+measures a byte per line larger on a Windows developer's machine than on Linux CI
+— 139 bytes on `agents/re-analyst.md` alone — and §6's freshness layer, which
+regenerates and requires no diff, would fail on every run for a reason that has
+nothing to do with a footprint. Counting the content rather than the checkout is
+also the more honest figure: a user installs a bundle assembled by CI, so LF is
+what they actually pay for.
 
 **This settles the sequencing question §8 raised.** `agents/re-analyst.md`'s
-frontmatter, at 2 359 B, is the single largest resident source in the plugin —
+frontmatter, at 2 326 B, is the single largest resident source in the plugin —
 larger than `set_prototype` (2 305 B), the largest tool schema. Had the gate been
 built before this section, the biggest thing the plugin charges to every request
 would have sat outside the measurement entirely, and a ceiling fitted to the MCP
