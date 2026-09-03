@@ -76,7 +76,6 @@
 //!     build it with `CallToolRequestParams::new(name).with_arguments(json_object)` instead of a
 //!     struct literal (`rmcp-3.1.4/src/model.rs`, the `CallToolRequestParams` definition).
 
-use crate::config::ServerConfig;
 use crate::state::ServerState;
 use ghidra_ipc::error::{ErrorCode, ErrorEnvelope};
 use ghidra_ipc::protocol::FunctionContext;
@@ -126,9 +125,18 @@ impl GhidraMcpServer {
 
 /// Serve MCP over stdio until the client disconnects. Kicks off warmup right after the transport is up
 /// (spec §5) and performs graceful shutdown on exit (spec §4.6).
-pub async fn serve(cfg: ServerConfig) -> std::io::Result<()> {
+pub async fn serve(raw: crate::config::RawConfig) -> std::io::Result<()> {
     let script_dir = crate::paths::versioned_script_dir();
-    let state = Arc::new(ServerState::new(cfg, script_dir));
+    // Unresolved on purpose: a bad or absent Ghidra configuration must not stop the server coming up,
+    // so that `tools/list` still answers on a machine with no Ghidra. The failure is reported by the
+    // first tool CALL instead (state.rs / execute.rs).
+    let state = Arc::new(ServerState::from_raw(raw, script_dir));
+    if let Err(e) = state.cfg() {
+        tracing::warn!(
+            reason = %e.error.message,
+            "no usable Ghidra configuration; tools will list but every call will fail"
+        );
+    }
     let server = GhidraMcpServer::new(Arc::clone(&state));
     // Warmup: single-flight background boot (spec §5); sets Booting so the tool path returns
     // WORKER_WARMING while it boots (start_warmup is the one correct kick — never bare spawn_boot).

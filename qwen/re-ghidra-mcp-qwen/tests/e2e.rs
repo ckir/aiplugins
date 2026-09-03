@@ -231,29 +231,73 @@ fn mcp_binary_keeps_usage_off_stdout() {
     );
 }
 
-/// A `serve` with nothing configured must fail fast with the documented
-/// configuration exit code rather than booting a JVM and timing out.
+/// A `serve` with nothing configured must still speak MCP.
+///
+/// It starts, completes the handshake and returns its tool schemas, so a host can
+/// read what this extension offers — and what it costs in context — on a machine
+/// with no Ghidra install. The configuration failure is reported on the first tool
+/// CALL instead (`shared/ghidra-mcp/tests/config_deferral.rs` pins that half).
+///
+/// This is a deliberate replacement for an earlier test that asserted exit 2, the
+/// old configuration-error contract. That contract was the bug: the process died
+/// before `serve` was reached, so a host asking only for tool schemas got nothing.
+/// What the old test was really protecting — not booting a JVM and timing out — is
+/// still protected, by the `boot_count` assertions in config_deferral.rs.
 #[test]
-fn serve_without_configuration_exits_two() {
+fn serve_without_configuration_still_answers_tools_list() {
     let ws = Workspace::new("noconfig");
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_re-ghidra-qwen-mcp"));
     for key in INHERITED {
         cmd.env_remove(key);
     }
-    let out = cmd
+    // `ws.dir` carries an empty `.qwen/`, so no settings file supplies the config
+    // that the environment no longer does.
+    let mut child = cmd
         .arg("serve")
         .current_dir(&ws.dir)
-        .output()
-        .expect("run serve");
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn serve");
 
+    {
+        let mut stdin = child.stdin.take().expect("serve stdin");
+        for request in [
+            serde_json::json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {"name": "e2e", "version": "0"}
+            }}),
+            serde_json::json!({"jsonrpc": "2.0", "method": "notifications/initialized"}),
+            serde_json::json!({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}),
+        ] {
+            writeln!(stdin, "{request}").expect("write request");
+        }
+        // Dropping stdin closes it; the server shuts down on EOF once it has answered.
+    }
+
+    let out = child.wait_with_output().expect("serve exits");
     assert_eq!(
         out.status.code(),
-        Some(2),
-        "exit 2 is the configuration-error contract; stderr was: {}",
+        Some(0),
+        "an unconfigured serve must exit cleanly; stderr was: {}",
         String::from_utf8_lossy(&out.stderr)
     );
+
+    let tools = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .find(|msg| msg["id"] == 2)
+        .and_then(|msg| msg["result"]["tools"].as_array().cloned())
+        .expect("a tools/list response on stdout");
+
     assert!(
-        out.stdout.is_empty(),
-        "configuration errors go to stderr, never the MCP channel"
+        !tools.is_empty(),
+        "an unconfigured server must still advertise its tool schemas"
+    );
+    assert!(
+        tools.iter().any(|t| t["name"] == "inspect_function"),
+        "inspect_function missing from an unconfigured server's tools/list"
     );
 }
