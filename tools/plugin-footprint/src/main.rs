@@ -11,6 +11,7 @@ use plugin_footprint::canonical::canonical_json;
 use plugin_footprint::document::{build, Tree};
 use plugin_footprint::manifest::{looks_like_a_plugin, read_mcp_servers};
 use plugin_footprint::probe::{probe, Limits, Outcome, Status};
+use plugin_footprint::sources::read_file_sources;
 use std::path::Path;
 use std::process::ExitCode;
 
@@ -39,6 +40,17 @@ fn measure(plugin_dir: &Path) -> ExitCode {
         );
         return ExitCode::from(2);
     }
+
+    // Read before probing, not after. This is the cheap check, and a plugin
+    // whose skill layout is malformed should say so in milliseconds rather than
+    // after a probe that may sit through its 120-second budget first.
+    let files = match read_file_sources(plugin_dir) {
+        Ok(files) => files,
+        Err(e) => {
+            eprintln!("plugin-footprint: {e}");
+            return ExitCode::from(1);
+        }
+    };
 
     let servers = match read_mcp_servers(plugin_dir) {
         Ok(s) => s,
@@ -103,6 +115,7 @@ fn measure(plugin_dir: &Path) -> ExitCode {
         plugin_version(plugin_dir).as_deref(),
         now_epoch_secs(),
         &merged,
+        &files,
     );
 
     let value = match serde_json::to_value(&document) {

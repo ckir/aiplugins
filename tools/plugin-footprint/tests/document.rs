@@ -8,6 +8,7 @@
 
 use plugin_footprint::document::{build, Tree};
 use plugin_footprint::probe::{Outcome, Status};
+use plugin_footprint::sources::{FileSource, FileSources};
 use serde_json::json;
 use std::path::{Path, PathBuf};
 
@@ -44,6 +45,7 @@ fn a_successful_probe_itemises_every_source_it_measured() {
         Some("0.6.4"),
         0,
         &ok_outcome(),
+        &FileSources::default(),
     );
 
     let value = serde_json::to_value(&doc).expect("serialises");
@@ -77,6 +79,7 @@ fn tier_bytes_are_the_sum_of_the_sources() {
         Some("0.6.4"),
         0,
         &ok_outcome(),
+        &FileSources::default(),
     );
     let value = serde_json::to_value(&doc).expect("serialises");
 
@@ -98,8 +101,16 @@ fn a_failed_probe_omits_the_tiers_entirely_rather_than_reporting_zero() {
         "bin/x",
     );
 
-    let value = serde_json::to_value(build("x", Path::new("plug"), Tree::Dev, None, 0, &failed))
-        .expect("serialises");
+    let value = serde_json::to_value(build(
+        "x",
+        Path::new("plug"),
+        Tree::Dev,
+        None,
+        0,
+        &failed,
+        &FileSources::default(),
+    ))
+    .expect("serialises");
 
     assert_eq!(value["probe"]["status"], "failed");
     assert!(
@@ -131,6 +142,7 @@ fn a_timed_out_probe_is_distinguishable_from_a_failed_one() {
         None,
         0,
         &timed_out,
+        &FileSources::default(),
     ))
     .expect("serialises");
 
@@ -150,6 +162,7 @@ fn tokens_are_absent_until_an_oracle_has_produced_them() {
         None,
         0,
         &ok_outcome(),
+        &FileSources::default(),
     ))
     .unwrap();
 
@@ -182,7 +195,16 @@ fn the_binary_path_is_recorded_normalised_and_platform_independent() {
         &native.to_string_lossy(),
     );
 
-    let value = serde_json::to_value(build("x", &plugin_dir, Tree::Dev, None, 0, &probed)).unwrap();
+    let value = serde_json::to_value(build(
+        "x",
+        &plugin_dir,
+        Tree::Dev,
+        None,
+        0,
+        &probed,
+        &FileSources::default(),
+    ))
+    .unwrap();
 
     // Plugin-relative, forward slashes, no `.exe` — so a relative and an
     // absolute invocation produce the same document, and Linux and Windows
@@ -199,6 +221,7 @@ fn the_document_serialises_in_the_pinned_canonical_form() {
         Some("0.6.4"),
         0,
         &ok_outcome(),
+        &FileSources::default(),
     );
     let text = plugin_footprint::canonical::canonical_json(&serde_json::to_value(&doc).unwrap());
 
@@ -231,6 +254,7 @@ fn a_binary_outside_the_plugin_degrades_to_a_name_not_a_machine_path() {
         None,
         0,
         &elsewhere,
+        &FileSources::default(),
     ))
     .unwrap();
 
@@ -248,7 +272,16 @@ fn a_command_that_is_the_plugin_root_is_not_recorded_as_an_empty_path() {
         &plugin_dir.to_string_lossy(),
     );
 
-    let value = serde_json::to_value(build("x", &plugin_dir, Tree::Dev, None, 0, &probed)).unwrap();
+    let value = serde_json::to_value(build(
+        "x",
+        &plugin_dir,
+        Tree::Dev,
+        None,
+        0,
+        &probed,
+        &FileSources::default(),
+    ))
+    .unwrap();
 
     assert_eq!(value["probe"]["binary"], "plug");
 }
@@ -267,7 +300,107 @@ fn a_backslash_in_a_unix_filename_is_not_turned_into_a_directory() {
         &plugin_dir.join(r"my\binary").to_string_lossy(),
     );
 
-    let value = serde_json::to_value(build("x", &plugin_dir, Tree::Dev, None, 0, &probed)).unwrap();
+    let value = serde_json::to_value(build(
+        "x",
+        &plugin_dir,
+        Tree::Dev,
+        None,
+        0,
+        &probed,
+        &FileSources::default(),
+    ))
+    .unwrap();
 
     assert_eq!(value["probe"]["binary"], r"my\binary");
+}
+
+fn some_files() -> FileSources {
+    FileSources {
+        resident: vec![FileSource {
+            kind: "skill_frontmatter",
+            id: "doctor".to_string(),
+            bytes: 100,
+        }],
+        invocation: vec![FileSource {
+            kind: "skill_body",
+            id: "doctor".to_string(),
+            bytes: 900,
+        }],
+    }
+}
+
+#[test]
+fn file_backed_sources_join_the_resident_tier() {
+    let doc = build(
+        "x",
+        Path::new("plug"),
+        Tree::Dev,
+        Some("0.6.4"),
+        0,
+        &ok_outcome(),
+        &some_files(),
+    );
+    let value = serde_json::to_value(&doc).expect("serialises");
+
+    let kinds: Vec<&str> = value["tiers"]["resident"]["sources"]
+        .as_array()
+        .expect("itemised")
+        .iter()
+        .map(|s| s["kind"].as_str().unwrap())
+        .collect();
+
+    assert!(kinds.contains(&"mcp_tool_schema"));
+    assert!(
+        kinds.contains(&"skill_frontmatter"),
+        "the resident tier must include the file-backed half, got {kinds:?}"
+    );
+}
+
+#[test]
+fn the_invocation_tier_carries_the_bodies() {
+    let doc = build(
+        "x",
+        Path::new("plug"),
+        Tree::Dev,
+        None,
+        0,
+        &ok_outcome(),
+        &some_files(),
+    );
+    let value = serde_json::to_value(&doc).expect("serialises");
+
+    assert_eq!(value["tiers"]["invocation"]["bytes"], 900);
+    assert_eq!(
+        value["tiers"]["invocation"]["sources"][0]["kind"],
+        "skill_body"
+    );
+}
+
+#[test]
+fn a_failed_probe_still_omits_every_tier_even_with_file_sources_present() {
+    // The file sources were read successfully, but the MCP half was not. A
+    // document that reported only the half that worked would look like a
+    // complete measurement of a much cheaper plugin.
+    let failed = outcome(
+        Status::Failed("could not launch".to_string()),
+        Vec::new(),
+        "bin/x",
+    );
+
+    let value = serde_json::to_value(build(
+        "x",
+        Path::new("plug"),
+        Tree::Dev,
+        None,
+        0,
+        &failed,
+        &some_files(),
+    ))
+    .expect("serialises");
+
+    assert!(
+        value.get("tiers").is_none() || value["tiers"].is_null(),
+        "a partial measurement is not a measurement, got: {}",
+        value["tiers"]
+    );
 }

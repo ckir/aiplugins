@@ -18,6 +18,7 @@
 use crate::canonical::canonical_len;
 use crate::manifest::absolutize;
 use crate::probe::{Outcome, Status};
+use crate::sources::{FileSource, FileSources};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
@@ -78,6 +79,7 @@ pub struct ProbeReport {
 #[derive(Debug, Clone, Serialize)]
 pub struct Tiers {
     pub resident: Tier,
+    pub invocation: Tier,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -121,6 +123,7 @@ pub fn build(
     plugin_version: Option<&str>,
     measured_at_epoch_secs: i64,
     outcome: &Outcome,
+    files: &FileSources,
 ) -> Document {
     let (status, detail) = match &outcome.status {
         Status::Ok => ("ok", None),
@@ -129,7 +132,8 @@ pub fn build(
     };
 
     let tiers = matches!(outcome.status, Status::Ok).then(|| Tiers {
-        resident: resident_tier(outcome),
+        resident: resident_tier(outcome, &files.resident),
+        invocation: tier_from_files(&files.invocation),
     });
 
     Document {
@@ -152,13 +156,9 @@ pub fn build(
 }
 
 /// The resident tier: what the host holds in every request, for the whole
-/// session (spec §3).
-///
-/// MCP tool schemas and prompt entries only. The file-backed resident sources
-/// §3 also names — skill frontmatter, agent context files, command and agent
-/// descriptions — are not measured yet, so this tier is a LOWER BOUND and §7
-/// must render it as one until §4.5 is implemented.
-fn resident_tier(outcome: &Outcome) -> Tier {
+/// session (spec §3). MCP schemas and prompts, plus the frontmatter the host
+/// reads to decide what a skill or agent is for.
+fn resident_tier(outcome: &Outcome, files: &[FileSource]) -> Tier {
     let mut sources: Vec<Source> = outcome
         .tools
         .iter()
@@ -169,16 +169,39 @@ fn resident_tier(outcome: &Outcome) -> Tier {
                 .iter()
                 .map(|prompt| source("mcp_prompt", prompt)),
         )
+        .chain(files.iter().map(from_file))
         .collect();
 
-    // Sorted by id so the document does not inherit the order a server happened
-    // to list its tools in, which would churn the committed copy for no reason.
-    sources.sort_by(|a, b| a.id.cmp(&b.id));
+    // Sorted so the document does not inherit the order a server happened to
+    // list its tools in, which would churn the committed copy for no reason.
+    // The key is (kind, id) rather than id alone: two sources can now share an
+    // id — a skill's frontmatter and its body — and sorting on the id alone
+    // would leave their relative order to the sort's stability, not to the data.
+    sources.sort_by(|a, b| (a.kind, &a.id).cmp(&(b.kind, &b.id)));
+    total(sources)
+}
 
+/// A tier built only from file-backed sources.
+fn tier_from_files(files: &[FileSource]) -> Tier {
+    let mut sources: Vec<Source> = files.iter().map(from_file).collect();
+    sources.sort_by(|a, b| (a.kind, &a.id).cmp(&(b.kind, &b.id)));
+    total(sources)
+}
+
+fn total(sources: Vec<Source>) -> Tier {
     Tier {
         bytes: sources.iter().map(|s| s.bytes).sum(),
         tokens: None,
         sources,
+    }
+}
+
+fn from_file(file: &FileSource) -> Source {
+    Source {
+        kind: file.kind,
+        id: file.id.clone(),
+        bytes: file.bytes,
+        tokens: None,
     }
 }
 
