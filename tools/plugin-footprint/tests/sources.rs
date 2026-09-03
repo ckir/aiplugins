@@ -289,3 +289,45 @@ fn a_filename_that_is_not_utf8_is_refused_rather_than_lossily_collided() {
         "the error must say why, got: {err}"
     );
 }
+
+#[test]
+fn a_crlf_source_measures_the_same_as_an_lf_one() {
+    // THE defect that nearly shipped, found while about to merge. Git stores
+    // these files with LF and hands a Windows checkout CRLF, so the SAME commit
+    // measures differently on a Windows developer's machine and on Linux CI:
+    // `agents/re-analyst.md` was 8790 bytes on disk and 8651 in git, one byte
+    // per line apart.
+    //
+    // The committed documents are generated on one machine and re-measured on
+    // the other by §6's freshness layer, which is "regenerate, then require no
+    // diff". A platform-dependent byte count makes that layer fail on every run
+    // for a reason that has nothing to do with a footprint — and it is exactly
+    // what removing the timestamp was meant to guarantee could not happen.
+    //
+    // Counting the CONTENT rather than the checkout is also the more honest
+    // measurement: a user installs a bundle assembled on Linux, so LF is what
+    // they actually pay for.
+    let lf = Fixture::new("lf");
+    lf.write(
+        "skills/s/SKILL.md",
+        "---\nname: s\ndesc: d\n---\n\nbody\nmore\n",
+    );
+
+    let crlf = Fixture::new("crlf");
+    crlf.write(
+        "skills/s/SKILL.md",
+        "---\r\nname: s\r\ndesc: d\r\n---\r\n\r\nbody\r\nmore\r\n",
+    );
+
+    let a = read_file_sources(lf.path()).expect("lf reads");
+    let b = read_file_sources(crlf.path()).expect("crlf reads");
+
+    assert_eq!(
+        a.resident[0].bytes, b.resident[0].bytes,
+        "frontmatter must not depend on the checkout's line endings"
+    );
+    assert_eq!(
+        a.invocation[0].bytes, b.invocation[0].bytes,
+        "body must not depend on the checkout's line endings"
+    );
+}

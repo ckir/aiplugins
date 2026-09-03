@@ -4,30 +4,30 @@ expression: value
 ---
 {
   "invocation": {
-    "bytes": 37513,
+    "bytes": 36903,
     "sources": [
       {
-        "bytes": 6421,
+        "bytes": 6317,
         "id": "re-analyst",
         "kind": "agent_body"
       },
       {
-        "bytes": 11607,
+        "bytes": 11358,
         "id": "doctor",
         "kind": "skill_body"
       },
       {
-        "bytes": 19485,
+        "bytes": 19228,
         "id": "ghidra-re-driver",
         "kind": "skill_body"
       }
     ]
   },
   "resident": {
-    "bytes": 21670,
+    "bytes": 21631,
     "sources": [
       {
-        "bytes": 2359,
+        "bytes": 2326,
         "id": "re-analyst",
         "kind": "agent_frontmatter"
       },
@@ -127,12 +127,12 @@ expression: value
         "kind": "mcp_tool_schema"
       },
       {
-        "bytes": 642,
+        "bytes": 638,
         "id": "doctor",
         "kind": "skill_frontmatter"
       },
       {
-        "bytes": 250,
+        "bytes": 248,
         "id": "ghidra-re-driver",
         "kind": "skill_frontmatter"
       }

@@ -155,10 +155,31 @@ pub fn read_file_sources(plugin_dir: &Path) -> Result<FileSources, SourceError> 
 
     for layout in LAYOUT {
         for (id, path) in entries(&plugin_dir.join(layout.dir), layout)? {
-            let text = std::fs::read_to_string(&path).map_err(|source| SourceError::Read {
+            let raw = std::fs::read_to_string(&path).map_err(|source| SourceError::Read {
                 path: path.clone(),
                 source,
             })?;
+            // Line endings normalised before ANYTHING is counted.
+            //
+            // Git stores these files with LF and hands a Windows checkout CRLF,
+            // so without this the same commit measures differently on a Windows
+            // developer's machine and on Linux CI — MEASURED at one byte per
+            // line, 139 of them in `agents/re-analyst.md` alone. §6's freshness
+            // layer is "regenerate, then require no diff", so a platform-
+            // dependent count fails it on every run for a reason that has
+            // nothing to do with a footprint. Removing the document's timestamp
+            // was meant to make that layer meaningful; this is the other half of
+            // the same guarantee.
+            //
+            // Counting the CONTENT rather than the checkout is also the more
+            // honest measurement. A user installs a bundle assembled by CI, so
+            // LF is what they actually pay for; the CRLF is an artefact of one
+            // developer's working copy and nobody's context window.
+            let text = if raw.contains('\r') {
+                raw.replace("\r\n", "\n")
+            } else {
+                raw
+            };
 
             let (front, body) = match split_frontmatter(&text) {
                 Some((front, body)) => (Some(front), body),
