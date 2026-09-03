@@ -158,6 +158,12 @@ pub fn build(
 /// The resident tier: what the host holds in every request, for the whole
 /// session (spec §3). MCP schemas and prompts, plus the frontmatter the host
 /// reads to decide what a skill or agent is for.
+///
+/// Hook output is still not counted, in either tier: measuring it means
+/// executing contributor-authored code against a synthetic event (spec §4.5),
+/// and that is a price this tool does not pay. A plugin whose hooks emit a large
+/// SessionStart preamble is therefore under-reported, which is the one honest
+/// gap left in the measurement.
 fn resident_tier(outcome: &Outcome, files: &[FileSource]) -> Tier {
     let mut sources: Vec<Source> = outcome
         .tools

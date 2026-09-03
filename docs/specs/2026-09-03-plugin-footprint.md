@@ -52,6 +52,11 @@ MCP stdio handshake, not source parsing):
 Largest single tool schema: `set_prototype` at 2 293 B — one tool costing most
 of what the entire `rtk-mcp-cc` plugin costs.
 
+> **Superseded by §4.5.1.** This table counts only the MCP half, by hand, before
+> `canonical_json` pinned the serialisation. §4.5.1 carries the generated figures
+> for both tiers — and the largest resident source turns out not to be a tool
+> schema at all.
+
 Installing `re-ghidra-mcp-cc` therefore spends roughly 5k tokens of every
 context window, on every request, before the user types anything. Nothing in
 this repo measures that today, and no plugin marketplace publishes it.
@@ -452,8 +457,42 @@ The gate (§6) may assert on the measured subset, because it compares like with
 like across runs; the *disclosure* may not, because its reader is deciding
 whether to install.
 
-The §2 table's Invocation column predates this contract and was produced by
-hand. It is illustrative, not generated, until this section is implemented.
+### 4.5.1 Implemented 2026-09-03 — the measured figures
+
+File-backed acquisition is implemented (`tools/plugin-footprint/src/sources.rs`).
+Frontmatter goes to Resident, the body to Invocation, split at the closing `---`;
+`skills/<name>/SKILL.md`, `agents/<name>.md` and `commands/<name>.md` are read,
+and a mis-structured skill is an error rather than a silent skip. Measured against
+the `dev` tree at plugin version 0.6.4, both plugins probing `ok`:
+
+| Plugin | Resident bytes | of which MCP | of which files | Invocation bytes |
+|---|---|---|---|---|
+| `rtk-mcp-cc` | 3 696 | 2 832 | 864 | 6 227 |
+| `re-ghidra-mcp-cc` | 21 670 | 18 419 | 3 251 | 37 513 |
+
+Per source, for `re-ghidra-mcp-cc`:
+
+| Source | Resident (frontmatter) | Invocation (body) |
+|---|---|---|
+| `agents/re-analyst.md` | 2 359 | 6 421 |
+| `skills/doctor` | 642 | 11 607 |
+| `skills/ghidra-re-driver` | 250 | 19 485 |
+
+**This settles the sequencing question §8 raised.** `agents/re-analyst.md`'s
+frontmatter, at 2 359 B, is the single largest resident source in the plugin —
+larger than `set_prototype` (2 305 B), the largest tool schema. Had the gate been
+built before this section, the biggest thing the plugin charges to every request
+would have sat outside the measurement entirely, and a ceiling fitted to the MCP
+half alone would have been 15% low from the day it was set.
+
+The Resident tier is therefore **no longer a lower bound, with one exception**:
+hook output, which stays unmeasured permanently for the reason given above. §7's
+disclosure obligation is unchanged and still applies to it.
+
+The §2 table's Invocation column predates this contract and was produced by hand;
+it also predates `canonical_json`, so its schema-byte figures run a few bytes
+below the ones this section reports. Read the table for the argument and this
+section for the numbers.
 
 ## 5. Output contract
 
