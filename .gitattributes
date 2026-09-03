@@ -9,3 +9,10 @@
 # The dispatcher template is copied verbatim into bundles as a POSIX sh script,
 # where a CRLF shebang line is "bad interpreter" on Linux and macOS.
 *.sh.in text eol=lf
+
+# Generated footprint documents keep LF, because `plugin-footprint --out` writes
+# LF on every platform and §6's freshness layer is `regenerate, then require no
+# diff`. Without this, a Windows checkout gets CRLF, the tool rewrites LF, and
+# every one of these files shows as modified in `git status` forever after —
+# noise on exactly the files a reviewer is meant to read.
+docs/footprints/*.json text eol=lf
