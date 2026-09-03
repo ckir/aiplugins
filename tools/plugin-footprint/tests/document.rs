@@ -43,7 +43,6 @@ fn a_successful_probe_itemises_every_source_it_measured() {
         Path::new("plug"),
         Tree::Dev,
         Some("0.6.4"),
-        0,
         &ok_outcome(),
         &FileSources::default(),
     );
@@ -77,7 +76,6 @@ fn tier_bytes_are_the_sum_of_the_sources() {
         Path::new("plug"),
         Tree::Dev,
         Some("0.6.4"),
-        0,
         &ok_outcome(),
         &FileSources::default(),
     );
@@ -106,7 +104,6 @@ fn a_failed_probe_omits_the_tiers_entirely_rather_than_reporting_zero() {
         Path::new("plug"),
         Tree::Dev,
         None,
-        0,
         &failed,
         &FileSources::default(),
     ))
@@ -140,7 +137,6 @@ fn a_timed_out_probe_is_distinguishable_from_a_failed_one() {
         Path::new("plug"),
         Tree::Dev,
         None,
-        0,
         &timed_out,
         &FileSources::default(),
     ))
@@ -160,7 +156,6 @@ fn tokens_are_absent_until_an_oracle_has_produced_them() {
         Path::new("plug"),
         Tree::Dev,
         None,
-        0,
         &ok_outcome(),
         &FileSources::default(),
     ))
@@ -200,7 +195,6 @@ fn the_binary_path_is_recorded_normalised_and_platform_independent() {
         &plugin_dir,
         Tree::Dev,
         None,
-        0,
         &probed,
         &FileSources::default(),
     ))
@@ -219,15 +213,21 @@ fn the_document_serialises_in_the_pinned_canonical_form() {
         Path::new("plug"),
         Tree::Dev,
         Some("0.6.4"),
-        0,
         &ok_outcome(),
         &FileSources::default(),
     );
     let text = plugin_footprint::canonical::canonical_json(&serde_json::to_value(&doc).unwrap());
 
-    // Sorted keys, so a committed document does not churn on field order.
+    // Sorted keys, so a committed document does not churn on field order — and
+    // no timestamp, so two identical regenerations produce identical bytes and
+    // §6's freshness layer (`regenerate, then require no diff`) means something.
     assert!(
-        text.starts_with(r#"{"agent":"claude-code","measuredAt""#),
+        !text.contains("measuredAt"),
+        "the document must carry no wall clock: {}",
+        &text[..text.len().min(120)]
+    );
+    assert!(
+        text.starts_with(r#"{"agent":"claude-code","plugin":"x""#),
         "expected canonical ordering, got: {}",
         &text[..text.len().min(80)]
     );
@@ -252,7 +252,6 @@ fn a_binary_outside_the_plugin_degrades_to_a_name_not_a_machine_path() {
         Path::new("plug"),
         Tree::Dev,
         None,
-        0,
         &elsewhere,
         &FileSources::default(),
     ))
@@ -277,7 +276,6 @@ fn a_command_that_is_the_plugin_root_is_not_recorded_as_an_empty_path() {
         &plugin_dir,
         Tree::Dev,
         None,
-        0,
         &probed,
         &FileSources::default(),
     ))
@@ -305,7 +303,6 @@ fn a_backslash_in_a_unix_filename_is_not_turned_into_a_directory() {
         &plugin_dir,
         Tree::Dev,
         None,
-        0,
         &probed,
         &FileSources::default(),
     ))
@@ -336,7 +333,6 @@ fn file_backed_sources_join_the_resident_tier() {
         Path::new("plug"),
         Tree::Dev,
         Some("0.6.4"),
-        0,
         &ok_outcome(),
         &some_files(),
     );
@@ -363,7 +359,6 @@ fn the_invocation_tier_carries_the_bodies() {
         Path::new("plug"),
         Tree::Dev,
         None,
-        0,
         &ok_outcome(),
         &some_files(),
     );
@@ -392,7 +387,6 @@ fn a_failed_probe_still_omits_every_tier_even_with_file_sources_present() {
         Path::new("plug"),
         Tree::Dev,
         None,
-        0,
         &failed,
         &some_files(),
     ))
