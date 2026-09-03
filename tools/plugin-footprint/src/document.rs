@@ -19,7 +19,7 @@ use crate::canonical::canonical_len;
 use crate::manifest::absolutize;
 use crate::probe::{Outcome, Status};
 use serde::Serialize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// The schema version consumers check before trusting the shape.
 ///
@@ -205,11 +205,35 @@ fn source(kind: &'static str, value: &serde_json::Value) -> Source {
 /// Forward slashes and no `.exe` because the gate may run on Linux while the
 /// published figure is regenerated on Windows (§8, Fork 7); snapshotting an
 /// un-normalised path would flake on the platform rather than on the footprint.
+/// When the prefix cannot be stripped — a symlinked plugin directory, a `\\?\`
+/// prefix on one side only, a working directory that moved between the two
+/// resolutions — this degrades to the file NAME rather than to the whole
+/// absolute path. Falling back to the full path would write
+/// `C:/Users/<someone>/...` into a committed document, silently, and it would
+/// differ on every machine that regenerated it. A bare name is still useful
+/// provenance and can leak nothing.
 fn normalise_binary(plugin_dir: &Path, binary: &Path) -> String {
     let relative = absolutize(plugin_dir)
         .and_then(|root| binary.strip_prefix(&root).ok().map(Path::to_path_buf))
-        .unwrap_or_else(|| binary.to_path_buf());
-    let text = relative.to_string_lossy().replace('\\', "/");
+        // Stripping the root from itself leaves nothing, and `binary: ""` names
+        // no file at all — least of all the directory that was probed.
+        .filter(|relative| relative.components().next().is_some())
+        .unwrap_or_else(|| {
+            binary
+                .file_name()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| binary.to_path_buf())
+        });
+
+    // Separator rewriting is Windows-only. A backslash is a legal character in a
+    // Unix filename, so rewriting it there would turn the single file
+    // `my\binary` into `my/binary` — a file inside a directory, which is not
+    // what was probed.
+    let text = if cfg!(windows) {
+        relative.to_string_lossy().replace('\\', "/")
+    } else {
+        relative.to_string_lossy().into_owned()
+    };
     text.strip_suffix(".exe").unwrap_or(&text).to_string()
 }
 

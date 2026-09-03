@@ -172,23 +172,22 @@ fn the_binary_path_is_recorded_normalised_and_platform_independent() {
     // tool's development. Recorded with forward slashes and no `.exe`, because
     // the gate may run on Linux while the published figure is regenerated on
     // Windows, and the path must not differ on that alone.
-    let windows_path = outcome(
+    // The probed command is absolute (see `ServerSpec::command`), and native
+    // separators are whatever this platform uses.
+    let plugin_dir = std::env::current_dir().expect("cwd").join("plug");
+    let native = plugin_dir.join("bin").join("x-mcp.exe");
+    let probed = outcome(
         Status::Ok,
         vec![json!({ "name": "t" })],
-        "claude-code\\x\\bin\\x-mcp.exe",
+        &native.to_string_lossy(),
     );
 
-    let value = serde_json::to_value(build(
-        "x",
-        Path::new("plug"),
-        Tree::Dev,
-        None,
-        0,
-        &windows_path,
-    ))
-    .unwrap();
+    let value = serde_json::to_value(build("x", &plugin_dir, Tree::Dev, None, 0, &probed)).unwrap();
 
-    assert_eq!(value["probe"]["binary"], "claude-code/x/bin/x-mcp");
+    // Plugin-relative, forward slashes, no `.exe` — so a relative and an
+    // absolute invocation produce the same document, and Linux and Windows
+    // produce the same document.
+    assert_eq!(value["probe"]["binary"], "bin/x-mcp");
 }
 
 #[test]
@@ -209,4 +208,66 @@ fn the_document_serialises_in_the_pinned_canonical_form() {
         "expected canonical ordering, got: {}",
         &text[..text.len().min(80)]
     );
+}
+
+#[test]
+fn a_binary_outside_the_plugin_degrades_to_a_name_not_a_machine_path() {
+    // `normalise_binary` strips the plugin prefix. If that ever fails — a
+    // symlinked plugin directory, a `\?\` prefix on one side, a cwd that moved
+    // between the two resolutions — falling back to the WHOLE absolute path
+    // would write `C:/Users/<someone>/...` into a document that gets committed
+    // (§4.3.1), and it would do it silently. The file name is still useful
+    // provenance and cannot leak a home directory or churn between machines.
+    let elsewhere = outcome(
+        Status::Ok,
+        vec![json!({ "name": "t" })],
+        "/somewhere/else/entirely/bin/x-mcp",
+    );
+
+    let value = serde_json::to_value(build(
+        "x",
+        Path::new("plug"),
+        Tree::Dev,
+        None,
+        0,
+        &elsewhere,
+    ))
+    .unwrap();
+
+    assert_eq!(value["probe"]["binary"], "x-mcp");
+}
+
+#[test]
+fn a_command_that_is_the_plugin_root_is_not_recorded_as_an_empty_path() {
+    // Stripping the root from itself leaves nothing. `binary: ""` names no file
+    // at all, and least of all the directory that was actually probed.
+    let plugin_dir = std::env::current_dir().expect("cwd").join("plug");
+    let probed = outcome(
+        Status::Failed("is a directory".to_string()),
+        Vec::new(),
+        &plugin_dir.to_string_lossy(),
+    );
+
+    let value = serde_json::to_value(build("x", &plugin_dir, Tree::Dev, None, 0, &probed)).unwrap();
+
+    assert_eq!(value["probe"]["binary"], "plug");
+}
+
+#[test]
+#[cfg(unix)]
+fn a_backslash_in_a_unix_filename_is_not_turned_into_a_directory() {
+    // A backslash is a legal character in a Unix filename. Rewriting it to `/`
+    // for cross-platform tidiness would make the document name `my/binary` — a
+    // file `binary` inside a directory `my` — when what was probed was a single
+    // file called `my\binary`.
+    let plugin_dir = std::env::current_dir().expect("cwd").join("plug");
+    let probed = outcome(
+        Status::Ok,
+        vec![json!({ "name": "t" })],
+        &plugin_dir.join(r"my\binary").to_string_lossy(),
+    );
+
+    let value = serde_json::to_value(build("x", &plugin_dir, Tree::Dev, None, 0, &probed)).unwrap();
+
+    assert_eq!(value["probe"]["binary"], r"my\binary");
 }
