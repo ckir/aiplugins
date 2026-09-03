@@ -42,6 +42,164 @@ fn strip_delimiter_line(text: &str) -> Option<&str> {
     rest.is_empty().then_some(rest)
 }
 
+use std::path::{Path, PathBuf};
+
+/// One file-backed source, already measured.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileSource {
+    pub kind: &'static str,
+    pub id: String,
+    pub bytes: u64,
+}
+
+/// A plugin's file-backed sources, split by the tier that pays for them.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FileSources {
+    pub resident: Vec<FileSource>,
+    pub invocation: Vec<FileSource>,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SourceError {
+    #[error("reading {path}: {source}")]
+    Read {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+    #[error("{path} is not where a source belongs; expected {expected}")]
+    Malformed {
+        path: PathBuf,
+        expected: &'static str,
+    },
+}
+
+/// Where a plugin keeps each kind of file-backed source, and what to call it.
+///
+/// `README.md` and `examples/` are deliberately absent: the host never loads
+/// them, so counting them would overstate what a user actually pays. Hooks are
+/// absent because measuring their output means executing contributor-authored
+/// code (spec §4.5).
+const LAYOUT: &[Layout] = &[
+    Layout {
+        dir: "skills",
+        nested: true,
+        resident_kind: "skill_frontmatter",
+        invocation_kind: "skill_body",
+    },
+    Layout {
+        dir: "agents",
+        nested: false,
+        resident_kind: "agent_frontmatter",
+        invocation_kind: "agent_body",
+    },
+    Layout {
+        dir: "commands",
+        nested: false,
+        resident_kind: "command_frontmatter",
+        invocation_kind: "command_body",
+    },
+];
+
+struct Layout {
+    dir: &'static str,
+    /// `true` for `skills/<id>/SKILL.md`, `false` for `<dir>/<id>.md`.
+    nested: bool,
+    resident_kind: &'static str,
+    invocation_kind: &'static str,
+}
+
+/// Read every file-backed source a plugin contributes.
+///
+/// A plugin with none of these directories is not an error — an MCP-only plugin
+/// is perfectly ordinary. A directory that exists but cannot be read IS an
+/// error, because reporting no sources for files we failed to read would
+/// understate the footprint and quietly pass the gate.
+pub fn read_file_sources(plugin_dir: &Path) -> Result<FileSources, SourceError> {
+    let mut out = FileSources::default();
+
+    for layout in LAYOUT {
+        for (id, path) in entries(&plugin_dir.join(layout.dir), layout)? {
+            let text = std::fs::read_to_string(&path).map_err(|source| SourceError::Read {
+                path: path.clone(),
+                source,
+            })?;
+
+            let (front, body) = match split_frontmatter(&text) {
+                Some((front, body)) => (Some(front), body),
+                None => (None, text.as_str()),
+            };
+
+            if let Some(front) = front {
+                out.resident.push(FileSource {
+                    kind: layout.resident_kind,
+                    id: id.clone(),
+                    bytes: front.len() as u64,
+                });
+            }
+            if !body.is_empty() {
+                out.invocation.push(FileSource {
+                    kind: layout.invocation_kind,
+                    id,
+                    bytes: body.len() as u64,
+                });
+            }
+        }
+    }
+
+    // Sorted so the document does not inherit directory iteration order, which
+    // differs between filesystems and would churn the committed copy.
+    out.resident
+        .sort_by(|a, b| (a.kind, &a.id).cmp(&(b.kind, &b.id)));
+    out.invocation
+        .sort_by(|a, b| (a.kind, &a.id).cmp(&(b.kind, &b.id)));
+    Ok(out)
+}
+
+/// The `(id, path)` pairs one layout contributes, or nothing if its directory
+/// is absent.
+fn entries(dir: &Path, layout: &Layout) -> Result<Vec<(String, PathBuf)>, SourceError> {
+    let listing = match std::fs::read_dir(dir) {
+        Ok(listing) => listing,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(source) => {
+            return Err(SourceError::Read {
+                path: dir.to_path_buf(),
+                source,
+            })
+        }
+    };
+
+    let mut found = Vec::new();
+    for entry in listing {
+        let entry = entry.map_err(|source| SourceError::Read {
+            path: dir.to_path_buf(),
+            source,
+        })?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+
+        if layout.nested {
+            // A mis-structured skill is an ERROR, not a skip. The loader expects
+            // `skills/<name>/SKILL.md`; a `.md` file sitting directly in
+            // `skills/`, or a directory with no `SKILL.md` inside it, is a skill
+            // somebody meant to write. Skipping it drops its bytes from the
+            // measurement with nothing failing anywhere — the false zero this
+            // whole tool is built to refuse, arriving through the filesystem
+            // instead of through a probe.
+            let file = entry.path().join("SKILL.md");
+            if !file.is_file() {
+                return Err(SourceError::Malformed {
+                    path: entry.path(),
+                    expected: "skills/<name>/SKILL.md",
+                });
+            }
+            found.push((name, file));
+        } else if let Some(id) = name.strip_suffix(".md") {
+            found.push((id.to_string(), entry.path()));
+        }
+    }
+    Ok(found)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
