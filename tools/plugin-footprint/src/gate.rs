@@ -121,10 +121,23 @@ pub fn budget_for(budgets: &Value, plugin: &str) -> BudgetLookup {
             // violating value could not survive a regeneration.
             //
             // Not pedantry about an inequality. The ratchet reclaims slack down
-            // to `headroom` above the low-water mark; a cap at or above that
-            // headroom lets ONE change spend the entire allowance the ratchet
-            // exists to reclaim, which is exactly the jump §6 says the ceiling
-            // is blind to. A cap that large is the delta layer switched off.
+            // to `headroom` above the low-water mark, so the ceiling is never
+            // more than `headroom` away — and a cap of `headroom` or more
+            // therefore admits a change that grows by the whole of it. One pull
+            // request swallows the entire allowance the ratchet just reclaimed,
+            // which is exactly the jump §6 says the ceiling is blind to. A cap
+            // that large is the delta layer switched off while still reading as
+            // configured.
+            //
+            // Refused rather than clamped, and refused HERE as well as in
+            // `ratchet`. Clamping to `headroom - 1` would remove the wedge a
+            // violating base policy causes, but the gate would then judge by a
+            // number the committed file does not state. Accepting it instead —
+            // "use the legacy policy one last time" — trades a loud failure on a
+            // state that needs a CI bypass to create for a silent weakening that
+            // persists indefinitely and looks exactly like a passing build. Both
+            // were considered and rejected; the peer that raised the wedge
+            // withdrew its own proposed fix once it traced that consequence.
             if delta_bytes >= headroom_bytes {
                 return BudgetLookup::Malformed(format!(
                     "`deltaBytes` {delta_bytes} is not below `headroomBytes` {headroom_bytes}; \
