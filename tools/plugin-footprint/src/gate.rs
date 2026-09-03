@@ -166,6 +166,12 @@ fn probe_failed(measured: &Value) -> Option<String> {
         .get("status")
         .and_then(Value::as_str)
         .unwrap_or("absent");
+    // A complete measurement of a plugin that has no server to ask. The
+    // tool-count check below exists to catch a server that launched and
+    // returned nothing; there was no server here, so it does not apply.
+    if status == "no_server" {
+        return None;
+    }
     if status != "ok" {
         let detail = probe
             .get("detail")

@@ -202,7 +202,13 @@ fn entries(dir: &Path, layout: &Layout) -> Result<Vec<(String, PathBuf)>, Source
         })?;
         let name = entry.file_name().to_string_lossy().into_owned();
 
-        if is_os_artifact(&name) {
+        // Only FILES. Skipping every dot-named entry skipped dot-named
+        // DIRECTORIES too, so `skills/.sneaky/SKILL.md` would have vanished from
+        // the measurement with nothing failing — a way to hide cost, created by
+        // the fix for a way to fail loudly. A dot-named directory goes through
+        // the normal check instead: it is either a source or malformed, and both
+        // are loud.
+        if !entry.path().is_dir() && is_os_artifact(&name) {
             continue;
         }
 

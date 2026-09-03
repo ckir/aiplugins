@@ -238,3 +238,29 @@ fn the_error_names_the_layout_that_was_violated_not_always_skills() {
     assert!(err.to_string().contains("commands/<name>.md"), "got: {err}");
     assert!(!err.to_string().contains("SKILL.md"), "got: {err}");
 }
+
+#[test]
+fn a_dot_named_directory_cannot_hide_a_source_from_the_measurement() {
+    // The edge the round-1 `.DS_Store` fix created. Skipping every dot-named
+    // entry skipped dot-named DIRECTORIES too, so `skills/.sneaky/SKILL.md`
+    // would have vanished from the footprint with nothing failing — a way to
+    // hide cost, introduced by a fix for a way to fail loudly.
+    //
+    // OS artifacts are FILES. A dot-named directory goes through the normal
+    // check: it is either a skill, or it is malformed, and both are loud. The
+    // trade is that a stray `.vscode/` inside `skills/` now hard-fails, which
+    // costs seconds to fix and announces itself, versus silently unmeasured
+    // bytes which do neither.
+    let fx = Fixture::new("dotdir");
+    fx.write("skills/.sneaky/SKILL.md", SKILL);
+
+    let sources = read_file_sources(fx.path()).expect("a dot-named skill is still a skill");
+
+    assert_eq!(
+        sources.resident.len(),
+        1,
+        "a dot-named directory must not hide a source: {:?}",
+        sources.resident
+    );
+    assert_eq!(sources.resident[0].id, ".sneaky");
+}

@@ -134,8 +134,13 @@ jobs:
       - name: Verify the committed footprints are not stale
         run: |
           just footprint-regen
-          if ! git diff --quiet -- docs/footprints/; then
-            echo "::error::Committed footprint documents are stale. Run 'just footprint-regen' and commit."
+          # --porcelain, not `git diff`: a diff cannot see an UNTRACKED file, so
+          # a new plugin's document that was never `git add`ed would be
+          # regenerated here, ignored by the check, read off disk by the gate,
+          # and merged without ever entering the repository.
+          if [ -n "$(git status --porcelain -- docs/footprints/)" ]; then
+            echo "::error::Committed footprint documents are stale or incomplete. Run 'just footprint-regen', 'git add docs/footprints/', and commit."
+            git status --porcelain -- docs/footprints/
             git --no-pager diff -- docs/footprints/
             exit 1
           fi

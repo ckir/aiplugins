@@ -63,6 +63,16 @@ impl Default for Limits {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Status {
     Ok,
+    /// The plugin declares no MCP server, so there was nothing to probe.
+    ///
+    /// A COMPLETE measurement, not a failed one, and distinct from `Ok` with an
+    /// empty tool list on purpose. A skills-only or hooks-only plugin is
+    /// ordinary (see `manifest::looks_like_a_plugin`) and its whole cost sits in
+    /// the file-backed tiers; a server that WAS launched and answered
+    /// `tools/list` with nothing is broken, and must not be able to satisfy a
+    /// ceiling by costing nothing. Collapsing the two into one status is what
+    /// made the gate reject the first while trying to catch the second.
+    NoServer,
     Failed(String),
     TimedOut(String),
 }
@@ -199,6 +209,10 @@ fn with_stderr(status: Status, stderr: &Arc<Mutex<String>>) -> Status {
         Status::Failed(why) => Status::Failed(format!("{why}; stderr: {tail}")),
         Status::TimedOut(why) => Status::TimedOut(format!("{why}; stderr: {tail}")),
         Status::Ok => Status::Ok,
+        // Never produced here — nothing was launched, so there is no stderr to
+        // attach. Spelled out rather than wildcarded so that a future status
+        // added to this enum has to be considered at this site too.
+        Status::NoServer => Status::NoServer,
     }
 }
 
