@@ -4,7 +4,11 @@ members = [
     "claude-code/*",
     "antigravity/*",
     "qwen/*",
-    "shared/*"
+    "shared/*",
+    # Maintainer tooling, never published to any marketplace. Kept out of
+    # `shared/`, which the root README defines as engines that several agents'
+    # plugins FRONT — this is fronted by none.
+    "tools/*"
 ]
 
 [workspace.package]
