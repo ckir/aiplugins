@@ -9,7 +9,7 @@
 use plugin_footprint::document::{build, Tree};
 use plugin_footprint::probe::{Outcome, Status};
 use serde_json::json;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn outcome(status: Status, tools: Vec<serde_json::Value>, binary: &str) -> Outcome {
     Outcome {
@@ -37,7 +37,14 @@ fn ok_outcome() -> Outcome {
 
 #[test]
 fn a_successful_probe_itemises_every_source_it_measured() {
-    let doc = build("x", Tree::Dev, Some("0.6.4"), 0, &ok_outcome());
+    let doc = build(
+        "x",
+        Path::new("plug"),
+        Tree::Dev,
+        Some("0.6.4"),
+        0,
+        &ok_outcome(),
+    );
 
     let value = serde_json::to_value(&doc).expect("serialises");
     assert_eq!(value["schemaVersion"], 1);
@@ -63,7 +70,14 @@ fn a_successful_probe_itemises_every_source_it_measured() {
 
 #[test]
 fn tier_bytes_are_the_sum_of_the_sources() {
-    let doc = build("x", Tree::Dev, Some("0.6.4"), 0, &ok_outcome());
+    let doc = build(
+        "x",
+        Path::new("plug"),
+        Tree::Dev,
+        Some("0.6.4"),
+        0,
+        &ok_outcome(),
+    );
     let value = serde_json::to_value(&doc).expect("serialises");
 
     let sources = value["tiers"]["resident"]["sources"].as_array().unwrap();
@@ -84,7 +98,8 @@ fn a_failed_probe_omits_the_tiers_entirely_rather_than_reporting_zero() {
         "bin/x",
     );
 
-    let value = serde_json::to_value(build("x", Tree::Dev, None, 0, &failed)).expect("serialises");
+    let value = serde_json::to_value(build("x", Path::new("plug"), Tree::Dev, None, 0, &failed))
+        .expect("serialises");
 
     assert_eq!(value["probe"]["status"], "failed");
     assert!(
@@ -109,8 +124,15 @@ fn a_timed_out_probe_is_distinguishable_from_a_failed_one() {
         "bin/x",
     );
 
-    let value =
-        serde_json::to_value(build("x", Tree::Dev, None, 0, &timed_out)).expect("serialises");
+    let value = serde_json::to_value(build(
+        "x",
+        Path::new("plug"),
+        Tree::Dev,
+        None,
+        0,
+        &timed_out,
+    ))
+    .expect("serialises");
 
     assert_eq!(value["probe"]["status"], "timed_out");
 }
@@ -121,7 +143,15 @@ fn tokens_are_absent_until_an_oracle_has_produced_them() {
     // counter and are cached into the committed document (spec §4.3.1). An
     // un-run oracle must leave the field absent, never 0 — the same
     // failure-is-not-a-zero rule the probe status follows.
-    let value = serde_json::to_value(build("x", Tree::Dev, None, 0, &ok_outcome())).unwrap();
+    let value = serde_json::to_value(build(
+        "x",
+        Path::new("plug"),
+        Tree::Dev,
+        None,
+        0,
+        &ok_outcome(),
+    ))
+    .unwrap();
 
     assert!(value["tiers"]["resident"]["bytes"].is_u64());
     assert!(
@@ -148,14 +178,29 @@ fn the_binary_path_is_recorded_normalised_and_platform_independent() {
         "claude-code\\x\\bin\\x-mcp.exe",
     );
 
-    let value = serde_json::to_value(build("x", Tree::Dev, None, 0, &windows_path)).unwrap();
+    let value = serde_json::to_value(build(
+        "x",
+        Path::new("plug"),
+        Tree::Dev,
+        None,
+        0,
+        &windows_path,
+    ))
+    .unwrap();
 
     assert_eq!(value["probe"]["binary"], "claude-code/x/bin/x-mcp");
 }
 
 #[test]
 fn the_document_serialises_in_the_pinned_canonical_form() {
-    let doc = build("x", Tree::Dev, Some("0.6.4"), 0, &ok_outcome());
+    let doc = build(
+        "x",
+        Path::new("plug"),
+        Tree::Dev,
+        Some("0.6.4"),
+        0,
+        &ok_outcome(),
+    );
     let text = plugin_footprint::canonical::canonical_json(&serde_json::to_value(&doc).unwrap());
 
     // Sorted keys, so a committed document does not churn on field order.

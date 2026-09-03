@@ -98,6 +98,7 @@ fn measure(plugin_dir: &Path) -> ExitCode {
     let name = plugin_name(plugin_dir);
     let document = build(
         &name,
+        plugin_dir,
         Tree::Dev,
         plugin_version(plugin_dir).as_deref(),
         now_epoch_secs(),
