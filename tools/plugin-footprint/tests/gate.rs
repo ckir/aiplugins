@@ -1,0 +1,202 @@
+//! The gate's layers (spec §6). Every case is a pair of parsed documents, so
+//! nothing here needs a filesystem, a git checkout or a built binary.
+
+use plugin_footprint::gate::{check, Budget, Verdict};
+use serde_json::{json, Value};
+
+fn budget() -> Budget {
+    Budget {
+        resident_bytes: 20_000,
+        headroom_bytes: 2_000,
+        delta_bytes: 500,
+    }
+}
+
+fn doc(status: &str, tools: u64, resident: u64) -> Value {
+    json!({
+        "schemaVersion": 1,
+        "plugin": "x",
+        "probe": { "status": status, "toolCount": tools, "binary": "bin/x", "promptCount": 0 },
+        "tiers": {
+            "resident": {
+                "bytes": resident,
+                "sources": [{ "kind": "mcp_tool_schema", "id": "t", "bytes": resident }]
+            },
+            "invocation": { "bytes": 0, "sources": [] }
+        }
+    })
+}
+
+fn failed_doc() -> Value {
+    json!({
+        "schemaVersion": 1,
+        "plugin": "x",
+        "probe": { "status": "failed", "detail": "could not launch", "binary": "bin/x",
+                   "toolCount": 0, "promptCount": 0 }
+    })
+}
+
+fn reasons(verdict: Verdict) -> Vec<String> {
+    match verdict {
+        Verdict::Pass => panic!("expected a failure"),
+        Verdict::Fail(reasons) => reasons,
+    }
+}
+
+#[test]
+fn a_clean_measurement_matching_its_baseline_passes() {
+    let d = doc("ok", 19, 18_000);
+    assert_eq!(check(&d, Some(&d), &budget()), Verdict::Pass);
+}
+
+#[test]
+fn a_failed_probe_fails_the_gate_before_anything_else_is_considered() {
+    // Layer 1 is fatal precisely because every later layer would be reasoning
+    // about numbers that were never measured.
+    let verdict = reasons(check(&failed_doc(), None, &budget()));
+
+    assert!(
+        verdict.iter().any(|r| r.contains("probe")),
+        "the probe failure must be named, got {verdict:?}"
+    );
+    assert_eq!(
+        verdict.len(),
+        1,
+        "no later layer may also report, got {verdict:?}"
+    );
+}
+
+#[test]
+fn a_probe_reporting_no_tools_at_all_fails() {
+    // The false-zero this whole design guards against: a plugin that measured
+    // nothing must not satisfy a ceiling by costing nothing.
+    let verdict = reasons(check(&doc("ok", 0, 0), None, &budget()));
+
+    assert!(
+        verdict.iter().any(|r| r.contains("no tools")),
+        "{verdict:?}"
+    );
+}
+
+#[test]
+fn a_measurement_over_budget_fails_naming_the_numbers() {
+    let over = doc("ok", 19, 25_000);
+
+    let verdict = reasons(check(&over, Some(&over), &budget()));
+
+    let joined = verdict.join(" ");
+    assert!(joined.contains("25000"), "actual must be named: {joined}");
+    assert!(joined.contains("20000"), "budget must be named: {joined}");
+}
+
+#[test]
+fn growth_larger_than_the_delta_cap_fails_even_when_under_budget() {
+    // 19000 is comfortably under the 20000 ceiling, so only the delta cap can
+    // catch it. That is the whole reason the cap exists: the ceiling permits any
+    // growth beneath it, including a single jump nobody intended.
+    let baseline = doc("ok", 19, 18_000);
+    let grown = doc("ok", 19, 19_000);
+
+    let verdict = reasons(check(&grown, Some(&baseline), &budget()));
+
+    assert!(
+        verdict.iter().any(|r| r.contains("delta")),
+        "a 1000-byte jump exceeds the 500-byte cap, got {verdict:?}"
+    );
+    assert!(
+        !verdict.iter().any(|r| r.contains("budget")),
+        "it is under the ceiling; only the delta may fire, got {verdict:?}"
+    );
+}
+
+#[test]
+fn shrinking_is_never_a_delta_failure() {
+    // `saturating_sub` matters here: a plugin that got smaller must not read as
+    // enormous growth through an underflow.
+    let baseline = doc("ok", 19, 18_000);
+    let smaller = doc("ok", 19, 12_000);
+
+    assert_eq!(check(&smaller, Some(&baseline), &budget()), Verdict::Pass);
+}
+
+#[test]
+fn a_baseline_from_a_newer_schema_is_refused_rather_than_guessed_at() {
+    let measured = doc("ok", 19, 18_000);
+    let mut newer = measured.clone();
+    newer["schemaVersion"] = json!(2);
+
+    let verdict = reasons(check(&measured, Some(&newer), &budget()));
+
+    assert!(
+        verdict.iter().any(|r| r.contains("schemaVersion")),
+        "{verdict:?}"
+    );
+}
+
+#[test]
+fn an_older_baseline_schema_is_read_not_refused() {
+    // The PR that bumps the version reads a baseline written by the previous
+    // one. Refusing that deadlocks the bump: the merge base can only ever carry
+    // the older version.
+    let mut measured = doc("ok", 19, 18_000);
+    measured["schemaVersion"] = json!(2);
+    let older = doc("ok", 19, 18_000);
+
+    let verdict = check(&measured, Some(&older), &budget());
+
+    assert_eq!(verdict, Verdict::Pass, "got {verdict:?}");
+}
+
+#[test]
+fn a_plugin_with_no_baseline_is_measured_but_not_compared() {
+    // A newly added plugin has no merge-base document. It must still satisfy the
+    // probe and budget layers; only the comparisons are skipped.
+    let d = doc("ok", 19, 18_000);
+    assert_eq!(check(&d, None, &budget()), Verdict::Pass);
+
+    let over = doc("ok", 19, 25_000);
+    assert!(matches!(check(&over, None, &budget()), Verdict::Fail(_)));
+}
+
+#[test]
+fn a_failed_probe_reports_only_the_probe_even_when_the_document_claims_a_tier() {
+    // This is what actually pins the ORDER, and `failed_doc()` alone does not.
+    // A document with no tiers reads as 0 resident bytes, which is under every
+    // ceiling — so moving the probe check to the END of `check` leaves the
+    // earlier test green, because the budget layer had nothing to complain
+    // about either way. MEASURED: that mutation passed all nine of the first
+    // tests written for this module.
+    //
+    // Giving the failed document a tier that IS over budget separates the two
+    // orderings: fatal-first reports one reason, fatal-last reports two.
+    let mut failed = failed_doc();
+    failed["tiers"] = json!({
+        "resident": { "bytes": 25_000, "sources": [] },
+        "invocation": { "bytes": 0, "sources": [] }
+    });
+
+    let verdict = reasons(check(&failed, None, &budget()));
+
+    assert_eq!(
+        verdict.len(),
+        1,
+        "the probe layer is fatal and alone; nothing later may report: {verdict:?}"
+    );
+    assert!(verdict[0].contains("probe"), "{verdict:?}");
+}
+
+#[test]
+fn a_probe_that_listed_no_tools_reports_only_the_probe_even_when_over_budget() {
+    // Not a contrived shape: a server that answers `tools/list` with an empty
+    // array still yields a large resident tier when the plugin's skills and
+    // agents are large, because those are read from disk and not from the
+    // server. The gate must say the probe is wrong, not that the plugin is fat.
+    let verdict = reasons(check(&doc("ok", 0, 25_000), None, &budget()));
+
+    assert_eq!(
+        verdict.len(),
+        1,
+        "the probe layer is fatal and alone; nothing later may report: {verdict:?}"
+    );
+    assert!(verdict[0].contains("no tools"), "{verdict:?}");
+}
