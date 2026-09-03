@@ -215,8 +215,29 @@ pub fn check_worker_version(announced: &str) -> Result<(), ErrorEnvelope> {
 ///
 /// Deterministic and non-retryable: nothing the server does will fix it, so the message is the
 /// resolver's own, which names the missing field and the flag/variable that supplies it.
+///
+/// The code is picked per variant rather than fixed. `suggested_action` is serialized into the tool
+/// result the user reads (`ghidra-ipc/src/error.rs`), and `GhidraNotFound` carries "point
+/// GHIDRA_INSTALL_DIR at your Ghidra install root" — a wrong instruction for someone whose install is
+/// fine and whose project settings are not. The action is overridden too, because every one of these
+/// is a settings problem and none of the code-level hints says so.
 fn config_unusable(e: crate::config::ConfigError) -> ErrorEnvelope {
-    ErrorEnvelope::new(ErrorCode::GhidraNotFound, e.to_string())
+    use crate::config::ConfigError;
+    let code = match &e {
+        ConfigError::Missing {
+            field: "project_dir" | "project_name",
+            ..
+        }
+        | ConfigError::NoProjectDir(_) => ErrorCode::ProjectNotFound,
+        ConfigError::Missing {
+            field: "bootstrap_program",
+            ..
+        } => ErrorCode::ProgramNotFound,
+        ConfigError::Missing { .. } | ConfigError::NotGhidra(_) => ErrorCode::GhidraNotFound,
+    };
+    ErrorEnvelope::new(code, e.to_string()).with_action(
+        "set the value named in the message — as a CLI flag, an environment variable, or in this          agent's settings file — then restart the server",
+    )
 }
 
 /// A structured boot/transport failure envelope (retryable).

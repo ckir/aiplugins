@@ -190,3 +190,96 @@ async fn tools_list_answers_over_mcp_with_no_ghidra_configuration() {
     let _ = client.cancel().await;
     server_handle.abort();
 }
+
+// ---- which configuration is wrong, and what the user is told to do about it ----
+
+/// `suggested_action` is serialized into the tool result the user reads, so a wrong one is a wrong
+/// instruction. A project-level misconfiguration must not send someone off to reinstall Ghidra.
+///
+/// `RawConfig::resolve` checks every required field for presence BEFORE it touches the filesystem, so
+/// setting `ghidra_install_dir` to any non-empty string is enough to get past it and reach the
+/// project_dir check — no Ghidra fixture needed.
+#[tokio::test]
+async fn a_project_misconfiguration_is_not_reported_as_a_missing_ghidra_install() {
+    let raw = RawConfig {
+        ghidra_install_dir: Some("anything-non-empty".to_string()),
+        ..RawConfig::default()
+    };
+    let state = Arc::new(ServerState::from_raw(raw, versioned_script_dir()));
+
+    let err = call_worker(
+        &state,
+        "list_programs",
+        "",
+        "list_programs",
+        serde_json::json!({}),
+    )
+    .await
+    .map(|_| ())
+    .expect_err("a missing project_dir must still fail the call");
+
+    assert!(
+        err.error.message.contains("project_dir"),
+        "the failing field should be project_dir, got: {}",
+        err.error.message
+    );
+    assert_ne!(
+        err.error.code,
+        ErrorCode::GhidraNotFound,
+        "the Ghidra install is not what is missing here"
+    );
+    assert!(
+        !err.error.suggested_action.contains("GHIDRA_INSTALL_DIR"),
+        "must not tell the user to fix an install directory that is not the problem; got: {}",
+        err.error.suggested_action
+    );
+    assert!(
+        err.error.suggested_action.contains("settings"),
+        "the action should point at the configuration, got: {}",
+        err.error.suggested_action
+    );
+}
+
+/// Regression guard for an ordering that is load-bearing and easy to reverse.
+///
+/// `call_worker` runs the readiness wait — which is where the deferred configuration error is
+/// raised — BEFORE it acquires the bounded permit (`execute.rs`, steps 2 and 3). Reversed, a burst of
+/// concurrent calls larger than `SERVER_PERMITS` would report SERVER_BUSY to the overflow callers,
+/// telling them to retry a server that can never succeed, instead of naming the misconfiguration.
+///
+/// A capstone review asserted the code already had that defect; it does not, and this pins the reason.
+#[tokio::test]
+async fn concurrent_calls_all_report_the_config_error_not_server_busy() {
+    let state = Arc::new(ServerState::from_raw(
+        unresolvable(),
+        versioned_script_dir(),
+    ));
+
+    // Well above SERVER_PERMITS (4), dispatched together.
+    let calls = (0..16).map(|_| {
+        let state = Arc::clone(&state);
+        tokio::spawn(async move {
+            call_worker(
+                &state,
+                "list_programs",
+                "",
+                "list_programs",
+                serde_json::json!({}),
+            )
+            .await
+            .map(|_| ())
+            .expect_err("every call must fail")
+            .error
+            .code
+        })
+    });
+
+    for call in calls {
+        assert_eq!(
+            call.await.expect("task joins"),
+            ErrorCode::GhidraNotFound,
+            "a saturated permit pool must not mask the configuration error as SERVER_BUSY"
+        );
+    }
+    assert_eq!(state.boot_count(), 0);
+}
