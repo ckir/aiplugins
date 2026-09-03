@@ -116,13 +116,26 @@ fn resolve(
         path: manifest_path.to_path_buf(),
     })?;
 
-    let substituted = command.replace(PLUGIN_ROOT, &plugin_dir.to_string_lossy());
+    // Substituting the placeholder ALREADY anchors the path to the plugin
+    // directory, so joining afterwards would prepend it a second time. That is
+    // invisible while the plugin directory is absolute — the substituted path is
+    // then absolute too and `Path::join` replaces rather than appends — and
+    // wrong the moment it is relative, which is the normal case:
+    // `plugin-footprint measure claude-code/re-ghidra-mcp-cc`.
+    //
+    // A command with no placeholder is interpreted relative to the plugin, which
+    // is what the join is for.
+    let anchored = if command.contains(PLUGIN_ROOT) {
+        PathBuf::from(command.replace(PLUGIN_ROOT, &plugin_dir.to_string_lossy()))
+    } else {
+        plugin_dir.join(&command)
+    };
 
     // Normalising also settles separators: substitution can leave a Windows root
     // spliced onto forward slashes (`C:\plugin/bin/x`), and `PathBuf` compares
     // as raw text, so an un-normalised path would differ from the same location
     // written natively.
-    let resolved = lexically_normalize(&plugin_dir.join(&substituted));
+    let resolved = lexically_normalize(&anchored);
     let root = lexically_normalize(plugin_dir);
 
     let escapes = match (&resolved, &root) {

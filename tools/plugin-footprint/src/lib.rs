@@ -6,5 +6,6 @@
 
 pub mod canonical;
 pub mod child_env;
+pub mod document;
 pub mod manifest;
 pub mod probe;

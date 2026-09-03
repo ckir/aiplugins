@@ -200,3 +200,35 @@ fn a_sibling_whose_name_merely_starts_with_the_root_is_refused() {
         "expected a confinement refusal, got: {err}"
     );
 }
+
+#[test]
+fn a_relative_plugin_directory_resolves_without_doubling_the_path() {
+    // The tool is invoked as `plugin-footprint measure claude-code/re-ghidra-mcp-cc`,
+    // so a relative plugin directory is the NORMAL case, not an edge one. Every
+    // other test here uses an absolute temp directory, where an absolute
+    // substitution makes `Path::join` replace rather than append — which hid a
+    // bug that only appears when both sides are relative.
+    let fx = Fixture::new(
+        "relative",
+        r#"{ "mcpServers": { "s": { "command": "${CLAUDE_PLUGIN_ROOT}/bin/s-mcp" } } }"#,
+    );
+
+    // Address the same fixture by a relative path from its own parent.
+    let parent = fx
+        .path()
+        .parent()
+        .expect("fixture has a parent")
+        .to_path_buf();
+    let leaf = fx.path().file_name().expect("fixture has a name");
+    let previous = std::env::current_dir().expect("cwd readable");
+    std::env::set_current_dir(&parent).expect("enter the fixture's parent");
+    let servers = read_mcp_servers(Path::new(leaf));
+    std::env::set_current_dir(previous).expect("restore cwd");
+
+    let servers = servers.expect("a relative plugin directory reads");
+    assert_eq!(
+        servers[0].command,
+        Path::new(leaf).join("bin").join("s-mcp"),
+        "the plugin directory must appear once, not twice"
+    );
+}
