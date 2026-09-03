@@ -250,14 +250,17 @@ fn strip_root(root: &Path, binary: &Path) -> Option<PathBuf> {
     let mut rest = binary.components();
     for expected in root.components() {
         let actual = rest.next()?;
-        let same = if cfg!(windows) {
-            actual
-                .as_os_str()
-                .to_string_lossy()
-                .eq_ignore_ascii_case(&expected.as_os_str().to_string_lossy())
-        } else {
-            actual.as_os_str() == expected.as_os_str()
-        };
+        let (actual, expected) = (actual.as_os_str(), expected.as_os_str());
+        let same = actual == expected
+            || (cfg!(windows)
+                // Case-folded only when BOTH components are valid UTF-8. A lossy
+                // conversion maps every invalid sequence onto U+FFFD, so two
+                // genuinely different components would compare equal and this
+                // would strip a root the binary was never under.
+                && match (actual.to_str(), expected.to_str()) {
+                    (Some(a), Some(b)) => a.to_lowercase() == b.to_lowercase(),
+                    _ => false,
+                });
         if !same {
             return None;
         }
