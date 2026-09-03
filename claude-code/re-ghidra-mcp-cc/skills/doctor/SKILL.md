@@ -1,6 +1,6 @@
 ---
 name: doctor
-description: Diagnoses why the Ghidra MCP server will not start or will not attach to a project. Use when the user runs /re-ghidra-mcp-cc:doctor, when a re-ghidra-mcp-cc tool call fails with GHIDRA_NOT_FOUND, JDK_NOT_FOUND, PROJECT_LOCKED, WORKER_INCOMPATIBLE, WORKER_UNAVAILABLE or a boot timeout, when the plugin's tools do not appear at all, or when the user asks why Ghidra will not connect, why the worker will not boot, or how to check their Ghidra setup.
+description: Diagnoses why the Ghidra MCP server will not start or will not attach to a project. Use when the user runs /re-ghidra-mcp-cc:doctor, when a re-ghidra-mcp-cc tool call fails with GHIDRA_NOT_FOUND, PROJECT_NOT_FOUND, JDK_NOT_FOUND, PROJECT_LOCKED, WORKER_INCOMPATIBLE, WORKER_UNAVAILABLE or a boot timeout, when the plugin's tools are listed but every call fails with a configuration error, when the plugin's tools do not appear at all, or when the user asks why Ghidra will not connect, why the worker will not boot, or how to check their Ghidra setup.
 argument-hint: "[verbose]"
 allowed-tools: Bash, Read, Write
 ---
@@ -32,6 +32,14 @@ misdiagnosis this skill exists to prevent.
 `.mcp.json` points at `${CLAUDE_PLUGIN_ROOT}/bin/re-ghidra-cc-mcp`, and that
 directory is gitignored — a fresh clone has no binaries. Claude Code cannot
 report a server it never managed to launch.
+
+**If you can see the plugin's tools, the server started** — skip to check 2.
+A missing or invalid configuration no longer stops it: the server comes up and
+lists its tools regardless, and reports the problem on the first tool CALL as
+GHIDRA_NOT_FOUND or PROJECT_NOT_FOUND with the missing setting named in the
+message. So "tools visible, every call fails" is a CONFIGURATION fault, not a
+startup one, and only a genuinely absent or unlaunchable binary produces no
+tools at all.
 
 Two different failures look identical from inside the session, and they have
 different fixes, so separate them:
