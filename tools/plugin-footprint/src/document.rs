@@ -214,7 +214,7 @@ fn source(kind: &'static str, value: &serde_json::Value) -> Source {
 /// provenance and can leak nothing.
 fn normalise_binary(plugin_dir: &Path, binary: &Path) -> String {
     let relative = absolutize(plugin_dir)
-        .and_then(|root| binary.strip_prefix(&root).ok().map(Path::to_path_buf))
+        .and_then(|root| strip_root(&root, binary))
         // Stripping the root from itself leaves nothing, and `binary: ""` names
         // no file at all — least of all the directory that was probed.
         .filter(|relative| relative.components().next().is_some())
@@ -235,6 +235,34 @@ fn normalise_binary(plugin_dir: &Path, binary: &Path) -> String {
         relative.to_string_lossy().into_owned()
     };
     text.strip_suffix(".exe").unwrap_or(&text).to_string()
+}
+
+/// Strip `root` from `binary`, comparing components case-insensitively on
+/// Windows.
+///
+/// `Path::strip_prefix` compares byte-for-byte, so a plugin directory given as
+/// `c:\plugin` fails to strip from a command resolved as `C:\plugin\bin\x`
+/// purely on the drive letter's case — and the caller's fallback then throws
+/// away the whole internal path (`bin/`) that a reader needs. Windows paths are
+/// case-insensitive, so matching them that way here is not a loosening; it is
+/// what the platform already means.
+fn strip_root(root: &Path, binary: &Path) -> Option<PathBuf> {
+    let mut rest = binary.components();
+    for expected in root.components() {
+        let actual = rest.next()?;
+        let same = if cfg!(windows) {
+            actual
+                .as_os_str()
+                .to_string_lossy()
+                .eq_ignore_ascii_case(&expected.as_os_str().to_string_lossy())
+        } else {
+            actual.as_os_str() == expected.as_os_str()
+        };
+        if !same {
+            return None;
+        }
+    }
+    Some(rest.collect())
 }
 
 /// Format a Unix timestamp as RFC 3339 in UTC.

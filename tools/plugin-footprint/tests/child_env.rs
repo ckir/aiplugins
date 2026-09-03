@@ -98,3 +98,29 @@ fn windows_allowlist_matching_is_case_insensitive() {
 
     assert_eq!(env.len(), 2, "both should survive, got: {env:?}");
 }
+
+#[test]
+#[cfg(windows)]
+fn a_declared_value_wins_over_an_inherited_one_spelled_in_another_case() {
+    // Windows environments routinely carry `Path`, not `PATH`. A case-sensitive
+    // map keeps BOTH spellings, and `Command::envs` applies them in BTreeMap
+    // order — "PATH" before "Path" before "path" — so on a case-INsensitive
+    // environment block the last one applied wins. MEASURED: a map holding
+    // {"FOO": declared, "foo": ambient} produced a child that saw the ambient
+    // value, exactly reversing this module's documented contract.
+    let env = child_env(
+        &declared(&[("PATH", "/plugin/bin")]),
+        &inherited(&[("Path", "/usr/bin")]),
+    );
+
+    assert_eq!(
+        env.len(),
+        1,
+        "two spellings of one variable must not both survive: {env:?}"
+    );
+    assert_eq!(
+        env.values().next().map(String::as_str),
+        Some("/plugin/bin"),
+        "the manifest's value must be the one that reaches the child"
+    );
+}

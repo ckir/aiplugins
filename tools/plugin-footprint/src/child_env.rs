@@ -57,6 +57,16 @@ pub fn child_env(
         .collect();
 
     for (name, value) in declared {
+        // On Windows the environment BLOCK is case-insensitive but this map is
+        // not, so `PATH` and `Path` both survive as separate keys — and
+        // `Command::envs` applies them in map order, letting the alphabetically
+        // later spelling win. MEASURED: a map of {"FOO": declared, "foo":
+        // ambient} produced a child that saw the AMBIENT value, exactly
+        // reversing the rule this function documents. Dropping every other
+        // spelling first is what makes "declared wins" true rather than stated.
+        if cfg!(windows) {
+            out.retain(|existing, _| !existing.eq_ignore_ascii_case(name));
+        }
         out.insert(name.clone(), value.clone());
     }
 
