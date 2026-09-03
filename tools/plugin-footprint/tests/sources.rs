@@ -275,13 +275,27 @@ fn a_filename_that_is_not_utf8_is_refused_rather_than_lossily_collided() {
     // the sort key became (kind, id) was to stop exactly that.
     //
     // `document.rs::strip_root` already refuses to compare lossily for this same
-    // reason. Unix-only because Windows filenames cannot hold these bytes.
+    // reason.
+    //
+    // `cfg(unix)` gates the COMPILE, because only there can an `OsStr` be built
+    // from arbitrary bytes. It is not enough on its own: macOS enforces valid
+    // UTF-8 in filenames, so the OS refuses to CREATE this file and the test
+    // died on the write rather than on the behaviour it exists to pin. Skipped
+    // rather than narrowed to Linux, because the branch under test is genuinely
+    // unreachable on a filesystem that cannot hold such a name — there is
+    // nothing there to get wrong.
     use std::os::unix::ffi::OsStrExt;
 
     let fx = Fixture::new("notutf8");
     std::fs::create_dir_all(fx.path().join("agents")).expect("mkdir");
     let bad = std::ffi::OsStr::from_bytes(b"\xff\xfe.md");
-    std::fs::write(fx.path().join("agents").join(bad), SKILL).expect("write");
+    if std::fs::write(fx.path().join("agents").join(bad), SKILL).is_err() {
+        eprintln!(
+            "SKIP a_filename_that_is_not_utf8_is_refused_rather_than_lossily_collided: \
+             this filesystem will not create a non-UTF-8 name, so the path cannot arise here."
+        );
+        return;
+    }
 
     let err = read_file_sources(fx.path()).expect_err("a lossy name must be loud");
     assert!(
