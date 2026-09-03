@@ -79,20 +79,31 @@ footprint:
     # with itself. `check-qwen-marketplace.sh` keeps its generated manifest
     # honest exactly this way, on the stated reasoning that nothing fails when a
     # copy goes stale — it just advertises the wrong thing.
-    # `git status --porcelain`, NOT `git diff`. MEASURED: `git diff --quiet --
-    # docs/footprints/` exits 0 for an UNTRACKED file, because git diff only ever
-    # compares things git is tracking. A new plugin's document, regenerated but
-    # never `git add`ed, was therefore invisible here AND in CI — where
-    # footprint-regen recreates it identically, the diff stays quiet, and the
-    # gate reads it off disk and passes. The pull request merges with no
-    # committed document at all, so the NEXT change has no baseline to compare
-    # against, which is the one thing this file exists to provide.
+    # TWO checks, because neither alone is right, and each was wrong in a
+    # different direction. Both failures were MEASURED, one after the other.
+    #
+    # `git diff --quiet` alone is blind to an UNTRACKED file: a new plugin's
+    # document, regenerated but never `git add`ed, was invisible here AND in CI —
+    # regenerated on the runner, ignored by the diff, read off disk by the gate,
+    # and merged with no committed document at all, leaving the NEXT change with
+    # no baseline.
+    #
+    # `git status --porcelain` alone FALSE-POSITIVES on Windows. These files
+    # carry `text eol=lf` (.gitattributes), and git then reports a byte-identical
+    # file as modified: measured with the working file and the index blob both
+    # ending `6}}\n`, `git diff --quiet` exiting 0, and status still printing
+    # ` M docs/footprints/budgets.json`. That fails `just check` for a developer
+    # who has changed nothing.
+    #
+    # So: `diff` for tracked content, which normalises and does not lie; and
+    # `ls-files --others` for the untracked case it cannot see.
     just footprint-regen
-    if [ -n "$(git status --porcelain -- docs/footprints/)" ]; then
+    untracked=$(git ls-files --others --exclude-standard -- docs/footprints/)
+    if ! git diff --quiet -- docs/footprints/ || [ -n "$untracked" ]; then
         echo "ERROR: the committed footprint documents are stale or incomplete." >&2
         echo "A fresh measurement disagrees with what is committed:" >&2
-        git status --porcelain -- docs/footprints/ >&2
         git --no-pager diff --stat -- docs/footprints/ >&2
+        [ -n "$untracked" ] && echo "not committed at all: $untracked" >&2
         echo "Run 'just footprint-regen' and 'git add docs/footprints/', then commit." >&2
         exit 1
     fi
