@@ -95,7 +95,9 @@ fn main() -> ExitCode {
                 eprintln!(
                     "footprint-gate: {plugin}'s budget at {base_ref} is unreadable ({why}). \
                      Refusing to measure it without a ceiling: that is how a typo disables the \
-                     gate silently."
+                     gate silently. Fix it ON {base_ref}, not in a pull request: §6.2 has the \
+                     gate read thresholds from the base ref on purpose, so a branch cannot \
+                     correct the thresholds its own run is judged against."
                 );
                 failed = true;
                 continue;
