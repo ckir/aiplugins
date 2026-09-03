@@ -77,7 +77,8 @@ fn measure(plugin_dir: &Path, out: Option<&Path>) -> ExitCode {
     // than quietly producing a shape nobody designed.
     if servers.len() > 1 {
         eprintln!(
-            "plugin-footprint: {} declares {} MCP servers; measuring more than one into a single              document needs server-qualified source ids, which is not implemented",
+            "plugin-footprint: {} declares {} MCP servers; measuring more than one into \
+             a single document needs server-qualified source ids, which is not implemented",
             plugin_dir.display(),
             servers.len()
         );
@@ -178,23 +179,27 @@ fn measure(plugin_dir: &Path, out: Option<&Path>) -> ExitCode {
 /// Lowering on every improvement would mean a change saving 5 bytes tightens the
 /// ceiling by 5, so reverting it fails a gate that was green a day earlier. The
 /// ceiling therefore only follows a measurement that is a further `HEADROOM`
-/// below it: it moves when `measured <= current - 2*HEADROOM`, and moves to
-/// `measured + HEADROOM`.
+/// below it: it moves when `measured <= current - 2*headroom`, and moves to
+/// `measured + headroom`. The headroom is the PLUGIN's own `headroomBytes`, not
+/// a constant — the constants below are only the values used to seed a plugin
+/// that has no entry yet.
 ///
 /// What that buys, exactly: after a lowering, the new ceiling sits `HEADROOM`
-/// above the new measurement, so reverting a saving of up to `HEADROOM` bytes
-/// still clears THE CEILING. A saving LARGER than `HEADROOM` is banked, and
+/// above the new measurement, so reverting a saving of up to `headroom` bytes
+/// still clears THE CEILING. A saving LARGER than `headroom` is banked, and
 /// reverting it will fail the ceiling — which is what a ratchet is for, and is
 /// not a bug.
 ///
 /// The ceiling is not the whole gate, and this comment used to promise it was.
 /// The per-change delta cap (`DELTA`, 500) is far tighter than `HEADROOM`, so a
 /// revert of more than 500 bytes fails the DELTA layer while sitting comfortably
-/// under the ceiling. Precisely: "a revert of a saving up to HEADROOM clears the
-/// ceiling", NOT "a revert of a saving up to HEADROOM passes the gate".
+/// under the ceiling. Precisely: "a revert of a saving up to the headroom clears
+/// the ceiling", NOT "a revert of a saving up to the headroom passes the gate".
 fn ratchet(measured_path: &Path, budgets_path: &Path) -> ExitCode {
-    const HEADROOM: u64 = 2_000;
-    const DELTA: u64 = 500;
+    // Defaults, applied only when a plugin has no entry yet. Once written they
+    // are the file's to state and a maintainer's to change.
+    const DEFAULT_HEADROOM: u64 = 2_000;
+    const DEFAULT_DELTA: u64 = 500;
 
     let Ok(text) = std::fs::read_to_string(measured_path) else {
         eprintln!("plugin-footprint: cannot read {}", measured_path.display());
@@ -232,22 +237,60 @@ fn ratchet(measured_path: &Path, budgets_path: &Path) -> ExitCode {
         .and_then(|t| serde_json::from_str(&t).ok())
         .unwrap_or_else(|| serde_json::json!({}));
 
-    let current = budgets[&plugin]["residentBytes"].as_u64();
-    let target = measured + HEADROOM;
+    // Valid JSON of the wrong shape used to reach `budgets[&plugin] = ...` and
+    // panic inside serde_json ("cannot access key ... in JSON array"). MEASURED:
+    // under `set -e` in footprint-regen that aborts the run with a backtrace
+    // note and no statement of what is actually wrong.
+    let Some(map) = budgets.as_object_mut() else {
+        eprintln!(
+            "plugin-footprint: {} must hold a JSON object keyed by plugin name; found {}",
+            budgets_path.display(),
+            shape_of_json(&budgets)
+        );
+        return ExitCode::from(1);
+    };
+
+    // POLICY, preserved — not measurement, rebuilt. The plan gives budgets.json
+    // its own file precisely so "regenerating the first must not silently
+    // rewrite the second", and rebuilding the whole entry from these constants
+    // defeated exactly that: a maintainer who raised deltaBytes in review to
+    // admit one legitimately large change had it reset on the next
+    // footprint-regen, and the freshness check then failed the build reporting
+    // their own committed change as stale.
+    let existing = map.get(&plugin);
+    let headroom = existing
+        .and_then(|e| e.get("headroomBytes"))
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(DEFAULT_HEADROOM);
+    let delta = existing
+        .and_then(|e| e.get("deltaBytes"))
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(DEFAULT_DELTA);
+    let current = existing
+        .and_then(|e| e.get("residentBytes"))
+        .and_then(serde_json::Value::as_u64);
+
+    // The plugin's OWN headroom drives the hysteresis. Using the default here
+    // while writing the per-plugin value would apply a different rule from the
+    // one the file states.
+    let target = measured + headroom;
     let next = match current {
         // Seed: the budget starts where the plugin already is, plus headroom.
         None => target,
         // Tighten only when the measurement is a further headroom below the
         // ceiling — the hysteresis described above.
-        Some(current) if target + HEADROOM <= current => target,
+        Some(current) if target + headroom <= current => target,
         Some(current) => current,
     };
 
-    budgets[&plugin] = serde_json::json!({
-        "residentBytes": next,
-        "headroomBytes": HEADROOM,
-        "deltaBytes": DELTA,
-    });
+    map.insert(
+        plugin.clone(),
+        serde_json::json!({
+            "residentBytes": next,
+            "headroomBytes": headroom,
+            "deltaBytes": delta,
+        }),
+    );
 
     let text = canonical_json(&budgets);
     if let Err(e) = std::fs::write(budgets_path, format!("{text}\n")) {
@@ -255,6 +298,18 @@ fn ratchet(measured_path: &Path, budgets_path: &Path) -> ExitCode {
         return ExitCode::from(1);
     }
     ExitCode::SUCCESS
+}
+
+/// Name a JSON value's shape, for an error message about the wrong one.
+fn shape_of_json(value: &serde_json::Value) -> &'static str {
+    match value {
+        serde_json::Value::Null => "null",
+        serde_json::Value::Bool(_) => "a boolean",
+        serde_json::Value::Number(_) => "a number",
+        serde_json::Value::String(_) => "a string",
+        serde_json::Value::Array(_) => "an array",
+        serde_json::Value::Object(_) => "an object",
+    }
 }
 
 /// The plugin's declared name, falling back to its directory.

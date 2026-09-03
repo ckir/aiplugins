@@ -2,7 +2,7 @@
 //!
 //! Usage: `footprint-gate <base-ref>` — for example `footprint-gate origin/main`.
 
-use plugin_footprint::gate::{budget_for, check, Budget, BudgetLookup, Verdict};
+use plugin_footprint::gate::{at_ref, budget_for, check, AtRef, Budget, BudgetLookup, Verdict};
 use std::process::{Command, ExitCode};
 
 /// A plugin with no baseline is measured but not compared, so it needs a budget
@@ -62,7 +62,19 @@ fn main() -> ExitCode {
 
     // Budgets from the base ref. Absent on the very first run, which is not a
     // failure — every plugin is then new and only the probe layer applies.
-    let budgets = show(base_ref, BUDGETS_PATH).unwrap_or_else(|| serde_json::json!({}));
+    // Unreadable is a different matter entirely, and used to be indistinguishable.
+    let budgets = match at_ref(show(base_ref, BUDGETS_PATH).as_deref()) {
+        AtRef::Found(budgets) => budgets,
+        AtRef::Missing => serde_json::json!({}),
+        AtRef::Unreadable(why) => {
+            eprintln!(
+                "footprint-gate: {BUDGETS_PATH} at {base_ref} does not parse ({why}). \
+                 Refusing to measure every plugin without a ceiling: one syntax error \
+                 must not disable the gate for the whole repository."
+            );
+            return ExitCode::from(1);
+        }
+    };
 
     let mut failed = false;
     for plugin in &plugins {
@@ -111,8 +123,21 @@ fn main() -> ExitCode {
         };
 
         // Absent for a plugin added by this change, which is not a failure —
-        // there is simply nothing to compare against yet.
-        let baseline = show(base_ref, &path);
+        // there is simply nothing to compare against yet. Present-but-corrupt is
+        // a failure: skipping the comparison would drop the delta cap silently.
+        let baseline = match at_ref(show(base_ref, &path).as_deref()) {
+            AtRef::Found(baseline) => Some(baseline),
+            AtRef::Missing => None,
+            AtRef::Unreadable(why) => {
+                eprintln!(
+                    "footprint-gate: {path} at {base_ref} does not parse ({why}). \
+                     Refusing to compare against nothing: that silently drops the \
+                     per-change delta cap."
+                );
+                failed = true;
+                continue;
+            }
+        };
 
         match check(&measured, baseline.as_ref(), &budget) {
             Verdict::Pass => println!("footprint-gate: {plugin} ok"),
@@ -173,16 +198,18 @@ fn resolves(base_ref: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Read a path as it exists at `base_ref`, or `None` when it is not there.
-fn show(base_ref: &str, path: &str) -> Option<serde_json::Value> {
+/// The RAW bytes of a path as it exists at `base_ref`, or `None` when git could
+/// not produce it.
+///
+/// Deliberately does not parse. Parsing here meant a corrupt file and an absent
+/// one both arrived as `None`, and the caller then treated the corrupt one as
+/// "nothing to compare against" — see `gate::AtRef`.
+fn show(base_ref: &str, path: &str) -> Option<Vec<u8>> {
     let output = Command::new("git")
         .args(["show", &format!("{base_ref}:{path}")])
         .output()
         .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    serde_json::from_slice(&output.stdout).ok()
+    output.status.success().then_some(output.stdout)
 }
 
 /// Name the sources that grew most, so a red build says what to look at.
