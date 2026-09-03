@@ -383,9 +383,19 @@ impl Conn<'_> {
                 )));
             }
 
-            if let Some(page_items) = result.get(key).and_then(Value::as_array) {
-                items.extend(page_items.iter().cloned());
-            }
+            // A missing or non-array key is a FAILURE, not an empty page. This is
+            // the same rule the probe status follows, and the place it matters
+            // most: a server answering under some other key would otherwise read
+            // as "this plugin has no tools", sail through the gate as a
+            // spectacular footprint reduction, and publish zero for a plugin that
+            // costs whatever it costs. A wrong number people trust is worse than
+            // a crash.
+            let Some(page_items) = result.get(key).and_then(Value::as_array) else {
+                return Err(Status::Failed(format!(
+                    "{method} answered without a `{key}` array; a result we cannot read is not a                      measurement of zero"
+                )));
+            };
+            items.extend(page_items.iter().cloned());
 
             cursor = result
                 .get("nextCursor")
