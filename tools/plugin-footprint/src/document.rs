@@ -53,7 +53,6 @@ pub struct Document {
     pub tree: Tree,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub plugin_version: Option<String>,
-    pub measured_at: String,
     pub probe: ProbeReport,
     /// Absent unless the probe succeeded.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -114,14 +113,21 @@ pub struct Oracle {
 
 /// Assemble the document for one probed plugin.
 ///
-/// `measured_at_epoch_secs` is passed in rather than read from the clock so the
-/// library stays deterministic and testable; the CLI supplies the real time.
+/// Deliberately carries NO timestamp. The byte counts are a pure function of the
+/// plugin tree, so the git commit that holds this document already records when
+/// it was measured — more reliably than a field inside it. Recording a wall
+/// clock here would also make two identical regenerations differ, and §6's
+/// freshness layer is exactly `regenerate, then require no diff`: a
+/// non-deterministic document turns that layer permanently red and teaches
+/// everyone to special-case it. The one measurement that IS separated in time is
+/// the oracle's cached token count (§4.3.1), produced by a run that is not this
+/// one; when that lands, the timestamp belongs on `Oracle`, describing the age
+/// of the cache rather than of the document.
 pub fn build(
     plugin: &str,
     plugin_dir: &Path,
     tree: Tree,
     plugin_version: Option<&str>,
-    measured_at_epoch_secs: i64,
     outcome: &Outcome,
     files: &FileSources,
 ) -> Document {
@@ -142,7 +148,6 @@ pub fn build(
         agent: "claude-code",
         tree,
         plugin_version: plugin_version.map(str::to_string),
-        measured_at: rfc3339_utc(measured_at_epoch_secs),
         probe: ProbeReport {
             status,
             detail,
@@ -295,49 +300,4 @@ fn strip_root(root: &Path, binary: &Path) -> Option<PathBuf> {
         }
     }
     Some(rest.collect())
-}
-
-/// Format a Unix timestamp as RFC 3339 in UTC.
-///
-/// Hand-rolled rather than pulling in a date crate for one field. The civil-date
-/// conversion is Howard Hinnant's `civil_from_days`, which is the standard
-/// algorithm and is pinned by tests against known epochs.
-fn rfc3339_utc(epoch_secs: i64) -> String {
-    let days = epoch_secs.div_euclid(86_400);
-    let secs_of_day = epoch_secs.rem_euclid(86_400);
-    let (year, month, day) = civil_from_days(days);
-    let (h, m, s) = (
-        secs_of_day / 3600,
-        (secs_of_day % 3600) / 60,
-        secs_of_day % 60,
-    );
-    format!("{year:04}-{month:02}-{day:02}T{h:02}:{m:02}:{s:02}Z")
-}
-
-/// Days since 1970-01-01 to a civil (year, month, day).
-fn civil_from_days(days: i64) -> (i64, u32, u32) {
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z.rem_euclid(146_097);
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let y = yoe + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
-    (if m <= 2 { y + 1 } else { y }, m, d)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn known_epochs_format_correctly() {
-        assert_eq!(rfc3339_utc(0), "1970-01-01T00:00:00Z");
-        assert_eq!(rfc3339_utc(1_000_000_000), "2001-09-09T01:46:40Z");
-        // A leap day, which is where a hand-rolled conversion goes wrong.
-        assert_eq!(rfc3339_utc(1_709_164_800), "2024-02-29T00:00:00Z");
-        assert_eq!(rfc3339_utc(1_756_857_600), "2025-09-03T00:00:00Z");
-    }
 }

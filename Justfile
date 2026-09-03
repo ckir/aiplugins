@@ -54,6 +54,21 @@ marketplace:
 qwen-marketplace:
     bash scripts/check-qwen-marketplace.sh
 
+# Regenerate the committed footprint document for every published plugin, and
+# maintain the thresholds alongside them.
+# Requires the plugin binaries: `just build-rtk-mcp-cc build-re-ghidra-mcp-cc`.
+footprint-regen:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for plugin in $(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r'); do
+        cargo run -q -p plugin-footprint --bin plugin-footprint -- measure "claude-code/$plugin" \
+            --out "docs/footprints/$plugin.json"
+        cargo run -q -p plugin-footprint --bin plugin-footprint -- ratchet \
+            --measured "docs/footprints/$plugin.json" \
+            --budgets docs/footprints/budgets.json
+        echo "regenerated docs/footprints/$plugin.json"
+    done
+
 # Drive every branch of the dispatcher shipped as bin/<name> in a plugin bundle.
 # Any one machine exercises exactly one branch of it, so the platform is faked;
 # the Git Bash branch shipped broken in 0.6.0 for want of this.
