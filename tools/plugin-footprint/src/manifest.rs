@@ -23,6 +23,12 @@ pub struct ServerSpec {
     /// The key under `mcpServers`, used to name this server's sources in the
     /// footprint document.
     pub name: String,
+    /// ABSOLUTE, always. A relative command whose normalised form loses its
+    /// separator — `./cmd.exe` becoming `cmd.exe` — is not the same instruction
+    /// to the OS: `Command::new` resolves a bare name through `PATH`
+    /// (CreateProcessW on Windows, execvp on Unix), so confinement would
+    /// authorise a path inside the plugin while something else entirely got
+    /// launched. Storing the absolute form removes that whole class.
     pub command: PathBuf,
     pub args: Vec<String>,
     /// Only what the manifest declares. The prober adds a minimal platform
@@ -146,7 +152,10 @@ fn resolve(
     // spliced onto forward slashes (`C:\plugin/bin/x`), and `PathBuf` compares
     // as raw text, so an un-normalised path would differ from the same location
     // written natively.
-    let resolved = lexically_normalize(&anchored);
+    // The absolute form is what gets stored and launched, so that normalising
+    // can never change what executing the path MEANS. The document records a
+    // plugin-relative path separately (`document::build`).
+    let resolved = absolutize(&anchored);
 
     if !is_confined(plugin_dir, &anchored) {
         return Err(ManifestError::CommandEscapesPluginRoot {
@@ -155,7 +164,7 @@ fn resolve(
             plugin_dir: plugin_dir.to_path_buf(),
         });
     }
-    let resolved = resolved.expect("confinement rejects a path that cannot normalise");
+    let resolved = resolved.expect("confinement rejects a path that cannot be absolutised");
 
     Ok(ServerSpec {
         name: name.to_string(),
@@ -195,9 +204,12 @@ fn is_confined(plugin_dir: &Path, command: &Path) -> bool {
 /// A lexically normalised absolute form, resolving a relative path against the
 /// process working directory.
 ///
+/// Public because the document needs the same notion of "absolute" to compute a
+/// plugin-relative path from an absolute command.
+///
 /// Filesystem-free, like `lexically_normalize`: the command routinely does not
 /// exist yet when this runs.
-fn absolutize(path: &Path) -> Option<PathBuf> {
+pub fn absolutize(path: &Path) -> Option<PathBuf> {
     let anchored = if path.is_absolute() {
         path.to_path_buf()
     } else {
@@ -282,20 +294,24 @@ mod tests {
         let spec = resolve_for("claude-code/x", "${CLAUDE_PLUGIN_ROOT}/bin/s-mcp")
             .expect("a relative plugin directory resolves");
 
-        assert_eq!(
-            spec.command,
-            Path::new("claude-code/x").join("bin").join("s-mcp")
-        );
+        // Absolute (see `ServerSpec::command`), and the plugin directory appears
+        // exactly once within it.
+        let expected = absolutize(Path::new("claude-code/x"))
+            .expect("absolutises")
+            .join("bin")
+            .join("s-mcp");
+        assert_eq!(spec.command, expected);
     }
 
     #[test]
     fn a_command_without_the_placeholder_is_taken_relative_to_the_plugin() {
         let spec = resolve_for("claude-code/x", "bin/s-mcp").expect("resolves");
 
-        assert_eq!(
-            spec.command,
-            Path::new("claude-code/x").join("bin").join("s-mcp")
-        );
+        let expected = absolutize(Path::new("claude-code/x"))
+            .expect("absolutises")
+            .join("bin")
+            .join("s-mcp");
+        assert_eq!(spec.command, expected);
     }
 
     #[test]
@@ -317,6 +333,25 @@ mod tests {
                 err,
                 ManifestError::CommandEscapesPluginRoot { .. }
             ));
+        }
+    }
+
+    #[test]
+    fn a_bare_command_name_never_stays_bare() {
+        // MEASURED: `lexically_normalize` drops the CurDir component, so a
+        // command of "cmd.exe" under a plugin directory of "." came out as the
+        // bare string "cmd.exe". `Command::new` treats a name with no separator
+        // as a PATH lookup (CreateProcessW on Windows, execvp on Unix), so
+        // confinement authorised `./cmd.exe` inside the plugin while the OS
+        // launched C:\Windows\System32\cmd.exe. Normalising a path changed
+        // what executing it MEANS.
+        for root in [".", "./", "plug"] {
+            let spec = resolve_for(root, "cmd.exe").expect("resolves");
+            assert!(
+                spec.command.is_absolute(),
+                "root {root:?} produced {:?}, which the OS may resolve through PATH",
+                spec.command
+            );
         }
     }
 

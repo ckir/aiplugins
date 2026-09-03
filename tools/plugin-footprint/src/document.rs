@@ -16,6 +16,7 @@
 //!   "not measured" distinct from "measured as none".
 
 use crate::canonical::canonical_len;
+use crate::manifest::absolutize;
 use crate::probe::{Outcome, Status};
 use serde::Serialize;
 use std::path::Path;
@@ -115,6 +116,7 @@ pub struct Oracle {
 /// library stays deterministic and testable; the CLI supplies the real time.
 pub fn build(
     plugin: &str,
+    plugin_dir: &Path,
     tree: Tree,
     plugin_version: Option<&str>,
     measured_at_epoch_secs: i64,
@@ -140,7 +142,7 @@ pub fn build(
         probe: ProbeReport {
             status,
             detail,
-            binary: normalise_binary(&outcome.binary),
+            binary: normalise_binary(plugin_dir, &outcome.binary),
             tool_count: outcome.tools.len(),
             prompt_count: outcome.prompts.len(),
         },
@@ -193,14 +195,21 @@ fn source(kind: &'static str, value: &serde_json::Value) -> Source {
     }
 }
 
-/// Forward slashes, no executable suffix.
+/// Relative to the plugin, with forward slashes and no executable suffix.
 ///
-/// The gate may run on Linux while the published figure is regenerated on
-/// Windows (§8, Fork 7). An un-normalised path would differ between them on the
-/// platform alone, and snapshotting that would flake on the OS rather than on
-/// the footprint.
-fn normalise_binary(path: &Path) -> String {
-    let text = path.to_string_lossy().replace('\\', "/");
+/// Relative to the PLUGIN rather than to the working directory, so the recorded
+/// path is the same whether the tool was invoked as `measure claude-code/x` or
+/// with an absolute path. These documents are committed (§4.3.1), and a
+/// machine-specific path in one would churn on whoever regenerated it.
+///
+/// Forward slashes and no `.exe` because the gate may run on Linux while the
+/// published figure is regenerated on Windows (§8, Fork 7); snapshotting an
+/// un-normalised path would flake on the platform rather than on the footprint.
+fn normalise_binary(plugin_dir: &Path, binary: &Path) -> String {
+    let relative = absolutize(plugin_dir)
+        .and_then(|root| binary.strip_prefix(&root).ok().map(Path::to_path_buf))
+        .unwrap_or_else(|| binary.to_path_buf());
+    let text = relative.to_string_lossy().replace('\\', "/");
     text.strip_suffix(".exe").unwrap_or(&text).to_string()
 }
 
