@@ -58,7 +58,12 @@ pub async fn call_worker(
 /// returns `WORKER_WARMING`. Holds the slot lock only for the instantaneous state checks, never across
 /// the wait, and never while holding a permit (R2 seat-A).
 async fn wait_until_ready(state: &Arc<ServerState>) -> Result<(), ErrorEnvelope> {
-    let deadline = tokio::time::Instant::now() + state.cfg.warming_deadline;
+    // Ahead of the boot loop on purpose. With no usable configuration there is nothing to wait for,
+    // and falling through would kick a doomed single-flight boot on every pass until the deadline
+    // expired, finally answering WORKER_WARMING — a timeout that hides the actual fault. The
+    // configuration error is deterministic, so report it immediately.
+    let cfg = state.cfg()?;
+    let deadline = tokio::time::Instant::now() + cfg.warming_deadline;
     loop {
         {
             let mut slot = state.worker.lock().await;
@@ -124,7 +129,7 @@ async fn run_with_respawn(
             _ => return Err(worker_warming()),
         };
         if !holder.booted.conn.is_poisoned() {
-            match rpc_once(holder, method, params.clone(), state.cfg.rpc_deadline).await {
+            match rpc_once(holder, method, params.clone(), state.cfg()?.rpc_deadline).await {
                 RpcOutcome::Ok(v) => {
                     commit_attach_if_needed(holder, method, &v);
                     return Ok((v, holder.canon.clone()));
@@ -170,7 +175,7 @@ async fn respawn_and_retry(
         }
     };
     boot_reattach(&mut fresh, last_good).await;
-    match rpc_once(&mut fresh, method, params, state.cfg.rpc_deadline).await {
+    match rpc_once(&mut fresh, method, params, state.cfg()?.rpc_deadline).await {
         RpcOutcome::Ok(v) => {
             commit_attach_if_needed(&mut fresh, method, &v);
             let canon = fresh.canon.clone();

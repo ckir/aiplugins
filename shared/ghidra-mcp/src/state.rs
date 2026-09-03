@@ -44,7 +44,17 @@ pub enum WorkerSlot {
 }
 
 pub struct ServerState {
-    pub cfg: ServerConfig,
+    /// The resolved configuration, or the failure that resolving it produced.
+    ///
+    /// Held as a `Result` rather than a `ServerConfig` so that `serve` can start, handshake and list
+    /// its tools on a machine with no Ghidra install. Resolution still happens ONCE, at construction —
+    /// the inputs are CLI flags and environment variables, immutable for the process's lifetime — so
+    /// what is deferred is the FAILURE, not the work. Every call therefore reports the same error, and
+    /// no lock or interior mutability is needed to read it on the hot path.
+    ///
+    /// Private on purpose: reach it through [`ServerState::cfg`], which is the `?`-able accessor that
+    /// makes the deferred failure impossible to ignore at a call site.
+    cfg: Result<ServerConfig, ErrorEnvelope>,
     pub script_dir: PathBuf,
     pub worker: Mutex<WorkerSlot>,
     pub poison: StdMutex<PoisonSet>,
@@ -57,7 +67,21 @@ pub struct ServerState {
 }
 
 impl ServerState {
+    /// Build from an already-resolved configuration.
     pub fn new(cfg: ServerConfig, script_dir: PathBuf) -> Self {
+        Self::build(Ok(cfg), script_dir)
+    }
+
+    /// Build from unresolved inputs, deferring any resolution failure to the first tool call.
+    ///
+    /// This is what `serve` uses. A configuration that cannot resolve is no longer fatal at startup:
+    /// the server comes up, `tools/list` answers normally, and the failure is reported by
+    /// [`ServerState::cfg`] when something actually needs the worker.
+    pub fn from_raw(raw: crate::config::RawConfig, script_dir: PathBuf) -> Self {
+        Self::build(raw.resolve().map_err(config_unusable), script_dir)
+    }
+
+    fn build(cfg: Result<ServerConfig, ErrorEnvelope>, script_dir: PathBuf) -> Self {
         Self {
             cfg,
             script_dir,
@@ -67,6 +91,20 @@ impl ServerState {
             boot_done: tokio::sync::Notify::new(),
             boot_count: std::sync::atomic::AtomicUsize::new(0),
         }
+    }
+
+    /// The resolved configuration, or the deferred configuration failure.
+    ///
+    /// Returns an owned error so callers can `?` it out of a `Result<_, ErrorEnvelope>` without
+    /// fighting the borrow of `self`.
+    pub fn cfg(&self) -> Result<&ServerConfig, ErrorEnvelope> {
+        self.cfg.as_ref().map_err(|e| e.clone())
+    }
+
+    /// Whether a worker could be booted at all. `false` means there is no usable configuration, so
+    /// anything that would launch or talk to a worker must decline instead of trying.
+    pub fn is_configured(&self) -> bool {
+        self.cfg.is_ok()
     }
 
     /// Number of worker boots attempted (test-only single-flight assertion; spec §8).
@@ -83,7 +121,7 @@ impl ServerState {
         // Extract the worker script into the per-version dir (idempotent by hash).
         crate::worker_asset::extract_worker(&self.script_dir)
             .map_err(|e| boot_env(format!("extract worker script: {e}")))?;
-        let wcfg = self.cfg.worker_config(self.script_dir.clone());
+        let wcfg = self.cfg()?.worker_config(self.script_dir.clone());
         let mut booted = ghidra_worker_ctl::boot::boot_worker(&wcfg)
             .await
             .map_err(|e| boot_env(format!("boot worker: {e}")))?;
@@ -92,7 +130,7 @@ impl ServerState {
         // Learn the bootstrap program + geometry (spec §6/§7), with a deadline so a worker that
         // handshakes then hangs before answering worker_info doesn't wedge the slot forever (R4 seat-M).
         let info = tokio::time::timeout(
-            self.cfg.rpc_deadline,
+            self.cfg()?.rpc_deadline,
             booted
                 .conn
                 .request(&mk("worker_info", serde_json::json!({}))),
@@ -143,6 +181,14 @@ impl ServerState {
     /// `Empty` slot leaves it `Empty` (spawn_boot publishes only when it finds `Booting`), so a racing
     /// `wait_until_ready` would launch a SECOND concurrent boot (two JVMs → project `LockException`).
     pub async fn start_warmup(self: &std::sync::Arc<Self>) {
+        // Nothing to boot WITH. Left unguarded, the boot would fail instantly, `spawn_boot` would
+        // treat that as transient and reset the slot to `Empty`, and the next tool call's
+        // `wait_until_ready` would kick the same doomed boot again in a tight loop until
+        // `warming_deadline` expired — answering WORKER_WARMING, which says nothing about the real
+        // problem. `execute.rs` short-circuits ahead of that loop for the same reason.
+        if !self.is_configured() {
+            return;
+        }
         let mut slot = self.worker.lock().await;
         if matches!(&*slot, WorkerSlot::Empty) {
             *slot = WorkerSlot::Booting;
@@ -163,6 +209,14 @@ pub fn check_worker_version(announced: &str) -> Result<(), ErrorEnvelope> {
             format!("worker script version {announced} != required {EXPECTED_WORKER_VERSION}"),
         ))
     }
+}
+
+/// A configuration that could not be resolved, as the envelope every tool call will return.
+///
+/// Deterministic and non-retryable: nothing the server does will fix it, so the message is the
+/// resolver's own, which names the missing field and the flag/variable that supplies it.
+fn config_unusable(e: crate::config::ConfigError) -> ErrorEnvelope {
+    ErrorEnvelope::new(ErrorCode::GhidraNotFound, e.to_string())
 }
 
 /// A structured boot/transport failure envelope (retryable).

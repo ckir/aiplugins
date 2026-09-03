@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 /// The settings-file layer, in the shape the shared config resolver consumes.
 ///
-/// Precedence is decided in `ghidra_mcp::cli::resolve_config`, not here: CLI
+/// Precedence is decided in `ghidra_mcp::cli::layered_config`, not here: CLI
 /// flag, then environment, then this. Returning a [`RawConfig`] rather than a
 /// bespoke struct is what keeps that single rule single.
 pub fn settings_from_markdown(source: &str) -> RawConfig {

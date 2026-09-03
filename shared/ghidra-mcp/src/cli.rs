@@ -22,8 +22,12 @@ use std::time::Duration;
 /// here. Pass `RawConfig::default()` for an agent with no settings file.
 ///
 /// Exit codes are part of the contract with the launching agent: 0 success,
-/// 1 serve terminated with an error, 2 bad configuration or usage, 3 the log
-/// file could not be opened.
+/// 1 serve terminated with an error, 2 bad usage, 3 the log file could not be
+/// opened.
+///
+/// A bad or absent Ghidra CONFIGURATION is deliberately not among them: `serve`
+/// starts anyway and reports the problem on the first tool call, so that a host
+/// listing the tool schemas gets them on a machine with no Ghidra install.
 pub async fn dispatch(
     product: &str,
     version: &str,
@@ -72,7 +76,7 @@ fn usage(product: &str, version: &str) {
     eprintln!("       {product} boot-smoke  (dev; env: GHIDRA_INSTALL_DIR, GHIDRA_MCP_FIXTURE_*)");
 }
 
-/// Resolve config (CLI > env > default), initialize file logging, and serve.
+/// Layer config (CLI > env > settings file), initialize file logging, and serve.
 /// `Err(code)` carries the exit code; the reason is reported on STDERR, never
 /// stdout — stdout is the MCP channel.
 async fn run_serve(
@@ -80,13 +84,11 @@ async fn run_serve(
     cli: Vec<String>,
     file_config: crate::config::RawConfig,
 ) -> Result<(), i32> {
-    let cfg = match resolve_config(cli, file_config) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("{product} serve: configuration error: {e}");
-            return Err(2);
-        }
-    };
+    // NOT resolved here. A bad or absent Ghidra configuration used to exit 2 before `serve` was ever
+    // reached, which meant a tool-schema probe got nothing on a machine without Ghidra. The layered
+    // inputs are handed to `serve` unresolved; resolution still happens once, inside `ServerState`,
+    // and its failure surfaces on the first tool call.
+    let raw = layered_config(cli, file_config);
     let log_path = crate::paths::instance_log_path();
     let _guard = match crate::logging::init_file_logging(&log_path) {
         Ok(g) => g,
@@ -99,25 +101,29 @@ async fn run_serve(
         }
     };
     tracing::info!(?log_path, product, "serve starting");
-    if let Err(e) = crate::server::serve(cfg).await {
+    if let Err(e) = crate::server::serve(raw).await {
         tracing::error!("serve terminated: {e}");
         return Err(1);
     }
     Ok(())
 }
 
-/// Layer CLI flags over the environment over the agent's settings file, then
-/// validate the result.
+/// Layer CLI flags over the environment over the agent's settings file.
+///
+/// Returns the merged-but-UNRESOLVED inputs. Validation is deliberately not done
+/// here: `serve` must start even when the result cannot resolve, so resolution
+/// happens once inside `ServerState` and its failure is reported on the first
+/// tool call rather than at startup.
 ///
 /// A CLI flag that was silently ignored would be a config trap, so flags DO
 /// layer over the environment rather than being an either/or — and the settings
 /// file sits below both, so a user can override a committed project setting for
 /// one session without editing it.
-pub fn resolve_config(
+pub fn layered_config(
     cli: Vec<String>,
     file_config: crate::config::RawConfig,
-) -> Result<crate::config::ServerConfig, crate::config::ConfigError> {
-    layer(parse_flags(&cli), file_config, env_or_none).resolve()
+) -> crate::config::RawConfig {
+    layer(parse_flags(&cli), file_config, env_or_none)
 }
 
 /// The precedence rule itself, with the environment injected so it is testable
