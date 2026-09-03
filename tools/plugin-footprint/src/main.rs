@@ -85,7 +85,15 @@ fn measure(plugin_dir: &Path, out: Option<&Path>) -> ExitCode {
     }
 
     let mut merged = Outcome {
-        status: Status::Ok,
+        // A plugin with no `.mcp.json` is ordinary — hooks or skills only — and
+        // its measurement is COMPLETE, not failed. Saying so explicitly is what
+        // lets the gate tell it apart from a server that launched and then
+        // answered `tools/list` with nothing.
+        status: if servers.is_empty() {
+            Status::NoServer
+        } else {
+            Status::Ok
+        },
         tools: Vec::new(),
         prompts: Vec::new(),
         binary: servers
@@ -155,7 +163,7 @@ fn measure(plugin_dir: &Path, out: Option<&Path>) -> ExitCode {
     // caller that only checks the status code cannot mistake it for a plugin
     // that costs nothing.
     match merged.status {
-        Status::Ok => ExitCode::SUCCESS,
+        Status::Ok | Status::NoServer => ExitCode::SUCCESS,
         _ => ExitCode::from(1),
     }
 }
@@ -175,10 +183,15 @@ fn measure(plugin_dir: &Path, out: Option<&Path>) -> ExitCode {
 ///
 /// What that buys, exactly: after a lowering, the new ceiling sits `HEADROOM`
 /// above the new measurement, so reverting a saving of up to `HEADROOM` bytes
-/// still passes. A saving LARGER than `HEADROOM` is banked, and reverting it
-/// will fail the ceiling — which is what a ratchet is for, and is not a bug. Do
-/// not describe this as "a revert always stays green"; it is "a revert of a
-/// saving up to HEADROOM stays green".
+/// still clears THE CEILING. A saving LARGER than `HEADROOM` is banked, and
+/// reverting it will fail the ceiling — which is what a ratchet is for, and is
+/// not a bug.
+///
+/// The ceiling is not the whole gate, and this comment used to promise it was.
+/// The per-change delta cap (`DELTA`, 500) is far tighter than `HEADROOM`, so a
+/// revert of more than 500 bytes fails the DELTA layer while sitting comfortably
+/// under the ceiling. Precisely: "a revert of a saving up to HEADROOM clears the
+/// ceiling", NOT "a revert of a saving up to HEADROOM passes the gate".
 fn ratchet(measured_path: &Path, budgets_path: &Path) -> ExitCode {
     const HEADROOM: u64 = 2_000;
     const DELTA: u64 = 500;
@@ -198,7 +211,12 @@ fn ratchet(measured_path: &Path, budgets_path: &Path) -> ExitCode {
     // A failed measurement must never move a threshold. Its tiers are absent,
     // and treating that as a footprint of zero would ratchet every budget to
     // the floor and fail every subsequent change.
-    if document["probe"]["status"].as_str() != Some("ok") {
+    // `no_server` is a complete measurement and may seed a threshold; only a
+    // genuine failure may not.
+    if !matches!(
+        document["probe"]["status"].as_str(),
+        Some("ok") | Some("no_server")
+    ) {
         eprintln!(
             "plugin-footprint: refusing to ratchet from a probe that did not succeed ({})",
             document["probe"]["status"].as_str().unwrap_or("absent")

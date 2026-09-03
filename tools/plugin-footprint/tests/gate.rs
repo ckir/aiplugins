@@ -253,3 +253,54 @@ fn an_entry_that_is_present_but_unreadable_is_malformed_not_absent() {
         );
     }
 }
+
+#[test]
+fn a_plugin_that_declares_no_mcp_server_is_a_complete_measurement_not_a_failed_one() {
+    // MEASURED during capstone round 2: a skills-only plugin — which `main.rs`
+    // and `manifest.rs` both call perfectly ordinary — measures cleanly at
+    // status "ok", toolCount 0, and 39 real resident bytes of skill
+    // frontmatter. The gate then hard-failed it with "a measurement of nothing
+    // satisfies every ceiling", which is exactly backwards: nothing was
+    // measured wrong, there was simply no server to ask.
+    //
+    // The two situations must not share a representation. "A server answered
+    // with an empty list" is broken. "No server was declared" is a whole
+    // plugin's cost, sitting entirely in the file-backed tiers.
+    let no_server = json!({
+        "schemaVersion": 1,
+        "plugin": "skillsonly",
+        "probe": { "status": "no_server", "toolCount": 0, "binary": "", "promptCount": 0 },
+        "tiers": {
+            "resident": { "bytes": 39, "sources": [
+                { "kind": "skill_frontmatter", "id": "advice", "bytes": 39 }] },
+            "invocation": { "bytes": 57, "sources": [] }
+        }
+    });
+
+    assert_eq!(check(&no_server, None, &budget()), Verdict::Pass);
+}
+
+#[test]
+fn a_declared_server_that_answers_with_no_tools_is_still_fatal() {
+    // The other half, and the reason the fix above is a new status rather than
+    // dropping the tool-count check. A server that answers `tools/list` with an
+    // empty array also reports status "ok"; accepting that would restore the
+    // false zero the check exists for — a broken server passing every ceiling
+    // by costing nothing. `binary` is non-empty precisely because a server WAS
+    // launched.
+    let answered_nothing = json!({
+        "schemaVersion": 1,
+        "plugin": "x",
+        "probe": { "status": "ok", "toolCount": 0, "binary": "bin/x", "promptCount": 0 },
+        "tiers": {
+            "resident": { "bytes": 0, "sources": [] },
+            "invocation": { "bytes": 0, "sources": [] }
+        }
+    });
+
+    let verdict = reasons(check(&answered_nothing, None, &budget()));
+    assert!(
+        verdict.iter().any(|r| r.contains("no tools")),
+        "{verdict:?}"
+    );
+}

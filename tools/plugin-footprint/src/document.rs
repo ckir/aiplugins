@@ -133,11 +133,14 @@ pub fn build(
 ) -> Document {
     let (status, detail) = match &outcome.status {
         Status::Ok => ("ok", None),
+        Status::NoServer => ("no_server", None),
         Status::Failed(why) => ("failed", Some(why.clone())),
         Status::TimedOut(why) => ("timed_out", Some(why.clone())),
     };
 
-    let tiers = matches!(outcome.status, Status::Ok).then(|| Tiers {
+    // `NoServer` carries tiers too: the plugin's cost is entirely file-backed,
+    // and omitting the tiers would report a real footprint as no footprint.
+    let tiers = matches!(outcome.status, Status::Ok | Status::NoServer).then(|| Tiers {
         resident: resident_tier(outcome, &files.resident),
         invocation: tier_from_files(&files.invocation),
     });

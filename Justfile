@@ -79,28 +79,42 @@ footprint:
     # with itself. `check-qwen-marketplace.sh` keeps its generated manifest
     # honest exactly this way, on the stated reasoning that nothing fails when a
     # copy goes stale — it just advertises the wrong thing.
+    # `git status --porcelain`, NOT `git diff`. MEASURED: `git diff --quiet --
+    # docs/footprints/` exits 0 for an UNTRACKED file, because git diff only ever
+    # compares things git is tracking. A new plugin's document, regenerated but
+    # never `git add`ed, was therefore invisible here AND in CI — where
+    # footprint-regen recreates it identically, the diff stays quiet, and the
+    # gate reads it off disk and passes. The pull request merges with no
+    # committed document at all, so the NEXT change has no baseline to compare
+    # against, which is the one thing this file exists to provide.
     just footprint-regen
-    if ! git diff --quiet -- docs/footprints/; then
-        echo "ERROR: the committed footprint documents are stale." >&2
+    if [ -n "$(git status --porcelain -- docs/footprints/)" ]; then
+        echo "ERROR: the committed footprint documents are stale or incomplete." >&2
         echo "A fresh measurement disagrees with what is committed:" >&2
+        git status --porcelain -- docs/footprints/ >&2
         git --no-pager diff --stat -- docs/footprints/ >&2
-        echo "Run 'just footprint-regen' and commit the result." >&2
+        echo "Run 'just footprint-regen' and 'git add docs/footprints/', then commit." >&2
         exit 1
     fi
-    # `main`, NOT `HEAD`. Against HEAD the baseline is the developer's own last
-    # commit, so once they have run `footprint-regen` and committed it to satisfy
-    # the freshness check above, the measured delta is zero BY CONSTRUCTION and
-    # the delta cap can never fire locally. `just check` would report green on
+    # NOT `HEAD`. Against HEAD the baseline is the developer's own last commit,
+    # so once they have run `footprint-regen` and committed it to satisfy the
+    # freshness check above, the measured delta is zero BY CONSTRUCTION and the
+    # delta cap can never fire locally. `just check` would report green on
     # exactly the change the cap exists to catch, and CI would be the first to
-    # say otherwise. Comparing against `main` is the local analogue of what CI
-    # does against the base branch.
+    # say otherwise.
     #
-    # `origin/main` before falling back to HEAD: a contributor who clones and
-    # runs `git switch -c feat` has no LOCAL `main` at all, only the remote
-    # branch — which is the ordinary case, not an exotic one, so without this
-    # step the cap was vacuous for most first-time contributors.
-    base=main
-    git rev-parse --verify --quiet "$base" >/dev/null 2>&1 || base=origin/main
+    # `origin/main` FIRST, then a local `main`. Two different developers break on
+    # the two different orders: one who cloned and ran `git switch -c feat` has
+    # no local `main` at all, and one who cloned months ago and has worked on
+    # branches since has a local `main` that resolves perfectly and points
+    # somewhere long superseded. Only `origin/main` moves on every fetch, and it
+    # is what CI's `origin/<base_ref>` actually means.
+    #
+    # HEAD remains the last resort, for a checkout with no remote. The cap is
+    # vacuous there, which is why CI runs the same check against the base branch
+    # with `fetch-depth: 0` — this recipe is a convenience, never the authority.
+    base=origin/main
+    git rev-parse --verify --quiet "$base" >/dev/null 2>&1 || base=main
     git rev-parse --verify --quiet "$base" >/dev/null 2>&1 || base=HEAD
     echo "footprint: comparing against $base"
     cargo run -q -p plugin-footprint --bin footprint-gate -- "$base"
