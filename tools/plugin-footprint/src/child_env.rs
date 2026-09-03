@@ -64,8 +64,14 @@ pub fn child_env(
         // ambient} produced a child that saw the AMBIENT value, exactly
         // reversing the rule this function documents. Dropping every other
         // spelling first is what makes "declared wins" true rather than stated.
+        //
+        // Case-folded through `to_lowercase`, not `eq_ignore_ascii_case`:
+        // Windows folds the whole of Unicode, so an ASCII-only comparison would
+        // leave `CAFÉ` and `café` as two surviving keys and reinstate exactly
+        // the override this is here to stop.
         if cfg!(windows) {
-            out.retain(|existing, _| !existing.eq_ignore_ascii_case(name));
+            let folded = name.to_lowercase();
+            out.retain(|existing, _| existing.to_lowercase() != folded);
         }
         out.insert(name.clone(), value.clone());
     }

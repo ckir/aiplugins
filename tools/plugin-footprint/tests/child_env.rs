@@ -124,3 +124,18 @@ fn a_declared_value_wins_over_an_inherited_one_spelled_in_another_case() {
         "the manifest's value must be the one that reaches the child"
     );
 }
+
+#[test]
+#[cfg(windows)]
+fn the_case_collision_guard_covers_non_ascii_names_too() {
+    // Windows folds the whole of Unicode, not just ASCII. An `eq_ignore_ascii_case`
+    // guard leaves `CAFÉ` and `café` as two surviving keys, and the ambient one
+    // sorts later and therefore wins — the exact override the guard exists to stop.
+    let env = child_env(
+        &declared(&[("CAFÉ", "declared")]),
+        &inherited(&[("café", "ambient")]),
+    );
+
+    assert_eq!(env.len(), 1, "one variable, one entry: {env:?}");
+    assert_eq!(env.values().next().map(String::as_str), Some("declared"));
+}
