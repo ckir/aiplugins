@@ -261,23 +261,41 @@ fn serve_without_configuration_still_answers_tools_list() {
         .spawn()
         .expect("spawn serve");
 
-    {
-        let mut stdin = child.stdin.take().expect("serve stdin");
-        for request in [
-            serde_json::json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
-                "protocolVersion": "2025-06-18",
-                "capabilities": {},
-                "clientInfo": {"name": "e2e", "version": "0"}
-            }}),
-            serde_json::json!({"jsonrpc": "2.0", "method": "notifications/initialized"}),
-            serde_json::json!({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}),
-        ] {
-            writeln!(stdin, "{request}").expect("write request");
-        }
-        // Dropping stdin closes it; the server shuts down on EOF once it has answered.
-    }
+    let mut stdin = child.stdin.take().expect("serve stdin");
 
-    let out = child.wait_with_output().expect("serve exits");
+    // The child is handed to the waiter thread BEFORE anything fallible is written to it.
+    // `std::process::Child` has no `Drop` that kills — it detaches — so a panic while writing would
+    // orphan the server, and on Windows that orphan holds this workspace as its cwd and makes
+    // `Workspace`'s `remove_dir_all` fail silently. Owned by the thread, an unwind instead drops
+    // `stdin`, the server sees EOF and exits, and the thread reaps it.
+    //
+    // Bounded, too: `wait_with_output` blocks forever if the server never exits, and this test
+    // depends on it exiting when stdin closes — so a regression there would hang CI rather than fail.
+    // The replaced test could not hang; it asserted an immediate exit 2.
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(child.wait_with_output());
+    });
+
+    for request in [
+        serde_json::json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "e2e", "version": "0"}
+        }}),
+        serde_json::json!({"jsonrpc": "2.0", "method": "notifications/initialized"}),
+        serde_json::json!({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}),
+    ] {
+        writeln!(stdin, "{request}").expect("write request");
+    }
+    // Closes stdin; the server shuts down on EOF once it has answered.
+    drop(stdin);
+
+    let out = rx
+        .recv_timeout(std::time::Duration::from_secs(30))
+        .expect("serve did not exit within 30s of stdin closing")
+        .expect("serve exits");
+
     assert_eq!(
         out.status.code(),
         Some(0),
