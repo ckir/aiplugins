@@ -58,6 +58,41 @@ pub enum BudgetLookup {
     Found(Budget),
 }
 
+/// What a path looks like at the base ref.
+///
+/// `Missing` and `Unreadable` are separate for the same reason `BudgetLookup`
+/// separates its two: MEASURED during capstone round 3, a `budgets.json` with a
+/// syntax error at the base ref made the gate print "has no budget yet;
+/// measuring without a ceiling" for every plugin and exit 0. One stray comma
+/// silently disabled the gate repository-wide.
+///
+/// That was the THIRD place this same conflation turned up — after the base ref
+/// itself and an individual budget entry — so it is a named type now rather than
+/// an `Option` re-interpreted at each call site.
+#[derive(Debug)]
+pub enum AtRef {
+    /// Not present at that ref. Legitimate: the thresholds file on a first run,
+    /// or a document for a plugin this change introduces.
+    Missing,
+    /// Present, and this tool cannot read it. A failure, never an absence.
+    Unreadable(String),
+    Found(Value),
+}
+
+/// Classify what `git show <ref>:<path>` produced.
+///
+/// `None` means git could not produce the path at all; `Some(bytes)` means it
+/// did, and the bytes either parse or they do not.
+pub fn at_ref(raw: Option<&[u8]>) -> AtRef {
+    match raw {
+        None => AtRef::Missing,
+        Some(bytes) => match serde_json::from_slice(bytes) {
+            Ok(value) => AtRef::Found(value),
+            Err(e) => AtRef::Unreadable(e.to_string()),
+        },
+    }
+}
+
 /// Resolve one plugin's budget out of the committed thresholds.
 pub fn budget_for(budgets: &Value, plugin: &str) -> BudgetLookup {
     let Some(entry) = budgets.get(plugin) else {

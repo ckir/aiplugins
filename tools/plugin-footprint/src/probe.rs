@@ -406,7 +406,8 @@ impl Conn<'_> {
             // a crash.
             let Some(page_items) = result.get(key).and_then(Value::as_array) else {
                 return Err(Status::Failed(format!(
-                    "{method} answered without a `{key}` array; a result we cannot read is not a                      measurement of zero"
+                    "{method} answered without a `{key}` array; a result we cannot read \
+                     is not a measurement of zero"
                 )));
             };
             items.extend(page_items.iter().cloned());

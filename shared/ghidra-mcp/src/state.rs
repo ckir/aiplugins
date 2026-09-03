@@ -238,7 +238,8 @@ fn config_unusable(e: crate::config::ConfigError) -> ErrorEnvelope {
         ConfigError::Missing { .. } | ConfigError::NotGhidra(_) => ErrorCode::GhidraNotFound,
     };
     ErrorEnvelope::new(code, e.to_string()).with_action(
-        "set the value named in the message — as a CLI flag, an environment variable, or in this          agent's settings file — then restart the server",
+        "set the value named in the message — as a CLI flag, an environment variable, \
+         or in this agent's settings file — then restart the server",
     )
 }
 

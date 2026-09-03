@@ -304,3 +304,43 @@ fn a_declared_server_that_answers_with_no_tools_is_still_fatal() {
         "{verdict:?}"
     );
 }
+
+// --- reading a path at the base ref: missing is not the same as unreadable ---
+
+use plugin_footprint::gate::{at_ref, AtRef};
+
+#[test]
+fn a_path_git_could_not_produce_is_missing() {
+    // Legitimate: the thresholds file on the very first run, or a document for a
+    // plugin this change adds.
+    assert!(matches!(at_ref(None), AtRef::Missing));
+}
+
+#[test]
+fn a_path_that_is_there_but_does_not_parse_is_unreadable_not_missing() {
+    // MEASURED during capstone round 3, against a real committed ref: a
+    // budgets.json with a syntax error made the gate print "has no budget at
+    // <ref> yet; measuring without a ceiling" for EVERY plugin and exit 0. One
+    // stray comma silently disabled the gate for the whole repository.
+    //
+    // This is the third distinct place the same conflation appeared — after the
+    // base ref itself and an individual budget entry — which is why it is now a
+    // named type rather than an Option at each call site.
+    assert!(matches!(
+        at_ref(Some(b"{\"x\": {\"residentBytes\": 1,,,}")),
+        AtRef::Unreadable(_)
+    ));
+    assert!(matches!(at_ref(Some(b"")), AtRef::Unreadable(_)));
+    assert!(matches!(
+        at_ref(Some(b"not json at all")),
+        AtRef::Unreadable(_)
+    ));
+}
+
+#[test]
+fn a_path_that_parses_comes_back_with_its_value() {
+    match at_ref(Some(br#"{"x":{"residentBytes":7}}"#)) {
+        AtRef::Found(value) => assert_eq!(value["x"]["residentBytes"], 7),
+        other => panic!("expected Found, got {other:?}"),
+    }
+}
