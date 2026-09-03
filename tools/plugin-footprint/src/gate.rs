@@ -37,6 +37,62 @@ pub struct Budget {
     pub delta_bytes: u64,
 }
 
+/// What the committed thresholds say about one plugin.
+///
+/// The distinction between `Absent` and `Malformed` is the whole point of this
+/// type. MEASURED during the capstone review, against a real committed ref: with
+/// `residentBytes` written as the STRING `"23670"`, the gate printed "has no
+/// budget yet; measuring without a ceiling" and passed the plugin uncapped, exit
+/// 0 — a one-character typo in a merged `budgets.json` silently disabling the
+/// gate, with a message that reads like normal operation for a new plugin.
+///
+/// Absent means "there is nothing to compare against", which is legitimate and
+/// common: every plugin looks like this on the run that introduces it.
+/// Malformed means "a ceiling exists and this tool cannot read it", which is a
+/// failure. Collapsing the second into the first is the false-zero rule turned
+/// on the gate's own thresholds.
+#[derive(Debug)]
+pub enum BudgetLookup {
+    Absent,
+    Malformed(String),
+    Found(Budget),
+}
+
+/// Resolve one plugin's budget out of the committed thresholds.
+pub fn budget_for(budgets: &Value, plugin: &str) -> BudgetLookup {
+    let Some(entry) = budgets.get(plugin) else {
+        return BudgetLookup::Absent;
+    };
+
+    let field = |name: &str| -> Result<u64, String> {
+        match entry.get(name) {
+            None => Err(format!("`{name}` is missing")),
+            Some(value) => value.as_u64().ok_or_else(|| {
+                format!("`{name}` is {value}, which is not a whole number of bytes")
+            }),
+        }
+    };
+
+    match (
+        field("residentBytes"),
+        field("headroomBytes"),
+        field("deltaBytes"),
+    ) {
+        (Ok(resident_bytes), Ok(headroom_bytes), Ok(delta_bytes)) => BudgetLookup::Found(Budget {
+            resident_bytes,
+            headroom_bytes,
+            delta_bytes,
+        }),
+        (r, h, d) => BudgetLookup::Malformed(
+            [r.err(), h.err(), d.err()]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .join("; "),
+        ),
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verdict {
     Pass,

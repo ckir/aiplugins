@@ -171,3 +171,70 @@ fn bytes_are_utf8_length_not_character_count() {
 
     assert_eq!(sources.resident[0].bytes, "name: é\n".len() as u64);
 }
+
+#[test]
+fn an_os_artifact_in_a_source_directory_is_skipped_not_fatal() {
+    // MEASURED during the capstone review: a `.DS_Store` — which appears the
+    // moment a macOS developer opens `skills/` in Finder — took the entire
+    // measurement down with "skills/.DS_Store is not where a source belongs".
+    // In CI that aborts `footprint-regen` under `set -e`, so the footprint job
+    // fails with an error about a skill that does not exist.
+    //
+    // This is the one silent skip the module tolerates, because an OS artifact
+    // is neither a source nor a mistake about a source.
+    let fx = Fixture::new("dsstore");
+    fx.write("skills/real/SKILL.md", SKILL);
+    fx.write("skills/.DS_Store", "\u{0}\u{0}\u{0}Bud1");
+    fx.write("agents/.DS_Store", "\u{0}\u{0}\u{0}Bud1");
+    fx.write("skills/Thumbs.db", "junk");
+
+    let sources = read_file_sources(fx.path()).expect("an OS artifact must not be fatal");
+
+    assert_eq!(sources.resident.len(), 1);
+    assert_eq!(sources.resident[0].id, "real");
+}
+
+#[test]
+fn a_flat_source_that_is_not_a_md_file_is_an_error_not_a_silent_skip() {
+    // MEASURED: `agents/re-analyst.md.bak` and `agents/nested/agent.md` were
+    // both dropped from the measurement with nothing failing anywhere. A skill
+    // in the wrong shape is already loud (see above); an agent in the wrong
+    // shape was not, and the asymmetry is the false zero this crate refuses,
+    // arriving through the one directory nobody thought about.
+    let fx = Fixture::new("flatbak");
+    fx.write("agents/re-analyst.md.bak", SKILL);
+
+    let err = read_file_sources(fx.path()).expect_err("a stray file must be loud");
+
+    assert!(
+        err.to_string().contains("agents/<name>.md"),
+        "the error must name the shape a source belongs in, got: {err}"
+    );
+}
+
+#[test]
+fn a_directory_where_a_flat_source_belongs_is_an_error_too() {
+    // `agents/reviewer/agent.md` — an agent someone structured like a skill.
+    // Skipping it drops a real source; the whole point is that this is loud.
+    let fx = Fixture::new("flatdir");
+    fx.write("agents/reviewer/agent.md", SKILL);
+
+    let err = read_file_sources(fx.path()).expect_err("a nested agent must be loud");
+
+    assert!(err.to_string().contains("agents/<name>.md"), "got: {err}");
+}
+
+#[test]
+fn the_error_names_the_layout_that_was_violated_not_always_skills() {
+    // Every Malformed used to report `skills/<name>/SKILL.md` whatever the
+    // directory, because only the nested layout could produce one. Now that a
+    // flat layout can too, an error naming the wrong directory would send a
+    // contributor to the wrong file.
+    let fx = Fixture::new("whichlayout");
+    fx.write("commands/stray.txt", "x");
+
+    let err = read_file_sources(fx.path()).expect_err("a stray file must be loud");
+
+    assert!(err.to_string().contains("commands/<name>.md"), "got: {err}");
+    assert!(!err.to_string().contains("SKILL.md"), "got: {err}");
+}
