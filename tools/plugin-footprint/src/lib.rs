@@ -9,3 +9,4 @@ pub mod child_env;
 pub mod document;
 pub mod manifest;
 pub mod probe;
+pub mod sources;
