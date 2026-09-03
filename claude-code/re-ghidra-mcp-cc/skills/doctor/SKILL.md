@@ -50,7 +50,9 @@ different fixes, so separate them:
   plugin directory by path instead. If absent, the fix is `just build-re-ghidra-mcp-cc`
   followed by a restart of Claude Code.
 - **Built, but the server died on launch.** The binaries exist, yet no
-  `re-ghidra-mcp-cc` MCP tools are available in this session. Tell the user to
+  `re-ghidra-mcp-cc` MCP tools are available in this session. A configuration
+  problem can no longer put you here — see above — so this is a crashing or
+  unloadable binary. Tell the user to
   run `/mcp` to see whether the server is registered but failing, and go to the
   log in the last section.
 
