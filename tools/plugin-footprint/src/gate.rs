@@ -113,11 +113,31 @@ pub fn budget_for(budgets: &Value, plugin: &str) -> BudgetLookup {
         field("headroomBytes"),
         field("deltaBytes"),
     ) {
-        (Ok(resident_bytes), Ok(headroom_bytes), Ok(delta_bytes)) => BudgetLookup::Found(Budget {
-            resident_bytes,
-            headroom_bytes,
-            delta_bytes,
-        }),
+        (Ok(resident_bytes), Ok(headroom_bytes), Ok(delta_bytes)) => {
+            // Fork 2 decided the cap with `D < H`, and the spec states it twice
+            // (§6 item 5, §8 Fork 2). Nothing enforced it until now, and round
+            // 3's policy-preservation fix is what made that matter: `ratchet`
+            // used to rebuild the entry from its constants every run, so a
+            // violating value could not survive a regeneration.
+            //
+            // Not pedantry about an inequality. The ratchet reclaims slack down
+            // to `headroom` above the low-water mark; a cap at or above that
+            // headroom lets ONE change spend the entire allowance the ratchet
+            // exists to reclaim, which is exactly the jump §6 says the ceiling
+            // is blind to. A cap that large is the delta layer switched off.
+            if delta_bytes >= headroom_bytes {
+                return BudgetLookup::Malformed(format!(
+                    "`deltaBytes` {delta_bytes} is not below `headroomBytes` {headroom_bytes}; \
+                     Fork 2 requires D < H, because a cap at or above the headroom lets one \
+                     change spend the whole allowance the ratchet exists to reclaim"
+                ));
+            }
+            BudgetLookup::Found(Budget {
+                resident_bytes,
+                headroom_bytes,
+                delta_bytes,
+            })
+        }
         (r, h, d) => BudgetLookup::Malformed(
             [r.err(), h.err(), d.err()]
                 .into_iter()

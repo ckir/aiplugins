@@ -71,6 +71,17 @@ pub enum SourceError {
         path: PathBuf,
         expected: &'static str,
     },
+    /// A file name that is not valid UTF-8.
+    ///
+    /// Refused rather than converted. `to_string_lossy` maps EVERY invalid byte
+    /// sequence onto U+FFFD, so two different names arrive as one id; two
+    /// sources then share an id and their relative order comes from `read_dir`
+    /// rather than from the data, churning the committed document between
+    /// machines. Making the sort key `(kind, id)` was specifically to stop that,
+    /// and a lossy id defeats it. `document::strip_root` refuses to compare
+    /// lossily for the same reason.
+    #[error("{path} has a name that is not valid UTF-8; rename it")]
+    NotUtf8 { path: PathBuf },
 }
 
 /// Where a plugin keeps each kind of file-backed source, and what to call it.
@@ -200,7 +211,9 @@ fn entries(dir: &Path, layout: &Layout) -> Result<Vec<(String, PathBuf)>, Source
             path: dir.to_path_buf(),
             source,
         })?;
-        let name = entry.file_name().to_string_lossy().into_owned();
+        let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+            return Err(SourceError::NotUtf8 { path: entry.path() });
+        };
 
         // Only FILES. Skipping every dot-named entry skipped dot-named
         // DIRECTORIES too, so `skills/.sneaky/SKILL.md` would have vanished from
