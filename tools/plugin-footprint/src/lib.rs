@@ -10,4 +10,5 @@ pub mod document;
 pub mod gate;
 pub mod manifest;
 pub mod probe;
+pub mod publish;
 pub mod sources;

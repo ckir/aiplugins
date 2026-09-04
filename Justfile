@@ -68,6 +68,10 @@ footprint-regen:
             --budgets docs/footprints/budgets.json
         echo "regenerated docs/footprints/$plugin.json"
     done
+    # The published figure (spec §7), rewritten from ALL documents at once —
+    # never per-plugin, which would rewrite the root comparison table with a
+    # single row and silently delete every other plugin's.
+    cargo run -q -p plugin-footprint --bin plugin-footprint -- publish
 
 # Verify each published plugin's committed footprint against a fresh measurement,
 # then against the thresholds. Requires the plugin binaries; see `footprint-regen`.
@@ -97,7 +101,28 @@ footprint:
     #
     # So: `diff` for tracked content, which normalises and does not lie; and
     # `ls-files --others` for the untracked case it cannot see.
+    # The READMEs are checked DIFFERENTLY from the documents, and the difference
+    # is not fussiness. `docs/footprints/*.json` is wholly generated, so git is
+    # the right oracle for it. A README is mostly hand-written prose with one
+    # generated region inside it, so asking git the same question would fail
+    # `just check` for any developer with an uncommitted paragraph — and fail it
+    # with the words "footprint documents are stale", which is not what happened.
+    #
+    # What actually indicates staleness is that REGENERATION CHANGED the file.
+    # Unrelated prose edits are present before and after, so they cancel.
+    readmes="README.md $(ls -d claude-code/*/README.md 2>/dev/null || true)"
+    before=$(md5sum $readmes)
+
     just footprint-regen
+
+    if [ "$before" != "$(md5sum $readmes)" ]; then
+        echo "ERROR: a published footprint region was stale." >&2
+        echo "Regenerating changed a README, so what it advertises was wrong:" >&2
+        git --no-pager diff --stat -- $readmes >&2
+        echo "The region is generated; commit the regenerated README." >&2
+        exit 1
+    fi
+
     untracked=$(git ls-files --others --exclude-standard -- docs/footprints/)
     if ! git diff --quiet -- docs/footprints/ || [ -n "$untracked" ]; then
         echo "ERROR: the committed footprint documents are stale or incomplete." >&2
