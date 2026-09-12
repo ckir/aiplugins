@@ -163,3 +163,8 @@ cargo nextest run -p re-ghidra-mcp-agy -p ghidra-mcp -p ghidra-ipc -p ghidra-wor
 Needs no Ghidra. The ~60 tests that drive a real JVM are gated at runtime on
 `GHIDRA_MCP_E2E` — without it they early-return and pass, which is what keeps
 the ubuntu and macos CI runners green.
+
+## Design Decisions
+
+For more detailed architectural choices and the reasoning behind this proxy approach, see [DESIGN.md](DESIGN.md).
+
