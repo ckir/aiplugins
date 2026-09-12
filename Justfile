@@ -123,6 +123,7 @@ footprint:
         exit 1
     fi
 
+
     untracked=$(git ls-files --others --exclude-standard -- docs/footprints/)
     if ! git diff --quiet -- docs/footprints/ || [ -n "$untracked" ]; then
         echo "ERROR: the committed footprint documents are stale or incomplete." >&2

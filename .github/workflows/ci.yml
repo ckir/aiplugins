@@ -148,7 +148,6 @@ jobs:
             git --no-pager diff -- $readmes
             exit 1
           fi
-
           # Two checks. `git diff` alone cannot see an UNTRACKED file, so a new
           # plugin's document that was never `git add`ed would be regenerated
           # here, ignored, read off disk by the gate, and merged without ever
