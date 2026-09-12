@@ -80,7 +80,12 @@ That stages `re-ghidra-agy-mcp` and `re-ghidra-agy-hook` into the target directo
 
 ## Installing
 
-To install the plugin for Antigravity, add it to your project's `.agents/plugins.json` or explicitly reference the directory:
+You can install the plugin directly from GitHub into your user-scoped global configuration using the `agy` CLI:
+```bash
+agy plugin install https://github.com/ckir/aiplugins/tree/main/antigravity/re-ghidra-mcp-agy
+```
+
+If you prefer a **Repo-Scoped** installation instead, you can add it to your project's `.agents/plugins.json` or explicitly reference the directory.
 
 Then configure the project — see `examples/re-ghidra-mcp-agy.local.md` and copy
 it to `.agents/re-ghidra-mcp-agy.local.md`.
