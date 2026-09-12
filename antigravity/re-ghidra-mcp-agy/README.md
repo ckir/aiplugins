@@ -85,7 +85,21 @@ You can install the plugin directly from GitHub into your user-scoped global con
 agy plugin install https://github.com/ckir/aiplugins/tree/main/antigravity/re-ghidra-mcp-agy
 ```
 
-If you prefer a **Repo-Scoped** installation instead, you can add it to your project's `.agents/plugins.json` or explicitly reference the directory.
+If you prefer a **Repo-Scoped** installation instead, you can clone the repository and configure it in your project's `.agents/plugins.json`:
+```bash
+git clone https://github.com/ckir/aiplugins.git
+```
+Then create or update your project's `.agents/plugins.json` (at the root of your workspace) to point to the cloned directory:
+```json
+{
+  "entries": [
+    {
+      "path": "path/to/aiplugins/antigravity/re-ghidra-mcp-agy"
+    }
+  ]
+}
+```
+*(Alternatively, you can simply copy the `re-ghidra-mcp-agy` directory directly into your project's `.agents/plugins/` folder).*
 
 Then configure the project — see `examples/re-ghidra-mcp-agy.local.md` and copy
 it to `.agents/re-ghidra-mcp-agy.local.md`.
