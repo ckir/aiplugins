@@ -22,8 +22,13 @@ This crate provides two main binaries:
 
    *(Alternatively, if building locally: run `cargo build --release` and ensure the output binaries `rtk-hook-preinvocation` and `rtk-mcp` are in your PATH).*
 
-2. **Install the Plugin (Repo-Scoped)**:
-   It is recommended to install this plugin repo-scoped for your project. Clone this repository and configure it in your project's `.agents/plugins.json`:
+2. **Install the Plugin**:
+   You can install the plugin directly from GitHub into your user-scoped global configuration using the `agy` CLI:
+   ```bash
+   agy plugin install https://github.com/ckir/aiplugins/tree/main/antigravity/rtk-mcp-agy
+   ```
+
+   If you prefer a **Repo-Scoped** installation instead, you can clone the repository and configure it in your project's `.agents/plugins.json`:
    ```bash
    git clone https://github.com/ckir/aiplugins.git
    ```

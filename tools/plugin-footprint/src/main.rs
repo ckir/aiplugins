@@ -7,11 +7,13 @@
 //! Usage:
 //!   plugin-footprint measure <plugin-dir> [--out <path>]
 //!   plugin-footprint ratchet --measured <path> --budgets <path>
+//!   plugin-footprint publish   (rewrites the README regions, spec §7)
 
 use plugin_footprint::canonical::canonical_json;
 use plugin_footprint::document::{build, Tree};
 use plugin_footprint::manifest::{looks_like_a_plugin, read_mcp_servers};
 use plugin_footprint::probe::{probe, Limits, Outcome, Status};
+use plugin_footprint::publish::{comparison_region, per_plugin_region, splice};
 use plugin_footprint::sources::read_file_sources;
 use std::path::Path;
 use std::process::ExitCode;
@@ -26,11 +28,13 @@ fn main() -> ExitCode {
         Some("ratchet") if args.len() == 5 && args[1] == "--measured" && args[3] == "--budgets" => {
             ratchet(Path::new(&args[2]), Path::new(&args[4]))
         }
+        Some("publish") if args.len() == 1 => publish(),
         _ => {
             // Usage goes to stderr: stdout carries the document, and a consumer
             // piping it into `jq` must never get prose mixed in.
             eprintln!("usage: plugin-footprint measure <plugin-dir> [--out <path>]");
             eprintln!("       plugin-footprint ratchet --measured <path> --budgets <path>");
+            eprintln!("       plugin-footprint publish   (run from the repository root)");
             ExitCode::from(2)
         }
     }
@@ -311,6 +315,105 @@ fn ratchet(measured_path: &Path, budgets_path: &Path) -> ExitCode {
         return ExitCode::from(1);
     }
     ExitCode::SUCCESS
+}
+
+/// Write the published figure into every README region (spec §7).
+///
+/// Run from the repository root, like `footprint-gate`, and driven by the same
+/// marketplace manifest the gate and `just smoke` iterate — so what is published
+/// cannot drift from what ships.
+///
+/// The ROOT region is rendered from ALL committed documents at once, never from
+/// the one plugin being changed. §7 names the failure directly: a generator
+/// invoked per-plugin against a shared aggregate region would rewrite the whole
+/// table with a single row and silently delete every other plugin's.
+fn publish() -> ExitCode {
+    let plugins = match published_plugins() {
+        Ok(plugins) => plugins,
+        Err(e) => {
+            eprintln!("plugin-footprint: {e}");
+            return ExitCode::from(1);
+        }
+    };
+
+    let mut documents = Vec::new();
+    for plugin in &plugins {
+        let path = format!("docs/footprints/{plugin}.json");
+        let text = match std::fs::read_to_string(&path) {
+            Ok(text) => text,
+            Err(e) => {
+                eprintln!("plugin-footprint: {path} is missing ({e}). Run `just footprint-regen`.");
+                return ExitCode::from(1);
+            }
+        };
+        match serde_json::from_str::<serde_json::Value>(&text) {
+            Ok(document) => documents.push((plugin.clone(), document)),
+            Err(e) => {
+                eprintln!("plugin-footprint: {path} does not parse: {e}");
+                return ExitCode::from(1);
+            }
+        }
+    }
+
+    for (plugin, document) in &documents {
+        let region = match per_plugin_region(document) {
+            Ok(region) => region,
+            Err(e) => {
+                eprintln!("plugin-footprint: {e}");
+                return ExitCode::from(1);
+            }
+        };
+        let path = format!("claude-code/{plugin}/README.md");
+        if let Err(e) = rewrite_region(&path, &region) {
+            eprintln!("plugin-footprint: {e}");
+            return ExitCode::from(1);
+        }
+    }
+
+    let region = match comparison_region(&documents) {
+        Ok(region) => region,
+        Err(e) => {
+            eprintln!("plugin-footprint: {e}");
+            return ExitCode::from(1);
+        }
+    };
+    if let Err(e) = rewrite_region("README.md", &region) {
+        eprintln!("plugin-footprint: {e}");
+        return ExitCode::from(1);
+    }
+
+    println!(
+        "published the footprint region in {} README(s)",
+        plugins.len() + 1
+    );
+    ExitCode::SUCCESS
+}
+
+/// Read a README, replace its marked region, write it back.
+fn rewrite_region(path: &str, region: &str) -> Result<(), String> {
+    let markdown = std::fs::read_to_string(path).map_err(|e| format!("reading {path}: {e}"))?;
+    let spliced = splice(path, &markdown, region).map_err(|e| e.to_string())?;
+    // Only when it actually changed: rewriting an identical file still updates
+    // its mtime, and the freshness check reads `git status`.
+    if spliced != markdown {
+        std::fs::write(path, spliced).map_err(|e| format!("writing {path}: {e}"))?;
+    }
+    Ok(())
+}
+
+/// The plugins the marketplace publishes — the same iteration source the gate
+/// and `just smoke` use.
+fn published_plugins() -> Result<Vec<String>, String> {
+    let text = std::fs::read_to_string(".claude-plugin/marketplace.json")
+        .map_err(|e| format!("reading the marketplace manifest: {e}"))?;
+    let manifest: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|e| format!("parsing the marketplace manifest: {e}"))?;
+    Ok(manifest["plugins"]
+        .as_array()
+        .ok_or("the marketplace manifest declares no plugins array")?
+        .iter()
+        .filter_map(|p| p["name"].as_str().map(str::to_string))
+        .collect())
 }
 
 /// Name a JSON value's shape, for an error message about the wrong one.

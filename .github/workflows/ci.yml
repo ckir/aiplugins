@@ -133,7 +133,21 @@ jobs:
       # measurement is caught here, before any threshold is consulted.
       - name: Verify the committed footprints are not stale
         run: |
+          # A stale README region is staleness too, and it is the one a USER
+          # reads. Checked by whether REGENERATION CHANGED the file rather than
+          # by git, because a README is mostly hand-written prose with one
+          # generated region in it — see the Justfile for why that distinction
+          # matters locally.
+          readmes="README.md $(ls -d claude-code/*/README.md)"
+          before=$(md5sum $readmes)
+
           just footprint-regen
+
+          if [ "$before" != "$(md5sum $readmes)" ]; then
+            echo "::error::A published footprint region is stale. Run 'just footprint-regen' and commit the regenerated README."
+            git --no-pager diff -- $readmes
+            exit 1
+          fi
           # Two checks. `git diff` alone cannot see an UNTRACKED file, so a new
           # plugin's document that was never `git add`ed would be regenerated
           # here, ignored, read off disk by the gate, and merged without ever
