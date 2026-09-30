@@ -16,3 +16,7 @@
 # every one of these files shows as modified in `git status` forever after —
 # noise on exactly the files a reviewer is meant to read.
 docs/footprints/*.json text eol=lf
+
+# Task 1 spike contract: the recorded V2 shell event shape. Must stay LF so
+# `jq` checks and freshness diffs behave identically on every platform.
+opencode/rtk-mcp-opencode/tests/shell-shape.json text eol=lf
