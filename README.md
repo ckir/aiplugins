@@ -40,6 +40,14 @@ Merge each plugin's `opencode.jsonc` into `.opencode/opencode.jsonc`; the
 `./bin/<name>` command in it is relative to the installed plugin copy, so
 stage the built binary next to that copy's merge target.
 
+Prefer to have an agent do it? Tell it to fetch and follow the install
+document for the plugin you want — it performs the whole procedure
+(prerequisites, file copies, dependency, binary, config merge,
+verification) and asks whether to install project-local or global first:
+
+- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/rtk-mcp-opencode/INSTALL.md`
+- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/re-ghidra-mcp-opencode/INSTALL.md`
+
 ## What each plugin costs a context window
 
 <!-- footprint:begin -->
