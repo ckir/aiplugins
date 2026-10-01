@@ -1,6 +1,6 @@
 //! Reading a plugin's file-backed resident and invocation sources (spec §4.5).
 
-use plugin_footprint::sources::read_file_sources;
+use plugin_footprint::sources::{read_file_sources, read_plugin_source};
 use std::path::{Path, PathBuf};
 
 struct Fixture {
@@ -344,4 +344,86 @@ fn a_crlf_source_measures_the_same_as_an_lf_one() {
         a.invocation[0].bytes, b.invocation[0].bytes,
         "body must not depend on the checkout's line endings"
     );
+}
+
+#[test]
+fn a_present_plugin_module_is_measured_lf_normalised() {
+    // The OpenCode `plugin.ts` is loaded into the host the way MCP schemas
+    // are, so its bytes are measured — as their own tier, not folded into
+    // Resident. Line endings are normalised exactly like the skill sources:
+    // a Windows checkout hands this file CRLF while CI assembles LF.
+    let fx = Fixture::new("plugin-present");
+    fx.write(
+        "plugin.ts",
+        "import { Plugin } from \"@opencode/plugin\";\r\nexport default {};\r\n",
+    );
+
+    let source = read_plugin_source(fx.path())
+        .expect("a present plugin.ts reads")
+        .expect("a present plugin.ts measures");
+
+    assert_eq!(source.kind, "plugin_source");
+    assert_eq!(
+        source.id,
+        fx.path()
+            .file_name()
+            .expect("fixture has a name")
+            .to_str()
+            .expect("fixture name is UTF-8")
+    );
+    assert_eq!(
+        source.bytes,
+        "import { Plugin } from \"@opencode/plugin\";\nexport default {};\n".len() as u64,
+        "CRLF must count as the LF the user actually pays for"
+    );
+}
+
+#[test]
+fn a_missing_plugin_module_is_not_an_error() {
+    // A Claude Code plugin has no `plugin.ts` at all. Absence is simply no
+    // Setup tier — not a failure to read one — so the same reader serves both
+    // plugin kinds without the caller branching on the agent first.
+    let fx = Fixture::new("plugin-absent");
+
+    assert!(read_plugin_source(fx.path())
+        .expect("a missing plugin.ts reads")
+        .is_none());
+}
+
+#[test]
+#[cfg(unix)]
+fn a_non_utf8_plugin_directory_falls_back_to_a_stable_id() {
+    // `entries` refuses a non-UTF-8 source name rather than converting it
+    // lossily, because several ids share one sort key there and a lossy id
+    // churns the committed document. There is at most one `plugin.ts` per
+    // directory, so no ordering key depends on this id — but it still must
+    // never panic and never carry a lossy collision. A fixed fallback is
+    // both. Unreachable on filesystems that refuse such a name (see the
+    // `entries` test for why this is `cfg(unix)` with a runtime skip).
+    use std::os::unix::ffi::OsStrExt;
+
+    let root = std::env::temp_dir().join(format!(
+        "plugin-footprint-sources-plugindir-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    std::fs::create_dir_all(&root).expect("mkdir");
+    let bad = std::ffi::OsStr::from_bytes(b"plug\xff\xfe");
+    let dir = root.join(bad);
+    if std::fs::create_dir(&dir).is_err() {
+        eprintln!(
+            "SKIP a_non_utf8_plugin_directory_falls_back_to_a_stable_id: \
+             this filesystem will not create a non-UTF-8 name, so the path cannot arise here."
+        );
+        std::fs::remove_dir_all(&root).ok();
+        return;
+    }
+    std::fs::write(dir.join("plugin.ts"), "export default {};\n").expect("write plugin.ts");
+
+    let source = read_plugin_source(&dir)
+        .expect("a non-UTF-8 directory name reads")
+        .expect("a present plugin.ts measures");
+
+    assert_eq!(source.id, "plugin");
+    std::fs::remove_dir_all(&root).ok();
 }

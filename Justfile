@@ -80,6 +80,15 @@ footprint-regen:
             --budgets docs/footprints/budgets.json
         echo "regenerated docs/footprints/$plugin.json"
     done
+    for dir in opencode/*/; do
+        name=$(basename "$dir")
+        cargo run -q -p plugin-footprint --bin plugin-footprint -- measure "$dir" \
+            --out "docs/footprints/$name.json"
+        cargo run -q -p plugin-footprint --bin plugin-footprint -- ratchet \
+            --measured "docs/footprints/$name.json" \
+            --budgets docs/footprints/budgets.json
+        echo "regenerated docs/footprints/$name.json"
+    done
     # The published figure (spec §7), rewritten from ALL documents at once —
     # never per-plugin, which would rewrite the root comparison table with a
     # single row and silently delete every other plugin's.
@@ -122,7 +131,7 @@ footprint:
     #
     # What actually indicates staleness is that REGENERATION CHANGED the file.
     # Unrelated prose edits are present before and after, so they cancel.
-    readmes="README.md $(ls -d claude-code/*/README.md 2>/dev/null || true)"
+    readmes="README.md $(ls -d claude-code/*/README.md opencode/*/README.md 2>/dev/null || true)"
     before=$(md5sum $readmes)
 
     just footprint-regen

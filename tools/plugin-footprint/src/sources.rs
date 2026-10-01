@@ -212,6 +212,34 @@ pub fn read_file_sources(plugin_dir: &Path) -> Result<FileSources, SourceError> 
     Ok(out)
 }
 
+/// The V2 plugin module itself. Claude Code plugins have no equivalent tier —
+/// hooks are excluded there because measuring them means executing
+/// contributor code — but an OpenCode `plugin.ts` is loaded into the host on
+/// every request the way MCP schemas are, so its bytes belong in the document
+/// as their own tier rather than hidden inside Resident.
+pub fn read_plugin_source(plugin_dir: &Path) -> Result<Option<FileSource>, SourceError> {
+    let path = plugin_dir.join("plugin.ts");
+    let raw = match std::fs::read_to_string(&path) {
+        Ok(t) => t,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(source) => return Err(SourceError::Read { path, source }),
+    };
+    let text = if raw.contains('\r') {
+        raw.replace("\r\n", "\n")
+    } else {
+        raw
+    };
+    Ok(Some(FileSource {
+        kind: "plugin_source",
+        id: plugin_dir
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("plugin")
+            .to_string(),
+        bytes: text.len() as u64,
+    }))
+}
+
 /// The `(id, path)` pairs one layout contributes, or nothing if its directory
 /// is absent.
 fn entries(dir: &Path, layout: &Layout) -> Result<Vec<(String, PathBuf)>, SourceError> {

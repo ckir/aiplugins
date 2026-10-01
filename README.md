@@ -46,9 +46,13 @@ stage the built binary next to that copy's merge target.
 | Plugin | Resident bytes | Invocation bytes |
 |---|---|---|
 | `re-ghidra-mcp-cc` | ≥ 21,631 | ≥ 36,903 |
+| `re-ghidra-mcp-opencode` | ≥ 21,631 | ≥ 36,903 |
 | `rtk-mcp-cc` | ≥ 3,690 | ≥ 6,091 |
+| `rtk-mcp-opencode` | ≥ 3,690 | ≥ 6,091 |
 
 **Resident** is what the host holds in every request, for the whole session — the MCP tool schemas plus the frontmatter it reads to decide what each skill and agent is for. **Invocation** loads only when one of them actually runs.
+
+**Setup, on OpenCode plugins only.** An OpenCode plugin also loads its `plugin.ts` setup module in-process with the host on every request — a third tier the table above does not include. Each plugin's own page reports it as Setup alongside these two tiers.
 
 **Bytes, not tokens.** This is the exact serialised size of what the host loads, measured by probing the plugin's own MCP server and reading its skill and agent frontmatter. It is not a token count and does not convert to one at a fixed rate — treat it as a figure you can compare between plugins, not as a context budget.
 

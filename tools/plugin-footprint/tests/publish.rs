@@ -204,3 +204,89 @@ fn one_unmeasurable_plugin_fails_the_whole_table_rather_than_dropping_a_row() {
     .expect_err("must not publish a partial table");
     assert!(err.to_string().contains("broken"), "got: {err}");
 }
+
+// --- the Setup tier: a third row, only where measured ---
+
+fn setup_doc(plugin: &str, resident: u64, invocation: u64, setup: u64) -> Value {
+    json!({
+        "schemaVersion": 1,
+        "plugin": plugin,
+        "probe": { "status": "ok", "toolCount": 4, "binary": "bin/x", "promptCount": 0 },
+        "tiers": {
+            "resident": { "bytes": resident, "sources": [] },
+            "invocation": { "bytes": invocation, "sources": [] },
+            "setup": {
+                "bytes": setup,
+                "sources": [{ "kind": "plugin_source", "id": plugin, "bytes": setup }]
+            }
+        }
+    })
+}
+
+#[test]
+fn a_document_without_a_setup_tier_renders_the_two_row_table_unchanged() {
+    // The byte-identical promise: regenerating a Claude Code README must not
+    // move a single byte because of a tier it does not have.
+    let region = per_plugin_region(&doc("x", 21_631, 36_903)).expect("renders");
+
+    assert!(
+        !region.contains("Setup"),
+        "no third row without a third tier: {region}"
+    );
+    assert!(!region.contains("plugin.ts"), "got: {region}");
+}
+
+#[test]
+fn a_document_with_a_setup_tier_renders_all_three_rows_setup_last() {
+    let region = per_plugin_region(&setup_doc("x-opencode", 3_690, 6_091, 5_432)).expect("renders");
+
+    assert!(region.contains("3,690"), "resident: {region}");
+    assert!(region.contains("6,091"), "invocation: {region}");
+    assert!(region.contains("5,432"), "setup, formatted: {region}");
+    assert!(
+        region.contains("plugin.ts"),
+        "must name what Setup measures: {region}"
+    );
+    let (resident_at, invocation_at, setup_at) = (
+        region.find("3,690").expect("resident present"),
+        region.find("6,091").expect("invocation present"),
+        region.find("5,432").expect("setup present"),
+    );
+    assert!(
+        resident_at < invocation_at && invocation_at < setup_at,
+        "resident leads, setup trails: {region}"
+    );
+    // The honest label survives the third row.
+    assert!(region.contains("not tokens"), "got: {region}");
+    assert!(region.contains("≥"), "got: {region}");
+    assert!(region.to_lowercase().contains("hook"), "got: {region}");
+}
+
+#[test]
+fn the_comparison_table_without_setup_carries_no_setup_note() {
+    let region = comparison_region(&[("x".to_string(), doc("x", 100, 200))]).expect("renders");
+
+    assert!(!region.contains("Setup"), "got: {region}");
+}
+
+#[test]
+fn the_comparison_table_with_setup_names_the_excluded_third_tier() {
+    // The table compares the two shared tiers. An OpenCode row without this
+    // note would read as that plugin's total, understating it by `plugin.ts`.
+    let region = comparison_region(&[
+        ("x-cc".to_string(), doc("x-cc", 100, 200)),
+        (
+            "x-opencode".to_string(),
+            setup_doc("x-opencode", 100, 200, 5_000),
+        ),
+    ])
+    .expect("renders");
+
+    assert!(region.contains("Setup"), "got: {region}");
+    assert!(region.contains("plugin.ts"), "got: {region}");
+    // And the Claude row itself is untouched by the neighbour's tier.
+    assert!(
+        region.contains("| `x-cc` | ≥ 100 | ≥ 200 |"),
+        "got: {region}"
+    );
+}

@@ -79,6 +79,14 @@ pub struct ProbeReport {
 pub struct Tiers {
     pub resident: Tier,
     pub invocation: Tier,
+    /// The OpenCode `plugin.ts`, loaded into the host the way MCP schemas
+    /// are. Absent for Claude Code plugins, which have no equivalent tier —
+    /// and absent rather than zeroed, so a document from before this tier
+    /// existed still reads as what was measured rather than as a plugin
+    /// whose setup costs nothing. `Option` for the same reason `tokens` is
+    /// one: "not measured" is distinct from "measured as none".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub setup: Option<Tier>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -143,6 +151,11 @@ pub fn build(
     let tiers = matches!(outcome.status, Status::Ok | Status::NoServer).then(|| Tiers {
         resident: resident_tier(outcome, &files.resident),
         invocation: tier_from_files(&files.invocation),
+        // Claude Code plugins never carry a Setup tier: `build` is the shared
+        // assembly point and the opencode `measure` path sets it afterwards
+        // from `read_plugin_source`, so every document built here — every
+        // Claude document — serialises exactly as before this tier existed.
+        setup: None,
     });
 
     Document {
@@ -200,6 +213,15 @@ fn tier_from_files(files: &[FileSource]) -> Tier {
     let mut sources: Vec<Source> = files.iter().map(from_file).collect();
     sources.sort_by(|a, b| (a.kind, &a.id).cmp(&(b.kind, &b.id)));
     total(sources)
+}
+
+/// The Setup tier for one measured `plugin.ts`.
+///
+/// A single source needs no sorting, but it goes through the same `total` so
+/// the tier's bytes are the sum of its (one) source by construction rather
+/// than by a second, independent count.
+pub fn setup_tier(plugin_source: &FileSource) -> Tier {
+    total(vec![from_file(plugin_source)])
 }
 
 fn total(sources: Vec<Source>) -> Tier {

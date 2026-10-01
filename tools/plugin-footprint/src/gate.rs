@@ -35,6 +35,14 @@ pub struct Budget {
     pub headroom_bytes: u64,
     /// The most one pull request may add.
     pub delta_bytes: u64,
+    /// The ceiling on `tiers.setup.bytes`, the OpenCode `plugin.ts` tier.
+    /// `None` for every budget written before this tier existed — and for the
+    /// uncapped first run of a new plugin — in which case the Setup tier is
+    /// measured but not compared, exactly like a missing baseline skips the
+    /// delta layer. Required-never: making it mandatory would turn every
+    /// pre-existing entry malformed, failing the gate on thresholds that were
+    /// green.
+    pub setup_bytes: Option<u64>,
 }
 
 /// What the committed thresholds say about one plugin.
@@ -108,6 +116,23 @@ pub fn budget_for(budgets: &Value, plugin: &str) -> BudgetLookup {
         }
     };
 
+    // The Setup ceiling arrived after the other three keys, so it is optional:
+    // absent means "no ceiling", never "zero". Present-but-unreadable is
+    // malformed, by the same rule that makes a mistyped `residentBytes`
+    // malformed rather than absent — a ceiling that exists and cannot be read
+    // must fail, not pass uncapped.
+    let setup_bytes = match entry.get("setupBytes") {
+        None => None,
+        Some(value) => match value.as_u64() {
+            Some(n) => Some(n),
+            None => {
+                return BudgetLookup::Malformed(format!(
+                    "`setupBytes` is {value}, which is not a whole number of bytes"
+                ))
+            }
+        },
+    };
+
     match (
         field("residentBytes"),
         field("headroomBytes"),
@@ -149,6 +174,7 @@ pub fn budget_for(budgets: &Value, plugin: &str) -> BudgetLookup {
                 resident_bytes,
                 headroom_bytes,
                 delta_bytes,
+                setup_bytes,
             })
         }
         (r, h, d) => BudgetLookup::Malformed(
@@ -211,6 +237,27 @@ pub fn check(measured: &Value, baseline: Option<&Value>, budget: &Budget) -> Ver
                 budget.delta_bytes
             ));
         }
+
+        // The same cap for the Setup tier, against its own baseline. Gated on
+        // the tier being BOTH measured and budgeted: an old baseline written
+        // before the tier existed carries no setup bytes, and reading that as
+        // zero would bill the whole `plugin.ts` as one change's growth.
+        if let (Some(measured_setup), Some(_)) = (setup_bytes_of(measured), budget.setup_bytes) {
+            let baseline_setup = baseline
+                .get("tiers")
+                .and_then(|t| t.get("setup"))
+                .and_then(|s| s.get("bytes"))
+                .and_then(Value::as_u64);
+            if let Some(was) = baseline_setup {
+                let growth = measured_setup.saturating_sub(was);
+                if growth > budget.delta_bytes {
+                    reasons.push(format!(
+                        "this change adds {growth} setup bytes, over the per-change delta cap of {}",
+                        budget.delta_bytes
+                    ));
+                }
+            }
+        }
     }
 
     // The budget ceiling.
@@ -219,6 +266,17 @@ pub fn check(measured: &Value, baseline: Option<&Value>, budget: &Budget) -> Ver
             "resident footprint {measured_bytes} bytes exceeds the budget of {} bytes",
             budget.resident_bytes
         ));
+    }
+
+    // The Setup ceiling. Only when the document carries the tier and the
+    // budget carries the cap — a Claude Code document has neither, and must
+    // keep passing exactly as before.
+    if let (Some(measured_setup), Some(cap)) = (setup_bytes_of(measured), budget.setup_bytes) {
+        if measured_setup > cap {
+            reasons.push(format!(
+                "setup footprint {measured_setup} bytes exceeds the budget of {cap} bytes"
+            ));
+        }
     }
 
     if reasons.is_empty() {
@@ -268,4 +326,11 @@ fn resident_bytes(document: &Value) -> u64 {
         .and_then(|r| r.get("bytes"))
         .and_then(Value::as_u64)
         .unwrap_or(0)
+}
+
+/// The Setup tier's bytes, or `None` when the document carries no Setup tier
+/// at all. `Option` rather than `unwrap_or(0)`: zero would satisfy every
+/// ceiling, so "no tier" must stay distinguishable from "an empty tier".
+fn setup_bytes_of(document: &Value) -> Option<u64> {
+    document.get("tiers")?.get("setup")?.get("bytes")?.as_u64()
 }
