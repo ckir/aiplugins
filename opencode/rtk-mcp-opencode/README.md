@@ -92,6 +92,18 @@ A copied `plugin.ts` auto-loads — no `plugins` entry is needed for the standar
 path. The `{ "package": … }` file-URL form is only for working-copy dev against
 a checkout.
 
+`plugin.ts` imports `@opencode/plugin` as a value, so the install target
+needs that package resolvable. From the project root (or
+`~/.config/opencode/` for a global install):
+
+```bash
+bun add @opencode/plugin@2.0.21
+```
+
+Use the version under "Tested with" at the top of this README if it names a
+newer one. OpenCode also runs `bun install` at startup, but install the
+dependency now rather than discovering it missing on next launch.
+
 The MCP server needs its binary. `rtk-cc-mcp` is a `[[bin]]` of the existing
 `rtk-mcp-cc` crate, staged by:
 
