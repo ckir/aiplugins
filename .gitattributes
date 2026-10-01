@@ -43,3 +43,12 @@ shared/ghidra-mcp/skill/SKILL.md text eol=lf
 # on a correct tree. (The opencode copy is already covered by opencode/**/*.md.)
 claude-code/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md text eol=lf
 qwen/re-ghidra-mcp-qwen/skills/ghidra-re-driver/SKILL.md text eol=lf
+
+# Every skill/agent source: compared byte-for-byte across fronts and read by
+# line-oriented tooling (frontmatter readers, footprint measurement), so all
+# keep LF on every platform. Without this, a fresh Windows checkout holds CRLF
+# sources next to LF-pinned copies and the staleness `cmp` false-positives on
+# a correct tree. (Proven by the wiring FAIL that surfaced right after the
+# main merge, with byte-identical blobs on both sides.)
+**/SKILL.md text eol=lf
+**/agents/*.md text eol=lf
