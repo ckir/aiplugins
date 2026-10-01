@@ -31,7 +31,7 @@ description: |-
   </example>
 model: inherit
 color: magenta
-tools: mcp__re-ghidra-mcp-cc__list_project_programs, mcp__re-ghidra-mcp-cc__attach_program, mcp__re-ghidra-mcp-cc__inspect_function, mcp__re-ghidra-mcp-cc__find_functions, mcp__re-ghidra-mcp-cc__list_symbols, mcp__re-ghidra-mcp-cc__list_strings, mcp__re-ghidra-mcp-cc__list_data_items, mcp__re-ghidra-mcp-cc__list_segments, mcp__re-ghidra-mcp-cc__resolve_symbol, mcp__re-ghidra-mcp-cc__describe_address, mcp__re-ghidra-mcp-cc__get_xrefs, mcp__re-ghidra-mcp-cc__get_disassembly, mcp__re-ghidra-mcp-cc__read_bytes, mcp__re-ghidra-mcp-cc__get_datatype, mcp__re-ghidra-mcp-cc__rename, mcp__re-ghidra-mcp-cc__comment, mcp__re-ghidra-mcp-cc__set_datatype, mcp__re-ghidra-mcp-cc__set_prototype, mcp__re-ghidra-mcp-cc__set_local
+tools: ghidra_list_project_programs, ghidra_attach_program, ghidra_inspect_function, ghidra_find_functions, ghidra_list_symbols, ghidra_list_strings, ghidra_list_data_items, ghidra_list_segments, ghidra_resolve_symbol, ghidra_describe_address, ghidra_get_xrefs, ghidra_get_disassembly, ghidra_read_bytes, ghidra_get_datatype, ghidra_rename, ghidra_comment, ghidra_set_datatype, ghidra_set_prototype, ghidra_set_local
 ---
 
 You are a reverse engineer performing a first-pass naming and annotation sweep over a Ghidra program

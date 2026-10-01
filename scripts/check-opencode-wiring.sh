@@ -18,7 +18,10 @@ jqr() {
 known=$(cargo metadata --no-deps --format-version 1 |
     jq -r '.packages[].targets[] | select(.kind[] == "bin") | .name' | sort -u)
 
-workspace_version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+# NOTE: Cargo.toml checks out with CRLF on Windows; strip CR exactly like
+# jqr does for jq output, otherwise `$` never matches and every version check
+# fails on a correct tree.
+workspace_version=$(tr -d '\r' < Cargo.toml | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1)
 
 failures=0
 checked=0
@@ -106,6 +109,28 @@ for pair in \
         fail "stale copy: $dst differs from $src"
     else
         printf '  ok       copy %-40s\n' "$dst"
+    fi
+done
+
+# 8. Pin-consistency: every opencode plugin pins the same @opencode/plugin
+# version, so one plugin drifting ahead of (or behind) the other fails loudly
+# instead of passing silently.
+pin_ref=""
+for pkg in opencode/*/package.json; do
+    [ -f "$pkg" ] || continue
+    pin=$(jqr '.dependencies["@opencode/plugin"] // ""' "$pkg" 2>/dev/null || echo "")
+    if [ -z "$pin" ]; then
+        fail "$pkg pins no @opencode/plugin version"
+        continue
+    fi
+    checked=$((checked + 1))
+    if [ -z "$pin_ref" ]; then
+        pin_ref=$pin
+        printf '  ok       @opencode/plugin %-16s <- %s\n' "$pin" "$pkg"
+    elif [ "$pin" != "$pin_ref" ]; then
+        fail "@opencode/plugin pin drift: $pkg pins $pin, expected $pin_ref"
+    else
+        printf '  ok       @opencode/plugin %-16s <- %s\n' "$pin" "$pkg"
     fi
 done
 

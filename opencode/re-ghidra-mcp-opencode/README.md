@@ -126,11 +126,11 @@ The MCP server needs its binary. `re-ghidra-cc-mcp` is a `[[bin]]` of the
 existing `re-ghidra-mcp-cc` crate, staged by:
 
 ```bash
-just build-re-ghidra-mcp-cc
+just build-re-ghidra-mcp-opencode
 ```
 
-That builds `re-ghidra-cc-mcp` and `re-ghidra-cc-hook` into
-`claude-code/re-ghidra-mcp-cc/bin/` (which is gitignored); release builds
+That builds `re-ghidra-cc-mcp` into
+`opencode/re-ghidra-mcp-opencode/bin/` (which is gitignored); release builds
 for all platforms come from CI via `cargo-dist`. Alternatively, unpack
 `re-ghidra-mcp-cc-plugin.zip` from the latest release, which carries the
 binaries for every supported platform. Either way, stage the built (or

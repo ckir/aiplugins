@@ -27,8 +27,8 @@ behavior for a single session without editing anything:
 |---|---|
 | `RTK_BIN` | Path to the rtk executable. Shared with the sibling `rtk-mcp-qwen` extension, so relocating rtk needs only one variable. |
 | `RTK_OPENCODE_DISABLE=1` | Pass every command through untouched. |
-| `RTK_OPENCODE_ULTRA_COMPACT` | Overrides `ultra_compact`. |
-| `RTK_OPENCODE_SKIP_ENV` | Overrides `skip_env`. |
+| `RTK_OPENCODE_ULTRA_COMPACT=1` | Overrides `ultra_compact`. |
+| `RTK_OPENCODE_SKIP_ENV=1` | Overrides `skip_env`. |
 
 Truthy values are `1`, `true`, `yes`, `on`; falsy are `0`, `false`, `no`, `off`
 (case-insensitive). `RTK_OPENCODE_DISABLE=0` therefore leaves the hook **active** —

@@ -68,4 +68,38 @@ describe("setup", () => {
     expect(needsDriverPointer(["ghidra_decompile"])).toBe(true);
     expect(needsDriverPointer([])).toBe(false);
   });
+
+  test("needsDriverPointer matches live OpenCode-registered ghidra_* names", () => {
+    // OpenCode prefixes MCP tools with the server name (`ghidra` here), so
+    // these are the exact keys SessionContext.tools carries live.
+    expect(needsDriverPointer(["bash", "ghidra_attach_program"])).toBe(true);
+    expect(needsDriverPointer(["ghidra_list_project_programs", "ghidra_rename"])).toBe(true);
+  });
+
+  test("needsDriverPointer rejects non-prefixed and Claude-style namespaced names", () => {
+    // `mcp__ghidra__*` is Claude Code's namespacing; it never occurs in
+    // OpenCode (docs: `<server>_<tool>`), so it must not match here.
+    expect(needsDriverPointer(["mcp__ghidra__attach_program"])).toBe(false);
+    expect(needsDriverPointer(["notghidra_foo", "myghidra_attach"])).toBe(false);
+  });
+
+  test("compaction handler tolerates a malformed event (no fields)", async () => {
+    const { hooks, ctx } = fakeCtx();
+    await (plugin as unknown as { setup: (ctx: unknown) => Promise<void> }).setup(ctx);
+    const event = {};
+    expect(() => {
+      for (const fn of hooks["session:compaction"]) fn(event);
+    }).not.toThrow();
+    expect(event).toEqual({});
+  });
+
+  test("context handler tolerates a malformed event (no fields)", async () => {
+    const { hooks, ctx } = fakeCtx();
+    await (plugin as unknown as { setup: (ctx: unknown) => Promise<void> }).setup(ctx);
+    const event = {};
+    expect(() => {
+      for (const fn of hooks["session:context"]) fn(event);
+    }).not.toThrow();
+    expect(event).toEqual({});
+  });
 });

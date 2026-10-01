@@ -96,10 +96,10 @@ The MCP server needs its binary. `rtk-cc-mcp` is a `[[bin]]` of the existing
 `rtk-mcp-cc` crate, staged by:
 
 ```bash
-just build-rtk-mcp-cc
+just build-rtk-mcp-opencode
 ```
 
-That builds `rtk-cc-hook` and `rtk-cc-mcp` into `claude-code/rtk-mcp-cc/bin/`
+That builds `rtk-cc-mcp` into `opencode/rtk-mcp-opencode/bin/`
 (which is gitignored); release builds for all platforms come from CI via
 `cargo-dist`. Alternatively, unpack `rtk-mcp-cc-plugin.zip` from the latest
 release, which carries the binaries for every supported platform. Either way,

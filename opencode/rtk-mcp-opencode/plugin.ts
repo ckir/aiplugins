@@ -128,7 +128,15 @@ export function delegate(
 ): string {
   if (!config.enabled) return "";
   if (payload.trim() === "") return "";
-  const stdout = run(hookArgs(config), payload);
+  // Defense-in-depth: production runRtk never throws (it catches and returns
+  // null), but an injected `run` that throws must still fail open, never
+  // propagate into the host hook.
+  let stdout: string | null;
+  try {
+    stdout = run(hookArgs(config), payload);
+  } catch {
+    return "";
+  }
   if (stdout === null || stdout.trim() === "") return "";
   try {
     JSON.parse(stdout.trim());

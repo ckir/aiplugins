@@ -10,6 +10,17 @@ export function compactionReminder(): string {
 }
 
 export function needsDriverPointer(toolNames: string[]): boolean {
+  // OpenCode registers MCP tools with the server name as prefix
+  // (https://opencode.ai/docs/mcp-servers: "registered with server name as
+  // prefix", e.g. `mymcpservername_*`; agent globs like `my-mcp*` match
+  // `my-mcp_search`). Our server is named `ghidra` (opencode.jsonc
+  // `mcp.servers.ghidra`), so live tool keys are `ghidra_<tool>` (e.g.
+  // `ghidra_attach_program` — bare names come from rmcp `#[tool_router]`
+  // method names in shared/ghidra-mcp/src/server.rs). Exact-prefix matching
+  // is therefore correct here; there is no `mcp__ghidra__*` namespacing in
+  // OpenCode (that is Claude Code's form). Installed
+  // @opencode/plugin@2.0.21 types are silent on naming (SessionContext.tools
+  // is just Record<string, ...>), so the docs above are the authority.
   return toolNames.some((name) => name.startsWith("ghidra"));
 }
 
@@ -29,10 +40,15 @@ export default Plugin.define({
   id: "re-ghidra-mcp-opencode",
   async setup(ctx) {
     await ctx.session.hook("compaction", (event) => {
-      event.system.push({ type: "text", text: compactionReminder() });
+      // Shape drift must never throw inside the host (spec: never a session
+      // block): only push when `system` is actually an array.
+      if (Array.isArray(event.system)) {
+        event.system.push({ type: "text", text: compactionReminder() });
+      }
     });
     await ctx.session.hook("context", (event) => {
-      if (needsDriverPointer(Object.keys(event.tools))) {
+      // `tools` may be absent on API drift; default to no tools (silent).
+      if (Array.isArray(event.system) && needsDriverPointer(Object.keys(event.tools ?? {}))) {
         event.system.push({ type: "text", text: driverPointer() });
       }
     });
