@@ -276,7 +276,9 @@ emit-ghidra-skill: build-re-ghidra-mcp-cc
         > claude-code/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md
     ./target/release/re-ghidra-qwen-mcp emit-skill \
         > qwen/re-ghidra-mcp-qwen/skills/ghidra-re-driver/SKILL.md
-    @echo "Regenerated the committed ghidra-re-driver skill copies (claude-code, qwen)"
+    ./claude-code/re-ghidra-mcp-cc/bin/re-ghidra-cc-mcp emit-skill \
+        > opencode/re-ghidra-mcp-opencode/skills/ghidra-re-driver/SKILL.md
+    @echo "Regenerated the committed ghidra-re-driver skill copies (claude-code, qwen, opencode)"
 
 # Run the live Ghidra suite. Needs a real Ghidra 12.1.2 + JDK 21 and an analyzed
 # fixture project; see shared/ghidra-mcp/tests/fixtures/README.md to build one.
