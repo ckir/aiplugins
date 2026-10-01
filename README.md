@@ -8,6 +8,7 @@ Initially, this marketplace provides and supports plugins for the following agen
 - **Claude Code**
 - **Antigravity**
 - **Qwen**
+- **OpenCode**
 
 ## Installing
 
@@ -26,6 +27,18 @@ the latest release that already contain the binaries for Windows x64 plus Linux
 and macOS on x86_64 and aarch64, so nothing is cloned, built, or compiled at
 install time. The Antigravity and Qwen plugins install through their own agents'
 mechanisms — again, see their READMEs.
+
+The OpenCode plugins install as file copies — no registry, no build of the
+TypeScript itself. Per plugin (full steps in its README):
+
+| Plugin | Copies | Binary staging |
+|---|---|---|
+| [`rtk-mcp-opencode`](opencode/rtk-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/`, `skills/*` → `.opencode/skills/` | `just build-rtk-mcp-opencode` |
+| [`re-ghidra-mcp-opencode`](opencode/re-ghidra-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/`, `skills/*` → `.opencode/skills/`, `agents/*` → `.opencode/agents/` | `just build-re-ghidra-mcp-opencode` |
+
+Merge each plugin's `opencode.jsonc` into `.opencode/opencode.jsonc`; the
+`./bin/<name>` command in it is relative to the installed plugin copy, so
+stage the built binary next to that copy's merge target.
 
 ## What each plugin costs a context window
 
@@ -54,6 +67,7 @@ aiplugins/
 ├── claude-code/   # Plugins specifically for Claude Code
 ├── antigravity/   # Plugins specifically for Antigravity
 ├── qwen/          # Plugins specifically for Qwen
+├── opencode/      # Plugins specifically for OpenCode
 ├── shared/        # Agent-agnostic crates that several plugins front
 ├── scripts/       # Repository checks run by CI and `just check`
 └── README.md      # Project overview

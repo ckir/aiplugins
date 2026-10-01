@@ -51,3 +51,6 @@ node_modules/
 
 # Release / Dist
 dist/
+
+# Staged OpenCode plugin binaries, produced by `just build-*-opencode`.
+opencode/*/bin/

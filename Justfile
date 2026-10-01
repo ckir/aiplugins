@@ -54,6 +54,18 @@ marketplace:
 qwen-marketplace:
     bash scripts/check-qwen-marketplace.sh
 
+# Verify opencode/ plugin configs, ids, and skill copies.
+opencode-wiring:
+    bash scripts/check-opencode-wiring.sh
+
+# Run the opencode TypeScript unit tests.
+test-opencode:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for dir in opencode/*/; do
+        (cd "$dir" && bun install && bun test tests/)
+    done
+
 # Regenerate the committed footprint document for every published plugin, and
 # maintain the thresholds alongside them.
 # Requires the plugin binaries: `just build-rtk-mcp-cc build-re-ghidra-mcp-cc`.
@@ -174,7 +186,7 @@ smoke:
     done
 
 # Run all pre-flight checks (what CI and lefthook would run)
-check: fmt lint test deny spellcheck wiring marketplace dispatch smoke footprint
+check: fmt lint test deny spellcheck wiring marketplace dispatch smoke footprint opencode-wiring
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
@@ -217,6 +229,28 @@ build-re-ghidra-mcp-cc:
         fi; \
     done
     @echo "Plugin binaries staged in claude-code/re-ghidra-mcp-cc/bin/"
+
+# Stage rtk-mcp-opencode's MCP binary into its bin/ directory.
+build-rtk-mcp-opencode:
+    cargo build -p rtk-mcp-cc --release --bin rtk-cc-mcp
+    mkdir -p opencode/rtk-mcp-opencode/bin
+    if [ -f "target/release/rtk-cc-mcp.exe" ]; then \
+        cp "target/release/rtk-cc-mcp.exe" opencode/rtk-mcp-opencode/bin/; \
+    else \
+        cp "target/release/rtk-cc-mcp" opencode/rtk-mcp-opencode/bin/; \
+    fi
+    @echo "Plugin binary staged in opencode/rtk-mcp-opencode/bin/"
+
+# Stage re-ghidra-mcp-opencode's MCP binary into its bin/ directory.
+build-re-ghidra-mcp-opencode:
+    cargo build -p re-ghidra-mcp-cc --release --bin re-ghidra-cc-mcp
+    mkdir -p opencode/re-ghidra-mcp-opencode/bin
+    if [ -f "target/release/re-ghidra-cc-mcp.exe" ]; then \
+        cp "target/release/re-ghidra-cc-mcp.exe" opencode/re-ghidra-mcp-opencode/bin/; \
+    else \
+        cp "target/release/re-ghidra-cc-mcp" opencode/re-ghidra-mcp-opencode/bin/; \
+    fi
+    @echo "Plugin binary staged in opencode/re-ghidra-mcp-opencode/bin/"
 
 # Assemble the installable plugin zips for a published release, the same way
 # .github/workflows/plugin-bundles.yml does — for testing a change to the
@@ -338,7 +372,7 @@ clean-stale:
         done
     done
     # Staged plugin binaries are copies, so they go stale the same way.
-    for staged in claude-code/*/bin/*; do
+    for staged in claude-code/*/bin/* opencode/*/bin/*; do
         [ -f "$staged" ] || continue
         name=$(basename "$staged"); name="${name%.exe}"
         if ! printf '%s\n' "$known" | grep -qxF "$name"; then
@@ -354,5 +388,5 @@ clean-stale:
 # full rebuild.
 clean:
     cargo clean
-    rm -rf claude-code/example/bin claude-code/rtk-mcp-cc/bin claude-code/re-ghidra-mcp-cc/bin
+    rm -rf claude-code/example/bin claude-code/rtk-mcp-cc/bin claude-code/re-ghidra-mcp-cc/bin opencode/rtk-mcp-opencode/bin opencode/re-ghidra-mcp-opencode/bin
     @echo "Removed target/ and staged plugin binaries."
