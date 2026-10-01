@@ -32,8 +32,9 @@ in the GUI, then closed. It does not import or analyze binaries itself.
 | Extension point | File | What it does here |
 |---|---|---|
 | Manifest | `plugin.json` | Name, version, metadata |
-| MCP server | `mcp_config.json` → `bin/re-ghidra-agy-mcp` | The 19 Ghidra tools |
-| Hook | `hooks.json` → `bin/re-ghidra-agy-hook` | `PreInvocation` preflight; silent when healthy |
+| MCP server | `mcp_config.json` → `re-ghidra-agy-mcp` | The 19 Ghidra tools |
+| Hook | `hooks.json` → `re-ghidra-agy-hook` | `PreInvocation` preflight; silent when healthy |
+| Skill | `skills/ghidra-re-driver/SKILL.md` | Ghidra RE driver agent workflow and guide |
 | Settings | `examples/re-ghidra-mcp-agy.local.md` | Per-project config via `.agents/*.local.md` |
 
 ### The 19 tools
@@ -69,14 +70,17 @@ You supply these; nothing here bundles them.
 
 ## Building
 
-The config files point at `bin/`, so the binaries must be built before the
-plugin does anything:
+Build and install the binaries into `~/.local/bin/` (or ensure they are on `PATH`):
 
 ```bash
-cargo build -p re-ghidra-mcp-agy
+just build-re-ghidra-mcp-agy
 ```
 
-That stages `re-ghidra-agy-mcp` and `re-ghidra-agy-hook` into the target directory. Ensure they are available on the PATH or adjust the paths in `mcp_config.json` and `hooks.json` to point to the built binaries.
+Or manually:
+```bash
+cargo build -p re-ghidra-mcp-agy --release
+cp target/release/re-ghidra-agy-mcp target/release/re-ghidra-agy-hook ~/.local/bin/
+```
 
 ## Installing
 
@@ -130,14 +134,19 @@ antigravity/re-ghidra-mcp-agy/
 ├── plugin.json                  # manifest
 ├── mcp_config.json              # MCP server registration
 ├── hooks.json                   # PreInvocation preflight registration
+├── skills/
+│   └── ghidra-re-driver/
+│       └── SKILL.md             # Ghidra RE driver agent workflow and guide
 ├── examples/
 │   └── re-ghidra-mcp-agy.local.md  # settings template
-├── bin/                         # built binaries (gitignored)
 ├── src/
 │   ├── lib.rs                   # settings parsing + preflight (pure, tested)
 │   └── bin/
 │       ├── mcp.rs               # thin front end over ghidra_mcp::cli
 │       └── hook.rs              # PreInvocation preflight binary
+└── tests/
+    ├── e2e.rs                   # configuration & manifest tests
+    └── skill_emit.rs            # verifies committed skill matches binary
 ```
 
 ## Testing

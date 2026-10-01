@@ -231,6 +231,19 @@ build-rtk-mcp-agy:
     done
     @echo "Antigravity rtk binaries installed to ~/.local/bin/"
 
+# Build the re-ghidra-mcp-agy Antigravity plugin binaries into ~/.local/bin/
+build-re-ghidra-mcp-agy:
+    cargo build -p re-ghidra-mcp-agy --release --bin re-ghidra-agy-hook --bin re-ghidra-agy-mcp
+    mkdir -p ~/.local/bin
+    for b in re-ghidra-agy-hook re-ghidra-agy-mcp; do \
+        if [ -f "target/release/$b.exe" ]; then \
+            cp "target/release/$b.exe" ~/.local/bin/; \
+        else \
+            cp --remove-destination "target/release/$b" ~/.local/bin/ 2>/dev/null || cp "target/release/$b" ~/.local/bin/; \
+        fi; \
+    done
+    @echo "Antigravity re-ghidra binaries installed to ~/.local/bin/"
+
 
 # Assemble the installable plugin zips for a published release, the same way
 # .github/workflows/plugin-bundles.yml does — for testing a change to the
@@ -286,11 +299,14 @@ bundle-qwen tag:
 # re-ghidra-mcp-qwen::skill_emit.
 emit-ghidra-skill: build-re-ghidra-mcp-cc
     cargo build -p re-ghidra-mcp-qwen --release --bin re-ghidra-qwen-mcp
+    cargo build -p re-ghidra-mcp-agy --release --bin re-ghidra-agy-mcp
     ./claude-code/re-ghidra-mcp-cc/bin/re-ghidra-cc-mcp emit-skill \
         > claude-code/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md
     ./target/release/re-ghidra-qwen-mcp emit-skill \
         > qwen/re-ghidra-mcp-qwen/skills/ghidra-re-driver/SKILL.md
-    @echo "Regenerated the committed ghidra-re-driver skill copies (claude-code, qwen)"
+    ./target/release/re-ghidra-agy-mcp emit-skill \
+        > antigravity/re-ghidra-mcp-agy/skills/ghidra-re-driver/SKILL.md
+    @echo "Regenerated the committed ghidra-re-driver skill copies (claude-code, qwen, antigravity)"
 
 # Run the live Ghidra suite. Needs a real Ghidra 12.1.2 + JDK 21 and an analyzed
 # fixture project; see shared/ghidra-mcp/tests/fixtures/README.md to build one.
