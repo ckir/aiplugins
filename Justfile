@@ -223,10 +223,10 @@ build-rtk-mcp-agy:
     cargo build -p rtk-mcp-agy --release --bin rtk-hook-preinvocation --bin rtk-mcp
     mkdir -p ~/.local/bin
     for b in rtk-hook-preinvocation rtk-mcp; do \
-        if [ -f "target/release/$$b.exe" ]; then \
-            cp "target/release/$$b.exe" ~/.local/bin/; \
+        if [ -f "target/release/$b.exe" ]; then \
+            cp "target/release/$b.exe" ~/.local/bin/; \
         else \
-            cp "target/release/$$b" ~/.local/bin/; \
+            cp --remove-destination "target/release/$b" ~/.local/bin/ 2>/dev/null || cp "target/release/$b" ~/.local/bin/; \
         fi; \
     done
     @echo "Antigravity rtk binaries installed to ~/.local/bin/"
