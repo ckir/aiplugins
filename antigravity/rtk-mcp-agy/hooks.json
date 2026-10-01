@@ -1,8 +1,11 @@
 {
-  "PreInvocation": [
-    {
-      "type": "command",
-      "command": "rtk-hook-preinvocation"
-    }
-  ]
+  "rtk-preinvocation": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "rtk-hook-preinvocation"
+      }
+    ]
+  }
 }
+

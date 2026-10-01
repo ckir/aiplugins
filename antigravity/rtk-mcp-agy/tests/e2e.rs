@@ -485,3 +485,44 @@ fn preinvocation_names_the_registered_server_and_tool() {
         "hook must name the advertised tool {tool:?}: {message}"
     );
 }
+
+#[test]
+fn hooks_json_conforms_to_antigravity_schema() {
+    let hooks: Value = serde_json::from_str(
+        &std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/hooks.json"))
+            .expect("read hooks.json"),
+    )
+    .expect("valid hooks.json");
+
+    let hooks_map = hooks
+        .as_object()
+        .expect("hooks.json must be a JSON object mapping hook names to specs");
+    assert!(
+        !hooks_map.is_empty(),
+        "hooks.json must define at least one hook"
+    );
+
+    // Antigravity's hooks.json schema is map[string]JSONHookSpec.
+    // The top-level keys are hook names (not event types like PreInvocation!).
+    // Each hook spec object may contain PreInvocation, PreToolUse, etc.
+    let mut found_preinvocation = false;
+    for (hook_name, hook_spec) in hooks_map {
+        assert!(
+            hook_spec.is_object(),
+            "hook {hook_name:?} must be a JSON object (JSONHookSpec), not an array or primitive"
+        );
+        if let Some(pre_inv) = hook_spec.get("PreInvocation") {
+            let handlers = pre_inv
+                .as_array()
+                .expect("PreInvocation must be an array of handlers");
+            for handler in handlers {
+                assert_eq!(handler["command"].as_str(), Some("rtk-hook-preinvocation"));
+            }
+            found_preinvocation = true;
+        }
+    }
+    assert!(
+        found_preinvocation,
+        "hooks.json must declare a PreInvocation hook"
+    );
+}
