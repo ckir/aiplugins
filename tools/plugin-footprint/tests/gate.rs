@@ -9,6 +9,14 @@ fn budget() -> Budget {
         resident_bytes: 20_000,
         headroom_bytes: 2_000,
         delta_bytes: 500,
+        setup_bytes: None,
+    }
+}
+
+fn setup_budget() -> Budget {
+    Budget {
+        setup_bytes: Some(8_000),
+        ..budget()
     }
 }
 
@@ -379,4 +387,126 @@ fn a_delta_cap_at_or_above_the_headroom_is_refused() {
         ),
         BudgetLookup::Found(_)
     ));
+}
+
+// --- the Setup tier: measured always, compared only when budgeted ---
+
+fn setup_doc(resident: u64, setup: u64) -> Value {
+    json!({
+        "schemaVersion": 1,
+        "plugin": "x-opencode",
+        "probe": { "status": "ok", "toolCount": 4, "binary": "bin/x", "promptCount": 0 },
+        "tiers": {
+            "resident": { "bytes": resident, "sources": [] },
+            "invocation": { "bytes": 0, "sources": [] },
+            "setup": {
+                "bytes": setup,
+                "sources": [{ "kind": "plugin_source", "id": "x-opencode", "bytes": setup }]
+            }
+        }
+    })
+}
+
+#[test]
+fn a_budget_written_before_the_setup_tier_reads_with_no_setup_ceiling() {
+    // Backward compatibility is load-bearing: every committed entry predates
+    // `setupBytes`, and requiring it would turn them all malformed and fail
+    // the gate on thresholds that were green.
+    match budget_for(
+        &json!({ "x": { "residentBytes": 20000, "headroomBytes": 2000, "deltaBytes": 500 } }),
+        "x",
+    ) {
+        BudgetLookup::Found(b) => assert_eq!(b.setup_bytes, None),
+        other => panic!("a pre-setup entry must still read, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_setup_ceiling_is_read_when_present() {
+    match budget_for(
+        &json!({ "x": { "residentBytes": 20000, "headroomBytes": 2000, "deltaBytes": 500,
+                        "setupBytes": 8000 } }),
+        "x",
+    ) {
+        BudgetLookup::Found(b) => assert_eq!(b.setup_bytes, Some(8_000)),
+        other => panic!("expected a budget, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_present_but_unreadable_setup_ceiling_is_malformed_not_absent() {
+    // The same rule as every other key: a ceiling that exists and cannot be
+    // read must fail, not pass uncapped.
+    for broken in [
+        json!({ "x": { "residentBytes": 20000, "headroomBytes": 2000, "deltaBytes": 500,
+                       "setupBytes": "8000" } }),
+        json!({ "x": { "residentBytes": 20000, "headroomBytes": 2000, "deltaBytes": 500,
+                       "setupBytes": 8000.5 } }),
+    ] {
+        assert!(
+            matches!(budget_for(&broken, "x"), BudgetLookup::Malformed(_)),
+            "must not read as absent: {broken}"
+        );
+    }
+}
+
+#[test]
+fn a_setup_footprint_over_its_ceiling_fails_naming_the_numbers() {
+    let over = setup_doc(18_000, 9_000);
+
+    let verdict = reasons(check(&over, Some(&over), &setup_budget()));
+
+    let joined = verdict.join(" ");
+    assert!(joined.contains("9000"), "actual must be named: {joined}");
+    assert!(joined.contains("8000"), "budget must be named: {joined}");
+}
+
+#[test]
+fn setup_growth_larger_than_the_delta_cap_fails_even_when_under_budget() {
+    let baseline = setup_doc(18_000, 6_000);
+    let grown = setup_doc(18_000, 7_000);
+
+    let verdict = reasons(check(&grown, Some(&baseline), &setup_budget()));
+
+    assert!(
+        verdict
+            .iter()
+            .any(|r| r.contains("setup") && r.contains("delta")),
+        "a 1000-byte setup jump exceeds the 500-byte cap, got {verdict:?}"
+    );
+    assert!(
+        !verdict.iter().any(|r| r.contains("resident")),
+        "resident did not move; only setup may fire, got {verdict:?}"
+    );
+}
+
+#[test]
+fn a_setup_tier_without_a_setup_ceiling_is_measured_but_not_compared() {
+    // The old entries' case: the tier is real, but no ceiling constrains it.
+    let big = setup_doc(18_000, 100_000);
+
+    assert_eq!(check(&big, Some(&big), &budget()), Verdict::Pass);
+}
+
+#[test]
+fn a_document_without_a_setup_tier_never_fails_the_setup_layers() {
+    // The Claude Code case: no tier, so nothing to compare even against a
+    // budget that carries a cap.
+    let d = doc("ok", 19, 18_000);
+    assert_eq!(check(&d, Some(&d), &setup_budget()), Verdict::Pass);
+}
+
+#[test]
+fn a_baseline_from_before_the_setup_tier_does_not_bill_the_whole_module_as_growth() {
+    // A baseline with no Setup tier is not a baseline of zero setup bytes —
+    // it predates the measurement. Billing the full `plugin.ts` as one
+    // change's growth would fail the delta cap on the very run that
+    // introduces the tier.
+    let baseline = doc("ok", 4, 18_000);
+    let with_setup = setup_doc(18_000, 7_000);
+
+    assert_eq!(
+        check(&with_setup, Some(&baseline), &setup_budget()),
+        Verdict::Pass
+    );
 }

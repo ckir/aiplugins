@@ -21,6 +21,16 @@ target
 .serena/
 .claude-profile
 
+# Superpowers session scratch (SDD ledgers, briefs, review packages).
+# Git-ignored working state, never committed — git history is the record.
+.superpowers/
+
+# Node modules installed by bun/npm. The pre-commit typos hook globs `*`,
+# and an unignored node_modules/ makes every commit scan third-party code
+# (measured: 173s failure on untracked deps). Per-plugin installs land in
+# opencode/*/node_modules/; this one rule covers those and the root.
+node_modules/
+
 # Per-session scratch written by the Qwen CLI. The directory is named after a
 # session id, so every session leaves a new one behind; the contents are
 # leftover prompts, not configuration. The rest of .qwen/ stays tracked.
@@ -41,3 +51,6 @@ target
 
 # Release / Dist
 dist/
+
+# Staged OpenCode plugin binaries, produced by `just build-*-opencode`.
+opencode/*/bin/
