@@ -41,6 +41,15 @@ done < <(
             | "\($file)::\(.)"
         ' "$config"
     done
+    for config in antigravity/*/hooks.json antigravity/*/mcp_config.json; do
+        [ -f "$config" ] || continue
+        jq -r --arg file "$config" '
+            [.. | objects | .command? // empty]
+            | .[]
+            | select(type == "string")
+            | "\($file)::\(.)"
+        ' "$config"
+    done
 )
 
 # A check that silently checks nothing is worse than no check at all: it reports

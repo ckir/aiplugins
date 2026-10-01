@@ -218,6 +218,20 @@ build-re-ghidra-mcp-cc:
     done
     @echo "Plugin binaries staged in claude-code/re-ghidra-mcp-cc/bin/"
 
+# Build the rtk-mcp-agy Antigravity plugin binaries into ~/.local/bin/
+build-rtk-mcp-agy:
+    cargo build -p rtk-mcp-agy --release --bin rtk-hook-preinvocation --bin rtk-mcp
+    mkdir -p ~/.local/bin
+    for b in rtk-hook-preinvocation rtk-mcp; do \
+        if [ -f "target/release/$$b.exe" ]; then \
+            cp "target/release/$$b.exe" ~/.local/bin/; \
+        else \
+            cp "target/release/$$b" ~/.local/bin/; \
+        fi; \
+    done
+    @echo "Antigravity rtk binaries installed to ~/.local/bin/"
+
+
 # Assemble the installable plugin zips for a published release, the same way
 # .github/workflows/plugin-bundles.yml does — for testing a change to the
 # bundling before tagging, or for rebuilding an asset by hand.
