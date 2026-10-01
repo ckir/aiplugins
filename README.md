@@ -8,6 +8,7 @@ Initially, this marketplace provides and supports plugins for the following agen
 - **Claude Code**
 - **Antigravity**
 - **Qwen**
+- **OpenCode**
 
 ## Installing
 
@@ -27,15 +28,39 @@ and macOS on x86_64 and aarch64, so nothing is cloned, built, or compiled at
 install time. The Antigravity and Qwen plugins install through their own agents'
 mechanisms — again, see their READMEs.
 
+The OpenCode plugins install as file copies — no registry, no build of the
+TypeScript itself. Per plugin (full steps in its README):
+
+| Plugin | Copies | Binary staging |
+|---|---|---|
+| [`rtk-mcp-opencode`](opencode/rtk-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/`, `skills/*` → `.opencode/skills/` | `just build-rtk-mcp-opencode` |
+| [`re-ghidra-mcp-opencode`](opencode/re-ghidra-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/`, `skills/*` → `.opencode/skills/`, `agents/*` → `.opencode/agents/` | `just build-re-ghidra-mcp-opencode` |
+
+Merge each plugin's `opencode.jsonc` into `.opencode/opencode.jsonc`; the
+`./bin/<name>` command in it is relative to the installed plugin copy, so
+stage the built binary next to that copy's merge target.
+
+Prefer to have an agent do it? Tell it to fetch and follow the install
+document for the plugin you want — it performs the whole procedure
+(prerequisites, file copies, dependency, binary, config merge,
+verification) and asks whether to install project-local or global first:
+
+- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/rtk-mcp-opencode/INSTALL.md`
+- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/re-ghidra-mcp-opencode/INSTALL.md`
+
 ## What each plugin costs a context window
 
 <!-- footprint:begin -->
 | Plugin | Resident bytes | Invocation bytes |
 |---|---|---|
 | `re-ghidra-mcp-cc` | ≥ 21,631 | ≥ 36,903 |
+| `re-ghidra-mcp-opencode` | ≥ 21,631 | ≥ 36,903 |
 | `rtk-mcp-cc` | ≥ 3,690 | ≥ 6,091 |
+| `rtk-mcp-opencode` | ≥ 3,690 | ≥ 6,091 |
 
 **Resident** is what the host holds in every request, for the whole session — the MCP tool schemas plus the frontmatter it reads to decide what each skill and agent is for. **Invocation** loads only when one of them actually runs.
+
+**Setup, on OpenCode plugins only.** An OpenCode plugin also loads its `plugin.ts` setup module in-process with the host on every request — a third tier the table above does not include. Each plugin's own page reports it as Setup alongside these two tiers.
 
 **Bytes, not tokens.** This is the exact serialised size of what the host loads, measured by probing the plugin's own MCP server and reading its skill and agent frontmatter. It is not a token count and does not convert to one at a fixed rate — treat it as a figure you can compare between plugins, not as a context budget.
 
@@ -54,6 +79,7 @@ aiplugins/
 ├── claude-code/   # Plugins specifically for Claude Code
 ├── antigravity/   # Plugins specifically for Antigravity
 ├── qwen/          # Plugins specifically for Qwen
+├── opencode/      # Plugins specifically for OpenCode
 ├── shared/        # Agent-agnostic crates that several plugins front
 ├── scripts/       # Repository checks run by CI and `just check`
 └── README.md      # Project overview

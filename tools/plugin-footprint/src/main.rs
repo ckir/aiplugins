@@ -10,11 +10,11 @@
 //!   plugin-footprint publish   (rewrites the README regions, spec §7)
 
 use plugin_footprint::canonical::canonical_json;
-use plugin_footprint::document::{build, Tree};
-use plugin_footprint::manifest::{looks_like_a_plugin, read_mcp_servers};
+use plugin_footprint::document::{build, setup_tier, Tree};
+use plugin_footprint::manifest::{looks_like_a_plugin, read_mcp_servers, read_opencode_servers};
 use plugin_footprint::probe::{probe, Limits, Outcome, Status};
 use plugin_footprint::publish::{comparison_region, per_plugin_region, splice};
-use plugin_footprint::sources::read_file_sources;
+use plugin_footprint::sources::{read_file_sources, read_plugin_source};
 use std::path::Path;
 use std::process::ExitCode;
 
@@ -64,12 +64,37 @@ fn measure(plugin_dir: &Path, out: Option<&Path>) -> ExitCode {
         }
     };
 
-    let servers = match read_mcp_servers(plugin_dir) {
+    // An OpenCode directory is probed through its `opencode.jsonc`, not a
+    // `.mcp.json` it does not have — and its `plugin.ts` is read as the Setup
+    // tier. The skills/agents/commands layout is identical, so
+    // `read_file_sources` serves both unchanged. Presence of `opencode.jsonc`
+    // selects the branch: no Claude Code plugin carries one.
+    let is_opencode = plugin_dir.join("opencode.jsonc").is_file();
+    let servers = match if is_opencode {
+        read_opencode_servers(plugin_dir)
+    } else {
+        read_mcp_servers(plugin_dir)
+    } {
         Ok(s) => s,
         Err(e) => {
             eprintln!("plugin-footprint: {e}");
             return ExitCode::from(1);
         }
+    };
+
+    // Claude Code plugins have no `plugin.ts` and no Setup tier. Absence is
+    // simply no tier (see `read_plugin_source`), so the Claude path never
+    // branches on it — and can never change because of it.
+    let plugin_source = if is_opencode {
+        match read_plugin_source(plugin_dir) {
+            Ok(source) => source,
+            Err(e) => {
+                eprintln!("plugin-footprint: {e}");
+                return ExitCode::from(1);
+            }
+        }
+    } else {
+        None
     };
 
     // Refused rather than merged. Merging several servers' tools into one tier
@@ -129,7 +154,7 @@ fn measure(plugin_dir: &Path, out: Option<&Path>) -> ExitCode {
     }
 
     let name = plugin_name(plugin_dir);
-    let document = build(
+    let mut document = build(
         &name,
         plugin_dir,
         Tree::Dev,
@@ -137,6 +162,17 @@ fn measure(plugin_dir: &Path, out: Option<&Path>) -> ExitCode {
         &merged,
         &files,
     );
+
+    // The opencode branch owns both differences from a Claude document: the
+    // agent the contract names, and the Setup tier. A failed probe carries no
+    // tiers at all, so there is nothing to attach the tier to — the same rule
+    // that drops the file-backed half then.
+    if is_opencode {
+        document.agent = "opencode";
+        if let (Some(tiers), Some(source)) = (document.tiers.as_mut(), plugin_source.as_ref()) {
+            tiers.setup = Some(setup_tier(source));
+        }
+    }
 
     let value = match serde_json::to_value(&document) {
         Ok(v) => v,
@@ -235,6 +271,9 @@ fn ratchet(measured_path: &Path, budgets_path: &Path) -> ExitCode {
 
     let plugin = document["plugin"].as_str().unwrap_or_default().to_string();
     let measured = document["tiers"]["resident"]["bytes"].as_u64().unwrap_or(0);
+    // `None` for every Claude Code document: they carry no Setup tier, and
+    // must come out of the ratchet with their entries byte-identical.
+    let measured_setup = document["tiers"]["setup"]["bytes"].as_u64();
 
     let mut budgets: serde_json::Value = std::fs::read_to_string(budgets_path)
         .ok()
@@ -273,6 +312,15 @@ fn ratchet(measured_path: &Path, budgets_path: &Path) -> ExitCode {
     let current = existing
         .and_then(|e| e.get("residentBytes"))
         .and_then(serde_json::Value::as_u64);
+    // The Setup ceiling follows the same ratchet as the Resident one — seeded
+    // from the first measurement, tightened past the same hysteresis —
+    // because it is the same mechanism on a second tier, not an audit of the
+    // TypeScript. A measurement without the tier preserves whatever ceiling
+    // exists rather than clearing it: dropping a cap on a re-measure is how
+    // thresholds silently disappear.
+    let existing_setup = existing
+        .and_then(|e| e.get("setupBytes"))
+        .and_then(serde_json::Value::as_u64);
 
     // Refused at the point of writing as well as at the point of reading, so a
     // violating combination cannot be committed and then discovered by a gate
@@ -300,14 +348,29 @@ fn ratchet(measured_path: &Path, budgets_path: &Path) -> ExitCode {
         Some(current) => current,
     };
 
-    map.insert(
-        plugin.clone(),
-        serde_json::json!({
-            "residentBytes": next,
-            "headroomBytes": headroom,
-            "deltaBytes": delta,
-        }),
-    );
+    let next_setup = match measured_setup {
+        Some(setup) => {
+            let target = setup + headroom;
+            match existing_setup {
+                None => Some(target),
+                Some(current) if target + headroom <= current => Some(target),
+                Some(current) => Some(current),
+            }
+        }
+        // No Setup tier measured: preserve, never clear — and never invent.
+        // A Claude Code document takes this branch with `existing_setup`
+        // `None`, so its entry keeps exactly the three keys it always had.
+        None => existing_setup,
+    };
+
+    let mut entry = serde_json::Map::with_capacity(4);
+    entry.insert("residentBytes".to_string(), serde_json::json!(next));
+    entry.insert("headroomBytes".to_string(), serde_json::json!(headroom));
+    entry.insert("deltaBytes".to_string(), serde_json::json!(delta));
+    if let Some(setup) = next_setup {
+        entry.insert("setupBytes".to_string(), serde_json::json!(setup));
+    }
+    map.insert(plugin.clone(), serde_json::Value::Object(entry));
 
     let text = canonical_json(&budgets);
     if let Err(e) = std::fs::write(budgets_path, format!("{text}\n")) {
@@ -335,9 +398,16 @@ fn publish() -> ExitCode {
             return ExitCode::from(1);
         }
     };
+    let opencode = match opencode_plugins() {
+        Ok(plugins) => plugins,
+        Err(e) => {
+            eprintln!("plugin-footprint: {e}");
+            return ExitCode::from(1);
+        }
+    };
 
     let mut documents = Vec::new();
-    for plugin in &plugins {
+    for plugin in plugins.iter().chain(opencode.iter()) {
         let path = format!("docs/footprints/{plugin}.json");
         let text = match std::fs::read_to_string(&path) {
             Ok(text) => text,
@@ -363,7 +433,15 @@ fn publish() -> ExitCode {
                 return ExitCode::from(1);
             }
         };
-        let path = format!("claude-code/{plugin}/README.md");
+        // An OpenCode document's region lives in its own README. The name
+        // decides the tree: Claude and OpenCode plugin names are distinct —
+        // a name in both would already collide in `docs/footprints/`.
+        let dir = if opencode.contains(plugin) {
+            "opencode"
+        } else {
+            "claude-code"
+        };
+        let path = format!("{dir}/{plugin}/README.md");
         if let Err(e) = rewrite_region(&path, &region) {
             eprintln!("plugin-footprint: {e}");
             return ExitCode::from(1);
@@ -384,7 +462,7 @@ fn publish() -> ExitCode {
 
     println!(
         "published the footprint region in {} README(s)",
-        plugins.len() + 1
+        plugins.len() + opencode.len() + 1
     );
     ExitCode::SUCCESS
 }
@@ -414,6 +492,28 @@ fn published_plugins() -> Result<Vec<String>, String> {
         .iter()
         .filter_map(|p| p["name"].as_str().map(str::to_string))
         .collect())
+}
+
+/// The OpenCode plugins: every directory under `opencode/` that looks like
+/// one. OpenCode has no marketplace manifest — installation is a file copy —
+/// so the directory listing is the iteration source, the same `opencode/*/`
+/// glob the regen loop and `just test-opencode` use. Sorted, so the root
+/// comparison table does not inherit readdir order.
+fn opencode_plugins() -> Result<Vec<String>, String> {
+    let entries = std::fs::read_dir("opencode")
+        .map_err(|e| format!("reading the opencode directory: {e}"))?;
+    let mut out = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("reading the opencode directory: {e}"))?;
+        let path = entry.path();
+        if path.is_dir() && looks_like_a_plugin(&path) {
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                out.push(name.to_string());
+            }
+        }
+    }
+    out.sort();
+    Ok(out)
 }
 
 /// Name a JSON value's shape, for an error message about the wrong one.

@@ -3,6 +3,7 @@
 //! Usage: `footprint-gate <base-ref>` — for example `footprint-gate origin/main`.
 
 use plugin_footprint::gate::{at_ref, budget_for, check, AtRef, Budget, BudgetLookup, Verdict};
+use plugin_footprint::manifest::looks_like_a_plugin;
 use std::process::{Command, ExitCode};
 
 /// A plugin with no baseline is measured but not compared, so it needs a budget
@@ -12,6 +13,7 @@ const UNCAPPED: Budget = Budget {
     resident_bytes: u64::MAX,
     headroom_bytes: 0,
     delta_bytes: u64::MAX,
+    setup_bytes: None,
 };
 
 /// Where the thresholds live. Read from the BASE REF, never from the working
@@ -60,6 +62,20 @@ fn main() -> ExitCode {
         }
     };
 
+    // The OpenCode plugins alongside the marketplace ones: a change that ADDS
+    // an opencode plugin must have it measured too, for the same reason the
+    // marketplace list is read from the working tree. A plugin added by this
+    // change has no document and no budget at the base ref, which is not a
+    // failure — it is measured without a ceiling and without a comparison.
+    let opencode = match opencode_plugins() {
+        Ok(plugins) => plugins,
+        Err(e) => {
+            eprintln!("footprint-gate: {e}");
+            return ExitCode::from(1);
+        }
+    };
+    let all: Vec<&String> = plugins.iter().chain(opencode.iter()).collect();
+
     // Budgets from the base ref. Absent on the very first run, which is not a
     // failure — every plugin is then new and only the probe layer applies.
     // Unreadable is a different matter entirely, and used to be indistinguishable.
@@ -77,7 +93,7 @@ fn main() -> ExitCode {
     };
 
     let mut failed = false;
-    for plugin in &plugins {
+    for plugin in &all {
         let budget = match budget_for(&budgets, plugin) {
             BudgetLookup::Found(budget) => budget,
             // Legitimate and common: every plugin looks like this on the run
@@ -179,6 +195,27 @@ fn published_plugins() -> Result<Vec<String>, String> {
         .iter()
         .filter_map(|p| p["name"].as_str().map(str::to_string))
         .collect())
+}
+
+/// The OpenCode plugins: every directory under `opencode/` that looks like
+/// one. OpenCode has no marketplace manifest, so the directory listing is the
+/// iteration source here exactly as in `publish` — and read from the working
+/// tree on purpose, so a change that adds a plugin has it measured.
+fn opencode_plugins() -> Result<Vec<String>, String> {
+    let entries = std::fs::read_dir("opencode")
+        .map_err(|e| format!("reading the opencode directory: {e}"))?;
+    let mut out = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("reading the opencode directory: {e}"))?;
+        let path = entry.path();
+        if path.is_dir() && looks_like_a_plugin(&path) {
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                out.push(name.to_string());
+            }
+        }
+    }
+    out.sort();
+    Ok(out)
 }
 
 /// Whether `base_ref` names a commit that actually exists here.

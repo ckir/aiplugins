@@ -63,17 +63,4 @@ When Antigravity starts its execution loop, the `PreInvocation` hook fires and o
 ```
 
 **Configuration:**
-In `~/.antigravity/config/hooks.json` (or workspace equivalent):
-```json
-{
-  "rtk-agy-hook": {
-    "PreInvocation": [
-      {
-        "type": "command",
-        "command": "rtk-hook-preinvocation"
-      }
-    ]
-  }
-}
-```
-And the MCP server is configured in Antigravity's MCP configuration folder to run the `rtk-mcp` binary.
+The tool is packaged as an Antigravity Plugin. Installing the plugin (e.g. via `agy plugin install https://github.com/ckir/aiplugins/tree/main/antigravity/rtk-mcp-agy`) automatically discovers and loads the hooks (`hooks.json`) and MCP server configuration (`mcp_config.json`) contained within the plugin bundle.

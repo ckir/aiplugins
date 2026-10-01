@@ -51,6 +51,14 @@ pub enum ManifestError {
     #[error("server '{server}' in {path} declares no command")]
     MissingCommand { server: String, path: PathBuf },
     #[error(
+        "server '{server}' in {path} uses type '{kind}': only local MCP servers are measurable"
+    )]
+    UnsupportedServerType {
+        server: String,
+        path: PathBuf,
+        kind: String,
+    },
+    #[error(
         "server '{server}' declares a command outside its plugin directory: {command} resolves \
          outside {plugin_dir}. The prober launches this command, so it is confined to the plugin \
          it belongs to."
@@ -87,6 +95,7 @@ struct RawServer {
 /// status exists to prevent, arriving one level up.
 pub fn looks_like_a_plugin(dir: &Path) -> bool {
     dir.join(".claude-plugin").join("plugin.json").is_file()
+        || (dir.join("plugin.ts").is_file() && dir.join("opencode.jsonc").is_file())
 }
 
 /// Read `<plugin_dir>/.mcp.json` and resolve every server it declares.
@@ -120,6 +129,81 @@ pub fn read_mcp_servers(plugin_dir: &Path) -> Result<Vec<ServerSpec>, ManifestEr
         .into_iter()
         .map(|(name, raw)| resolve(&name, raw, plugin_dir, &path))
         .collect()
+}
+
+#[derive(Deserialize)]
+struct OpencodeManifest {
+    #[serde(default)]
+    mcp: OpencodeMcp,
+}
+
+#[derive(Deserialize, Default)]
+struct OpencodeMcp {
+    #[serde(default)]
+    servers: BTreeMap<String, OpencodeServer>,
+}
+
+#[derive(Deserialize)]
+struct OpencodeServer {
+    #[serde(rename = "type")]
+    kind: String,
+    #[serde(default)]
+    command: Vec<String>,
+    #[serde(default)]
+    disabled: bool,
+}
+
+/// Read `<plugin_dir>/opencode.jsonc` and resolve every enabled local server.
+///
+/// A missing file declares no servers (same rule as `.mcp.json`). `disabled`
+/// servers are skipped — they contribute no footprint. Anything that is not
+/// `local` is refused: reporting "no servers" for a remote entry would
+/// understate the footprint exactly the way an unreadable manifest would.
+pub fn read_opencode_servers(plugin_dir: &Path) -> Result<Vec<ServerSpec>, ManifestError> {
+    let path = plugin_dir.join("opencode.jsonc");
+    let text = match std::fs::read_to_string(&path) {
+        Ok(t) => t,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(source) => return Err(ManifestError::Read { path, source }),
+    };
+    let manifest: OpencodeManifest =
+        serde_json::from_str(&text).map_err(|source| ManifestError::Parse {
+            path: path.clone(),
+            source,
+        })?;
+
+    let mut out = Vec::new();
+    for (name, raw) in manifest.mcp.servers {
+        if raw.disabled {
+            continue;
+        }
+        if raw.kind != "local" {
+            return Err(ManifestError::UnsupportedServerType {
+                server: name,
+                path: path.clone(),
+                kind: raw.kind,
+            });
+        }
+        let (head, tail) =
+            raw.command
+                .split_first()
+                .ok_or_else(|| ManifestError::MissingCommand {
+                    server: name.clone(),
+                    path: path.clone(),
+                })?;
+        out.push(resolve(
+            &name,
+            RawServer {
+                command: Some(head.to_string()),
+                args: tail.to_vec(),
+                env: BTreeMap::new(),
+            },
+            plugin_dir,
+            &path,
+        )?);
+    }
+    out.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(out)
 }
 
 fn resolve(
@@ -392,5 +476,52 @@ mod tests {
             "an unsubstituted placeholder would be launched literally: {:?}",
             spec.command
         );
+    }
+
+    #[test]
+    fn opencode_servers_come_from_mcp_dot_servers_with_array_commands() {
+        // opencode.jsonc fixture lives in tests/fixtures/opencode-basic/ (Step 2).
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("fixtures")
+            .join("opencode-basic");
+        let specs = read_opencode_servers(&dir).expect("parses");
+        assert_eq!(specs.len(), 1);
+        assert_eq!(specs[0].name, "rtk");
+        assert!(specs[0]
+            .command
+            .ends_with(Path::new("bin").join("rtk-cc-mcp")));
+        assert_eq!(specs[0].args, Vec::<String>::new());
+    }
+
+    #[test]
+    fn disabled_opencode_servers_contribute_nothing() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("fixtures")
+            .join("opencode-disabled");
+        let specs = read_opencode_servers(&dir).expect("parses");
+        assert!(specs.is_empty());
+    }
+
+    #[test]
+    fn remote_opencode_servers_are_refused_not_silently_dropped() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("fixtures")
+            .join("opencode-remote");
+        let err = read_opencode_servers(&dir).expect_err("remote must be loud");
+        assert!(matches!(err, ManifestError::UnsupportedServerType { .. }));
+    }
+
+    #[test]
+    fn an_opencode_dir_counts_as_a_plugin() {
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .ancestors()
+            .nth(2)
+            .expect("crate sits two levels below the repo root");
+        assert!(looks_like_a_plugin(
+            &repo.join("opencode").join("rtk-mcp-opencode")
+        ));
     }
 }

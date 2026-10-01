@@ -60,6 +60,24 @@ fn measured(plugin: &str, status: &str, bytes: u64) -> String {
     .to_string()
 }
 
+fn measured_with_setup(plugin: &str, bytes: u64, setup: u64) -> String {
+    serde_json::json!({
+        "schemaVersion": 1,
+        "plugin": plugin,
+        "agent": "opencode",
+        "probe": { "status": "ok", "toolCount": 4, "binary": "bin/x", "promptCount": 0 },
+        "tiers": {
+            "resident": { "bytes": bytes, "sources": [] },
+            "invocation": { "bytes": 0, "sources": [] },
+            "setup": {
+                "bytes": setup,
+                "sources": [{ "kind": "plugin_source", "id": plugin, "bytes": setup }]
+            }
+        }
+    })
+    .to_string()
+}
+
 fn ratchet(doc: &Path, budgets: &Path) -> std::process::Output {
     Command::new(BIN)
         .args([
@@ -214,4 +232,87 @@ fn a_plugin_with_no_mcp_server_may_still_seed_a_threshold() {
         fx.read("budgets.json")["skillsonly"]["residentBytes"],
         6_000
     );
+}
+
+#[test]
+fn a_setup_tier_seeds_a_setup_ceiling_from_the_first_measurement() {
+    // The ratchet, not an audit: a new OpenCode plugin's `setupBytes` starts
+    // where its `plugin.ts` already is, plus headroom — the same rule as the
+    // Resident tier.
+    let fx = Fixture::new("setupseed");
+    let doc = fx.write("m.json", &measured_with_setup("x-opencode", 10_000, 5_000));
+
+    let out = ratchet(&doc, &fx.path("budgets.json"));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let budgets = fx.read("budgets.json");
+    assert_eq!(budgets["x-opencode"]["setupBytes"], 7_000);
+    assert_eq!(budgets["x-opencode"]["residentBytes"], 12_000);
+    assert_eq!(budgets["x-opencode"]["headroomBytes"], 2_000);
+    assert_eq!(budgets["x-opencode"]["deltaBytes"], 500);
+}
+
+#[test]
+fn a_document_without_a_setup_tier_writes_no_setup_key() {
+    // The byte-identical promise at the budgets layer: re-ratcheting a Claude
+    // Code document must not add a `setupBytes` key its entry never had.
+    let fx = Fixture::new("nosetupkey");
+    let doc = fx.write("m.json", &measured("x", "ok", 10_000));
+    let budgets = fx.write(
+        "budgets.json",
+        r#"{"x":{"residentBytes":12000,"headroomBytes":2000,"deltaBytes":500}}"#,
+    );
+
+    assert!(ratchet(&doc, &budgets).status.success());
+
+    let after = fx.read("budgets.json");
+    assert!(
+        after["x"].get("setupBytes").is_none(),
+        "no Setup tier measured, so no ceiling may be invented: {after}"
+    );
+    assert_eq!(after["x"]["residentBytes"], 12_000);
+}
+
+#[test]
+fn the_setup_ceiling_tightens_only_past_the_same_hysteresis() {
+    // headroom 2000: the ceiling follows only a measurement a further 2000
+    // below it. 10000 - 2*2000 = 6000 moves it, to 8000; 9000 does not.
+    let fx = Fixture::new("setuphyst");
+    let budgets = fx.write(
+        "budgets.json",
+        r#"{"x":{"residentBytes":12000,"headroomBytes":2000,"deltaBytes":500,"setupBytes":10000}}"#,
+    );
+
+    let far = fx.write("m.json", &measured_with_setup("x", 10_000, 6_000));
+    assert!(ratchet(&far, &budgets).status.success());
+    assert_eq!(fx.read("budgets.json")["x"]["setupBytes"], 8_000);
+
+    let near = fx.write("m.json", &measured_with_setup("x", 10_000, 7_000));
+    assert!(ratchet(&near, &budgets).status.success());
+    assert_eq!(
+        fx.read("budgets.json")["x"]["setupBytes"],
+        8_000,
+        "a measurement within headroom must not move the ceiling"
+    );
+}
+
+#[test]
+fn an_existing_setup_ceiling_survives_a_measurement_without_one() {
+    // Dropping a cap on a re-measure is how thresholds silently disappear.
+    // (Unreachable in practice — entries are keyed by plugin name and Claude
+    // documents never share one with an OpenCode plugin — but the ratchet
+    // must preserve policy it did not measure regardless.)
+    let fx = Fixture::new("setuppreserve");
+    let doc = fx.write("m.json", &measured("x", "ok", 10_000));
+    let budgets = fx.write(
+        "budgets.json",
+        r#"{"x":{"residentBytes":12000,"headroomBytes":2000,"deltaBytes":500,"setupBytes":7000}}"#,
+    );
+
+    assert!(ratchet(&doc, &budgets).status.success());
+    assert_eq!(fx.read("budgets.json")["x"]["setupBytes"], 7_000);
 }
