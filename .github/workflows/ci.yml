@@ -232,6 +232,49 @@ jobs:
             bash scripts/smoke-bundle.sh "$plugin"
           done
 
+  # Proves both opencode/ plugins' setup() paths end-to-end (real spawnSync
+  # path, compiled mock-rtk-cc fixture on PATH) on a real machine of each OS.
+  # The fixture name keeps its hyphens (CARGO_BIN_EXE_mock-rtk-cc), which POSIX
+  # shells can neither `export` nor expand — hence `env "..."`.
+  opencode-smoke:
+    name: OpenCode Smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      # A fresh checkout has no node_modules, and bun cannot resolve
+      # @opencode/plugin without it — same install the opencode-test job runs.
+      - name: Install opencode plugin dependencies
+        shell: bash
+        run: |
+          for dir in opencode/*/; do
+            (cd "$dir" && bun install)
+          done
+
+      - name: Build the mock rtk fixture
+        run: cargo build -p rtk-mcp-cc --bin mock-rtk-cc
+
+      - name: Smoke each opencode plugin setup
+        shell: bash
+        run: |
+          exe=""
+          [ "$RUNNER_OS" = "Windows" ] && exe=".exe"
+          env "CARGO_BIN_EXE_mock-rtk-cc=$(pwd)/target/debug/mock-rtk-cc$exe" \
+            bash scripts/smoke-opencode.sh
+
   deny:
     name: Dependency Audit
     runs-on: ubuntu-latest
