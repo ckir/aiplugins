@@ -28,3 +28,18 @@ opencode/**/*.ts text eol=lf
 opencode/**/*.json text eol=lf
 opencode/**/*.jsonc text eol=lf
 opencode/**/*.md text eol=lf
+
+# The canonical Ghidra skill is baked into binaries at compile time
+# (`include_str!` in shared/ghidra-mcp/src/skill_asset.rs), so its working-copy
+# bytes ARE the emitted bytes. Without this pin a Windows checkout feeds CRLF
+# to the compiler while the LF-pinned plugin copies expect LF output, and the
+# emit byte-identity tests fail on a correct tree. Same class as the `*.sh`
+# pin above: build inputs must not depend on the checkout platform.
+shared/ghidra-mcp/skill/SKILL.md text eol=lf
+
+# The three emit outputs must match `emit-skill` stdout byte for byte, so they
+# carry the same pin as their source: without it a Windows checkout holds CRLF
+# copies while the (now LF) emitter prints LF, failing the byte-identity tests
+# on a correct tree. (The opencode copy is already covered by opencode/**/*.md.)
+claude-code/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md text eol=lf
+qwen/re-ghidra-mcp-qwen/skills/ghidra-re-driver/SKILL.md text eol=lf
