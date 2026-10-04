@@ -98,4 +98,23 @@ and is usually a thin front end.
 
 Fronted today by [`claude-code/re-ghidra-mcp-cc`](claude-code/re-ghidra-mcp-cc/).
 
+## Documentation index
+
+Plugin and example READMEs, by agent directory:
+
+- `claude-code/`
+  - [`re-ghidra-mcp-cc`](claude-code/re-ghidra-mcp-cc/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
+  - [`rtk-mcp-cc`](claude-code/rtk-mcp-cc/) — `rtk` shell-command rewriting for 60–90% fewer output tokens, plus analytics MCP tools.
+  - [`example`](claude-code/example/) — template Rust Claude Code plugin (TODO/FIXME/HACK tracker).
+- `antigravity/`
+  - [`re-ghidra-mcp-agy`](antigravity/re-ghidra-mcp-agy/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
+  - [`rtk-mcp-agy`](antigravity/rtk-mcp-agy/) — `rtk` shell-command rewriting via MCP proxy plus `PreInvocation` hook.
+- `qwen/`
+  - [`re-ghidra-mcp-qwen`](qwen/re-ghidra-mcp-qwen/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
+  - [`rtk-mcp-qwen`](qwen/rtk-mcp-qwen/) — `rtk` `PreToolUse` hook rewriting `run_shell_command` calls.
+  - [`example`](qwen/example/) — example Rust-based MCP server extension.
+- `opencode/`
+  - [`re-ghidra-mcp-opencode`](opencode/re-ghidra-mcp-opencode/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools, plus session hooks.
+  - [`rtk-mcp-opencode`](opencode/rtk-mcp-opencode/) — `rtk` shell-command rewriting for OpenCode, plus analytics MCP tools.
+
 *More details and plugin guidelines will be added soon.*
