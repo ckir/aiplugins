@@ -3,6 +3,7 @@
   "version": "0.7.0",
   "displayName": "RTK MCP Qwen — RTK Command Rewriter",
   "description": "PreToolUse hook that rewrites run_shell_command invocations via the rtk CLI before execution.",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "contextFileName": "QWEN.md",
   "hooks": {
     "PreToolUse": [
