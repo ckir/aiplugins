@@ -149,7 +149,7 @@ except `bin/`:
 
 ## Step 5 — merge the config snippet
 
-Fetch the reference snippet and merge its two sections into the user's
+Fetch the reference snippet and merge its three sections into the user's
 config (`$DEST/opencode.json` or `$DEST/opencode.jsonc` — whichever
 exists; create `opencode.jsonc` if neither does):
 
@@ -177,5 +177,35 @@ The reference (V2-native shapes — `mcp.servers`, ordered `permissions`):
 }
 ```
 
-Merge rules: add the `rtk` entry under the existing `mcp.servers
-...[truncated 1587 chars]
+Merge rules: add the `rtk` entry under the existing `mcp.servers`
+(creating `mcp.servers` if absent), keeping its `environment` as shipped.
+Add the `shell` permission entry if no equivalent is already allowed —
+do not duplicate it. Leave an existing `skills` list alone; add
+`"skills": []` only if the key is absent. Do not paste the whole snippet
+over the user's config. On Windows the command must name the `.exe`:
+`["./bin/rtk-cc-mcp.exe"]` — adjust that one field when merging. These
+shapes assume a V2-native config; if the user's file uses V1 keys
+(`mcpServers`, top-level `"plugin"`), say so and merge into the
+equivalent V1 locations instead of mixing shapes.
+
+## Step 6 — verify the install
+
+All four, in order:
+
+1. Every destination file exists and is non-empty (the three from Step 2
+   plus the binary from Step 4; the settings template only if the user
+   asked for it).
+2. The merged config parses: `jq -e . $DEST/opencode.jsonc` (or
+   `.../opencode.json`) exits 0, and the `rtk` server entry is present
+   under `mcp.servers`.
+3. The plugin module loads: from the directory where you ran `bun add`
+   in Step 3 (so `node_modules` resolves),
+   `bun -e "await import('$DEST/plugins/rtk-mcp-opencode.ts')"` exits 0
+   with no output. Importing only defines the hook — nothing executes
+   until the host loads it.
+4. Restart OpenCode (config and plugins load at startup), then confirm
+   the `rtk` server is connected (`/mcp`) and its four tools
+   (`rtk_gain`, `rtk_discover`, `rtk_check`, `rtk_proxy`) are listed.
+   Run one ordinary shell command: a rewrite proves the hook path, a
+   pass-through with working `rtk` on `PATH` means fail-open is doing
+   its job — either way nothing should error.
