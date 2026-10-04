@@ -28,8 +28,23 @@ fn main() {
 
     // Global flags may precede the subcommand; ignore them when dispatching,
     // but echo them back so tests can assert they were forwarded.
-    let positional: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
-    let flags: Vec<&String> = args.iter().filter(|a| a.starts_with("--")).collect();
+    let mut positional = Vec::new();
+    let mut flags = Vec::new();
+    let mut past_dash_dash = false;
+    for arg in &args {
+        if past_dash_dash {
+            positional.push(arg);
+        } else if arg == "--" {
+            past_dash_dash = true;
+        } else if arg.starts_with("--") {
+            flags.push(arg);
+        } else if arg.starts_with('-') {
+            eprintln!("mock-rtk-cc: unexpected flag {} before --", arg);
+            std::process::exit(2);
+        } else {
+            positional.push(arg);
+        }
+    }
 
     match positional.first().map(|s| s.as_str()) {
         Some("hook") => match positional.get(1).map(|s| s.as_str()) {

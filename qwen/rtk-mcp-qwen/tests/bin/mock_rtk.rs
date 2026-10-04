@@ -12,6 +12,10 @@ fn main() {
                 print!("ls -la");
                 exit(0);
             }
+            "-r" => {
+                print!("rtk -r");
+                exit(0);
+            }
             "fail" => {
                 eprintln!("mock simulated rtk error");
                 exit(1);
