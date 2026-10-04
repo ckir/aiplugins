@@ -398,3 +398,54 @@ fn a_failed_probe_still_omits_every_tier_even_with_file_sources_present() {
         value["tiers"]
     );
 }
+
+#[test]
+fn a_document_without_a_plugin_source_carries_no_setup_key_at_all() {
+    // The byte-identical promise, pinned at the type level: `setup: None`
+    // must serialise to an ABSENT key, not a null or a zeroed tier. A null
+    // would still change the canonical bytes of every committed Claude
+    // document on the next regeneration.
+    let value = serde_json::to_value(build(
+        "x",
+        Path::new("plug"),
+        Tree::Dev,
+        None,
+        &ok_outcome(),
+        &some_files(),
+    ))
+    .expect("serialises");
+    let text = plugin_footprint::canonical::canonical_json(&value);
+
+    assert!(
+        value["tiers"].get("setup").is_none(),
+        "no Setup tier was measured, so none may be reported: {}",
+        value["tiers"]
+    );
+    assert!(
+        !text.contains("setup"),
+        "the canonical bytes must not mention the tier at all: {text}"
+    );
+}
+
+#[test]
+fn the_setup_tier_is_the_sum_of_its_one_source() {
+    use plugin_footprint::document::setup_tier;
+
+    let tier = setup_tier(&FileSource {
+        kind: "plugin_source",
+        id: "x-opencode".to_string(),
+        bytes: 5_432,
+    });
+    let value = serde_json::to_value(&tier).expect("serialises");
+
+    assert_eq!(value["bytes"], 5_432);
+    assert_eq!(value["sources"].as_array().expect("itemised").len(), 1);
+    assert_eq!(value["sources"][0]["kind"], "plugin_source");
+    assert_eq!(value["sources"][0]["id"], "x-opencode");
+    assert_eq!(value["sources"][0]["bytes"], 5_432);
+    assert!(
+        value.get("tokens").is_none() || value["tokens"].is_null(),
+        "no oracle has run: {}",
+        value
+    );
+}

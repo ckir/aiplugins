@@ -5,11 +5,15 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     // We expect `mock-rtk rewrite <command>`
-    if args.len() >= 3 && args[1] == "rewrite" {
-        let command = &args[2];
+    if args.len() >= 4 && args[1] == "rewrite" && args[2] == "--" {
+        let command = &args[3];
         match command.as_str() {
             "ls" => {
                 print!("ls -la");
+                exit(0);
+            }
+            "-r" => {
+                print!("rtk -r");
                 exit(0);
             }
             "fail" => {

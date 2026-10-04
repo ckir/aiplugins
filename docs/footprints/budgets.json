@@ -1,1 +1,1 @@
-{"re-ghidra-mcp-cc":{"deltaBytes":500,"headroomBytes":2000,"residentBytes":23670},"rtk-mcp-cc":{"deltaBytes":500,"headroomBytes":2000,"residentBytes":5696}}
+{"re-ghidra-mcp-cc":{"deltaBytes":500,"headroomBytes":2000,"residentBytes":23670},"re-ghidra-mcp-opencode":{"deltaBytes":500,"headroomBytes":2000,"residentBytes":23631,"setupBytes":3774},"rtk-mcp-cc":{"deltaBytes":500,"headroomBytes":2000,"residentBytes":5696},"rtk-mcp-opencode":{"deltaBytes":500,"headroomBytes":2000,"residentBytes":5690,"setupBytes":7784}}

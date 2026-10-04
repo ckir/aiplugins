@@ -16,5 +16,11 @@
     "why": "Builds the live-test fixture program (shared/ghidra-mcp/tests/fixtures/fixture.c) with debug info, so Ghidra's datatype manager sees the named Rect/Color types the read tests assert on.",
     "install": "winget install LLVM.LLVM",
     "in_path": "clang"
+  },
+  {
+    "name": "mlc",
+    "why": "The pre-push hook (lefthook.yml) and `just links` run `mlc --offline --gitignore` to catch broken local markdown links. Without it every push fails at the hook.",
+    "install": "cargo install mlc — or `just setup`, which binstalls it with the other dev tools.",
+    "in_path": "mlc"
   }
 ]

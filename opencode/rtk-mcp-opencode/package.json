@@ -1,0 +1,10 @@
+{
+  "name": "rtk-mcp-opencode",
+  "version": "0.7.0",
+  "private": true,
+  "description": "OpenCode V2 integration for rtk (Rust Token Killer): rewrites shell commands through rtk for 60-90% token savings, plus rtk analytics as MCP tools.",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "dependencies": {
+    "@opencode/plugin": "2.0.21"
+  }
+}

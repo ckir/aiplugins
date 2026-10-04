@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "ghidra": {
+        "type": "local",
+        "command": ["./bin/re-ghidra-cc-mcp", "serve"],
+        "disabled": false,
+        "timeout": { "catalog": 30000, "execution": 30000 }
+      }
+    }
+  },
+  "permissions": [],
+  "skills": []
+}

@@ -125,6 +125,18 @@ fn test_e2e_rtk_successful_rewrite() {
 }
 
 #[test]
+fn test_e2e_rtk_preserves_command_flags() {
+    let input = r#"{"tool_name": "run_shell_command", "tool_input": {"command": "-r"}}"#;
+    let (stdout, _stderr, status) = run_bridge(input, true); // Use mock
+    assert!(status.success());
+    let json = assert_json_decision(&stdout, "allow", "RTK rewrite applied");
+    assert_eq!(
+        json["hook_specific_output"]["updated_input"]["command"],
+        "rtk -r"
+    );
+}
+
+#[test]
 fn test_e2e_rtk_failure_exit_code() {
     let input = r#"{"tool_name": "run_shell_command", "tool_input": {"command": "fail"}}"#;
     let (stdout, stderr, status) = run_bridge(input, true);

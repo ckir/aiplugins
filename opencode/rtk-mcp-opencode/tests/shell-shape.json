@@ -1,0 +1,8 @@
+{
+  "_note": "Recorded by the Task 1 spike against opencode v2.0.20 + @opencode/plugin 2.0.21. The hook handler in ../plugin.ts MUST read the tool id and command field named here.",
+  "_mutation_works": true,
+  "_opencode_version": "opencode v2.0.20",
+  "_plugin_pkg_version": "2.0.21",
+  "tool": "shell",
+  "input": { "command": "echo probe-ok" }
+}

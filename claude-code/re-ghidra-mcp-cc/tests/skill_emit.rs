@@ -20,6 +20,13 @@ fn plugin_copy() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("skills/ghidra-re-driver/SKILL.md")
 }
 
+/// The committed OpenCode plugin copy - the third artifact `emit-skill` regenerates.
+/// It lives outside any Cargo package, so it is pinned here, next to the binary
+/// that generates it (`just emit-ghidra-skill` writes it from this same binary).
+fn opencode_copy() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../opencode/re-ghidra-mcp-opencode/skills/ghidra-re-driver/SKILL.md")
+}
 /// Run `emit-skill` on the real binary and return its stdout.
 ///
 /// `env!("CARGO_BIN_EXE_re-ghidra-cc-mcp")` is the built binary's path, resolved by cargo at compile
@@ -55,6 +62,34 @@ fn emit_reproduces_the_committed_plugin_copy_byte_for_byte() {
             .unwrap_or_else(|| "no differing line; lengths differ".to_string());
         panic!(
             "`emit-skill` no longer reproduces skills/ghidra-re-driver/SKILL.md.\n\
+             emitted {} bytes / {} lines, committed copy {} bytes / {} lines\n{}\n\
+             Regenerate with: just emit-ghidra-skill",
+            stdout.len(),
+            got.lines().count(),
+            expected.len(),
+            want.lines().count(),
+            first_diff
+        );
+    }
+}
+
+#[test]
+fn emit_reproduces_the_opencode_plugin_copy_byte_for_byte() {
+    let stdout = emit();
+    let expected = std::fs::read(opencode_copy()).expect("read the committed OpenCode plugin copy");
+
+    // Compare as text so a failure is readable, but assert on the exact bytes.
+    if stdout != expected {
+        let got = String::from_utf8_lossy(&stdout);
+        let want = String::from_utf8_lossy(&expected);
+        let first_diff = got
+            .lines()
+            .zip(want.lines())
+            .position(|(a, b)| a != b)
+            .map(|i| format!("first differing line: {}", i + 1))
+            .unwrap_or_else(|| "no differing line; lengths differ".to_string());
+        panic!(
+            "`emit-skill` no longer reproduces opencode/re-ghidra-mcp-opencode/skills/ghidra-re-driver/SKILL.md.\n\
              emitted {} bytes / {} lines, committed copy {} bytes / {} lines\n{}\n\
              Regenerate with: just emit-ghidra-skill",
             stdout.len(),
