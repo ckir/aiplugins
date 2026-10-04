@@ -13,7 +13,7 @@
 
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    model::{Implementation, ServerCapabilities, ServerInfo},
+    model::{Implementation, ServerCapabilities, ServerConfig},
     tool, tool_handler, tool_router,
     transport::stdio,
     ErrorData, ServerHandler, ServiceExt,
@@ -246,8 +246,8 @@ impl RtkServer {
 
 #[tool_handler]
 impl ServerHandler for RtkServer {
-    fn get_info(&self) -> ServerInfo {
-        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+    fn get_info(&self) -> ServerConfig {
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             // Without this the server introduces itself as "rmcp" and is
             // indistinguishable from every other rmcp server in `/mcp`.
             //

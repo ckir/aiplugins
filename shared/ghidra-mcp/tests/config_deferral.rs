@@ -138,8 +138,8 @@ async fn the_config_error_is_identical_on_every_call() {
 struct DummyClientHandler {}
 
 impl rmcp::ClientHandler for DummyClientHandler {
-    fn get_info(&self) -> rmcp::model::ClientInfo {
-        rmcp::model::ClientInfo::default()
+    fn get_info(&self) -> rmcp::model::ClientConfig {
+        rmcp::model::ClientConfig::default()
     }
 }
 
