@@ -58,6 +58,7 @@ fn main() {
 fn rtk_rewrite(command: &str) -> Option<String> {
     let output = Command::new(resolve_rtk_bin(env::var("RTK_BIN").ok()))
         .arg("rewrite")
+        .arg("--")
         .arg(command)
         .output()
         .ok()?;

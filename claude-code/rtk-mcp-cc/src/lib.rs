@@ -301,6 +301,7 @@ pub fn check_args(command: &str, config: &Config) -> Result<Vec<String>, String>
     // Passed as a single argument. `rtk hook check` accepts both a quoted
     // command and a bare argv tail and treats them identically, so the single
     // argument avoids any question of who re-splits the string.
+    args.push("--".to_string());
     args.push(command.trim().to_string());
     Ok(args)
 }
@@ -322,6 +323,7 @@ pub fn proxy_args(argv: &[String], config: &Config) -> Result<Vec<String>, Strin
     }
     let mut args = vec!["proxy".to_string()];
     args.extend(config.global_flags());
+    args.push("--".to_string());
     args.extend(cleaned);
     Ok(args)
 }
@@ -570,7 +572,7 @@ mod tests {
     #[test]
     fn check_args_pass_the_command_as_one_argument() {
         let args = check_args("grep -rn foo src/", &Config::default()).unwrap();
-        assert_eq!(args, vec!["hook", "check", "grep -rn foo src/"]);
+        assert_eq!(args, vec!["hook", "check", "--", "grep -rn foo src/"]);
     }
 
     #[test]
@@ -591,6 +593,7 @@ mod tests {
             args,
             vec![
                 "proxy",
+                "--",
                 "git",
                 "commit",
                 "-m",

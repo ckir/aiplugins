@@ -53,7 +53,12 @@ fn main() {
 
 fn rtk_rewrite(command: &str) -> Option<String> {
     let rtk_bin = resolve_rtk_bin(env::var("RTK_BIN").ok());
-    let output = match Command::new(&rtk_bin).arg("rewrite").arg(command).output() {
+    let output = match Command::new(&rtk_bin)
+        .arg("rewrite")
+        .arg("--")
+        .arg(command)
+        .output()
+    {
         Ok(o) => o,
         Err(e) => {
             error!("Failed to spawn rtk (bin={}): {}", rtk_bin, e);
