@@ -1,110 +1,187 @@
-## [0.6.4] - 2026-09-01
+## [0.7.0] - 2026-10-04
 
-### ✨ Features
+### 🚀 Features
 
-- *(qwen)* Add extension bundle workflow and marketplace manifest (#31)
-  - `scripts/bundle-qwen-extension.sh` assembles a zip with `qwen-extension.json`, cross-platform binaries, and `/bin/sh` dispatchers
-  - `.qwen-plugin/marketplace.json` Qwen marketplace manifest for `rtk-mcp-qwen` and `re-ghidra-mcp-qwen` with `-extension.zip` release URLs
-  - `.github/workflows/qwen-extension-bundles.yml` CI workflow that runs after Release, assembles extension bundles, uploads them to the release, and verifies on all 3 OSes
-  - `scripts/check-qwen-marketplace.sh` consistency checker for the Qwen manifest
-  - `just bundle-qwen` and `just qwen-marketplace` tasks
+- *(ghidra-mcp)* Serve without a resolved Ghidra configuration
+- *(plugin-footprint)* Scaffold the crate with canonical bytes and manifest reading
+- *(plugin-footprint)* Probe a live MCP server for what it advertises
+- *(plugin-footprint)* Emit the footprint document and a CLI to produce it
+- *(plugin-footprint)* Split frontmatter from body
+- *(plugin-footprint)* Read skill and agent sources from disk
+- *(plugin-footprint)* Count skill and agent frontmatter as resident
+- *(plugin-footprint)* Commit footprint documents and ratcheted budgets
+- *(plugin-footprint)* The gate's five layers
+- *(plugin-footprint)* The gate binary, baselined on the merge base
+- *(plugin-footprint)* Publish the byte figures, honestly labelled
+- *(ghidra-mcp)* Serve without a resolved Ghidra configuration
+- *(plugin-footprint)* Scaffold the crate with canonical bytes and manifest reading
+- *(plugin-footprint)* Probe a live MCP server for what it advertises
+- *(plugin-footprint)* Emit the footprint document and a CLI to produce it
+- *(plugin-footprint)* Split frontmatter from body
+- *(plugin-footprint)* Read skill and agent sources from disk
+- *(plugin-footprint)* Count skill and agent frontmatter as resident
+- *(plugin-footprint)* Commit footprint documents and ratcheted budgets
+- *(plugin-footprint)* The gate's five layers
+- *(plugin-footprint)* The gate binary, baselined on the merge base
+- *(opencode)* Rtk-mcp-opencode hook with fail-open delegate and settings
+- *(opencode)* Re-ghidra-mcp-opencode port with session hooks and agent
+- *(footprint)* Read opencode.jsonc MCP servers for measurement
+- *(footprint)* Measure opencode plugins with setup tier and budgets
 
-## [0.6.3] - 2026-09-01
+### 🐛 Bug Fixes
 
-Documentation only — no code changed. Like 0.6.2, cut as a release because a
-plugin's skills ship inside its bundle, and this one is read by an agent
-mid-analysis.
+- Add install scripts to bypass broken qwen extensions install (#35)
+- *(ghidra-mcp)* Report which configuration is wrong, not always Ghidra
+- *(ghidra-mcp)* Stop config errors colliding with PROGRAM_NOT_FOUND
+- *(re-ghidra-mcp-cc)* Retune the doctor skill for the new failure shape
+- *(plugin-footprint)* Close three routes to a confidently wrong number
+- *(plugin-footprint)* Normalising a path must not change what running it means
+- *(plugin-footprint)* Keep the recorded binary honest about what was probed
+- *(plugin-footprint)* Make "declared wins" true rather than merely documented
+- *(plugin-footprint)* Complete two guards that only covered ASCII
+- *(plugin-footprint)* Close four gate holes found by the capstone review
+- *(plugin-footprint)* Close three more gate holes, capstone round 2
+- *(plugin-footprint)* The ratchet's untested edges, capstone round 3
+- *(plugin-footprint)* Enforce Fork 2's D < H, refuse lossy source names
+- *(plugin-footprint)* Normalise line endings before measuring
+- *(plugin-footprint)* Two tests that assumed the author's platform
+- *(plugin-footprint)* The non-UTF-8 test cannot create its own fixture on macOS
+- The freshness check needs BOTH git diff and ls-files, not either
+- *(ghidra-mcp)* Report which configuration is wrong, not always Ghidra
+- *(ghidra-mcp)* Stop config errors colliding with PROGRAM_NOT_FOUND
+- *(re-ghidra-mcp-cc)* Retune the doctor skill for the new failure shape
+- *(plugin-footprint)* Close three routes to a confidently wrong number
+- *(plugin-footprint)* Normalising a path must not change what running it means
+- *(plugin-footprint)* Keep the recorded binary honest about what was probed
+- *(plugin-footprint)* Make "declared wins" true rather than merely documented
+- *(plugin-footprint)* Complete two guards that only covered ASCII
+- *(plugin-footprint)* Close four gate holes found by the capstone review
+- *(plugin-footprint)* Close three more gate holes, capstone round 2
+- *(plugin-footprint)* The ratchet's untested edges, capstone round 3
+- *(plugin-footprint)* Enforce Fork 2's D < H, refuse lossy source names
+- *(plugin-footprint)* Normalise line endings before measuring
+- *(plugin-footprint)* Two tests that assumed the author's platform
+- *(plugin-footprint)* The non-UTF-8 test cannot create its own fixture on macOS
+- The freshness check needs BOTH git diff and ls-files, not either
+- *(opencode)* Final-review wave — handler guards, naming, tests, pins
+- Pin LF for ghidra skill source and emit copies so emit byte-identity holds on Windows
+- Pin LF for all skill/agent sources so byte-compare gates hold on Windows
+- *(rtk)* Add -- separator to rtk command invocations to prevent flag parsing collisions
+
+### 💼 Other
+
+- *(opencode)* Pin V2 shell execute.before shape; mutation works (opencode v2.0.20, @opencode/plugin 2.0.21)
 
 ### 📚 Documentation
 
-- *(ghidra)* Explain why an empty `get_xrefs` is a fact rather than a verdict, and why Rust binaries produce that result systematically (#28)
-  - Establish the difference with a control: the same call against something known to be referenced
-  - Rust `&str` constants carry their length at the use site, so literals sit in `.rdata` with no NUL separators; Ghidra's analyser defines an item only where a NUL falls, leaving some literals undefined and others with boundaries that fuse neighbours or start mid-word
-  - References attach to a defined item's start, so the address where a substring begins usually has none
-  - `describe_address` is the tool that explains the gap, and catches an address computed wrongly in the first place
-  - Names the self-referential fixture hazard: analysing the analysing tool's own binary puts its live diagnostics in `.rdata`, where a string result reads exactly like an error message
-
-### 🔧 Fixes
-
-- *(build)* `just emit-ghidra-skill` now regenerates every plugin's committed copy of the canonical skill, not only the Claude Code one (#28)
-  - The canonical skill is compiled into every agent's binary; emitting one front left the qwen copy stale, invisible to a package-scoped test run and caught only by the workspace run in CI
-
-## [0.6.2] - 2026-09-01
-
-Documentation only — no code changed. Cut as a release because a plugin's
-README and skills ship inside its bundle, so this is how they reach an
-installed plugin.
-
-### 📚 Documentation
-
-- *(rtk)* Explain the false `No hook installed` notice, and how to silence it (#25)
-  - rtk decides by looking for the literal `rtk hook claude` in Claude Code's `settings.json`, and cannot see a plugin's `hooks.json` — so it reports no hook while the hook is installed and rewriting
-  - A `PreToolUse` entry whose matcher matches no tool name satisfies the check without ever executing: no duplicate hook, no second process per command
-  - Under a Claude Code profile the file rtk reads is `$CLAUDE_CONFIG_DIR/settings.json`, not `~/.claude/settings.json`, and the two disagree
-- *(re-ghidra)* Teach the doctor three things a real diagnostic run got wrong (#26)
-  - A stale project lock is the normal cost of a session ending: the worker JVM is bound to a Job Object so it cannot outlive its parent, and Ghidra never releases the lock. The lock carries no PID, so deleting it stays the user's call
-  - An unset `GHIDRA_INSTALL_DIR` means "not configured", never "not installed" — a `-Depth 3` sweep missed an install at depth 5 and reported no Ghidra
-  - A worker log can belong to another client entirely, and a healthy connection ends `quit_reason=Closed`, which reads exactly like the crash being hunted
-
-## [0.6.1] - 2026-09-01
-
-### 🔧 Fixes
-
-- *(claude-code)* Dispatch to the `.exe` when a bundled hook runs under Git Bash (#21)
-  - A hook declared without `args` runs through a shell; where Git Bash is installed that shell executes the extensionless dispatcher rather than the sibling `.exe`, and 0.6.0's dispatcher rejected `MINGW64_NT` outright
-  - The `SessionStart` hook failed with `unsupported operating system MINGW64_NT-10.0-26200`; MCP servers were unaffected, because a direct spawn resolves the `.exe`
-  - Fixed for `MINGW*`, `MSYS*` and `CYGWIN*`; the bundles in 0.6.0 carry the broken dispatcher and are superseded by this release
-- *(ci)* Remove `--force-local` from the bundling scripts, which macOS's bsdtar does not accept (#21)
+- *(qwen)* Fix install URLs to use extension bundles, add manual workaround (#34)
+- *(doctor)* Rule config out of the "died on launch" branch explicitly
+- Add the plugin-footprint spec the crate was built from
+- Add the implementation plan for the file-backed sources and the gate
+- Record the qwen extensions install bug this repo works around
+- *(plugin-footprint)* The resident tier is no longer a lower bound
+- *(plugin-footprint)* Name the recovery path for an invalid base policy
+- *(plugin-footprint)* Record why D < H is refused rather than clamped
+- *(rtk-mcp-agy)* Update installation instructions to use agy plugin install via github
+- *(re-ghidra-mcp-agy)* Update installation instructions to use agy plugin install via github
+- *(doctor)* Rule config out of the "died on launch" branch explicitly
+- Add the plugin-footprint spec the crate was built from
+- Add the implementation plan for the file-backed sources and the gate
+- Record the qwen extensions install bug this repo works around
+- *(plugin-footprint)* The resident tier is no longer a lower bound
+- *(plugin-footprint)* Name the recovery path for an invalid base policy
+- *(plugin-footprint)* Record why D < H is refused rather than clamped
+- *(re-ghidra-mcp-agy)* Align repo-scoped install instructions with rtk-mcp-agy
+- Align DESIGN.md across plugins and update config instructions
+- *(spec)* OpenCode V2 support — opencode/ dir plus port of both plugins
+- *(plan)* Drop frozen-lockfile variant from test-opencode recipe
+- *(opencode)* Rtk-mcp-opencode config, skills, settings template, README
+- *(opencode)* Agent-fetchable INSTALL.md per plugin plus root pointer
+- *(opencode)* README Installing sections cover the @opencode/plugin dependency
 
 ### 🧪 Testing
 
-- *(ci)* Start the assembled plugins, on every PR and after every release (#21)
-  - `Bundle Smoke` stages a host-only bundle on ubuntu, windows and macOS and starts each entry point by BOTH routes Claude Code uses — through a shell, and spawned directly
-  - `plugin-bundles.yml` gains a `verify` job that downloads the published zips and starts them on all three platforms
-  - `scripts/check-bundle-dispatch.sh` drives all ten branches of the bin dispatcher with `uname` stubbed, since any one machine exercises only one of them
+- *(e2e)* Stop an unconfigured-serve panic orphaning the server
+- *(plugin-footprint)* Snapshot each plugin's source breakdown
+- *(e2e)* Stop an unconfigured-serve panic orphaning the server
+- *(plugin-footprint)* Snapshot each plugin's source breakdown
+- *(rtk)* Harden mock_rtk to strictly verify -- separator and add regression tests for flag parsing
 
+### ⚙️ Miscellaneous Tasks
+
+- Gate every pull request on plugin footprint
+- Pin the generated footprint documents to LF
+- Gate every pull request on plugin footprint
+- Pin the generated footprint documents to LF
+- Track opencode v2 plan; ignore superpowers scratch
+- Ignore node_modules so typos hook skips third-party code
+- Pin LF for opencode sources read by line-oriented checks
+- *(opencode)* Wiring gate, bun tests, just recipes, CI jobs, README
+- *(opencode)* Setup-path smoke harness across the 3-OS matrix
+## [0.6.4] - 2026-09-01
+
+### 🚀 Features
+
+- *(qwen)* Add extension bundle workflow and marketplace manifest (#31)
+
+### 🐛 Bug Fixes
+
+- *(qwen)* Extract binary name from \${/} path separator, not /bin/ (#33)
+
+### 📚 Documentation
+
+- Add .qwenignore and QWEN.md project context (#30)
+## [0.6.3] - 2026-09-01
+
+### 📚 Documentation
+
+- *(ghidra)* Why an empty get_xrefs is a fact, and why Rust strings cause it (#28)
+## [0.6.2] - 2026-09-01
+
+### 🐛 Bug Fixes
+
+- *(ci)* Create the parent directory the verify job extracts into (#23)
+
+### 📚 Documentation
+
+- *(rtk)* Explain the false "No hook installed" notice, and how to silence it (#25)
+- *(re-ghidra)* Teach the doctor three things a real run got wrong (#26)
+
+### ⚙️ Miscellaneous Tasks
+
+- Declare the aiplugins marketplace for this repository (#24)
+## [0.6.1] - 2026-09-01
+
+### 🐛 Bug Fixes
+
+- *(ci)* Trigger the plugin bundles from the Release run, not the release (#20)
+- *(claude-code)* Dispatch to the .exe under Git Bash, and start the assembled plugins in CI (#21)
 ## [0.6.0] - 2026-09-01
 
 ### 🚀 Features
 
 - *(claude-code)* Publish the plugins through a repo marketplace (#18)
-  - The repository root is now the `aiplugins` marketplace: `claude plugin marketplace add ckir/aiplugins`, then `claude plugin install <plugin>@aiplugins`
-  - Each release carries `<plugin>-plugin.zip`, a bundle holding the binaries for Windows x64 plus Linux and macOS on x86_64 and aarch64, so nothing is cloned or compiled at install time
-  - `scripts/bundle-plugin.sh` + `.github/workflows/plugin-bundles.yml` build and attach those bundles; `scripts/check-marketplace.sh` guards the manifest against drift, in `just check` and CI
 
-### 🔧 Fixes
+### 🐛 Bug Fixes
 
-- *(claude-code)* Sync the plugin manifests, which sat three releases behind at 0.2.1, and point `homepage`/`repository` at `ckir/aiplugins` rather than a repository that does not exist (#18)
-- *(claude-code)* Repair the agent frontmatter in `re-analyst` and `todo-triager` (#18)
-  - The `<example>` blocks sat between frontmatter keys as bare text, which is not valid YAML
-  - `tools`, `model` and `color` were silently dropped at load; the agents ran with only their filename
-- *(antigravity)* Sync the plugin manifest versions to the workspace version
+- *(qwen)* Sync extension manifest versions to 0.5.0 (#16)
 
-## [0.5.0] - 2026-09-01
+### 📚 Documentation
 
-### 🔧 Fixes
+- *(qwen)* Add CLI installation instructions to extension READMEs (#17)
+## [0.5.0] - 2026-08-31
 
-- *(qwen)* Switch extension manifests to use pre-built binaries from release artifacts (#14)
-  - `re-ghidra-mcp-qwen`: version 0.2.1 → 0.5.0, uses `${extensionPath}/bin/re-ghidra-qwen-mcp`
-  - `rtk-mcp-qwen`: uses `${extensionPath}/bin/rtk-mcp-qwen`
-  - Extensions now installable via `qwen extensions install` without requiring `cargo`
+### 🐛 Bug Fixes
 
+- *(qwen)* Switch extension manifests to pre-built binaries (#14)
 ## [0.4.0] - 2026-08-31
-
-### 🚀 Features
-
-- *(ghidra-worker-ctl)* Implement Linux/macOS JVM lifecycle via process groups (#12)
-  - Unix process group kill-guard replaces Windows-only Job Object
-  - `setsid()` + `SIGKILL` to process group ensures clean JVM teardown on Linux/macOS
-  - Cross-platform compilation verified for Windows, Linux, and macOS
-
-## [0.3.0] - 2026-08-31
 
 ### 🚀 Features
 
 - *(ghidra)* Port ghidrust as shared/ghidra-* crates and a Claude Code plugin (#5)
 - *(qwen)* Port re-ghidra-mcp as a Qwen Code extension (#9)
 - *(antigravity)* Implement re-ghidra-mcp-agy plugin (#10)
+- *(ghidra-worker-ctl)* Implement Linux/macOS JVM lifecycle via process groups (#12)
 
 ### 🧪 Testing
 
@@ -114,7 +191,6 @@ installed plugin.
 ### ⚙️ Miscellaneous Tasks
 
 - *(ghidra)* Pin LLVM for the live E2E fixture and update all actions (#6)
-
 ## [0.2.1] - 2026-08-29
 
 ### 🚜 Refactor
@@ -124,7 +200,6 @@ installed plugin.
 ### ⚙️ Miscellaneous Tasks
 
 - Release 0.2.1 (#4)
-
 ## [0.2.0] - 2026-08-29
 
 ### 🚀 Features
@@ -151,7 +226,6 @@ installed plugin.
 - Stop tracking Qwen per-session scratch
 - Ignore per-developer Claude Code state
 - Release 0.2.0 (#2)
-
 ## [0.1.5] - 2026-08-29
 
 ### 🚀 Features
@@ -161,7 +235,6 @@ installed plugin.
 ### ⚙️ Miscellaneous Tasks
 
 - Bump workspace version to 0.1.5
-
 ## [0.1.4] - 2026-08-29
 
 ### 🐛 Bug Fixes
@@ -171,7 +244,6 @@ installed plugin.
 ### ⚙️ Miscellaneous Tasks
 
 - Bump workspace version to 0.1.4
-
 ## [0.1.3] - 2026-08-29
 
 ### 🚀 Features
@@ -191,7 +263,6 @@ installed plugin.
 - Expand ignore rules and add .antigravityignore
 - Stop tracking agent-local config files
 - Bump workspace version to 0.1.3
-
 ## [0.1.2] - 2026-08-28
 
 ### 🐛 Bug Fixes
@@ -201,7 +272,6 @@ installed plugin.
 ### ⚙️ Miscellaneous Tasks
 
 - Release
-
 ## [0.1.1] - 2026-08-28
 
 ### 🚀 Features
