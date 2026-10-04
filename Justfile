@@ -203,7 +203,7 @@ smoke:
     done
 
 # Run all pre-flight checks (what CI and lefthook would run)
-check: fmt lint test deny spellcheck links wiring marketplace dispatch smoke footprint opencode-wiring
+check: fmt lint test deny spellcheck links versions wiring marketplace dispatch smoke footprint opencode-wiring
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
@@ -407,3 +407,7 @@ clean:
     cargo clean
     rm -rf claude-code/example/bin claude-code/rtk-mcp-cc/bin claude-code/re-ghidra-mcp-cc/bin opencode/rtk-mcp-opencode/bin opencode/re-ghidra-mcp-opencode/bin
     @echo "Removed target/ and staged plugin binaries."
+
+
+versions:
+    bash scripts/check-manifest-versions.sh
