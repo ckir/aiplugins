@@ -15,13 +15,13 @@ API is explicitly beta and will churn — re-test on bump.
 <!-- footprint:begin -->
 ### Context footprint
 
-Installing this plugin adds **≥ 3,690 bytes** to every request, for the whole session. A further **≥ 6,091 bytes** load only when one of its skills or agents is actually invoked. Its `plugin.ts` setup module adds **≥ 5,784 bytes**, loaded in-process with the host on every request and counted separately below so the TypeScript tier stays comparable across releases.
+Installing this plugin adds **≥ 3,690 bytes** to every request, for the whole session. A further **≥ 6,091 bytes** load only when one of its skills or agents is actually invoked. Its `plugin.ts` setup module adds **≥ 6,035 bytes**, loaded in-process with the host on every request and counted separately below so the TypeScript tier stays comparable across releases.
 
 | Tier | Bytes | When you pay it |
 |---|---|---|
 | Resident | ≥ 3,690 | Every request, for the whole session |
 | Invocation | ≥ 6,091 | Only when that skill or agent runs |
-| Setup | ≥ 5,784 | Every request — `plugin.ts` loads in-process with the host |
+| Setup | ≥ 6,035 | Every request — `plugin.ts` loads in-process with the host |
 
 **Bytes, not tokens.** This is the exact serialised size of what the host loads, measured by probing the plugin's own MCP server and reading its skill and agent frontmatter. It is not a token count and does not convert to one at a fixed rate — treat it as a figure you can compare between plugins, not as a context budget.
 
