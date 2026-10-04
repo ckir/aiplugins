@@ -10,7 +10,7 @@ setup:
     @echo "Installing cargo-binstall..."
     cargo install cargo-binstall
     @echo "Installing dev tools..."
-    cargo binstall cargo-nextest cargo-deny bacon typos-cli lefthook -y
+    cargo binstall cargo-nextest cargo-deny bacon typos-cli lefthook mlc -y
     @echo "Installing git hooks..."
     lefthook install
 
@@ -37,6 +37,14 @@ deny:
 # Check for spelling mistakes
 spellcheck:
     typos
+
+# Check local markdown links for breakage.
+# Offline (no web requests: fast and hermetic for a push hook) and limited to
+# our own docs. Vendored trees are listed explicitly because mlc's --gitignore
+# does not filter them on Windows (mlc 1.2.2); extend the list when a new
+# node_modules/ or build-output dir appears.
+links:
+    mlc --offline --ignore-path "./node_modules,./opencode/re-ghidra-mcp-opencode/node_modules,./opencode/rtk-mcp-opencode/node_modules,./target"
 
 # Verify plugin configs point at binaries this workspace actually builds.
 # Nothing else checks those strings: rename a [[bin]] and every test still
@@ -195,7 +203,7 @@ smoke:
     done
 
 # Run all pre-flight checks (what CI and lefthook would run)
-check: fmt lint test deny spellcheck wiring marketplace dispatch smoke footprint opencode-wiring
+check: fmt lint test deny spellcheck links wiring marketplace dispatch smoke footprint opencode-wiring
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
