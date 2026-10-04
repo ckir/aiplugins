@@ -1,0 +1,40 @@
+version: 2
+updates:
+  # Maintain dependencies for the Rust workspace
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      rust-all:
+        patterns:
+          - "*"
+
+  # Maintain GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions-all:
+        patterns:
+          - "*"
+
+  # Maintain OpenCode plugins (npm/bun)
+  - package-ecosystem: "npm"
+    directory: "/opencode/re-ghidra-mcp-opencode"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm-re-ghidra:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "npm"
+    directory: "/opencode/rtk-mcp-opencode"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm-rtk:
+        patterns:
+          - "*"
