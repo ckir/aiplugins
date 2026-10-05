@@ -80,9 +80,12 @@ jobs:
       - name: Determine plugins to bundle
         id: plugins
         run: |
-          names=$(jq -r '.plugins[].name' .opencode-plugin/marketplace.json | tr -d '\r' | tr '\n' ' ')
-          [ -n "$names" ] || { echo "marketplace lists no plugins"; exit 1; }
-          echo "names=$names" >> "$GITHUB_OUTPUT"
+          # Per-package releases carry one plugin: scope to the tag's own
+          # plugin instead of bundling the whole marketplace into every release.
+          name="${TAG%-v*}"
+          jq -e --arg n "$name" '.plugins[] | select(.name == $n)' .opencode-plugin/marketplace.json > /dev/null \
+            || { echo "$name from tag $TAG is not in .opencode-plugin/marketplace.json"; exit 1; }
+          echo "names=$name" >> "$GITHUB_OUTPUT"
 
       - name: Assemble plugin bundles
         run: |
