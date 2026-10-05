@@ -3,8 +3,8 @@
   "claude-code/re-ghidra-mcp-cc": "0.8.0",
   "qwen/rtk-mcp-qwen": "0.8.0",
   "qwen/re-ghidra-mcp-qwen": "0.8.0",
-  "opencode/rtk-mcp-opencode": "0.7.3",
-  "opencode/re-ghidra-mcp-opencode": "0.7.3",
+  "opencode/rtk-mcp-opencode": "0.7.4",
+  "opencode/re-ghidra-mcp-opencode": "0.7.4",
   "antigravity/rtk-mcp-agy": "0.8.0",
   "antigravity/re-ghidra-mcp-agy": "0.8.0"
 }
