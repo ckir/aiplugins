@@ -17,3 +17,7 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          include-component-in-tag: true
+          # Monorepo tags are always <package>-v<version> (simple strategy
+          # included: without this, simple packages tag bare v<version> and
+          # collide with each other — observed live on the first run).
