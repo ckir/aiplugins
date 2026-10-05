@@ -13,6 +13,11 @@ cd "$(dirname "$0")/.."
 
 manifest=.qwen-plugin/marketplace.json
 
+# qwen/example is a reference implementation people read, not something
+# anyone installs; it is deliberately absent from the marketplace (mirrors
+# the `not_published` exclusion in scripts/check-marketplace.sh).
+not_published="example"
+
 # The jq on a Windows PATH emits CRLF; a stray carriage return turns every
 # comparison below into a mismatch and every path into one that does not exist.
 jqr() {
@@ -103,6 +108,9 @@ done
 for dir in qwen/*/; do
     name=$(basename "$dir")
     [ -f "$dir/qwen-extension.json" ] || continue
+    case " $not_published " in
+        *" $name "*) continue ;;
+    esac
     printf '%s\n' "$entries" | grep -qxF "$name" ||
         fail "$name: exists in qwen/ but is not listed in $manifest"
 done

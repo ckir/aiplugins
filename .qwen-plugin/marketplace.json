@@ -14,7 +14,7 @@
         "source": "archive",
         "url": "https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-qwen-extension.zip"
       },
-      "description": "Qwen Code integration for rtk (Rust Token Killer): a PreToolUse hook that transparently rewrites Bash/PowerShell commands through rtk for 60-90% token savings, plus rtk analytics as MCP tools.",
+      "description": "PreToolUse hook that rewrites run_shell_command invocations via the rtk CLI before execution.",
       "author": {
         "name": "AI Plugins Marketplace Contributors"
       },
