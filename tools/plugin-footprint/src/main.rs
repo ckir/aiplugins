@@ -11,7 +11,9 @@
 
 use plugin_footprint::canonical::canonical_json;
 use plugin_footprint::document::{build, setup_tier, Tree};
-use plugin_footprint::manifest::{looks_like_a_plugin, read_mcp_servers, read_opencode_servers};
+use plugin_footprint::manifest::{
+    looks_like_a_plugin, plugin_version, read_mcp_servers, read_opencode_servers,
+};
 use plugin_footprint::probe::{probe, Limits, Outcome, Status};
 use plugin_footprint::publish::{comparison_region, per_plugin_region, splice};
 use plugin_footprint::sources::{read_file_sources, read_plugin_source};
@@ -530,25 +532,23 @@ fn shape_of_json(value: &serde_json::Value) -> &'static str {
 
 /// The plugin's declared name, falling back to its directory.
 fn plugin_name(plugin_dir: &Path) -> String {
-    plugin_json(plugin_dir)
-        .and_then(|v| v.get("name")?.as_str().map(str::to_string))
-        .unwrap_or_else(|| {
-            plugin_dir
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_else(|| "<unnamed>".to_string())
-        })
-}
-
-fn plugin_version(plugin_dir: &Path) -> Option<String> {
-    plugin_json(plugin_dir)?
-        .get("version")?
-        .as_str()
-        .map(str::to_string)
-}
-
-fn plugin_json(plugin_dir: &Path) -> Option<serde_json::Value> {
-    let text =
-        std::fs::read_to_string(plugin_dir.join(".claude-plugin").join("plugin.json")).ok()?;
-    serde_json::from_str(&text).ok()
+    for rel in [
+        ".claude-plugin/plugin.json",
+        "qwen-extension.json",
+        "package.json",
+        "plugin.json",
+    ] {
+        let Ok(text) = std::fs::read_to_string(plugin_dir.join(rel)) else {
+            continue;
+        };
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) {
+            if let Some(s) = v.get("name").and_then(|v| v.as_str()) {
+                return s.to_string();
+            }
+        }
+    }
+    plugin_dir
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "<unnamed>".to_string())
 }
