@@ -109,6 +109,9 @@ jobs:
       - name: Check marketplace manifest
         run: bash scripts/check-marketplace.sh
 
+      - name: Check generated marketplaces are current
+        run: bash scripts/gen-marketplaces.sh --check
+
       # Confirms each opencode/ plugin's id, opencode.jsonc, MCP commands,
       # and skill copies still agree with the sources they copy.
       - name: Check opencode wiring

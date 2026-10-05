@@ -62,6 +62,12 @@ marketplace:
 qwen-marketplace:
     bash scripts/check-qwen-marketplace.sh
 
+# Regenerate the host marketplace manifests from the plugin manifests.
+# CI runs --check: committed copies must match, so a stale copy fails
+# the same way a stale footprint does.
+gen-marketplaces:
+    bash scripts/gen-marketplaces.sh
+
 # Verify opencode/ plugin configs, ids, and skill copies.
 opencode-wiring:
     bash scripts/check-opencode-wiring.sh
