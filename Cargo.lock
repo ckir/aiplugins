@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "agy-example"
-version = "0.7.1"
+version = "0.7.2"
 
 [[package]]
 name = "aho-corasick"
@@ -120,7 +120,7 @@ dependencies = [
 
 [[package]]
 name = "claude-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "anyhow",
  "rmcp",
@@ -404,7 +404,7 @@ dependencies = [
 
 [[package]]
 name = "ghidra-ipc"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "insta",
  "proptest",
@@ -415,7 +415,7 @@ dependencies = [
 
 [[package]]
 name = "ghidra-mcp"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "ghidra-ipc",
  "ghidra-worker-ctl",
@@ -436,7 +436,7 @@ dependencies = [
 
 [[package]]
 name = "ghidra-worker-ctl"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "ghidra-ipc",
  "nix",
@@ -684,7 +684,7 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "plugin-footprint"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "anyhow",
  "insta",
@@ -767,7 +767,7 @@ dependencies = [
 
 [[package]]
 name = "qwen-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "anyhow",
  "serde",
@@ -828,7 +828,7 @@ dependencies = [
 
 [[package]]
 name = "re-ghidra-mcp-agy"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "ghidra-mcp",
  "serde",
@@ -838,7 +838,7 @@ dependencies = [
 
 [[package]]
 name = "re-ghidra-mcp-cc"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "ghidra-mcp",
  "serde_json",
@@ -847,7 +847,7 @@ dependencies = [
 
 [[package]]
 name = "re-ghidra-mcp-qwen"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "ghidra-mcp",
  "serde_json",
@@ -940,7 +940,7 @@ dependencies = [
 
 [[package]]
 name = "rtk-mcp-agy"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -948,7 +948,7 @@ dependencies = [
 
 [[package]]
 name = "rtk-mcp-cc"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "anyhow",
  "rmcp",
@@ -962,7 +962,7 @@ dependencies = [
 
 [[package]]
 name = "rtk-mcp-qwen"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "serde",
  "serde_json",
