@@ -47,7 +47,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
-      startsWith(github.event.workflow_run.head_branch, 'rtk-mcp-opencode-v'))
+      contains(github.event.workflow_run.head_branch, '-opencode-v'))
     runs-on: ubuntu-latest
     env:
       TAG: ${{ inputs.tag || github.event.workflow_run.head_branch }}
@@ -76,19 +76,10 @@ jobs:
           [ -n "$names" ] || { echo "marketplace lists no plugins"; exit 1; }
           echo "names=$names" >> "$GITHUB_OUTPUT"
 
-      - name: Download per-target archives from the release
-        run: |
-          mkdir -p assets
-          for name in ${{ steps.plugins.outputs.names }}; do
-            gh release download "$TAG" -D assets \
-              -p "$name-*.tar.xz" -p "$name-*.zip" --clobber
-          done
-          ls -la assets
-
       - name: Assemble plugin bundles
         run: |
           for name in ${{ steps.plugins.outputs.names }}; do
-            bash scripts/bundle-opencode-plugin.sh "$name" assets bundles
+            bash scripts/bundle-opencode-plugin.sh "opencode/$name" bundles
           done
 
       - name: Upload bundles to the release
@@ -97,7 +88,7 @@ jobs:
 
   # Everything above ran on Linux, against a tree this workflow assembled. This
   # downloads what was actually published, extracts it the way an install does,
-  # and starts the entry points on each OS — so "the zip we published works"
+  # and checks the published contents — so "the zip we published installs"
   # rests on the published zip rather than on the staging tree it came from.
   verify:
     name: Verify published bundle (${{ matrix.os }})
@@ -152,9 +143,15 @@ jobs:
             Expand-Archive -Path $zip.FullName -DestinationPath "extracted\$name"
           }
 
-      - name: Start the entry points
+      - name: Verify bundle contents
         shell: bash
         run: |
           for dir in extracted/*/; do
-            bash scripts/probe-plugin-bin.sh "$dir"
+            name=$(basename "$dir")
+            for f in plugin.ts opencode.jsonc package.json README.md INSTALL.md; do
+              [ -f "$dir/$f" ] || { echo "ERROR: $dir/$f is missing from the bundle" >&2; exit 1; }
+            done
+            [ -d "$dir/skills" ] || { echo "ERROR: $dir/skills is missing from the bundle" >&2; exit 1; }
+            jq -e . "$dir/opencode.jsonc" > /dev/null || { echo "ERROR: $dir/opencode.jsonc is not valid JSON" >&2; exit 1; }
+            echo "  ok    $name bundle contents sound"
           done

@@ -20,11 +20,6 @@ jqr() {
 known=$(cargo metadata --no-deps --format-version 1 |
     jq -r '.packages[].targets[] | select(.kind[] == "bin") | .name' | sort -u)
 
-# NOTE: Cargo.toml checks out with CRLF on Windows; strip CR exactly like
-# jqr does for jq output, otherwise `$` never matches and every version check
-# fails on a correct tree.
-workspace_version=$(tr -d '\r' < Cargo.toml | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1)
-
 failures=0
 checked=0
 fail() { echo "  FAIL  $1" >&2; failures=$((failures + 1)); }
@@ -43,10 +38,13 @@ for name in $(registry_plugins opencode | sort); do
     id=$(sed -n 's/^[[:space:]]*id:[[:space:]]*"\([^"]*\)".*$/\1/p' "$plugin_ts" | head -n 1)
     [ "$id" = "$name" ] || fail "$name: plugin.ts id is '$id'"
 
-    # 2. package.json version tracks the workspace.
+    # 2. package.json carries a well-formed semver version. Per-package
+    # releases bump it independently (the workspace version is not any
+    # plugin's release version); crate/manifest agreement for opencode lives
+    # in check-package-versions.sh, so form is all this check owns.
     pkg_version=$(jqr '.version // ""' "$pkg" 2>/dev/null || echo "")
-    [ "$pkg_version" = "$workspace_version" ] ||
-        fail "$name: package.json says $pkg_version, workspace is $workspace_version"
+    [[ "$pkg_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]] ||
+        fail "$name: package.json version '$pkg_version' is not semver"
 
     # 3. opencode.jsonc parses (kept comment-free so jq reads it) and carries
     #    V2-native shapes only.

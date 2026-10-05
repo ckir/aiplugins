@@ -31,7 +31,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to bundle (e.g. v0.6.0)"
+        description: "Release tag to bundle (e.g. rtk-mcp-cc-v0.7.2)"
         required: true
 
 permissions:
@@ -46,7 +46,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
-      startsWith(github.event.workflow_run.head_branch, 'v'))
+      contains(github.event.workflow_run.head_branch, '-cc-v'))
     runs-on: ubuntu-latest
     env:
       TAG: ${{ inputs.tag || github.event.workflow_run.head_branch }}

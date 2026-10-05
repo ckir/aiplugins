@@ -70,12 +70,6 @@ expected_base="$repo_url/releases/latest/download"
     exit 1
 }
 
-workspace_version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
-[ -n "$workspace_version" ] || {
-    echo "ERROR: no [workspace.package] version found in Cargo.toml." >&2
-    exit 1
-}
-
 entries=$(jqr '.plugins[].name' "$manifest")
 [ -n "$entries" ] || {
     echo "ERROR: $manifest lists no plugins — has the manifest shape changed?" >&2
@@ -99,11 +93,15 @@ for name in $entries; do
         fail "$name: plugin.json calls itself '$manifest_name'"
 
     # The bundle ships this plugin.json alongside binaries built from the
-    # workspace at that version, and with latest/download urls it is the only
-    # version anyone sees. It sat three releases behind before this check.
+    # package's own crate at that version, and with latest/download urls it
+    # is the only version anyone sees. It sat three releases behind before
+    # this check. Per-package releases bump crates independently, so the
+    # crate — never the workspace version — is the oracle here.
+    crate_version=$(tr -d '\r' < "$agent_dir/$name/Cargo.toml" | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1)
+    [ -n "$crate_version" ] || fail "$name: no version in $agent_dir/$name/Cargo.toml"
     manifest_version=$(jqr '.version // ""' "$plugin_json")
-    [ "$manifest_version" = "$workspace_version" ] ||
-        fail "$name: plugin.json says $manifest_version, workspace is $workspace_version"
+    [ "$manifest_version" = "$crate_version" ] ||
+        fail "$name: plugin.json says $manifest_version, crate is $crate_version"
 
     for field in description license; do
         want=$(jqr --arg f "$field" '.[$f] // ""' "$plugin_json")

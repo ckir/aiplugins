@@ -105,7 +105,7 @@ Leave the stage in place: Step 4 merges the staged `opencode.jsonc`.
 
 `re-ghidra-cc-mcp` (the 19 tools) ships in the versioned Claude Code
 plugin bundle — asset `re-ghidra-mcp-cc-plugin.zip` on release
-`v$VERSION` — reuse that zip, ignore everything in it except `bin/`:
+`re-ghidra-mcp-cc-v$VERSION` — reuse that zip, ignore everything in it except `bin/`:
 
 1. Map the machine to a target triple (`uname -s` + `uname -m`):
 
@@ -123,7 +123,7 @@ plugin bundle — asset `re-ghidra-mcp-cc-plugin.zip` on release
 
    ```bash
    curl -fsSL -o /tmp/ghidra-plugin.zip \
-     "https://github.com/ckir/aiplugins/releases/download/v$VERSION/re-ghidra-mcp-cc-plugin.zip"
+     "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-cc-v$VERSION/re-ghidra-mcp-cc-plugin.zip"
    mkdir -p "$DEST/bin"
    # Unix:
    unzip -p /tmp/ghidra-plugin.zip "bin/<triple>/re-ghidra-cc-mcp" > "$DEST/bin/re-ghidra-cc-mcp"
@@ -225,5 +225,11 @@ All four, in order:
    `.../opencode.json`) exits 0, and the `ghidra` server entry is present
    under `mcp.servers`.
 3. The plugin module loads: from any directory with the config dir's
-   `node_modules` resolvable, `b
-...[truncated 818 chars]
+   `node_modules` resolvable,
+   `bun -e "await import('$DEST/plugins/re-ghidra-mcp-opencode.ts')"` exits 0
+   with no output. Importing only defines the hooks — nothing executes
+   until the host loads it.
+4. Restart OpenCode (config and plugins load at startup), then confirm
+   the `ghidra` server is connected (`/mcp`) and its 19 tools are listed.
+   Run the `doctor` skill if anything here is wrong — it walks the Ghidra
+   setup checks from Step 0 in order.

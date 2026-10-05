@@ -92,8 +92,8 @@ Leave the stage in place: Step 4 merges the staged `opencode.jsonc`.
 ### The MCP server binary
 
 `rtk-cc-mcp` (the four analytics tools) ships in the versioned Claude Code
-plugin bundle — asset `rtk-mcp-cc-plugin.zip` on release `v$VERSION` —
-reuse that zip, ignore everything in it except `bin/`:
+plugin bundle — asset `rtk-mcp-cc-plugin.zip` on release
+`rtk-mcp-cc-v$VERSION` — reuse that zip, ignore everything in it except `bin/`:
 
 1. Map the machine to a target triple (`uname -s` + `uname -m`):
 
@@ -111,7 +111,7 @@ reuse that zip, ignore everything in it except `bin/`:
 
    ```bash
    curl -fsSL -o /tmp/rtk-plugin.zip \
-     "https://github.com/ckir/aiplugins/releases/download/v$VERSION/rtk-mcp-cc-plugin.zip"
+     "https://github.com/ckir/aiplugins/releases/download/rtk-mcp-cc-v$VERSION/rtk-mcp-cc-plugin.zip"
    mkdir -p "$DEST/bin"
    # Unix:
    unzip -p /tmp/rtk-plugin.zip "bin/<triple>/rtk-cc-mcp" > "$DEST/bin/rtk-cc-mcp"
