@@ -422,4 +422,4 @@ clean:
 
 
 versions:
-    bash scripts/check-manifest-versions.sh
+    bash scripts/check-package-versions.sh

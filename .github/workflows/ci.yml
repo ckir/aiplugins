@@ -100,6 +100,8 @@ jobs:
       # compiler or test validates.
       - name: Check manifest versions
         run: bash scripts/check-manifest-versions.sh
+      - name: Check package versions
+        run: bash scripts/check-package-versions.sh
       - name: Check plugin wiring
         run: bash scripts/check-plugin-wiring.sh
 
