@@ -1,0 +1,38 @@
+# HACK.md — contributor notes
+
+## Adding or removing a supported agent
+
+The set of supported agents lives in one place: `agents.json` at the repo
+root. Every wiring and marketplace check (`scripts/check-marketplace.sh`,
+`scripts/check-qwen-marketplace.sh`, `scripts/check-plugin-wiring.sh`,
+`scripts/check-opencode-wiring.sh`, via `scripts/lib/registry.sh`) enumerates
+agents from that registry, so a new agent needs no script edits — register it
+and every check picks it up.
+
+### To add an agent
+
+1. Copy the template front directory. `claude-code/example/` is the template
+   Rust plugin front end; duplicate the agent directory closest to the new
+   host's format and rename it to the new agent's `dir`.
+2. Add one entry to `agents.json` with all eight fields:
+   `id`, `dir`, `plugins`, `marketplace` (a path like
+   `.claude-plugin/marketplace.json`, or `null` when the host has no
+   marketplace manifest), `manifestPattern` (with `{plugin}` for the per-plugin
+   manifest path), `artifactSuffix`, `sourceUrlBase`, and `notPublished`
+   (plugin stems the checks skip, e.g. `example`).
+3. If the agent has a marketplace (`marketplace` is not `null`), regenerate
+   the host manifests: `bash scripts/gen-marketplaces.sh`.
+4. Run the Task 6 gate command — `bash scripts/gen-marketplaces.sh --check`
+   (the same step CI runs, plus the `just gen-marketplaces` recipe) — and the
+   wiring checks (`just marketplace qwen-marketplace wiring opencode-wiring`).
+   Every check picks the new agent up with no script edits.
+
+### To remove an agent
+
+1. Delete the agent's directory.
+2. Drop its entry from `agents.json`.
+3. Regenerate (`bash scripts/gen-marketplaces.sh`) and re-run the gate
+   command from step 4 above.
+
+Support is best-effort by design: an agent nobody registers in `agents.json`
+is invisible to all gates — nothing fails, nothing checks it.
