@@ -18,8 +18,14 @@
 # Field provenance per entry (key order: name, source, description, author,
 # homepage, license, category, keywords):
 #   name/description/license - the plugin's own manifest, the same
-#     fields the marketplace checks verify.
-#   source.url - registry sourceUrlBase + plugin name + artifactSuffix.
+#     fields the marketplace checks verify. Manifests whose schema has no
+#     license (the Antigravity plugin.json) fall back to the workspace
+#     license from Cargo.toml, the same way author falls back below.
+#   source.url - registry sourceUrlBase + plugin name + artifactSuffix, except
+#     for agents with versionedSourceUrl: those pin the release tag, giving
+#     sourceUrlBase/plugin-v<manifest version>/plugin+artifactSuffix (tag-
+#     pinned URLs only, never latest). Agents without the flag keep the
+#     latest/download layout byte-identical to before.
 #   author.name - the manifest's own author when its schema has one, else the
 #     workspace owner from Cargo.toml (a marketplace-wide fact).
 #   homepage - $repo/tree/main/$agent_dir/$plugin; the manifest homepage is
@@ -64,6 +70,12 @@ workspace_author=$(sed -n 's/^authors = \["\(.*\)"\]$/\1/p' Cargo.toml | head -n
     exit 1
 }
 
+workspace_license=$(sed -n 's/^license = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+[ -n "$workspace_license" ] || {
+    echo "ERROR: no [workspace.package] license found in Cargo.toml." >&2
+    exit 1
+}
+
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 
@@ -99,6 +111,7 @@ for agent in $(jqr '.agents[] | select(.marketplace != null) | .id' agents.json)
     agent_dir=$(registry_field "$agent" dir)
     source_base=$(registry_field "$agent" sourceUrlBase)
     artifact_suffix=$(registry_field "$agent" artifactSuffix)
+    versioned_url=$(registry_field "$agent" versionedSourceUrl)
 
     [ -f "$marketplace" ] || {
         echo "ERROR: $marketplace not found." >&2
@@ -115,7 +128,8 @@ for agent in $(jqr '.agents[] | select(.marketplace != null) | .id' agents.json)
 
         name=$(jqr '.name' "$plugin_json")
         description=$(jqr '.description' "$plugin_json")
-        license=$(jqr '.license' "$plugin_json")
+        license=$(jqr '.license // empty' "$plugin_json")
+        [ -n "$license" ] || license=$workspace_license
         author=$(jqr '.author.name // ""' "$plugin_json")
         [ -n "$author" ] || author=$workspace_author
         keywords=$(jqr -c '.keywords // empty' "$plugin_json")
@@ -123,9 +137,16 @@ for agent in $(jqr '.agents[] | select(.marketplace != null) | .id' agents.json)
             keywords=$(family_keywords "$plugin")
         fi
 
+        if [ "$versioned_url" = "true" ]; then
+            plugin_version=$(jqr '.version' "$plugin_json")
+            url="$source_base/$plugin-v$plugin_version/$plugin$artifact_suffix"
+        else
+            url="$source_base/$plugin$artifact_suffix"
+        fi
+
         jq -n \
             --arg name "$name" \
-            --arg url "$source_base/$plugin$artifact_suffix" \
+            --arg url "$url" \
             --arg description "$description" \
             --arg author "$author" \
             --arg homepage "$repo_url/tree/main/$agent_dir/$plugin" \

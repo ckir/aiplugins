@@ -24,20 +24,22 @@
       "id": "opencode",
       "dir": "opencode",
       "plugins": ["rtk-mcp-opencode", "re-ghidra-mcp-opencode"],
-      "marketplace": null,
+      "marketplace": ".opencode-plugin/marketplace.json",
       "manifestPattern": "opencode/{plugin}/package.json",
-      "artifactSuffix": "",
-      "sourceUrlBase": "",
+      "artifactSuffix": "-opencode.zip",
+      "sourceUrlBase": "https://github.com/ckir/aiplugins/releases/download",
+      "versionedSourceUrl": true,
       "notPublished": []
     },
     {
       "id": "antigravity",
       "dir": "antigravity",
       "plugins": ["rtk-mcp-agy", "re-ghidra-mcp-agy"],
-      "marketplace": null,
+      "marketplace": ".agy-plugin/marketplace.json",
       "manifestPattern": "antigravity/{plugin}/plugin.json",
-      "artifactSuffix": "",
-      "sourceUrlBase": "",
+      "artifactSuffix": "-agy-plugin.zip",
+      "sourceUrlBase": "https://github.com/ckir/aiplugins/releases/download",
+      "versionedSourceUrl": true,
       "notPublished": []
     }
   ]

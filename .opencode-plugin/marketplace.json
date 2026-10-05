@@ -1,0 +1,56 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "aiplugins-opencode",
+  "owner": {
+    "name": "AI Plugins Marketplace Contributors"
+  },
+  "metadata": {
+    "description": "OpenCode plugins from the AI Plugins Marketplace monorepo"
+  },
+  "plugins": [
+    {
+      "name": "rtk-mcp-opencode",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/rtk-mcp-opencode-v0.7.2/rtk-mcp-opencode-opencode.zip"
+      },
+      "description": "OpenCode V2 integration for rtk (Rust Token Killer): rewrites shell commands through rtk for 60-90% token savings, plus rtk analytics as MCP tools.",
+      "author": {
+        "name": "AI Plugins Marketplace Contributors"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/opencode/rtk-mcp-opencode",
+      "license": "PolyForm-Noncommercial-1.0.0",
+      "category": "development",
+      "keywords": [
+        "rtk",
+        "tokens",
+        "hooks",
+        "mcp",
+        "rust",
+        "performance"
+      ]
+    },
+    {
+      "name": "re-ghidra-mcp-opencode",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-opencode-v0.7.2/re-ghidra-mcp-opencode-opencode.zip"
+      },
+      "description": "OpenCode V2 integration for Ghidra reverse engineering: existing 19-tool MCP server plus session hooks that preserve RE state across compaction and point at the driver skill.",
+      "author": {
+        "name": "AI Plugins Marketplace Contributors"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/opencode/re-ghidra-mcp-opencode",
+      "license": "PolyForm-Noncommercial-1.0.0",
+      "category": "development",
+      "keywords": [
+        "ghidra",
+        "reverse-engineering",
+        "decompiler",
+        "binary-analysis",
+        "mcp",
+        "rust"
+      ]
+    }
+  ]
+}
