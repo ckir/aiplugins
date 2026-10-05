@@ -15,7 +15,11 @@
 #     the rust strategy owns the crate version), else "simple" (the opencode
 #     plugins ship no crates; the version lives in package.json alone).
 #   extra-files  - the registry manifestPattern for that agent/plugin (the host
-#     manifest whose `version` key release-please bumps alongside the release).
+#     manifest whose `version` key release-please bumps alongside the release),
+#     RELATIVE to the package directory: release-please resolves extra-files
+#     against the package path, so emitting the repo-rooted manifest path would
+#     make it look for <package>/<package>/... (observed live: every extra-file
+#     fetched 404 on the first release-please run).
 #
 # Crate-vs-extra-files rule: the rust strategy owns the crate version and
 # extra-files owns the host manifest; the two must never target the same file.
@@ -57,6 +61,16 @@ for agent in $(jqr '.agents[].id' agents.json); do
         case "$manifest" in
             *Cargo.toml)
                 echo "ERROR: manifestPattern for '$key' resolves to a Cargo.toml ($manifest): extra-files must list host manifests only, never Cargo.toml." >&2
+                exit 1
+                ;;
+        esac
+        case "$manifest" in
+            "$key"/*)
+                # release-please joins extra-files onto the package path.
+                manifest="${manifest#"$key"/}"
+                ;;
+            *)
+                echo "ERROR: manifestPattern for '$key' does not live under the package dir ($manifest): extra-files must be package-relative." >&2
                 exit 1
                 ;;
         esac

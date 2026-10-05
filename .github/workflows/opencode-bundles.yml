@@ -27,6 +27,12 @@ on:
   workflow_run:
     workflows: ["Release"]
     types: [completed]
+  # The Release workflow never runs for opencode tags (it is excluded there:
+  # dist has no crate to build), so chain alone would never fire for opencode
+  # releases. Tag pushes do trigger workflows, so trigger on them directly.
+  push:
+    tags:
+      - '*-opencode-v*'
   # Backfill a release that predates this workflow, or re-cut bundles after a
   # fix to the bundling script.
   workflow_dispatch:
@@ -45,12 +51,14 @@ jobs:
     # anything to. Only a successful tag push produced one.
     if: >-
       github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' &&
+      contains(github.ref_name, '-opencode-v')) ||
       (github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       contains(github.event.workflow_run.head_branch, '-opencode-v'))
     runs-on: ubuntu-latest
     env:
-      TAG: ${{ inputs.tag || github.event.workflow_run.head_branch }}
+      TAG: ${{ inputs.tag || github.event.workflow_run.head_branch || github.ref_name }}
       GH_TOKEN: ${{ github.token }}
     steps:
       # The plugin tree has to come from the same commit as the binaries on the
@@ -58,7 +66,7 @@ jobs:
       # another.
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.tag || github.event.workflow_run.head_branch }}
+          ref: ${{ inputs.tag || github.event.workflow_run.head_branch || github.ref_name }}
 
       # Only tags cut after this workflow landed carry the bundling script, and
       # "No such file or directory" three steps later is a poor way to learn it.
@@ -99,12 +107,12 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     env:
-      TAG: ${{ inputs.tag || github.event.workflow_run.head_branch }}
+      TAG: ${{ inputs.tag || github.event.workflow_run.head_branch || github.ref_name }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.tag || github.event.workflow_run.head_branch }}
+          ref: ${{ inputs.tag || github.event.workflow_run.head_branch || github.ref_name }}
 
       - name: Download the published bundles
         shell: bash
