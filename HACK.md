@@ -69,3 +69,20 @@ out the release-please branch (`release-please--branches--main`), run
 `bash scripts/gen-marketplaces.sh`, commit, push. Merge the bump PR only
 once that commit is green. The new marketplace points at the about-to-exist
 release; dist + bundle workflows attach the zips within minutes of the tag.
+
+## Tag pushes that must trigger workflows (read before hand-pushing tags)
+
+Two GitHub behaviors have bitten this repo; both are silent (no error, no
+run, nothing anywhere to say why):
+
+1. Tags created by release-please never trigger tag-push workflows.
+   release-please pushes with the default `GITHUB_TOKEN`, and GitHub does
+   not start workflow runs for `GITHUB_TOKEN`-created pushes. Concretely:
+   after every release PR merges, its tags exist and its GitHub releases
+   exist (empty), but dist never builds and no bundle workflow ever fires.
+   Until release-please runs under a PAT (open issue), backfill by hand:
+   delete each empty release (`gh release delete <tag> --yes`), delete each
+   remote tag, recreate the identical tag at the identical commit, and push.
+2. Never push more than ~3 tags for one commit in a single push. Past that,
+   GitHub assumes a mistake and silently starts zero runs. Push tags one at
+   a time (`git push origin <tag>`, confirm the run appears, repeat).
