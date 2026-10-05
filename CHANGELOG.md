@@ -1,3 +1,9 @@
+## [0.7.2] - 2026-10-05
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump the rust-all group with 6 updates, adapting to the rmcp 3.5 renames (#43)
+
 ## [0.7.1] - 2026-10-05
 
 The v0.7.0 tag predates #39, #41, #42 and #44, so this is the first

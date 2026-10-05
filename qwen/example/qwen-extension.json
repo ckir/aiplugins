@@ -1,6 +1,6 @@
 {
   "name": "qwen-example",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "displayName": "Qwen Example Extension",
   "description": "Example Qwen Code extension with Rust MCP server, commands, skills, and agents",
   "contextFileName": "QWEN.md",
