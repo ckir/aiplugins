@@ -200,7 +200,7 @@ The reference (V2-native shape — `mcp.servers`):
     "servers": {
       "ghidra": {
         "type": "local",
-        "command": ["./bin/re-ghidra-cc-mcp", "serve"],
+        "command": ["<DEST>/bin/re-ghidra-cc-mcp", "serve"],
         "disabled": false,
         "timeout": { "catalog": 30000, "execution": 30000 }
       }
@@ -212,11 +212,15 @@ The reference (V2-native shape — `mcp.servers`):
 ```
 
 Merge rules: add the `ghidra` entry under the existing `mcp.servers`
-(creating `mcp.servers` if absent). There are no `permissions` to merge
+(creating `mcp.servers` if absent). Write `command` as an absolute path:
+replace `<DEST>` with the absolute config dir. A relative `./bin/...` does
+NOT resolve against the config dir — the host spawns it against the
+session directory and fails with `NotFound: ChildProcess.spawn` (observed
+live on OpenCode V2). Expand `$DEST` yourself now; JSON has no variables. There are no `permissions` to merge
 (the reference carries none — the server needs no host-tool grants
 beyond what the user already allows). Do not paste the whole snippet over
 the user's config. On Windows the command must name the `.exe`:
-`["./bin/re-ghidra-cc-mcp.exe", "serve"]` — adjust that one field when
+`["<DEST>/bin/re-ghidra-cc-mcp.exe", "serve"]` — adjust those fields when
 merging. These shapes assume a V2-native config; if the user's file uses
 V1 keys (`mcpServers`, top-level `"plugin"`), say so and merge into the
 equivalent V1 locations instead of mixing shapes.

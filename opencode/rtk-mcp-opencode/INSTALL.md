@@ -183,7 +183,7 @@ The reference (V2-native shapes — `mcp.servers`, ordered `permissions`):
     "servers": {
       "rtk": {
         "type": "local",
-        "command": ["./bin/rtk-cc-mcp"],
+        "command": ["<DEST>/bin/rtk-cc-mcp"],
         "disabled": false,
         "timeout": { "catalog": 30000, "execution": 30000 },
         "environment": { "RUST_LOG": "info" }
@@ -197,11 +197,16 @@ The reference (V2-native shapes — `mcp.servers`, ordered `permissions`):
 
 Merge rules: add the `rtk` entry under the existing `mcp.servers`
 (creating `mcp.servers` if absent), keeping its `environment` as shipped.
+Write `command` as an absolute path: replace `<DEST>` with the absolute
+config dir (e.g. `/home/user/.config/opencode`). A relative `./bin/...`
+does NOT resolve against the config dir — the host spawns it against the
+session directory and fails with `NotFound: ChildProcess.spawn` (observed
+live on OpenCode V2). Expand `$DEST` yourself now; JSON has no variables.
 Add the `shell` permission entry if no equivalent is already allowed —
 do not duplicate it. Leave an existing `skills` list alone; add
 `"skills": []` only if the key is absent. Do not paste the whole snippet
 over the user's config. On Windows the command must name the `.exe`:
-`["./bin/rtk-cc-mcp.exe"]` — adjust that one field when merging. These
+`["<DEST>/bin/rtk-cc-mcp.exe"]` — adjust those fields when merging (absolute path + `.exe`). These
 shapes assume a V2-native config; if the user's file uses V1 keys
 (`mcpServers`, top-level `"plugin"`), say so and merge into the
 equivalent V1 locations instead of mixing shapes.
