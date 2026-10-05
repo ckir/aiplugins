@@ -828,7 +828,7 @@ dependencies = [
 
 [[package]]
 name = "re-ghidra-mcp-agy"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "ghidra-mcp",
  "serde",
@@ -838,7 +838,7 @@ dependencies = [
 
 [[package]]
 name = "re-ghidra-mcp-cc"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "ghidra-mcp",
  "serde_json",
@@ -847,7 +847,7 @@ dependencies = [
 
 [[package]]
 name = "re-ghidra-mcp-qwen"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "ghidra-mcp",
  "serde_json",
@@ -940,7 +940,7 @@ dependencies = [
 
 [[package]]
 name = "rtk-mcp-agy"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -948,7 +948,7 @@ dependencies = [
 
 [[package]]
 name = "rtk-mcp-cc"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "rmcp",
@@ -962,7 +962,7 @@ dependencies = [
 
 [[package]]
 name = "rtk-mcp-qwen"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "serde",
  "serde_json",

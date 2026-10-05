@@ -12,7 +12,7 @@
       "name": "rtk-mcp-qwen",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/rtk-mcp-qwen-v0.7.2/rtk-mcp-qwen-extension.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/rtk-mcp-qwen-v0.8.0/rtk-mcp-qwen-extension.zip"
       },
       "description": "PreToolUse hook that rewrites run_shell_command invocations via the rtk CLI before execution.",
       "author": {
@@ -34,7 +34,7 @@
       "name": "re-ghidra-mcp-qwen",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-qwen-v0.7.2/re-ghidra-mcp-qwen-extension.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-qwen-v0.8.0/re-ghidra-mcp-qwen-extension.zip"
       },
       "description": "Drive a persistent headless Ghidra JVM from Qwen Code: 19 reverse-engineering tools over MCP — decompile, navigate and search a program, plus durable rename/comment/set-datatype/set-prototype/set-local writes saved to the project.",
       "author": {

@@ -12,7 +12,7 @@
       "name": "rtk-mcp-agy",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/rtk-mcp-agy-v0.7.2/rtk-mcp-agy-agy-plugin.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/rtk-mcp-agy-v0.8.0/rtk-mcp-agy-agy-plugin.zip"
       },
       "description": "An Antigravity hook integration for rtk (Rust Token Killer)",
       "author": {
@@ -34,7 +34,7 @@
       "name": "re-ghidra-mcp-agy",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-agy-v0.7.2/re-ghidra-mcp-agy-agy-plugin.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-agy-v0.8.0/re-ghidra-mcp-agy-agy-plugin.zip"
       },
       "description": "An Antigravity plugin for Ghidra reverse engineering",
       "author": {

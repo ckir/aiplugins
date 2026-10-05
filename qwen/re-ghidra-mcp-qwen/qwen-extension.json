@@ -1,6 +1,6 @@
 {
   "name": "re-ghidra-mcp-qwen",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "displayName": "re-ghidra-mcp-qwen — Ghidra MCP for Qwen Code",
   "description": "Drive a persistent headless Ghidra JVM from Qwen Code: 19 reverse-engineering tools over MCP — decompile, navigate and search a program, plus durable rename/comment/set-datatype/set-prototype/set-local writes saved to the project.",
   "license": "PolyForm-Noncommercial-1.0.0",
@@ -8,7 +8,9 @@
   "mcpServers": {
     "re-ghidra-mcp-qwen": {
       "command": "${extensionPath}${/}bin${/}re-ghidra-qwen-mcp",
-      "args": ["serve"]
+      "args": [
+        "serve"
+      ]
     }
   },
   "hooks": {
