@@ -4,48 +4,56 @@
   "packages": {
     "claude-code/rtk-mcp-cc": {
       "release-type": "rust",
+      "component": "rtk-mcp-cc",
       "extra-files": [
         ".claude-plugin/plugin.json"
       ]
     },
     "claude-code/re-ghidra-mcp-cc": {
       "release-type": "rust",
+      "component": "re-ghidra-mcp-cc",
       "extra-files": [
         ".claude-plugin/plugin.json"
       ]
     },
     "qwen/rtk-mcp-qwen": {
       "release-type": "rust",
+      "component": "rtk-mcp-qwen",
       "extra-files": [
         "qwen-extension.json"
       ]
     },
     "qwen/re-ghidra-mcp-qwen": {
       "release-type": "rust",
+      "component": "re-ghidra-mcp-qwen",
       "extra-files": [
         "qwen-extension.json"
       ]
     },
     "opencode/rtk-mcp-opencode": {
       "release-type": "simple",
+      "component": "rtk-mcp-opencode",
       "extra-files": [
         "package.json"
       ]
     },
     "opencode/re-ghidra-mcp-opencode": {
       "release-type": "simple",
+      "component": "re-ghidra-mcp-opencode",
       "extra-files": [
         "package.json"
       ]
     },
     "antigravity/rtk-mcp-agy": {
       "release-type": "rust",
+      "component": "rtk-mcp-agy",
       "extra-files": [
         "plugin.json"
       ]
     },
     "antigravity/re-ghidra-mcp-agy": {
       "release-type": "rust",
+      "component": "re-ghidra-mcp-agy",
       "extra-files": [
         "plugin.json"
       ]
