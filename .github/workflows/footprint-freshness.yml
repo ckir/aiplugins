@@ -1,0 +1,54 @@
+name: Footprint Freshness
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: footprint-freshness
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Early exit when measured inputs are untouched
+        run: |
+          if [ -z "$(git log --since='7 days' --oneline -- claude-code/ qwen/ opencode/ antigravity/ shared/ tools/plugin-footprint/ docs/footprints/)" ]; then
+            echo "No measured inputs changed in 7 days; nothing to regenerate."
+            echo "SKIP=true" >> "$GITHUB_ENV"
+          fi
+      - uses: dtolnay/rust-toolchain@stable
+        if: env.SKIP != 'true'
+      - uses: Swatinem/rust-cache@v2
+        if: env.SKIP != 'true'
+      - uses: taiki-e/install-action@just
+        if: env.SKIP != 'true'
+      - name: Regenerate and upsert correction branch
+        if: env.SKIP != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          just build-rtk-mcp-cc
+          just build-re-ghidra-mcp-cc
+          just build-rtk-mcp-opencode
+          just build-re-ghidra-mcp-opencode
+          just footprint-regen
+          if git diff --quiet -- docs/footprints/ README.md claude-code/*/README.md opencode/*/README.md; then
+            echo "Fresh. Nothing to do."
+            exit 0
+          fi
+          git checkout -B chore/footprint-freshness
+          git add docs/footprints/ README.md claude-code/*/README.md opencode/*/README.md
+          git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" \
+            commit -m "chore(footprint): regenerate stale documents (scheduled)"
+          git push --force-with-lease origin chore/footprint-freshness
+          if [ -z "$(gh pr list --head chore/footprint-freshness --json number --jq '.[].number')" ]; then
+            gh pr create --head chore/footprint-freshness --base main \
+              --title "chore(footprint): regenerate stale documents (scheduled)" \
+              --body "Scheduled freshness job found main's committed footprints stale. Review the measured deltas, then merge via the recorded override procedure if the gate trips on the correction."
+          fi
