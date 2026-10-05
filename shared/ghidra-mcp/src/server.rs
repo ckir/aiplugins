@@ -7,10 +7,10 @@
 //!     #[rmcp::tool_handler] on the `impl ServerHandler for T` block (wires
 //!     call_tool/list_tools) — the fully-qualified attribute paths still resolve: `rmcp_macros`
 //!     is re-exported at the crate root via `pub use rmcp_macros::*;` (`rmcp-3.1.4/src/lib.rs`)
-//!   - server info: rmcp::model::ServerInfo (a `#[non_exhaustive]` type alias for
+//!   - server info: rmcp::model::ServerConfig (a `#[non_exhaustive]` type alias for
 //!     `InitializeResult` as of 3.1 — no more struct-literal + `..Default::default()` from
 //!     outside the defining crate), built via the builder methods instead:
-//!     `ServerInfo::new(capabilities).with_instructions(text)`; capabilities still come from
+//!     `ServerConfig::new(capabilities).with_instructions(text)`; capabilities still come from
 //!     rmcp::model::ServerCapabilities::builder().enable_tools().build()
 //!   - tool result OK: rmcp::model::CallToolResult::success(vec![ContentBlock::text(s)])
 //!   - tool result domain-err: rmcp::model::CallToolResult::error(vec![ContentBlock::text(s)])
@@ -81,7 +81,7 @@ use ghidra_ipc::error::{ErrorCode, ErrorEnvelope};
 use ghidra_ipc::protocol::FunctionContext;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
-use rmcp::model::{CallToolResult, ContentBlock, ServerCapabilities, ServerInfo};
+use rmcp::model::{CallToolResult, ContentBlock, ServerCapabilities, ServerConfig};
 use rmcp::ServerHandler;
 use std::sync::Arc;
 
@@ -964,8 +964,8 @@ impl GhidraMcpServer {
 // becomes dead code. Naming the field restores the original design.
 #[rmcp::tool_handler(router = self.tool_router)]
 impl ServerHandler for GhidraMcpServer {
-    fn get_info(&self) -> ServerInfo {
-        ServerInfo::new(ServerCapabilities::builder().enable_tools().build()).with_instructions(
+    fn get_info(&self) -> ServerConfig {
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().build()).with_instructions(
             "ghidra-mcp: inspect a Ghidra project's programs and decompiled functions. Start with \
              list_project_programs to find a program_path, optionally attach_program to switch \
              targets, then inspect_function by name or canonical address.",

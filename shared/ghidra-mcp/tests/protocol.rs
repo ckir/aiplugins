@@ -20,7 +20,7 @@
 use ghidra_mcp::config::ServerConfig;
 use ghidra_mcp::server::GhidraMcpServer;
 use ghidra_mcp::state::ServerState;
-use rmcp::model::{CallToolRequestParams, ClientInfo};
+use rmcp::model::{CallToolRequestParams, ClientConfig};
 use rmcp::{ClientHandler, ServiceExt};
 use std::sync::Arc;
 use std::time::Duration;
@@ -32,8 +32,8 @@ use std::time::Duration;
 struct DummyClientHandler {}
 
 impl ClientHandler for DummyClientHandler {
-    fn get_info(&self) -> ClientInfo {
-        ClientInfo::default()
+    fn get_info(&self) -> ClientConfig {
+        ClientConfig::default()
     }
 }
 
