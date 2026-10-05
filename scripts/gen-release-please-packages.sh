@@ -79,11 +79,19 @@ for agent in $(jqr '.agents[].id' agents.json); do
         else
             release_type="simple"
         fi
+        # Explicit component (the directory basename): the rust strategy
+        # derives this from the Cargo package name, but simple-strategy
+        # packages have no crate, and lived runs show release-please failing
+        # to map their tags back to manifest paths without it (unconverging
+        # bump proposals). Basename equals the Cargo name for all six
+        # rust packages, so this is a no-op for them.
+        component="${key##*/}"
         jq -n \
             --arg key "$key" \
             --arg release_type "$release_type" \
             --arg manifest "$manifest" \
-            '{"key": $key, "value": {"release-type": $release_type, "extra-files": [$manifest]}}' \
+            --arg component "$component" \
+            '{"key": $key, "value": {"release-type": $release_type, "component": $component, "extra-files": [$manifest]}}' \
             >> "$tmpdir/entries.jsonl"
     done
 done
