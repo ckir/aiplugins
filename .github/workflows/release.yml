@@ -3,7 +3,8 @@
 # Copyright 2022-2024, axodotdev
 # SPDX-License-Identifier: MIT or Apache-2.0
 #
-# LOCAL PATCH, RE-APPLY AFTER REGENERATING: actions/checkout is bumped v6 -> v7.
+# LOCAL PATCHES, RE-APPLY AFTER REGENERATING:
+# 1. actions/checkout is bumped v6 -> v7.
 # dist 0.32.0 (the latest release, and the version pinned in dist-workspace.toml)
 # still emits v6, so `dist init` WILL revert this. Every other action this file
 # uses is already current (download-artifact@v8, upload-artifact@v7). Drop this
@@ -45,11 +46,18 @@ permissions:
 #
 # If there's a prerelease-style suffix to the version, then the release(s)
 # will be marked as a prerelease.
+# 2. Tag trigger excludes crateless opencode packages: dist cannot parse a tag
+# whose package has no Cargo crate (`dist host --tag=rtk-mcp-opencode-v0.7.2`
+# fails version parsing), so opencode tags must never invoke this workflow.
+# Opencode releases are created by release-please (or once by hand at
+# bootstrap) and bundled by opencode-bundles.yml, which triggers on the tag
+# push directly.
 on:
   pull_request:
   push:
     tags:
       - '*-v[0-9]*'
+      - '!*-opencode-v*'
 
 jobs:
   # Run 'dist plan' (or host) to determine what tasks we need to do
