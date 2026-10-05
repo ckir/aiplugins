@@ -1,0 +1,56 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "aiplugins-antigravity",
+  "owner": {
+    "name": "AI Plugins Marketplace Contributors"
+  },
+  "metadata": {
+    "description": "Antigravity plugins from the AI Plugins Marketplace monorepo"
+  },
+  "plugins": [
+    {
+      "name": "rtk-mcp-agy",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/rtk-mcp-agy-v0.7.2/rtk-mcp-agy-agy-plugin.zip"
+      },
+      "description": "An Antigravity hook integration for rtk (Rust Token Killer)",
+      "author": {
+        "name": "AI Plugins Marketplace Contributors"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/antigravity/rtk-mcp-agy",
+      "license": "PolyForm-Noncommercial-1.0.0",
+      "category": "development",
+      "keywords": [
+        "rtk",
+        "tokens",
+        "hooks",
+        "mcp",
+        "rust",
+        "performance"
+      ]
+    },
+    {
+      "name": "re-ghidra-mcp-agy",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-agy-v0.7.2/re-ghidra-mcp-agy-agy-plugin.zip"
+      },
+      "description": "An Antigravity plugin for Ghidra reverse engineering",
+      "author": {
+        "name": "AI Plugins Marketplace Contributors"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/antigravity/re-ghidra-mcp-agy",
+      "license": "PolyForm-Noncommercial-1.0.0",
+      "category": "development",
+      "keywords": [
+        "ghidra",
+        "reverse-engineering",
+        "decompiler",
+        "binary-analysis",
+        "mcp",
+        "rust"
+      ]
+    }
+  ]
+}

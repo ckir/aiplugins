@@ -6,8 +6,9 @@
 > exactly which step failed and what you saw — do not improvise workarounds
 > that change what gets installed.
 >
-> Fetch-and-follow URL for this document:
-> `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/re-ghidra-mcp-opencode/INSTALL.md`
+> Everything below comes from versioned release assets — no branch files,
+> no unpinned URLs. Agree the version with the user first (`0.7.2`
+> is current as of this writing) and use it for every URL.
 
 You will install `re-ghidra-mcp-opencode`: a persistent headless Ghidra JVM
 exposed as 19 reverse-engineering tools over MCP, plus two session hooks
@@ -33,7 +34,7 @@ Ghidra — the user supplies it:
    `application.java.min=21`).
 4. A Ghidra project already created, imported, **fully analyzed, and
    closed in the GUI**. Note `GHIDRA_MCP_PROJECT_DIR` (directory holding
-   the `.gpr`/`.rep`) and `GHIDRA_MCP_PROJECT_NAME` — Step 5 needs them.
+   the `.gpr`/`.rep`) and `GHIDRA_MCP_PROJECT_NAME` — Step 4 needs them.
    Warn the user: **one server = one Ghidra project.** The install target
    must not point at a project an open GUI (or another server) holds —
    they collide on Ghidra's `project.lock`. And the writes are durable
@@ -56,30 +57,91 @@ project)? Then set `DEST` accordingly and use it for every path below:
 
 Do not proceed on an assumed default.
 
-## Step 2 — fetch the plugin files
+## Step 2 — fetch the plugin bundle and the MCP server binary
 
-Base URL for every file (same shape as this document's own URL):
+Set the agreed version once; every URL below uses it (shown with
+`0.7.2` — substitute the agreed version everywhere `VERSION` appears):
 
-```text
-https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/re-ghidra-mcp-opencode/
+```bash
+VERSION=0.7.2
 ```
 
-Create the directories, then download each file to its destination
-(exact names matter):
+### The plugin files
+
+Download the versioned plugin bundle — asset
+`re-ghidra-mcp-opencode-opencode.zip` on release
+`re-ghidra-mcp-opencode-v$VERSION` (the doubled name is
+`<package>-opencode.zip` for package `re-ghidra-mcp-opencode`) — and stage
+it outside `$DEST`:
 
 ```bash
 mkdir -p "$DEST/plugins" "$DEST/skills/ghidra-re-driver" "$DEST/skills/doctor" "$DEST/agents"
-curl -fsSL "$BASE/plugin.ts" -o "$DEST/plugins/re-ghidra-mcp-opencode.ts"
-curl -fsSL "$BASE/skills/ghidra-re-driver/SKILL.md" -o "$DEST/skills/ghidra-re-driver/SKILL.md"
-curl -fsSL "$BASE/skills/doctor/SKILL.md" -o "$DEST/skills/doctor/SKILL.md"
-curl -fsSL "$BASE/agents/re-analyst.md" -o "$DEST/agents/re-analyst.md"
+curl -fsSL -o /tmp/ghidra-opencode.zip \
+  "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-opencode-v$VERSION/re-ghidra-mcp-opencode-opencode.zip"
+rm -rf /tmp/ghidra-opencode-stage && mkdir -p /tmp/ghidra-opencode-stage
+unzip -q -o /tmp/ghidra-opencode.zip -d /tmp/ghidra-opencode-stage
 ```
 
-with `BASE=https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/re-ghidra-mcp-opencode`.
-Every `curl` must exit 0 and produce a non-empty file — verify with
-`wc -c` on each destination. (`plugin.ts` is deliberately renamed on
-install; the host loads every file in `plugins/`, and the name keeps
-global installs identifiable.)
+The zip's top level IS the plugin directory (`plugin.ts`,
+`opencode.jsonc`, `skills/`, `agents/`, … — no wrapper folder), but the
+destinations keep the host layout, so copy each staged file to its place
+(exact names matter):
+
+```bash
+cp /tmp/ghidra-opencode-stage/plugin.ts "$DEST/plugins/re-ghidra-mcp-opencode.ts"
+cp /tmp/ghidra-opencode-stage/skills/ghidra-re-driver/SKILL.md "$DEST/skills/ghidra-re-driver/SKILL.md"
+cp /tmp/ghidra-opencode-stage/skills/doctor/SKILL.md "$DEST/skills/doctor/SKILL.md"
+cp /tmp/ghidra-opencode-stage/agents/re-analyst.md "$DEST/agents/re-analyst.md"
+```
+
+(`plugin.ts` is deliberately renamed on install; the host loads every
+file in `plugins/`, and the name keeps global installs identifiable.)
+Every download and copy must exit 0 and every destination must be
+non-empty — verify with `wc -c` on each destination.
+
+Leave the stage in place: Step 4 merges the staged `opencode.jsonc`.
+
+### The MCP server binary
+
+`re-ghidra-cc-mcp` (the 19 tools) ships in the versioned Claude Code
+plugin bundle — asset `re-ghidra-mcp-cc-plugin.zip` on release
+`re-ghidra-mcp-cc-v$VERSION` — reuse that zip, ignore everything in it except `bin/`:
+
+1. Map the machine to a target triple (`uname -s` + `uname -m`):
+
+   | System | Triple |
+   |---|---|
+   | Linux x86_64 | `x86_64-unknown-linux-gnu` |
+   | Linux aarch64 | `aarch64-unknown-linux-gnu` |
+   | macOS x86_64 | `x86_64-apple-darwin` |
+   | macOS arm64 (`uname -m` says `arm64`) | `aarch64-apple-darwin` |
+   | Windows x86_64 | `x86_64-pc-windows-msvc` |
+
+   Anything else: stop and report — there is no build for it.
+
+2. Download and extract only the one binary for that triple:
+
+   ```bash
+   curl -fsSL -o /tmp/ghidra-plugin.zip \
+     "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-cc-v$VERSION/re-ghidra-mcp-cc-plugin.zip"
+   mkdir -p "$DEST/bin"
+   # Unix:
+   unzip -p /tmp/ghidra-plugin.zip "bin/<triple>/re-ghidra-cc-mcp" > "$DEST/bin/re-ghidra-cc-mcp"
+   chmod +x "$DEST/bin/re-ghidra-cc-mcp"
+   # Windows (PowerShell):
+   # Expand-Archive C:\tmp\ghidra-plugin.zip C:\tmp\ghidra-plugin
+   # Copy-Item C:\tmp\ghidra-plugin\bin\re-ghidra-cc-mcp.exe $DEST\bin\re-ghidra-cc-mcp.exe
+   ```
+
+   Do NOT extract `bin/<name>` (the extensionless dispatcher) — it is a
+   shell script for the Claude Code host, and OpenCode spawns the server
+   binary directly. The per-target binary is the file you want.
+
+3. Confirm the binary executes: `$DEST/bin/re-ghidra-cc-mcp --help`
+   exits 0 (any `--help` text counts; "cannot execute binary file" means
+   the wrong triple — go back to step 1 of this section). This proves
+   the binary runs; it does not prove Ghidra connects — the `doctor`
+   skill does that.
 
 ## Step 3 — install the plugin runtime dependency
 
@@ -110,49 +172,8 @@ offline mirror), not this plugin: OpenCode itself runs `bun install` at
 startup and will hit the same wall, so fix network access first and
 then retry.
 
-## Step 4 — stage the MCP server binary
 
-`re-ghidra-cc-mcp` (the 19 tools) ships in the Claude Code plugin bundle
-on the latest release — reuse that zip, ignore everything in it except
-`bin/`:
-
-1. Map the machine to a target triple (`uname -s` + `uname -m`):
-
-   | System | Triple |
-   |---|---|
-   | Linux x86_64 | `x86_64-unknown-linux-gnu` |
-   | Linux aarch64 | `aarch64-unknown-linux-gnu` |
-   | macOS x86_64 | `x86_64-apple-darwin` |
-   | macOS arm64 (`uname -m` says `arm64`) | `aarch64-apple-darwin` |
-   | Windows x86_64 | `x86_64-pc-windows-msvc` |
-
-   Anything else: stop and report — there is no build for it.
-
-2. Download and extract only the one binary for that triple:
-
-   ```bash
-   curl -fsSL -o /tmp/ghidra-plugin.zip \
-     https://github.com/ckir/aiplugins/releases/latest/download/re-ghidra-mcp-cc-plugin.zip
-   mkdir -p "$DEST/bin"
-   # Unix:
-   unzip -p /tmp/ghidra-plugin.zip "bin/<triple>/re-ghidra-cc-mcp" > "$DEST/bin/re-ghidra-cc-mcp"
-   chmod +x "$DEST/bin/re-ghidra-cc-mcp"
-   # Windows (PowerShell):
-   # Expand-Archive C:\tmp\ghidra-plugin.zip C:\tmp\ghidra-plugin
-   # Copy-Item C:\tmp\ghidra-plugin\bin\re-ghidra-cc-mcp.exe $DEST\bin\re-ghidra-cc-mcp.exe
-   ```
-
-   Do NOT extract `bin/<name>` (the extensionless dispatcher) — it is a
-   shell script for the Claude Code host, and OpenCode spawns the server
-   binary directly. The per-target binary is the file you want.
-
-3. Confirm the binary executes: `$DEST/bin/re-ghidra-cc-mcp --help`
-   exits 0 (any `--help` text counts; "cannot execute binary file" means
-   the wrong triple — go back to step 1 of this section). This proves
-   the binary runs; it does not prove Ghidra connects — the `doctor`
-   skill does that.
-
-## Step 5 — merge the config snippet
+## Step 4 — merge the config snippet
 
 Fetch the reference snippet and merge its section into the user's config
 (`$DEST/opencode.json` or `$DEST/opencode.jsonc` — whichever exists;
@@ -162,7 +183,7 @@ from Step 0 (`GHIDRA_MCP_PROJECT_DIR`, `GHIDRA_MCP_PROJECT_NAME`, plus
 environment):
 
 ```bash
-curl -fsSL "$BASE/opencode.jsonc" -o /tmp/ghidra-opencode.jsonc
+cp /tmp/ghidra-opencode-stage/opencode.jsonc /tmp/ghidra-opencode.jsonc
 ```
 
 The reference (V2-native shape — `mcp.servers`):
@@ -194,15 +215,21 @@ merging. These shapes assume a V2-native config; if the user's file uses
 V1 keys (`mcpServers`, top-level `"plugin"`), say so and merge into the
 equivalent V1 locations instead of mixing shapes.
 
-## Step 6 — verify the install
+## Step 5 — verify the install
 
 All four, in order:
 
-1. Every destination file exists and is non-empty (the four from Step 2
-   plus the binary from Step 4).
+1. Every destination file exists and is non-empty (the four plugin files
+   Step 2 copied plus the MCP binary it staged).
 2. The merged config parses: `jq -e . $DEST/opencode.jsonc` (or
    `.../opencode.json`) exits 0, and the `ghidra` server entry is present
    under `mcp.servers`.
 3. The plugin module loads: from any directory with the config dir's
-   `node_modules` resolvable, `b
-...[truncated 818 chars]
+   `node_modules` resolvable,
+   `bun -e "await import('$DEST/plugins/re-ghidra-mcp-opencode.ts')"` exits 0
+   with no output. Importing only defines the hooks — nothing executes
+   until the host loads it.
+4. Restart OpenCode (config and plugins load at startup), then confirm
+   the `ghidra` server is connected (`/mcp`) and its 19 tools are listed.
+   Run the `doctor` skill if anything here is wrong — it walks the Ghidra
+   setup checks from Step 0 in order.

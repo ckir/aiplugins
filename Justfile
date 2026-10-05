@@ -62,6 +62,12 @@ marketplace:
 qwen-marketplace:
     bash scripts/check-qwen-marketplace.sh
 
+# Regenerate the host marketplace manifests from the plugin manifests.
+# CI runs --check: committed copies must match, so a stale copy fails
+# the same way a stale footprint does.
+gen-marketplaces:
+    bash scripts/gen-marketplaces.sh
+
 # Verify opencode/ plugin configs, ids, and skill copies.
 opencode-wiring:
     bash scripts/check-opencode-wiring.sh
@@ -104,6 +110,12 @@ footprint-regen:
 
 # Verify each published plugin's committed footprint against a fresh measurement,
 # then against the thresholds. Requires the plugin binaries; see `footprint-regen`.
+# OVERRIDE PROCEDURE (correction PRs that trip the delta cap on stale-base
+# cleanup, never for new growth): a maintainer reviews the measured delta,
+# confirms it is a measurement correction (zero new source bytes vs base,
+# shown by `git diff <base>...HEAD -- <plugin dir>`), then admin-merges with
+# `footprint-override: <reason>` in the merge message. New growth that trips
+# the cap is never overridden — shrink the change or earn the budget first.
 footprint:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -410,4 +422,12 @@ clean:
 
 
 versions:
-    bash scripts/check-manifest-versions.sh
+    bash scripts/check-package-versions.sh
+
+# Report working-copy files checked out as CRLF against an `eol=lf` pin.
+# A stale Windows checkout fails byte-identity gates (wiring `cmp`, footprint
+# freshness) on files whose blobs are already correct; renormalize instead of
+# editing content: `git rm --cached` is NOT needed, `rm <file> && git checkout
+# -- <file>` restores the pinned endings.
+doctor:
+    @git ls-files --eol | grep "w/crlf" | grep "eol=lf" || echo "Working copy matches all eol pins."

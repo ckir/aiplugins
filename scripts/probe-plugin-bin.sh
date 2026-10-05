@@ -25,6 +25,11 @@
 #      release and a manifest from another gets caught.
 #
 # Usage: scripts/probe-plugin-bin.sh <plugin-root>
+#
+# <plugin-root> is an assembled Claude bundle (`.claude-plugin/plugin.json`,
+# `hooks/hooks.json`, `.mcp.json`) or an assembled Antigravity bundle
+# (`plugin.json`, `hooks.json`, `mcp_config.json` at the top level); the entry
+# points are derived from whichever configs the tree carries.
 set -euo pipefail
 
 if [ "$#" -ne 1 ]; then
@@ -47,23 +52,40 @@ node=$(command -v node) || {
 }
 
 manifest="$root/.claude-plugin/plugin.json"
+# Antigravity bundles carry the manifest at the top level instead of under
+# `.claude-plugin/`. Prefer the Claude path so a tree containing both still
+# probes as Claude.
+[ -f "$manifest" ] || manifest="$root/plugin.json"
 version=""
 if [ -f "$manifest" ]; then
     version=$(jq -r '.version // ""' "$manifest" | tr -d '\r')
 fi
 
 names=$(
-    for config in "$root/hooks/hooks.json" "$root/.mcp.json"; do
-        [ -f "$config" ] || continue
-        jq -r '
-            [.. | objects | .command? // empty]
-            | .[]
-            | select(type == "string" and contains("CLAUDE_PLUGIN_ROOT"))
-        ' "$config"
-    done | sed 's#.*/bin/##; s#\.exe$##' | tr -d '\r' | sort -u
+    {
+        for config in "$root/hooks/hooks.json" "$root/.mcp.json"; do
+            [ -f "$config" ] || continue
+            jq -r '
+                [.. | objects | .command? // empty]
+                | .[]
+                | select(type == "string" and contains("CLAUDE_PLUGIN_ROOT"))
+            ' "$config"
+        done
+        # Antigravity bundles name bare binaries in top-level hooks.json and
+        # mcp_config.json — the same contract scripts/check-plugin-wiring.sh
+        # enforces. Absent on Claude trees, so this loop is a no-op there.
+        for config in "$root/hooks.json" "$root/mcp_config.json"; do
+            [ -f "$config" ] || continue
+            jq -r '
+                [.. | objects | .command? // empty]
+                | .[]
+                | select(type == "string")
+            ' "$config"
+        done
+    } | sed 's#.*/bin/##; s#\.exe$##' | tr -d '\r' | sort -u
 )
 [ -n "$names" ] || {
-    echo "ERROR: $root declares no \${CLAUDE_PLUGIN_ROOT}/bin/... commands to probe." >&2
+    echo "ERROR: $root declares no probed entry points (no \${CLAUDE_PLUGIN_ROOT}/bin/... or agy bare-name commands)." >&2
     exit 1
 }
 

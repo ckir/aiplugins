@@ -1,10 +1,10 @@
-name: Plugin Bundles
+name: Agy Bundles
 
-# Publish the installable Claude Code plugin zips.
+# Publish the installable Antigravity plugin zips.
 #
 # dist's own release job uploads per-target archives of the binaries — that is
 # what a `cargo install`-shaped consumer wants, and it is not a plugin: no
-# manifest, no skills, no hooks.json. `claude plugin install` fetches ONE zip per
+# manifest, no skills, no hooks.json. The agy host fetches ONE zip per
 # marketplace entry and extracts it as the plugin directory, so the marketplace
 # needs an asset that is the whole plugin, every platform at once.
 #
@@ -14,7 +14,8 @@ name: Plugin Bundles
 #
 # Linux is not incidental: the bundles carry a /bin/sh dispatcher and unix
 # binaries whose exec bits have to survive the zip, and only a unix-made zip
-# entry can record them. scripts/bundle-plugin.sh refuses to run anywhere else.
+# entry can record them. scripts/bundle-agy-plugin.sh refuses to run anywhere
+# else.
 
 # Deliberately NOT `release: published`. dist's announce job creates the release
 # with the default GITHUB_TOKEN, and GitHub does not let a token-created release
@@ -31,7 +32,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to bundle (e.g. rtk-mcp-cc-v0.7.2)"
+        description: "Release tag to bundle (e.g. rtk-mcp-agy-v0.7.2)"
         required: true
 
 permissions:
@@ -46,7 +47,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
-      contains(github.event.workflow_run.head_branch, '-cc-v'))
+      contains(github.event.workflow_run.head_branch, '-agy-v'))
     runs-on: ubuntu-latest
     env:
       TAG: ${{ inputs.tag || github.event.workflow_run.head_branch }}
@@ -63,15 +64,15 @@ jobs:
       # "No such file or directory" three steps later is a poor way to learn it.
       - name: Confirm the tag can be bundled
         run: |
-          test -f scripts/bundle-plugin.sh || {
-            echo "Tag $TAG predates scripts/bundle-plugin.sh — bundles exist from the next release onward." >&2
+          test -f scripts/bundle-agy-plugin.sh || {
+            echo "Tag $TAG predates scripts/bundle-agy-plugin.sh — bundles exist from the next release onward." >&2
             exit 1
           }
 
       - name: Determine plugins to bundle
         id: plugins
         run: |
-          names=$(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r' | tr '\n' ' ')
+          names=$(jq -r '.plugins[].name' .agy-plugin/marketplace.json | tr -d '\r' | tr '\n' ' ')
           [ -n "$names" ] || { echo "marketplace lists no plugins"; exit 1; }
           echo "names=$names" >> "$GITHUB_OUTPUT"
 
@@ -87,12 +88,12 @@ jobs:
       - name: Assemble plugin bundles
         run: |
           for name in ${{ steps.plugins.outputs.names }}; do
-            bash scripts/bundle-plugin.sh "$name" assets bundles
+            bash scripts/bundle-agy-plugin.sh "$name" assets bundles
           done
 
       - name: Upload bundles to the release
         run: |
-          gh release upload "$TAG" bundles/*-plugin.zip --clobber
+          gh release upload "$TAG" bundles/*-agy-plugin.zip --clobber
 
   # Everything above ran on Linux, against a tree this workflow assembled. This
   # downloads what was actually published, extracts it the way an install does,
@@ -118,8 +119,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p bundles
-          for plugin in $(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r'); do
-            gh release download "$TAG" -D bundles -p "$plugin-plugin.zip" --clobber
+          for plugin in $(jq -r '.plugins[].name' .agy-plugin/marketplace.json | tr -d '\r'); do
+            gh release download "$TAG" -D bundles -p "$plugin-agy-plugin.zip" --clobber
           done
           ls -la bundles
 
@@ -131,8 +132,8 @@ jobs:
           # extracting into extracted/<name> fails while extracted/ does not yet
           # exist. Expand-Archive creates parents, which is why only the unix
           # legs of this job failed.
-          for zip in bundles/*-plugin.zip; do
-            name=$(basename "$zip" -plugin.zip)
+          for zip in bundles/*-agy-plugin.zip; do
+            name=$(basename "$zip" -agy-plugin.zip)
             mkdir -p "extracted/$name"
             unzip -q "$zip" -d "extracted/$name"
           done
@@ -146,8 +147,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          foreach ($zip in Get-ChildItem bundles\*-plugin.zip) {
-            $name = $zip.Name -replace '-plugin\.zip$', ''
+          foreach ($zip in Get-ChildItem bundles\*-agy-plugin.zip) {
+            $name = $zip.Name -replace '-agy-plugin\.zip$', ''
             Expand-Archive -Path $zip.FullName -DestinationPath "extracted\$name"
           }
 

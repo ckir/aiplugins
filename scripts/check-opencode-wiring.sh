@@ -10,6 +10,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+source scripts/lib/registry.sh
+
 # The jq on a Windows PATH emits CRLF; strip it exactly like the other checks.
 jqr() {
     jq -r "$@" | tr -d '\r'
@@ -18,17 +20,13 @@ jqr() {
 known=$(cargo metadata --no-deps --format-version 1 |
     jq -r '.packages[].targets[] | select(.kind[] == "bin") | .name' | sort -u)
 
-# NOTE: Cargo.toml checks out with CRLF on Windows; strip CR exactly like
-# jqr does for jq output, otherwise `$` never matches and every version check
-# fails on a correct tree.
-workspace_version=$(tr -d '\r' < Cargo.toml | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1)
-
 failures=0
 checked=0
 fail() { echo "  FAIL  $1" >&2; failures=$((failures + 1)); }
 
-for dir in opencode/*/; do
-    name=$(basename "$dir")
+# Sorted: the old opencode/*/ glob expanded alphabetically.
+for name in $(registry_plugins opencode | sort); do
+    dir="opencode/$name/"
     plugin_ts="$dir/plugin.ts"
     jsonc="$dir/opencode.jsonc"
     pkg="$dir/package.json"
@@ -40,10 +38,13 @@ for dir in opencode/*/; do
     id=$(sed -n 's/^[[:space:]]*id:[[:space:]]*"\([^"]*\)".*$/\1/p' "$plugin_ts" | head -n 1)
     [ "$id" = "$name" ] || fail "$name: plugin.ts id is '$id'"
 
-    # 2. package.json version tracks the workspace.
+    # 2. package.json carries a well-formed semver version. Per-package
+    # releases bump it independently (the workspace version is not any
+    # plugin's release version); crate/manifest agreement for opencode lives
+    # in check-package-versions.sh, so form is all this check owns.
     pkg_version=$(jqr '.version // ""' "$pkg" 2>/dev/null || echo "")
-    [ "$pkg_version" = "$workspace_version" ] ||
-        fail "$name: package.json says $pkg_version, workspace is $workspace_version"
+    [[ "$pkg_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]] ||
+        fail "$name: package.json version '$pkg_version' is not semver"
 
     # 3. opencode.jsonc parses (kept comment-free so jq reads it) and carries
     #    V2-native shapes only.
@@ -116,7 +117,8 @@ done
 # version, so one plugin drifting ahead of (or behind) the other fails loudly
 # instead of passing silently.
 pin_ref=""
-for pkg in opencode/*/package.json; do
+for name in $(registry_plugins opencode | sort); do
+    pkg="opencode/$name/package.json"
     [ -f "$pkg" ] || continue
     pin=$(jqr '.dependencies["@opencode/plugin"] // ""' "$pkg" 2>/dev/null || echo "")
     if [ -z "$pin" ]; then
@@ -136,7 +138,7 @@ done
 
 if [ "$checked" -eq 0 ]; then
     echo "ERROR: found no opencode references to check." >&2
-    echo "       Either the opencode/ globs or the jq filters have gone stale." >&2
+    echo "       Either the registry plugin list or the jq filters have gone stale." >&2
     exit 1
 fi
 

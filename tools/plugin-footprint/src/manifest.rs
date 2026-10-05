@@ -206,6 +206,29 @@ pub fn read_opencode_servers(plugin_dir: &Path) -> Result<Vec<ServerSpec>, Manif
     Ok(out)
 }
 
+/// The version stamped into a footprint document. Each package owns its
+/// number in its own manifest; lookup tries each candidate path in order and
+/// the first manifest carrying a string `version` wins. A missing file moves
+/// on to the next candidate — only the absence of every manifest yields `None`.
+pub fn plugin_version(plugin_dir: &Path) -> Option<String> {
+    for rel in [
+        ".claude-plugin/plugin.json",
+        "qwen-extension.json",
+        "package.json",
+        "plugin.json",
+    ] {
+        let Ok(text) = std::fs::read_to_string(plugin_dir.join(rel)) else {
+            continue;
+        };
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) {
+            if let Some(s) = v.get("version").and_then(|v| v.as_str()) {
+                return Some(s.to_string());
+            }
+        }
+    }
+    None
+}
+
 fn resolve(
     name: &str,
     raw: RawServer,

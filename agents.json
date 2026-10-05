@@ -1,0 +1,46 @@
+{
+  "agents": [
+    {
+      "id": "claude-code",
+      "dir": "claude-code",
+      "plugins": ["rtk-mcp-cc", "re-ghidra-mcp-cc"],
+      "marketplace": ".claude-plugin/marketplace.json",
+      "manifestPattern": "claude-code/{plugin}/.claude-plugin/plugin.json",
+      "artifactSuffix": "-plugin.zip",
+      "sourceUrlBase": "https://github.com/ckir/aiplugins/releases/latest/download",
+      "notPublished": ["example"]
+    },
+    {
+      "id": "qwen",
+      "dir": "qwen",
+      "plugins": ["rtk-mcp-qwen", "re-ghidra-mcp-qwen"],
+      "marketplace": ".qwen-plugin/marketplace.json",
+      "manifestPattern": "qwen/{plugin}/qwen-extension.json",
+      "artifactSuffix": "-extension.zip",
+      "sourceUrlBase": "https://github.com/ckir/aiplugins/releases/latest/download",
+      "notPublished": ["example"]
+    },
+    {
+      "id": "opencode",
+      "dir": "opencode",
+      "plugins": ["rtk-mcp-opencode", "re-ghidra-mcp-opencode"],
+      "marketplace": ".opencode-plugin/marketplace.json",
+      "manifestPattern": "opencode/{plugin}/package.json",
+      "artifactSuffix": "-opencode.zip",
+      "sourceUrlBase": "https://github.com/ckir/aiplugins/releases/download",
+      "versionedSourceUrl": true,
+      "notPublished": []
+    },
+    {
+      "id": "antigravity",
+      "dir": "antigravity",
+      "plugins": ["rtk-mcp-agy", "re-ghidra-mcp-agy"],
+      "marketplace": ".agy-plugin/marketplace.json",
+      "manifestPattern": "antigravity/{plugin}/plugin.json",
+      "artifactSuffix": "-agy-plugin.zip",
+      "sourceUrlBase": "https://github.com/ckir/aiplugins/releases/download",
+      "versionedSourceUrl": true,
+      "notPublished": []
+    }
+  ]
+}

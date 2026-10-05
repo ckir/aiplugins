@@ -12,6 +12,20 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+source scripts/lib/registry.sh
+
+claude_dir=$(registry_field claude-code dir)
+agy_dir=$(registry_field antigravity dir)
+
+# registry_plugins lists the published plugins; claude-code/example still
+# ships hooks/mcp configs that name binaries, so the check enumerates the
+# registry's notPublished entries too. Callers sort: the old directory globs
+# expanded alphabetically.
+all_plugins() {
+    registry_plugins "$1"
+    rq --arg a "$1" '.agents[] | select(.id == $a) | .notPublished[]?'
+}
+
 known=$(cargo metadata --no-deps --format-version 1 |
     jq -r '.packages[].targets[] | select(.kind[] == "bin") | .name' | sort -u)
 
@@ -32,7 +46,8 @@ while IFS= read -r reference; do
         failures=$((failures + 1))
     fi
 done < <(
-    for config in claude-code/*/hooks/hooks.json claude-code/*/.mcp.json; do
+    for name in $(all_plugins claude-code | sort -u); do
+        config="$claude_dir/$name/hooks/hooks.json"
         [ -f "$config" ] || continue
         jq -r --arg file "$config" '
             [.. | objects | .command? // empty]
@@ -41,7 +56,28 @@ done < <(
             | "\($file)::\(.)"
         ' "$config"
     done
-    for config in antigravity/*/hooks.json antigravity/*/mcp_config.json; do
+    for name in $(all_plugins claude-code | sort -u); do
+        config="$claude_dir/$name/.mcp.json"
+        [ -f "$config" ] || continue
+        jq -r --arg file "$config" '
+            [.. | objects | .command? // empty]
+            | .[]
+            | select(type == "string" and contains("CLAUDE_PLUGIN_ROOT"))
+            | "\($file)::\(.)"
+        ' "$config"
+    done
+    for name in $(registry_plugins antigravity | sort); do
+        config="$agy_dir/$name/hooks.json"
+        [ -f "$config" ] || continue
+        jq -r --arg file "$config" '
+            [.. | objects | .command? // empty]
+            | .[]
+            | select(type == "string")
+            | "\($file)::\(.)"
+        ' "$config"
+    done
+    for name in $(registry_plugins antigravity | sort); do
+        config="$agy_dir/$name/mcp_config.json"
         [ -f "$config" ] || continue
         jq -r --arg file "$config" '
             [.. | objects | .command? // empty]
@@ -57,7 +93,7 @@ done < <(
 # a config is renamed, the manifest shape changes — say so and fail.
 if [ "$checked" -eq 0 ]; then
     echo "ERROR: found no plugin binary references to check." >&2
-    echo "       Either the config globs or the jq filter has gone stale." >&2
+    echo "       Either the registry plugin lists or the jq filter has gone stale." >&2
     exit 1
 fi
 

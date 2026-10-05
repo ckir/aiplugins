@@ -20,6 +20,7 @@
 # title/body based on your changelogs.
 
 name: Release
+run-name: "Release ${{ github.ref_name }}"
 permissions:
   "contents": "write"
 
@@ -48,7 +49,7 @@ on:
   pull_request:
   push:
     tags:
-      - '**[0-9]+.[0-9]+.[0-9]+*'
+      - '*-v[0-9]*'
 
 jobs:
   # Run 'dist plan' (or host) to determine what tasks we need to do

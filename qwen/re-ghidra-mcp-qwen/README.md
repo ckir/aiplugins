@@ -72,7 +72,7 @@ The script downloads the release bundle, validates it, extracts it to
 ### Via `qwen extensions install`
 
 ```bash
-qwen extensions install https://github.com/ckir/aiplugins/releases/latest/download/re-ghidra-mcp-qwen-extension.zip
+qwen extensions install https://github.com/ckir/aiplugins/releases/download/v0.7.2/re-ghidra-mcp-qwen-extension.zip
 ```
 
 > **⚠️ Known issue:** As of Qwen Code v0.22.3, `qwen extensions install` from
@@ -85,7 +85,7 @@ qwen extensions install https://github.com/ckir/aiplugins/releases/latest/downlo
 1. Download the extension bundle:
 
    ```
-   https://github.com/ckir/aiplugins/releases/latest/download/re-ghidra-mcp-qwen-extension.zip
+   https://github.com/ckir/aiplugins/releases/download/v0.7.2/re-ghidra-mcp-qwen-extension.zip
    ```
 
 2. Extract it to your Qwen extensions directory:

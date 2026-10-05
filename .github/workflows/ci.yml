@@ -98,8 +98,10 @@ jobs:
       # Confirms every binary named in a plugin's hooks.json / .mcp.json is a
       # [[bin]] target this workspace builds. Those are plain strings that no
       # compiler or test validates.
-      - name: Check manifest versions
-        run: bash scripts/check-manifest-versions.sh
+      - name: Check package versions
+        run: bash scripts/check-package-versions.sh
+      - name: Check release-please packages match the registry
+        run: bash scripts/gen-release-please-packages.sh --check
       - name: Check plugin wiring
         run: bash scripts/check-plugin-wiring.sh
 
@@ -108,6 +110,9 @@ jobs:
       # Its every field is a copy of something owned elsewhere.
       - name: Check marketplace manifest
         run: bash scripts/check-marketplace.sh
+
+      - name: Check generated marketplaces are current
+        run: bash scripts/gen-marketplaces.sh --check
 
       # Confirms each opencode/ plugin's id, opencode.jsonc, MCP commands,
       # and skill copies still agree with the sources they copy.

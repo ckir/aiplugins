@@ -17,11 +17,19 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+source scripts/lib/registry.sh
+
+agent=claude-code
+agent_dir=$(registry_field "$agent" dir)
+source_base=$(registry_field "$agent" sourceUrlBase)
+artifact_suffix=$(registry_field "$agent" artifactSuffix)
+
 manifest=.claude-plugin/marketplace.json
 
 # claude-code/example is a reference implementation people read, not something
-# anyone installs; it is deliberately absent from the marketplace.
-not_published="example"
+# anyone installs; it is deliberately absent from the marketplace. The
+# exclusion list lives in agents.json (notPublished); registry_is_excluded
+# below is the only read path.
 
 # The jq on a Windows PATH emits CRLF; a stray carriage return turns every
 # comparison below into a mismatch and every path into one that does not exist.
@@ -53,9 +61,12 @@ repo_url=$(sed -n 's/^repository = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
 }
 repo_url=${repo_url%.git}
 
-workspace_version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
-[ -n "$workspace_version" ] || {
-    echo "ERROR: no [workspace.package] version found in Cargo.toml." >&2
+# The registry pins the release-asset base url; it must stay the workspace
+# repository's latest/download endpoint so the marketplace url cannot quietly
+# point at a different repo.
+expected_base="$repo_url/releases/latest/download"
+[ "$source_base" = "$expected_base" ] || {
+    echo "ERROR: registry sourceUrlBase for $agent ($source_base) is not $expected_base." >&2
     exit 1
 }
 
@@ -68,7 +79,7 @@ entries=$(jqr '.plugins[].name' "$manifest")
 checked=0
 for name in $entries; do
     checked=$((checked + 1))
-    plugin_json="claude-code/$name/.claude-plugin/plugin.json"
+    plugin_json=$(registry_manifest_path "$agent" "$name")
 
     if [ ! -f "$plugin_json" ]; then
         fail "$name: no such plugin ($plugin_json missing)"
@@ -82,11 +93,15 @@ for name in $entries; do
         fail "$name: plugin.json calls itself '$manifest_name'"
 
     # The bundle ships this plugin.json alongside binaries built from the
-    # workspace at that version, and with latest/download urls it is the only
-    # version anyone sees. It sat three releases behind before this check.
+    # package's own crate at that version, and with latest/download urls it
+    # is the only version anyone sees. It sat three releases behind before
+    # this check. Per-package releases bump crates independently, so the
+    # crate — never the workspace version — is the oracle here.
+    crate_version=$(tr -d '\r' < "$agent_dir/$name/Cargo.toml" | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1)
+    [ -n "$crate_version" ] || fail "$name: no version in $agent_dir/$name/Cargo.toml"
     manifest_version=$(jqr '.version // ""' "$plugin_json")
-    [ "$manifest_version" = "$workspace_version" ] ||
-        fail "$name: plugin.json says $manifest_version, workspace is $workspace_version"
+    [ "$manifest_version" = "$crate_version" ] ||
+        fail "$name: plugin.json says $manifest_version, crate is $crate_version"
 
     for field in description license; do
         want=$(jqr --arg f "$field" '.[$f] // ""' "$plugin_json")
@@ -94,7 +109,7 @@ for name in $entries; do
         [ "$want" = "$got" ] || fail "$name: $field differs from $plugin_json"
     done
 
-    want_url="$repo_url/releases/latest/download/$name-plugin.zip"
+    want_url="$source_base/$name$artifact_suffix"
     got_url=$(jqr '.source.url // ""' <<< "$entry")
     [ "$want_url" = "$got_url" ] ||
         fail "$name: source url is '$got_url', expected '$want_url'"
@@ -110,14 +125,12 @@ done
 
 # The reverse direction: a plugin added to claude-code/ and never listed here is
 # a plugin nobody can install, and nothing else in CI would notice.
-for dir in claude-code/*/; do
+for dir in "$agent_dir"/*/; do
     name=$(basename "$dir")
-    [ -f "$dir.claude-plugin/plugin.json" ] || continue
-    case " $not_published " in
-        *" $name "*) continue ;;
-    esac
+    [ -f "$(registry_manifest_path "$agent" "$name")" ] || continue
+    if registry_is_excluded "$agent" "$name"; then continue; fi
     printf '%s\n' "$entries" | grep -qxF "$name" ||
-        fail "$name: exists in claude-code/ but is not listed in $manifest"
+        fail "$name: exists in $agent_dir/ but is not listed in $manifest"
 done
 
 if [ "$failures" -gt 0 ]; then

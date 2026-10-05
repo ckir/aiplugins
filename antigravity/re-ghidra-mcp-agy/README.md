@@ -80,26 +80,57 @@ That stages `re-ghidra-agy-mcp` and `re-ghidra-agy-hook` into the target directo
 
 ## Installing
 
-You can install the plugin directly from GitHub into your user-scoped global configuration using the `agy` CLI:
+Pick the version you want (`0.7.2` is current as of this writing) and
+fetch its `-agy-plugin.zip` — the doubled name is
+`<package>-agy-plugin.zip` for package `re-ghidra-mcp-agy`. The zip
+carries the plugin files plus the binaries for every supported platform,
+so nothing is compiled at install time:
+
 ```bash
-agy plugin install https://github.com/ckir/aiplugins/tree/main/antigravity/re-ghidra-mcp-agy
+curl -fsSL -o /tmp/re-ghidra-mcp-agy-agy-plugin.zip \
+  https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-agy-v0.7.2/re-ghidra-mcp-agy-agy-plugin.zip
+unzip -q -o /tmp/re-ghidra-mcp-agy-agy-plugin.zip -d /tmp/re-ghidra-mcp-agy
 ```
 
-If you prefer a **Repo-Scoped** installation instead, you can clone the repository and configure it in your project's `.agents/plugins.json`:
+Install the extracted directory into your user-scoped global
+configuration:
+
 ```bash
-git clone https://github.com/ckir/aiplugins.git
+agy plugin install /tmp/re-ghidra-mcp-agy
 ```
-Then create or update your project's `.agents/plugins.json` (at the root of your workspace) to point to the cloned directory:
+
+This copies the directory into place — after downloading a newer bundle,
+install again from its fresh extraction.
+
+If you prefer a **Repo-Scoped** installation instead, point your
+project's `.agents/plugins.json` (at the root of your workspace) at the
+extracted directory:
 ```json
 {
   "entries": [
     {
-      "path": "path/to/aiplugins/antigravity/re-ghidra-mcp-agy"
+      "path": "path/to/re-ghidra-mcp-agy"
     }
   ]
 }
 ```
-*(Alternatively, you can simply copy the `re-ghidra-mcp-agy` directory directly into your project's `.agents/plugins/` folder).*
+*(Alternatively, you can simply copy the extracted `re-ghidra-mcp-agy` directory directly into your project's `.agents/plugins/` folder).*
+
+Then put the installed `bin/` on `PATH`. `hooks.json` and
+`mcp_config.json` name bare binaries (`re-ghidra-agy-hook`,
+`re-ghidra-agy-mcp`) and never learn about platforms: the host resolves
+them through `PATH` — it does not add the plugin's `bin/` itself. On
+macOS/Linux the bare names hit the `bin/<name>` dispatcher, which execs
+the build for the running machine (`bin/<target>/<name>`); on Windows
+they resolve to the `bin/<name>.exe` siblings. So export the installed
+copy's `bin/` (under your agy user config, e.g.
+`~/.gemini/config/plugins/re-ghidra-mcp-agy/bin`), then confirm:
+
+```bash
+agy plugin validate <installed plugin directory>
+```
+
+which fails `not found on PATH` until the binaries resolve.
 
 Then configure the project — see `examples/re-ghidra-mcp-agy.local.md` and copy
 it to `.agents/re-ghidra-mcp-agy.local.md`.
