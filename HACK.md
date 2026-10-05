@@ -54,3 +54,18 @@ In particular never run `git push --tags`: it pushes every local tag,
 including stale or experimental ones, and each matching tag mints a real
 release. Footprint gate overrides use `footprint-override: <reason>` in the
 merge message (see the `footprint` recipe notes in the Justfile).
+
+## Marketplace URLs are pinned per release (regen after every bump)
+
+Marketplace `source.url` entries are tag-pinned
+(`releases/download/<package>-v<version>/<file>`), rendered from each
+package's own manifest by `bash scripts/gen-marketplaces.sh`. There is no
+`latest` anywhere: one repo-wide `latest` cannot serve eight packages.
+
+After every release-please bump PR, the committed marketplaces are stale by
+construction (manifests moved, urls did not), and CI fails the bump PR on
+`gen-marketplaces.sh --check` plus the host wiring checks. Procedure: check
+out the release-please branch (`release-please--branches--main`), run
+`bash scripts/gen-marketplaces.sh`, commit, push. Merge the bump PR only
+once that commit is green. The new marketplace points at the about-to-exist
+release; dist + bundle workflows attach the zips within minutes of the tag.

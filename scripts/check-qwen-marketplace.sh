@@ -56,9 +56,9 @@ repo_url=$(sed -n 's/^repository = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
 repo_url=${repo_url%.git}
 
 # The registry pins the release-asset base url; it must stay the workspace
-# repository's latest/download endpoint so the marketplace url cannot quietly
+# repository's releases/download endpoint so the marketplace url cannot quietly
 # point at a different repo.
-expected_base="$repo_url/releases/latest/download"
+expected_base="$repo_url/releases/download"
 [ "$source_base" = "$expected_base" ] || {
     echo "ERROR: registry sourceUrlBase for $agent ($source_base) is not $expected_base." >&2
     exit 1
@@ -87,8 +87,8 @@ for name in $entries; do
         fail "$name: qwen-extension.json calls itself '$manifest_name'"
 
     # The bundle ships this qwen-extension.json alongside binaries built from
-    # the package's own crate at that version, and with latest/download urls
-    # it is the only version anyone sees. Per-package releases bump crates
+    # the package's own crate at that version, and with tag-pinned urls the
+    # manifest version selects the release. Per-package releases bump crates
     # independently, so the crate — never the workspace version — is the
     # oracle here.
     crate_version=$(tr -d '\r' < "$agent_dir/$name/Cargo.toml" | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1)
@@ -103,7 +103,7 @@ for name in $entries; do
         [ "$want" = "$got" ] || fail "$name: $field differs from $ext_json"
     done
 
-    want_url="$source_base/$name$artifact_suffix"
+    want_url="$source_base/$name-v$manifest_version/$name$artifact_suffix"
     got_url=$(jqr '.source.url // ""' <<< "$entry")
     [ "$want_url" = "$got_url" ] ||
         fail "$name: source url is '$got_url', expected '$want_url'"
@@ -113,7 +113,7 @@ for name in $entries; do
         fail "$name: source type is '$got_source', expected 'archive'"
 
     if jq -e 'has("version")' <<< "$entry" > /dev/null 2>&1; then
-        fail "$name: entry declares a version; the latest/download payload owns that"
+        fail "$name: entry declares a version; the tag-pinned release payload owns that"
     fi
 done
 
