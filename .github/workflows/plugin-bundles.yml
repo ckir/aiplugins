@@ -121,9 +121,11 @@ jobs:
         shell: bash
         run: |
           mkdir -p bundles
-          for plugin in $(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r'); do
-            gh release download "$TAG" -D bundles -p "$plugin-plugin.zip" --clobber
-          done
+          # Per-package release: verify only this tag's own plugin.
+          name="${TAG%-v*}"
+          jq -e --arg n "$name" '.plugins[] | select(.name == $n)' .claude-plugin/marketplace.json > /dev/null \
+            || { echo "$name from tag $TAG is not in .claude-plugin/marketplace.json"; exit 1; }
+          gh release download "$TAG" -D bundles -p "$name-plugin.zip" --clobber
           ls -la bundles
 
       - name: Extract
