@@ -1,3 +1,24 @@
+## [0.7.1] - 2026-10-05
+
+The v0.7.0 tag predates #39, #41, #42 and #44, so this is the first
+release whose artifacts contain the OpenCode V2 support and footprint
+gates the 0.7.0 entry describes. On top of that code:
+
+### 🐛 Bug Fixes
+
+- *(rtk-mcp-agy)* Fix hooks.json schema and wire Antigravity plugin binaries (#39)
+- *(qwen)* Align marketplace copies with extension manifests and exclude the example (#44)
+- Correct stale footprint documents and published README regions (#44)
+- *(opencode)* Condense re-ghidra plugin.ts comments to fit the setup delta cap (#44)
+
+### 📚 Documentation
+
+- *(rtk-mcp-opencode)* Complete truncated INSTALL.md merge rules and verify step (#44)
+
+### ⚙️ Miscellaneous Tasks
+
+- Add dependabot configuration (#42)
+
 ## [0.7.0] - 2026-10-04
 
 ### 🚀 Features

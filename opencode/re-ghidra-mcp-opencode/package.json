@@ -1,6 +1,6 @@
 {
   "name": "re-ghidra-mcp-opencode",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "description": "OpenCode V2 integration for Ghidra reverse engineering: existing 19-tool MCP server plus session hooks that preserve RE state across compaction and point at the driver skill.",
   "license": "PolyForm-Noncommercial-1.0.0",
