@@ -7,8 +7,11 @@
 > that change what gets installed.
 >
 > Everything below comes from versioned release assets — no branch files,
-> no unpinned URLs. Agree the version with the user first (`0.7.2`
-> is current as of this writing) and use it for every URL.
+> no unpinned URLs. Agree the versions with the user first (plugin
+> and MCP server binary version independently — `0.7.3` / `0.8.0` are
+> current as of this writing; check
+> https://github.com/ckir/aiplugins/releases for what is newest) and use
+> them for every URL below.
 
 You will install `re-ghidra-mcp-opencode`: a persistent headless Ghidra JVM
 exposed as 19 reverse-engineering tools over MCP, plus two session hooks
@@ -59,11 +62,14 @@ Do not proceed on an assumed default.
 
 ## Step 2 — fetch the plugin bundle and the MCP server binary
 
-Set the agreed version once; every URL below uses it (shown with
-`0.7.2` — substitute the agreed version everywhere `VERSION` appears):
+Set the agreed versions once. The plugin bundle and the MCP server
+binary below come from different packages on independent versions (shown
+with the versions current as of this writing — substitute the agreed
+versions everywhere `VERSION` and `CC_VERSION` appear):
 
 ```bash
-VERSION=0.7.2
+VERSION=0.7.3
+CC_VERSION=0.8.0
 ```
 
 ### The plugin files
@@ -105,7 +111,7 @@ Leave the stage in place: Step 4 merges the staged `opencode.jsonc`.
 
 `re-ghidra-cc-mcp` (the 19 tools) ships in the versioned Claude Code
 plugin bundle — asset `re-ghidra-mcp-cc-plugin.zip` on release
-`re-ghidra-mcp-cc-v$VERSION` — reuse that zip, ignore everything in it except `bin/`:
+`re-ghidra-mcp-cc-v$CC_VERSION` — reuse that zip, ignore everything in it except `bin/`:
 
 1. Map the machine to a target triple (`uname -s` + `uname -m`):
 
@@ -123,7 +129,7 @@ plugin bundle — asset `re-ghidra-mcp-cc-plugin.zip` on release
 
    ```bash
    curl -fsSL -o /tmp/ghidra-plugin.zip \
-     "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-cc-v$VERSION/re-ghidra-mcp-cc-plugin.zip"
+     "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-cc-v$CC_VERSION/re-ghidra-mcp-cc-plugin.zip"
    mkdir -p "$DEST/bin"
    # Unix:
    unzip -p /tmp/ghidra-plugin.zip "bin/<triple>/re-ghidra-cc-mcp" > "$DEST/bin/re-ghidra-cc-mcp"
