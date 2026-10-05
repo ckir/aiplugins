@@ -54,7 +54,7 @@ verification) and asks whether to install project-local or global first:
 | Plugin | Resident bytes | Invocation bytes |
 |---|---|---|
 | `re-ghidra-mcp-cc` | ≥ 21,631 | ≥ 36,903 |
-| `re-ghidra-mcp-opencode` | ≥ 21,631 | ≥ 36,903 |
+| `re-ghidra-mcp-opencode` | ≥ 21,327 | ≥ 36,903 |
 | `rtk-mcp-cc` | ≥ 3,690 | ≥ 6,091 |
 | `rtk-mcp-opencode` | ≥ 3,690 | ≥ 6,091 |
 

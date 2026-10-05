@@ -3,6 +3,7 @@
   "version": "0.7.0",
   "displayName": "re-ghidra-mcp-qwen — Ghidra MCP for Qwen Code",
   "description": "Drive a persistent headless Ghidra JVM from Qwen Code: 19 reverse-engineering tools over MCP — decompile, navigate and search a program, plus durable rename/comment/set-datatype/set-prototype/set-local writes saved to the project.",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "contextFileName": "QWEN.md",
   "mcpServers": {
     "re-ghidra-mcp-qwen": {
