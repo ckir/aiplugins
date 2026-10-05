@@ -98,8 +98,6 @@ jobs:
       # Confirms every binary named in a plugin's hooks.json / .mcp.json is a
       # [[bin]] target this workspace builds. Those are plain strings that no
       # compiler or test validates.
-      - name: Check manifest versions
-        run: bash scripts/check-manifest-versions.sh
       - name: Check package versions
         run: bash scripts/check-package-versions.sh
       - name: Check release-please packages match the registry

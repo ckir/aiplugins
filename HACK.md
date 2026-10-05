@@ -45,3 +45,12 @@ zero new source bytes. Procedure: verify with
 `git diff origin/main...HEAD -- <measured dirs>` (must be empty of measured
 inputs), admin-merge with `footprint-override: <reason>` in the merge
 message. Each use is greppable via `git log --grep=footprint-override`.
+
+## Tags and releases
+
+Never push tags by hand — per-package `*-v*` tags are created only by
+release-please after its bump PR merges, and tag protection enforces it.
+In particular never run `git push --tags`: it pushes every local tag,
+including stale or experimental ones, and each matching tag mints a real
+release. Footprint gate overrides use `footprint-override: <reason>` in the
+merge message (see the `footprint` recipe notes in the Justfile).

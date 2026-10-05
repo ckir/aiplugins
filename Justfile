@@ -423,3 +423,11 @@ clean:
 
 versions:
     bash scripts/check-package-versions.sh
+
+# Report working-copy files checked out as CRLF against an `eol=lf` pin.
+# A stale Windows checkout fails byte-identity gates (wiring `cmp`, footprint
+# freshness) on files whose blobs are already correct; renormalize instead of
+# editing content: `git rm --cached` is NOT needed, `rm <file> && git checkout
+# -- <file>` restores the pinned endings.
+doctor:
+    @git ls-files --eol | grep "w/crlf" | grep "eol=lf" || echo "Working copy matches all eol pins."

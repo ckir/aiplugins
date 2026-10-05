@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Per-package version agreement. Replaces check-manifest-versions.sh.
+# Per-package version agreement across the eight registry packages.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 failures=0
