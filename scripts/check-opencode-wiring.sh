@@ -10,6 +10,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+source scripts/lib/registry.sh
+
 # The jq on a Windows PATH emits CRLF; strip it exactly like the other checks.
 jqr() {
     jq -r "$@" | tr -d '\r'
@@ -27,8 +29,9 @@ failures=0
 checked=0
 fail() { echo "  FAIL  $1" >&2; failures=$((failures + 1)); }
 
-for dir in opencode/*/; do
-    name=$(basename "$dir")
+# Sorted: the old opencode/*/ glob expanded alphabetically.
+for name in $(registry_plugins opencode | sort); do
+    dir="opencode/$name/"
     plugin_ts="$dir/plugin.ts"
     jsonc="$dir/opencode.jsonc"
     pkg="$dir/package.json"
@@ -116,7 +119,8 @@ done
 # version, so one plugin drifting ahead of (or behind) the other fails loudly
 # instead of passing silently.
 pin_ref=""
-for pkg in opencode/*/package.json; do
+for name in $(registry_plugins opencode | sort); do
+    pkg="opencode/$name/package.json"
     [ -f "$pkg" ] || continue
     pin=$(jqr '.dependencies["@opencode/plugin"] // ""' "$pkg" 2>/dev/null || echo "")
     if [ -z "$pin" ]; then
@@ -136,7 +140,7 @@ done
 
 if [ "$checked" -eq 0 ]; then
     echo "ERROR: found no opencode references to check." >&2
-    echo "       Either the opencode/ globs or the jq filters have gone stale." >&2
+    echo "       Either the registry plugin list or the jq filters have gone stale." >&2
     exit 1
 fi
 
