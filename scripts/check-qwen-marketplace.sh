@@ -11,12 +11,19 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+source scripts/lib/registry.sh
+
+agent=qwen
+agent_dir=$(registry_field "$agent" dir)
+source_base=$(registry_field "$agent" sourceUrlBase)
+artifact_suffix=$(registry_field "$agent" artifactSuffix)
+
 manifest=.qwen-plugin/marketplace.json
 
 # qwen/example is a reference implementation people read, not something
-# anyone installs; it is deliberately absent from the marketplace (mirrors
-# the `not_published` exclusion in scripts/check-marketplace.sh).
-not_published="example"
+# anyone installs; it is deliberately absent from the marketplace. The
+# exclusion list lives in agents.json (notPublished); registry_is_excluded
+# below is the only read path.
 
 # The jq on a Windows PATH emits CRLF; a stray carriage return turns every
 # comparison below into a mismatch and every path into one that does not exist.
@@ -48,6 +55,15 @@ repo_url=$(sed -n 's/^repository = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
 }
 repo_url=${repo_url%.git}
 
+# The registry pins the release-asset base url; it must stay the workspace
+# repository's latest/download endpoint so the marketplace url cannot quietly
+# point at a different repo.
+expected_base="$repo_url/releases/latest/download"
+[ "$source_base" = "$expected_base" ] || {
+    echo "ERROR: registry sourceUrlBase for $agent ($source_base) is not $expected_base." >&2
+    exit 1
+}
+
 workspace_version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
 [ -n "$workspace_version" ] || {
     echo "ERROR: no [workspace.package] version found in Cargo.toml." >&2
@@ -63,7 +79,7 @@ entries=$(jqr '.plugins[].name' "$manifest")
 checked=0
 for name in $entries; do
     checked=$((checked + 1))
-    ext_json="qwen/$name/qwen-extension.json"
+    ext_json=$(registry_manifest_path "$agent" "$name")
 
     if [ ! -f "$ext_json" ]; then
         fail "$name: no such extension ($ext_json missing)"
@@ -89,7 +105,7 @@ for name in $entries; do
         [ "$want" = "$got" ] || fail "$name: $field differs from $ext_json"
     done
 
-    want_url="$repo_url/releases/latest/download/$name-extension.zip"
+    want_url="$source_base/$name$artifact_suffix"
     got_url=$(jqr '.source.url // ""' <<< "$entry")
     [ "$want_url" = "$got_url" ] ||
         fail "$name: source url is '$got_url', expected '$want_url'"
@@ -105,14 +121,12 @@ done
 
 # The reverse direction: an extension added to qwen/ and never listed here is
 # an extension nobody can install, and nothing else in CI would notice.
-for dir in qwen/*/; do
+for dir in "$agent_dir"/*/; do
     name=$(basename "$dir")
-    [ -f "$dir/qwen-extension.json" ] || continue
-    case " $not_published " in
-        *" $name "*) continue ;;
-    esac
+    [ -f "$(registry_manifest_path "$agent" "$name")" ] || continue
+    if registry_is_excluded "$agent" "$name"; then continue; fi
     printf '%s\n' "$entries" | grep -qxF "$name" ||
-        fail "$name: exists in qwen/ but is not listed in $manifest"
+        fail "$name: exists in $agent_dir/ but is not listed in $manifest"
 done
 
 if [ "$failures" -gt 0 ]; then
