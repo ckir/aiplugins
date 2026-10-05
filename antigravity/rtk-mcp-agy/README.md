@@ -17,32 +17,62 @@ This crate provides two main binaries:
 
 ## Installation and Configuration
 
-1. **Get the Binaries**:
-   Download the latest precompiled binaries from the [Releases page](https://github.com/ckir/aiplugins/releases) and place them in your environment PATH.
+1. **Download the versioned plugin bundle**:
+   pick the version you want (`0.7.2` is current as of this writing) and
+   fetch its `-agy-plugin.zip` — the doubled name is
+   `<package>-agy-plugin.zip` for package `rtk-mcp-agy`:
 
-   *(Alternatively, if building locally: run `cargo build --release` and ensure the output binaries `rtk-hook-preinvocation` and `rtk-mcp` are in your PATH).*
-
-2. **Install the Plugin**:
-   You can install the plugin directly from GitHub into your user-scoped global configuration using the `agy` CLI:
    ```bash
-   agy plugin install https://github.com/ckir/aiplugins/tree/main/antigravity/rtk-mcp-agy
+   curl -fsSL -o /tmp/rtk-mcp-agy-agy-plugin.zip \
+     https://github.com/ckir/aiplugins/releases/download/rtk-mcp-agy-v0.7.2/rtk-mcp-agy-agy-plugin.zip
+   unzip -q -o /tmp/rtk-mcp-agy-agy-plugin.zip -d /tmp/rtk-mcp-agy
    ```
 
-   If you prefer a **Repo-Scoped** installation instead, you can clone the repository and configure it in your project's `.agents/plugins.json`:
+   The zip carries the plugin files plus the binaries for every supported
+   platform — Windows x64, and Linux and macOS on both x86_64 and
+   aarch64 — so nothing is compiled at install time. (Hacking on the
+   binaries instead? `cargo build -p rtk-mcp-agy` from a checkout builds
+   them from source.)
+
+2. **Install the plugin** from the extracted directory into your
+   user-scoped global configuration:
+
    ```bash
-   git clone https://github.com/ckir/aiplugins.git
+   agy plugin install /tmp/rtk-mcp-agy
    ```
-   Then create or update your project's `.agents/plugins.json` (at the root of your workspace) to point to the cloned directory:
+
+   This copies the directory into place — after downloading a newer
+   bundle, install again from its fresh extraction.
+
+   If you prefer a **Repo-Scoped** installation instead, point your
+   project's `.agents/plugins.json` (at the root of your workspace) at
+   the extracted directory:
    ```json
    {
      "entries": [
        {
-         "path": "path/to/aiplugins/antigravity/rtk-mcp-agy"
+         "path": "path/to/rtk-mcp-agy"
        }
      ]
    }
    ```
-   *(Alternatively, you can simply copy the `rtk-mcp-agy` directory directly into your project's `.agents/plugins/` folder).*
+   *(Alternatively, you can simply copy the extracted `rtk-mcp-agy` directory directly into your project's `.agents/plugins/` folder).*
+
+3. **Put the installed `bin/` on `PATH`.** `hooks.json` and
+   `mcp_config.json` name bare binaries (`rtk-hook-preinvocation`,
+   `rtk-mcp`) and never learn about platforms: the host resolves them
+   through `PATH` — it does not add the plugin's `bin/` itself. On
+   macOS/Linux the bare names hit the `bin/<name>` dispatcher, which
+   execs the build for the running machine (`bin/<target>/<name>`); on
+   Windows they resolve to the `bin/<name>.exe` siblings. So export the
+   installed copy's `bin/` (under your agy user config, e.g.
+   `~/.gemini/config/plugins/rtk-mcp-agy/bin`), then confirm:
+
+   ```bash
+   agy plugin validate <installed plugin directory>
+   ```
+
+   which fails `not found on PATH` until the binaries resolve.
 
 
 

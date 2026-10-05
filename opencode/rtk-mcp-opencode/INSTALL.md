@@ -6,8 +6,9 @@
 > exactly which step failed and what you saw — do not improvise workarounds
 > that change what gets installed.
 >
-> Fetch-and-follow URL for this document:
-> `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/rtk-mcp-opencode/INSTALL.md`
+> Everything below comes from versioned release assets — no branch files,
+> no unpinned URLs. Agree the version with the user first (`0.7.2`
+> is current as of this writing) and use it for every URL.
 
 You will install `rtk-mcp-opencode`: a PreToolUse-style hook that rewrites
 OpenCode shell commands through `rtk` (60–90% token savings) plus four MCP
@@ -46,37 +47,87 @@ project)? Then set `DEST` accordingly and use it for every path below:
 
 Do not proceed on an assumed default.
 
-## Step 2 — fetch the plugin files
+## Step 2 — fetch the plugin bundle and the MCP server binary
 
-Base URL for every file (same shape as this document's own URL):
+Set the agreed version once; every URL below uses it (shown with
+`0.7.2` — substitute the agreed version everywhere `VERSION` appears):
 
-```text
-https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/rtk-mcp-opencode/
+```bash
+VERSION=0.7.2
 ```
 
-Create the directories, then download each file to its destination
-(exact names matter):
+### The plugin files
+
+Download the versioned plugin bundle — asset
+`rtk-mcp-opencode-opencode.zip` on release
+`rtk-mcp-opencode-v$VERSION` (the doubled name is `<package>-opencode.zip`
+for package `rtk-mcp-opencode`) — and stage it outside `$DEST`:
 
 ```bash
 mkdir -p "$DEST/plugins" "$DEST/skills/rtk-policy" "$DEST/skills/gain"
-curl -fsSL "$BASE/plugin.ts" -o "$DEST/plugins/rtk-mcp-opencode.ts"
-curl -fsSL "$BASE/skills/rtk-policy/SKILL.md" -o "$DEST/skills/rtk-policy/SKILL.md"
-curl -fsSL "$BASE/skills/gain/SKILL.md" -o "$DEST/skills/gain/SKILL.md"
+curl -fsSL -o /tmp/rtk-opencode.zip \
+  "https://github.com/ckir/aiplugins/releases/download/rtk-mcp-opencode-v$VERSION/rtk-mcp-opencode-opencode.zip"
+rm -rf /tmp/rtk-opencode-stage && mkdir -p /tmp/rtk-opencode-stage
+unzip -q -o /tmp/rtk-opencode.zip -d /tmp/rtk-opencode-stage
 ```
 
-with `BASE=https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/rtk-mcp-opencode`.
-Every `curl` must exit 0 and produce a non-empty file — verify with
-`wc -c` on each destination. (`plugin.ts` is deliberately renamed to
-`rtk-mcp-opencode.ts` on install; the host loads every file in
-`plugins/`, and the name keeps global installs identifiable.)
-
-Optional but recommended: the settings template, only if the user wants
-non-default config now (otherwise skip — environment variables from
-README.md work without any file):
+The zip's top level IS the plugin directory (`plugin.ts`,
+`opencode.jsonc`, `skills/`, … — no wrapper folder), but the destinations
+keep the host layout, so copy each staged file to its place (exact names
+matter):
 
 ```bash
-curl -fsSL "$BASE/examples/rtk-mcp-opencode.local.md" -o "$DEST/rtk-mcp-opencode.local.md"
+cp /tmp/rtk-opencode-stage/plugin.ts "$DEST/plugins/rtk-mcp-opencode.ts"
+cp /tmp/rtk-opencode-stage/skills/rtk-policy/SKILL.md "$DEST/skills/rtk-policy/SKILL.md"
+cp /tmp/rtk-opencode-stage/skills/gain/SKILL.md "$DEST/skills/gain/SKILL.md"
 ```
+
+(`plugin.ts` is deliberately renamed to `rtk-mcp-opencode.ts` on install;
+the host loads every file in `plugins/`, and the name keeps global
+installs identifiable.) Every download and copy must exit 0 and every
+destination must be non-empty — verify with `wc -c` on each destination.
+
+Leave the stage in place: Step 4 merges the staged `opencode.jsonc`.
+
+### The MCP server binary
+
+`rtk-cc-mcp` (the four analytics tools) ships in the versioned Claude Code
+plugin bundle — asset `rtk-mcp-cc-plugin.zip` on release `v$VERSION` —
+reuse that zip, ignore everything in it except `bin/`:
+
+1. Map the machine to a target triple (`uname -s` + `uname -m`):
+
+   | System | Triple |
+   |---|---|
+   | Linux x86_64 | `x86_64-unknown-linux-gnu` |
+   | Linux aarch64 | `aarch64-unknown-linux-gnu` |
+   | macOS x86_64 | `x86_64-apple-darwin` |
+   | macOS arm64 (`uname -m` says `arm64`) | `aarch64-apple-darwin` |
+   | Windows x86_64 | `x86_64-pc-windows-msvc` |
+
+   Anything else: stop and report — there is no build for it.
+
+2. Download and extract only the one binary for that triple:
+
+   ```bash
+   curl -fsSL -o /tmp/rtk-plugin.zip \
+     "https://github.com/ckir/aiplugins/releases/download/v$VERSION/rtk-mcp-cc-plugin.zip"
+   mkdir -p "$DEST/bin"
+   # Unix:
+   unzip -p /tmp/rtk-plugin.zip "bin/<triple>/rtk-cc-mcp" > "$DEST/bin/rtk-cc-mcp"
+   chmod +x "$DEST/bin/rtk-cc-mcp"
+   # Windows (PowerShell):
+   # Expand-Archive C:\tmp\rtk-plugin.zip C:\tmp\rtk-plugin
+   # Copy-Item C:\tmp\rtk-plugin\bin\rtk-cc-mcp.exe $DEST\bin\rtk-cc-mcp.exe
+   ```
+
+   Do NOT extract `bin/<name>` (the extensionless dispatcher) — it is a
+   shell script for the Claude Code host, and OpenCode spawns the server
+   binary directly. The per-target binary is the file you want.
+
+3. Confirm the binary executes: `$DEST/bin/rtk-cc-mcp --help` exits 0
+   (any `--help` text counts; a "cannot execute binary file" error means
+   the wrong triple — go back to step 1 of this section).
 
 ## Step 3 — install the plugin runtime dependency
 
@@ -107,54 +158,15 @@ offline mirror), not this plugin: OpenCode itself runs `bun install` at
 startup and will hit the same wall, so fix network access first and
 then retry.
 
-## Step 4 — stage the MCP server binary
 
-`rtk-cc-mcp` (the four analytics tools) ships in the Claude Code plugin
-bundle on the latest release — reuse that zip, ignore everything in it
-except `bin/`:
-
-1. Map the machine to a target triple (`uname -s` + `uname -m`):
-
-   | System | Triple |
-   |---|---|
-   | Linux x86_64 | `x86_64-unknown-linux-gnu` |
-   | Linux aarch64 | `aarch64-unknown-linux-gnu` |
-   | macOS x86_64 | `x86_64-apple-darwin` |
-   | macOS arm64 (`uname -m` says `arm64`) | `aarch64-apple-darwin` |
-   | Windows x86_64 | `x86_64-pc-windows-msvc` |
-
-   Anything else: stop and report — there is no build for it.
-
-2. Download and extract only the one binary for that triple:
-
-   ```bash
-   curl -fsSL -o /tmp/rtk-plugin.zip \
-     https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-cc-plugin.zip
-   mkdir -p "$DEST/bin"
-   # Unix:
-   unzip -p /tmp/rtk-plugin.zip "bin/<triple>/rtk-cc-mcp" > "$DEST/bin/rtk-cc-mcp"
-   chmod +x "$DEST/bin/rtk-cc-mcp"
-   # Windows (PowerShell):
-   # Expand-Archive C:\tmp\rtk-plugin.zip C:\tmp\rtk-plugin
-   # Copy-Item C:\tmp\rtk-plugin\bin\rtk-cc-mcp.exe $DEST\bin\rtk-cc-mcp.exe
-   ```
-
-   Do NOT extract `bin/<name>` (the extensionless dispatcher) — it is a
-   shell script for the Claude Code host, and OpenCode spawns the server
-   binary directly. The per-target binary is the file you want.
-
-3. Confirm the binary executes: `$DEST/bin/rtk-cc-mcp --help` exits 0
-   (any `--help` text counts; a "cannot execute binary file" error means
-   the wrong triple — go back to step 1 of this section).
-
-## Step 5 — merge the config snippet
+## Step 4 — merge the config snippet
 
 Fetch the reference snippet and merge its three sections into the user's
 config (`$DEST/opencode.json` or `$DEST/opencode.jsonc` — whichever
 exists; create `opencode.jsonc` if neither does):
 
 ```bash
-curl -fsSL "$BASE/opencode.jsonc" -o /tmp/rtk-opencode.jsonc
+cp /tmp/rtk-opencode-stage/opencode.jsonc /tmp/rtk-opencode.jsonc
 ```
 
 The reference (V2-native shapes — `mcp.servers`, ordered `permissions`):
@@ -188,13 +200,12 @@ shapes assume a V2-native config; if the user's file uses V1 keys
 (`mcpServers`, top-level `"plugin"`), say so and merge into the
 equivalent V1 locations instead of mixing shapes.
 
-## Step 6 — verify the install
+## Step 5 — verify the install
 
 All four, in order:
 
-1. Every destination file exists and is non-empty (the three from Step 2
-   plus the binary from Step 4; the settings template only if the user
-   asked for it).
+1. Every destination file exists and is non-empty (the three plugin files
+   Step 2 copied plus the MCP binary it staged).
 2. The merged config parses: `jq -e . $DEST/opencode.jsonc` (or
    `.../opencode.json`) exits 0, and the `rtk` server entry is present
    under `mcp.servers`.
