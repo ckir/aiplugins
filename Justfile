@@ -110,6 +110,12 @@ footprint-regen:
 
 # Verify each published plugin's committed footprint against a fresh measurement,
 # then against the thresholds. Requires the plugin binaries; see `footprint-regen`.
+# OVERRIDE PROCEDURE (correction PRs that trip the delta cap on stale-base
+# cleanup, never for new growth): a maintainer reviews the measured delta,
+# confirms it is a measurement correction (zero new source bytes vs base,
+# shown by `git diff <base>...HEAD -- <plugin dir>`), then admin-merges with
+# `footprint-override: <reason>` in the merge message. New growth that trips
+# the cap is never overridden — shrink the change or earn the budget first.
 footprint:
     #!/usr/bin/env bash
     set -euo pipefail

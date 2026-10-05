@@ -36,3 +36,12 @@ and every check picks it up.
 
 Support is best-effort by design: an agent nobody registers in `agents.json`
 is invisible to all gates — nothing fails, nothing checks it.
+
+## Footprint gate override (stale-base corrections only)
+
+The delta cap compares fresh measurements against the merge-base document.
+If the base document itself is stale, the correction PR trips the cap with
+zero new source bytes. Procedure: verify with
+`git diff origin/main...HEAD -- <measured dirs>` (must be empty of measured
+inputs), admin-merge with `footprint-override: <reason>` in the merge
+message. Each use is greppable via `git log --grep=footprint-override`.
