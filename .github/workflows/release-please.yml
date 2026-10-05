@@ -15,9 +15,13 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v4
         with:
+          # PAT (secret RELEASE_PLEASE_TOKEN), not GITHUB_TOKEN: tags and
+          # releases created by GITHUB_TOKEN do not trigger tag-push
+          # workflows, which silently stalls every release pipeline.
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           include-component-in-tag: true
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           # Monorepo tags are always <package>-v<version> (simple strategy
           # included: without this, simple packages tag bare v<version> and
           # collide with each other — observed live on the first run).
