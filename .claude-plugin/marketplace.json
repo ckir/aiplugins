@@ -12,7 +12,7 @@
       "name": "rtk-mcp-cc",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/latest/download/rtk-mcp-cc-plugin.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/rtk-mcp-cc-v0.8.0/rtk-mcp-cc-plugin.zip"
       },
       "description": "Claude Code integration for rtk (Rust Token Killer): a PreToolUse hook that transparently rewrites Bash/PowerShell commands through rtk for 60-90% token savings, plus rtk analytics as MCP tools.",
       "author": {
@@ -34,7 +34,7 @@
       "name": "re-ghidra-mcp-cc",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/latest/download/re-ghidra-mcp-cc-plugin.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-cc-v0.8.0/re-ghidra-mcp-cc-plugin.zip"
       },
       "description": "Drive a persistent headless Ghidra JVM from Claude Code: 19 reverse-engineering tools over MCP — decompile, navigate and search a program, plus durable rename/comment/set-datatype/set-prototype/set-local writes saved to the project.",
       "author": {
