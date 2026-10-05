@@ -1,10 +1,10 @@
 {
-  "claude-code/rtk-mcp-cc": "0.7.2",
-  "claude-code/re-ghidra-mcp-cc": "0.7.2",
-  "qwen/rtk-mcp-qwen": "0.7.2",
-  "qwen/re-ghidra-mcp-qwen": "0.7.2",
-  "opencode/rtk-mcp-opencode": "0.7.2",
-  "opencode/re-ghidra-mcp-opencode": "0.7.2",
-  "antigravity/rtk-mcp-agy": "0.7.2",
-  "antigravity/re-ghidra-mcp-agy": "0.7.2"
+  "claude-code/rtk-mcp-cc": "0.8.0",
+  "claude-code/re-ghidra-mcp-cc": "0.8.0",
+  "qwen/rtk-mcp-qwen": "0.8.0",
+  "qwen/re-ghidra-mcp-qwen": "0.8.0",
+  "opencode/rtk-mcp-opencode": "0.7.3",
+  "opencode/re-ghidra-mcp-opencode": "0.7.3",
+  "antigravity/rtk-mcp-agy": "0.8.0",
+  "antigravity/re-ghidra-mcp-agy": "0.8.0"
 }
