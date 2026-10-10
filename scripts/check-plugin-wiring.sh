@@ -32,7 +32,7 @@ while IFS= read -r reference; do
         failures=$((failures + 1))
     fi
 done < <(
-    for config in claude-code/*/hooks/hooks.json claude-code/*/.mcp.json; do
+    for config in claude-code/plugins/*/hooks/hooks.json claude-code/plugins/*/.mcp.json; do
         [ -f "$config" ] || continue
         jq -r --arg file "$config" '
             [.. | objects | .command? // empty]
@@ -41,7 +41,7 @@ done < <(
             | "\($file)::\(.)"
         ' "$config"
     done
-    for config in antigravity/*/hooks.json antigravity/*/mcp_config.json; do
+    for config in antigravity/plugins/*/hooks.json antigravity/plugins/*/mcp_config.json; do
         [ -f "$config" ] || continue
         jq -r --arg file "$config" '
             [.. | objects | .command? // empty]

@@ -44,7 +44,7 @@ spellcheck:
 # does not filter them on Windows (mlc 1.2.2); extend the list when a new
 # node_modules/ or build-output dir appears.
 links:
-    mlc --offline --ignore-path "./node_modules,./opencode/re-ghidra-mcp-opencode/node_modules,./opencode/rtk-mcp-opencode/node_modules,./target"
+    mlc --offline --ignore-path "./node_modules,./opencode/plugins/re-ghidra-mcp-opencode/node_modules,./opencode/plugins/rtk-mcp-opencode/node_modules,./target"
 
 # Verify plugin configs point at binaries this workspace actually builds.
 # Nothing else checks those strings: rename a [[bin]] and every test still
@@ -62,7 +62,7 @@ marketplace:
 qwen-marketplace:
     bash scripts/check-qwen-marketplace.sh
 
-# Verify opencode/ plugin configs, ids, and skill copies.
+# Verify opencode/plugins/ plugin configs, ids, and skill copies.
 opencode-wiring:
     bash scripts/check-opencode-wiring.sh
 
@@ -70,7 +70,7 @@ opencode-wiring:
 test-opencode:
     #!/usr/bin/env bash
     set -euo pipefail
-    for dir in opencode/*/; do
+    for dir in opencode/plugins/*/; do
         (cd "$dir" && bun install && bun test tests/)
     done
 
@@ -81,14 +81,14 @@ footprint-regen:
     #!/usr/bin/env bash
     set -euo pipefail
     for plugin in $(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r'); do
-        cargo run -q -p plugin-footprint --bin plugin-footprint -- measure "claude-code/$plugin" \
+        cargo run -q -p plugin-footprint --bin plugin-footprint -- measure "claude-code/plugins/$plugin" \
             --out "docs/footprints/$plugin.json"
         cargo run -q -p plugin-footprint --bin plugin-footprint -- ratchet \
             --measured "docs/footprints/$plugin.json" \
             --budgets docs/footprints/budgets.json
         echo "regenerated docs/footprints/$plugin.json"
     done
-    for dir in opencode/*/; do
+    for dir in opencode/plugins/*/; do
         name=$(basename "$dir")
         cargo run -q -p plugin-footprint --bin plugin-footprint -- measure "$dir" \
             --out "docs/footprints/$name.json"
@@ -139,7 +139,7 @@ footprint:
     #
     # What actually indicates staleness is that REGENERATION CHANGED the file.
     # Unrelated prose edits are present before and after, so they cancel.
-    readmes="README.md $(ls -d claude-code/*/README.md opencode/*/README.md 2>/dev/null || true)"
+    readmes="README.md $(ls -d claude-code/plugins/*/README.md opencode/plugins/*/README.md 2>/dev/null || true)"
     before=$(md5sum $readmes)
 
     just footprint-regen
@@ -209,65 +209,65 @@ check: fmt lint test deny spellcheck links versions wiring marketplace dispatch 
 # Windows developers run this locally; CI produces the other platforms.
 build-claude-example:
     cargo build -p claude-example --release --bin claude-example-mcp --bin claude-example-hook
-    mkdir -p claude-code/example/bin
+    mkdir -p claude-code/plugins/example/bin
     for b in claude-example-mcp claude-example-hook; do \
         if [ -f "target/release/$b.exe" ]; then \
-            cp "target/release/$b.exe" claude-code/example/bin/; \
+            cp "target/release/$b.exe" claude-code/plugins/example/bin/; \
         else \
-            cp "target/release/$b" claude-code/example/bin/; \
+            cp "target/release/$b" claude-code/plugins/example/bin/; \
         fi; \
     done
-    @echo "Plugin binaries staged in claude-code/example/bin/"
+    @echo "Plugin binaries staged in claude-code/plugins/example/bin/"
 
 # Build the rtk-mcp-cc Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
 build-rtk-mcp-cc:
     cargo build -p rtk-mcp-cc --release --bin rtk-cc-hook --bin rtk-cc-mcp
-    mkdir -p claude-code/rtk-mcp-cc/bin
+    mkdir -p claude-code/plugins/rtk-mcp-cc/bin
     for b in rtk-cc-hook rtk-cc-mcp; do \
         if [ -f "target/release/$b.exe" ]; then \
-            cp "target/release/$b.exe" claude-code/rtk-mcp-cc/bin/; \
+            cp "target/release/$b.exe" claude-code/plugins/rtk-mcp-cc/bin/; \
         else \
-            cp "target/release/$b" claude-code/rtk-mcp-cc/bin/; \
+            cp "target/release/$b" claude-code/plugins/rtk-mcp-cc/bin/; \
         fi; \
     done
-    @echo "Plugin binaries staged in claude-code/rtk-mcp-cc/bin/"
+    @echo "Plugin binaries staged in claude-code/plugins/rtk-mcp-cc/bin/"
 
 # Build the re-ghidra-mcp-cc Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
 build-re-ghidra-mcp-cc:
     cargo build -p re-ghidra-mcp-cc --release --bin re-ghidra-cc-mcp --bin re-ghidra-cc-hook
-    mkdir -p claude-code/re-ghidra-mcp-cc/bin
+    mkdir -p claude-code/plugins/re-ghidra-mcp-cc/bin
     for b in re-ghidra-cc-mcp re-ghidra-cc-hook; do \
         if [ -f "target/release/$b.exe" ]; then \
-            cp "target/release/$b.exe" claude-code/re-ghidra-mcp-cc/bin/; \
+            cp "target/release/$b.exe" claude-code/plugins/re-ghidra-mcp-cc/bin/; \
         else \
-            cp "target/release/$b" claude-code/re-ghidra-mcp-cc/bin/; \
+            cp "target/release/$b" claude-code/plugins/re-ghidra-mcp-cc/bin/; \
         fi; \
     done
-    @echo "Plugin binaries staged in claude-code/re-ghidra-mcp-cc/bin/"
+    @echo "Plugin binaries staged in claude-code/plugins/re-ghidra-mcp-cc/bin/"
 
 # Stage rtk-mcp-opencode's MCP binary into its bin/ directory.
 build-rtk-mcp-opencode:
     cargo build -p rtk-mcp-cc --release --bin rtk-cc-mcp
-    mkdir -p opencode/rtk-mcp-opencode/bin
+    mkdir -p opencode/plugins/rtk-mcp-opencode/bin
     if [ -f "target/release/rtk-cc-mcp.exe" ]; then \
-        cp "target/release/rtk-cc-mcp.exe" opencode/rtk-mcp-opencode/bin/; \
+        cp "target/release/rtk-cc-mcp.exe" opencode/plugins/rtk-mcp-opencode/bin/; \
     else \
-        cp "target/release/rtk-cc-mcp" opencode/rtk-mcp-opencode/bin/; \
+        cp "target/release/rtk-cc-mcp" opencode/plugins/rtk-mcp-opencode/bin/; \
     fi
-    @echo "Plugin binary staged in opencode/rtk-mcp-opencode/bin/"
+    @echo "Plugin binary staged in opencode/plugins/rtk-mcp-opencode/bin/"
 
 # Stage re-ghidra-mcp-opencode's MCP binary into its bin/ directory.
 build-re-ghidra-mcp-opencode:
     cargo build -p re-ghidra-mcp-cc --release --bin re-ghidra-cc-mcp
-    mkdir -p opencode/re-ghidra-mcp-opencode/bin
+    mkdir -p opencode/plugins/re-ghidra-mcp-opencode/bin
     if [ -f "target/release/re-ghidra-cc-mcp.exe" ]; then \
-        cp "target/release/re-ghidra-cc-mcp.exe" opencode/re-ghidra-mcp-opencode/bin/; \
+        cp "target/release/re-ghidra-cc-mcp.exe" opencode/plugins/re-ghidra-mcp-opencode/bin/; \
     else \
-        cp "target/release/re-ghidra-cc-mcp" opencode/re-ghidra-mcp-opencode/bin/; \
+        cp "target/release/re-ghidra-cc-mcp" opencode/plugins/re-ghidra-mcp-opencode/bin/; \
     fi
-    @echo "Plugin binary staged in opencode/re-ghidra-mcp-opencode/bin/"
+    @echo "Plugin binary staged in opencode/plugins/re-ghidra-mcp-opencode/bin/"
 
 # Assemble the installable plugin zips for a published release, the same way
 # .github/workflows/plugin-bundles.yml does — for testing a change to the
@@ -323,12 +323,12 @@ bundle-qwen tag:
 # re-ghidra-mcp-qwen::skill_emit.
 emit-ghidra-skill: build-re-ghidra-mcp-cc
     cargo build -p re-ghidra-mcp-qwen --release --bin re-ghidra-qwen-mcp
-    ./claude-code/re-ghidra-mcp-cc/bin/re-ghidra-cc-mcp emit-skill \
-        > claude-code/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md
+    ./claude-code/plugins/re-ghidra-mcp-cc/bin/re-ghidra-cc-mcp emit-skill \
+        > claude-code/plugins/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md
     ./target/release/re-ghidra-qwen-mcp emit-skill \
-        > qwen/re-ghidra-mcp-qwen/skills/ghidra-re-driver/SKILL.md
-    ./claude-code/re-ghidra-mcp-cc/bin/re-ghidra-cc-mcp emit-skill \
-        > opencode/re-ghidra-mcp-opencode/skills/ghidra-re-driver/SKILL.md
+        > qwen/plugins/re-ghidra-mcp-qwen/skills/ghidra-re-driver/SKILL.md
+    ./claude-code/plugins/re-ghidra-mcp-cc/bin/re-ghidra-cc-mcp emit-skill \
+        > opencode/plugins/re-ghidra-mcp-opencode/skills/ghidra-re-driver/SKILL.md
     @echo "Regenerated the committed ghidra-re-driver skill copies (claude-code, qwen, opencode)"
 
 # Run the live Ghidra suite. Needs a real Ghidra 12.1.2 + JDK 21 and an analyzed
@@ -389,7 +389,7 @@ clean-stale:
         done
     done
     # Staged plugin binaries are copies, so they go stale the same way.
-    for staged in claude-code/*/bin/* opencode/*/bin/*; do
+    for staged in claude-code/plugins/*/bin/* opencode/plugins/*/bin/*; do
         [ -f "$staged" ] || continue
         name=$(basename "$staged"); name="${name%.exe}"
         if ! printf '%s\n' "$known" | grep -qxF "$name"; then
@@ -405,7 +405,7 @@ clean-stale:
 # full rebuild.
 clean:
     cargo clean
-    rm -rf claude-code/example/bin claude-code/rtk-mcp-cc/bin claude-code/re-ghidra-mcp-cc/bin opencode/rtk-mcp-opencode/bin opencode/re-ghidra-mcp-opencode/bin
+    rm -rf claude-code/plugins/example/bin claude-code/plugins/rtk-mcp-cc/bin claude-code/plugins/re-ghidra-mcp-cc/bin opencode/plugins/rtk-mcp-opencode/bin opencode/plugins/re-ghidra-mcp-opencode/bin
     @echo "Removed target/ and staged plugin binaries."
 
 

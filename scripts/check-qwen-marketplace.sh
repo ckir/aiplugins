@@ -13,7 +13,7 @@ cd "$(dirname "$0")/.."
 
 manifest=.qwen-plugin/marketplace.json
 
-# qwen/example is a reference implementation people read, not something
+# qwen/plugins/example is a reference implementation people read, not something
 # anyone installs; it is deliberately absent from the marketplace (mirrors
 # the `not_published` exclusion in scripts/check-marketplace.sh).
 not_published="example"
@@ -63,7 +63,7 @@ entries=$(jqr '.plugins[].name' "$manifest")
 checked=0
 for name in $entries; do
     checked=$((checked + 1))
-    ext_json="qwen/$name/qwen-extension.json"
+    ext_json="qwen/plugins/$name/qwen-extension.json"
 
     if [ ! -f "$ext_json" ]; then
         fail "$name: no such extension ($ext_json missing)"
@@ -103,16 +103,16 @@ for name in $entries; do
     fi
 done
 
-# The reverse direction: an extension added to qwen/ and never listed here is
+# The reverse direction: an extension added to qwen/plugins/ and never listed here is
 # an extension nobody can install, and nothing else in CI would notice.
-for dir in qwen/*/; do
+for dir in qwen/plugins/*/; do
     name=$(basename "$dir")
     [ -f "$dir/qwen-extension.json" ] || continue
     case " $not_published " in
         *" $name "*) continue ;;
     esac
     printf '%s\n' "$entries" | grep -qxF "$name" ||
-        fail "$name: exists in qwen/ but is not listed in $manifest"
+        fail "$name: exists in qwen/plugins/ but is not listed in $manifest"
 done
 
 if [ "$failures" -gt 0 ]; then

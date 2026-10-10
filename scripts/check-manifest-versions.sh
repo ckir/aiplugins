@@ -34,15 +34,15 @@ check_file() {
     fi
 }
 
-for file in antigravity/*/plugin.json claude-code/*/.claude-plugin/plugin.json; do
+for file in antigravity/plugins/*/plugin.json claude-code/plugins/*/.claude-plugin/plugin.json; do
     check_file "$file" "version"
 done
 
-for file in qwen/*/qwen-extension.json; do
+for file in qwen/plugins/*/qwen-extension.json; do
     check_file "$file" "version"
 done
 
-for file in opencode/*/package.json; do
+for file in opencode/plugins/*/package.json; do
     check_file "$file" "version"
 done
 

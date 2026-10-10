@@ -18,7 +18,7 @@
       "author": {
         "name": "AI Plugins Marketplace Contributors"
       },
-      "homepage": "https://github.com/ckir/aiplugins/tree/main/claude-code/rtk-mcp-cc",
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/claude-code/plugins/rtk-mcp-cc",
       "license": "PolyForm-Noncommercial-1.0.0",
       "category": "development",
       "keywords": [
@@ -40,7 +40,7 @@
       "author": {
         "name": "AI Plugins Marketplace Contributors"
       },
-      "homepage": "https://github.com/ckir/aiplugins/tree/main/claude-code/re-ghidra-mcp-cc",
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/claude-code/plugins/re-ghidra-mcp-cc",
       "license": "PolyForm-Noncommercial-1.0.0",
       "category": "development",
       "keywords": [

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Verify the opencode/ plugins still describe things this repo builds.
+# Verify the opencode/plugins/ plugins still describe things this repo builds.
 #
 # An opencode.jsonc names its MCP binary as a plain string, a plugin.ts id is
 # free text, and a skill copy is just a file: nothing else checks any of them.
@@ -27,7 +27,7 @@ failures=0
 checked=0
 fail() { echo "  FAIL  $1" >&2; failures=$((failures + 1)); }
 
-for dir in opencode/*/; do
+for dir in opencode/plugins/*/; do
     name=$(basename "$dir")
     plugin_ts="$dir/plugin.ts"
     jsonc="$dir/opencode.jsonc"
@@ -96,10 +96,10 @@ done
 # catches a forgotten opencode regen (or a hand-edit) with no build, while the
 # generator side stays pinned by `skill_emit.rs` (which covers both copies).
 for pair in \
-    "claude-code/rtk-mcp-cc/skills/rtk-policy/SKILL.md:opencode/rtk-mcp-opencode/skills/rtk-policy/SKILL.md" \
-    "claude-code/rtk-mcp-cc/skills/gain/SKILL.md:opencode/rtk-mcp-opencode/skills/gain/SKILL.md" \
-    "claude-code/re-ghidra-mcp-cc/skills/doctor/SKILL.md:opencode/re-ghidra-mcp-opencode/skills/doctor/SKILL.md" \
-    "claude-code/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md:opencode/re-ghidra-mcp-opencode/skills/ghidra-re-driver/SKILL.md" \
+    "claude-code/plugins/rtk-mcp-cc/skills/rtk-policy/SKILL.md:opencode/plugins/rtk-mcp-opencode/skills/rtk-policy/SKILL.md" \
+    "claude-code/plugins/rtk-mcp-cc/skills/gain/SKILL.md:opencode/plugins/rtk-mcp-opencode/skills/gain/SKILL.md" \
+    "claude-code/plugins/re-ghidra-mcp-cc/skills/doctor/SKILL.md:opencode/plugins/re-ghidra-mcp-opencode/skills/doctor/SKILL.md" \
+    "claude-code/plugins/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md:opencode/plugins/re-ghidra-mcp-opencode/skills/ghidra-re-driver/SKILL.md" \
 ; do
     src=${pair%%:*}; dst=${pair#*:}
     checked=$((checked + 1))
@@ -116,7 +116,7 @@ done
 # version, so one plugin drifting ahead of (or behind) the other fails loudly
 # instead of passing silently.
 pin_ref=""
-for pkg in opencode/*/package.json; do
+for pkg in opencode/plugins/*/package.json; do
     [ -f "$pkg" ] || continue
     pin=$(jqr '.dependencies["@opencode/plugin"] // ""' "$pkg" 2>/dev/null || echo "")
     if [ -z "$pin" ]; then
@@ -136,7 +136,7 @@ done
 
 if [ "$checked" -eq 0 ]; then
     echo "ERROR: found no opencode references to check." >&2
-    echo "       Either the opencode/ globs or the jq filters have gone stale." >&2
+    echo "       Either the opencode/plugins/ globs or the jq filters have gone stale." >&2
     exit 1
 fi
 

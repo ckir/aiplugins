@@ -18,7 +18,7 @@
       "author": {
         "name": "AI Plugins Marketplace Contributors"
       },
-      "homepage": "https://github.com/ckir/aiplugins/tree/main/qwen/rtk-mcp-qwen",
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/qwen/plugins/rtk-mcp-qwen",
       "license": "PolyForm-Noncommercial-1.0.0",
       "category": "development",
       "keywords": [
@@ -40,7 +40,7 @@
       "author": {
         "name": "AI Plugins Marketplace Contributors"
       },
-      "homepage": "https://github.com/ckir/aiplugins/tree/main/qwen/re-ghidra-mcp-qwen",
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/qwen/plugins/re-ghidra-mcp-qwen",
       "license": "PolyForm-Noncommercial-1.0.0",
       "category": "development",
       "keywords": [

@@ -23,7 +23,7 @@ fi
 # arrives with a carriage return attached and every path built from it is wrong.
 plugin=$(printf '%s' "$1" | tr -d '\r')
 repo=$(cd "$(dirname "$0")/.." && pwd)
-src="$repo/claude-code/$plugin"
+src="$repo/claude-code/plugins/$plugin"
 
 command -v jq > /dev/null 2>&1 || {
     echo "ERROR: jq is required and not on PATH." >&2

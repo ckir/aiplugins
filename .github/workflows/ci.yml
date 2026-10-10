@@ -78,7 +78,7 @@ jobs:
 
       - name: Run opencode plugin tests
         run: |
-          for dir in opencode/*/; do
+          for dir in opencode/plugins/*/; do
             (cd "$dir" && bun install && bun test tests/)
           done
         shell: bash
@@ -109,7 +109,7 @@ jobs:
       - name: Check marketplace manifest
         run: bash scripts/check-marketplace.sh
 
-      # Confirms each opencode/ plugin's id, opencode.jsonc, MCP commands,
+      # Confirms each opencode/plugins/ plugin's id, opencode.jsonc, MCP commands,
       # and skill copies still agree with the sources they copy.
       - name: Check opencode wiring
         run: bash scripts/check-opencode-wiring.sh
@@ -167,7 +167,7 @@ jobs:
           # by git, because a README is mostly hand-written prose with one
           # generated region in it — see the Justfile for why that distinction
           # matters locally.
-          readmes="README.md $(ls -d claude-code/*/README.md opencode/*/README.md)"
+          readmes="README.md $(ls -d claude-code/plugins/*/README.md opencode/plugins/*/README.md)"
           before=$(md5sum $readmes)
 
           just footprint-regen
@@ -234,7 +234,7 @@ jobs:
             bash scripts/smoke-bundle.sh "$plugin"
           done
 
-  # Proves both opencode/ plugins' setup() paths end-to-end (real spawnSync
+  # Proves both opencode/plugins/ plugins' setup() paths end-to-end (real spawnSync
   # path, compiled mock-rtk-cc fixture on PATH) on a real machine of each OS.
   # The fixture name keeps its hyphens (CARGO_BIN_EXE_mock-rtk-cc), which POSIX
   # shells can neither `export` nor expand — hence `env "..."`.
@@ -262,7 +262,7 @@ jobs:
       - name: Install opencode plugin dependencies
         shell: bash
         run: |
-          for dir in opencode/*/; do
+          for dir in opencode/plugins/*/; do
             (cd "$dir" && bun install)
           done
 

@@ -33,8 +33,8 @@ TypeScript itself. Per plugin (full steps in its README):
 
 | Plugin | Copies | Binary staging |
 |---|---|---|
-| [`rtk-mcp-opencode`](opencode/rtk-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/`, `skills/*` → `.opencode/skills/` | `just build-rtk-mcp-opencode` |
-| [`re-ghidra-mcp-opencode`](opencode/re-ghidra-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/`, `skills/*` → `.opencode/skills/`, `agents/*` → `.opencode/agents/` | `just build-re-ghidra-mcp-opencode` |
+| [`rtk-mcp-opencode`](opencode/plugins/rtk-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/`, `skills/*` → `.opencode/skills/` | `just build-rtk-mcp-opencode` |
+| [`re-ghidra-mcp-opencode`](opencode/plugins/re-ghidra-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/`, `skills/*` → `.opencode/skills/`, `agents/*` → `.opencode/agents/` | `just build-re-ghidra-mcp-opencode` |
 
 Merge each plugin's `opencode.jsonc` into `.opencode/opencode.jsonc`; the
 `./bin/<name>` command in it is relative to the installed plugin copy, so
@@ -45,8 +45,8 @@ document for the plugin you want — it performs the whole procedure
 (prerequisites, file copies, dependency, binary, config merge,
 verification) and asks whether to install project-local or global first:
 
-- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/rtk-mcp-opencode/INSTALL.md`
-- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/re-ghidra-mcp-opencode/INSTALL.md`
+- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/plugins/rtk-mcp-opencode/INSTALL.md`
+- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/plugins/re-ghidra-mcp-opencode/INSTALL.md`
 
 ## What each plugin costs a context window
 
@@ -76,10 +76,14 @@ This repository is structured as a monorepo. It will contain specialized package
 ```text
 aiplugins/
 ├── .claude-plugin/  # marketplace.json — what `claude plugin marketplace add` reads
-├── claude-code/   # Plugins specifically for Claude Code
-├── antigravity/   # Plugins specifically for Antigravity
-├── qwen/          # Plugins specifically for Qwen
-├── opencode/      # Plugins specifically for OpenCode
+├── claude-code/plugins/   # Plugins specifically for Claude Code
+├── claude-code/{agents,skills,commands,models,themes}/  # Standalone components (plugin-embedded ones stay in plugins/*/)
+├── antigravity/plugins/   # Plugins specifically for Antigravity
+├── antigravity/{agents,skills,commands,models,themes}/
+├── qwen/plugins/          # Plugins specifically for Qwen
+├── qwen/{agents,skills,commands,models,themes}/
+├── opencode/plugins/      # Plugins specifically for OpenCode
+├── opencode/{agents,skills,commands,models,themes}/
 ├── shared/        # Agent-agnostic crates that several plugins front
 ├── scripts/       # Repository checks run by CI and `just check`
 └── README.md      # Project overview
@@ -96,25 +100,25 @@ and is usually a thin front end.
 | `shared/ghidra-worker-ctl` | Headless Ghidra JVM lifecycle: boot, launch, connection, Windows Job Object containment |
 | `shared/ghidra-mcp` | The MCP server and its 19 reverse-engineering tools, plus the embedded Ghidra worker script and driver skill |
 
-Fronted today by [`claude-code/re-ghidra-mcp-cc`](claude-code/re-ghidra-mcp-cc/).
+Fronted today by [`claude-code/plugins/re-ghidra-mcp-cc`](claude-code/plugins/re-ghidra-mcp-cc/).
 
 ## Documentation index
 
 Plugin and example READMEs, by agent directory:
 
-- `claude-code/`
-  - [`re-ghidra-mcp-cc`](claude-code/re-ghidra-mcp-cc/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
-  - [`rtk-mcp-cc`](claude-code/rtk-mcp-cc/) — `rtk` shell-command rewriting for 60–90% fewer output tokens, plus analytics MCP tools.
-  - [`example`](claude-code/example/) — template Rust Claude Code plugin (TODO/FIXME/HACK tracker).
-- `antigravity/`
-  - [`re-ghidra-mcp-agy`](antigravity/re-ghidra-mcp-agy/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
-  - [`rtk-mcp-agy`](antigravity/rtk-mcp-agy/) — `rtk` shell-command rewriting via MCP proxy plus `PreInvocation` hook.
-- `qwen/`
-  - [`re-ghidra-mcp-qwen`](qwen/re-ghidra-mcp-qwen/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
-  - [`rtk-mcp-qwen`](qwen/rtk-mcp-qwen/) — `rtk` `PreToolUse` hook rewriting `run_shell_command` calls.
-  - [`example`](qwen/example/) — example Rust-based MCP server extension.
-- `opencode/`
-  - [`re-ghidra-mcp-opencode`](opencode/re-ghidra-mcp-opencode/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools, plus session hooks.
-  - [`rtk-mcp-opencode`](opencode/rtk-mcp-opencode/) — `rtk` shell-command rewriting for OpenCode, plus analytics MCP tools.
+- `claude-code/plugins/`
+  - [`re-ghidra-mcp-cc`](claude-code/plugins/re-ghidra-mcp-cc/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
+  - [`rtk-mcp-cc`](claude-code/plugins/rtk-mcp-cc/) — `rtk` shell-command rewriting for 60–90% fewer output tokens, plus analytics MCP tools.
+  - [`example`](claude-code/plugins/example/) — template Rust Claude Code plugin (TODO/FIXME/HACK tracker).
+- `antigravity/plugins/`
+  - [`re-ghidra-mcp-agy`](antigravity/plugins/re-ghidra-mcp-agy/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
+  - [`rtk-mcp-agy`](antigravity/plugins/rtk-mcp-agy/) — `rtk` shell-command rewriting via MCP proxy plus `PreInvocation` hook.
+- `qwen/plugins/`
+  - [`re-ghidra-mcp-qwen`](qwen/plugins/re-ghidra-mcp-qwen/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
+  - [`rtk-mcp-qwen`](qwen/plugins/rtk-mcp-qwen/) — `rtk` `PreToolUse` hook rewriting `run_shell_command` calls.
+  - [`example`](qwen/plugins/example/) — example Rust-based MCP server extension.
+- `opencode/plugins/`
+  - [`re-ghidra-mcp-opencode`](opencode/plugins/re-ghidra-mcp-opencode/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools, plus session hooks.
+  - [`rtk-mcp-opencode`](opencode/plugins/rtk-mcp-opencode/) — `rtk` shell-command rewriting for OpenCode, plus analytics MCP tools.
 
 *More details and plugin guidelines will be added soon.*

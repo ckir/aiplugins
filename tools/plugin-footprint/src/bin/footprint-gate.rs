@@ -52,7 +52,7 @@ fn main() -> ExitCode {
     // tree is deliberate: a change that ADDS a plugin must have it measured.
     //
     // A plugin delisted here drops out of the gate — but not out of CI: measured,
-    // `scripts/check-marketplace.sh` exits 1 with "exists in claude-code/ but is
+    // `scripts/check-marketplace.sh` exits 1 with "exists in claude-code/plugins/ but is
     // not listed", and ci.yml runs it in the `wiring` job.
     let plugins = match published_plugins() {
         Ok(plugins) => plugins,
@@ -197,16 +197,16 @@ fn published_plugins() -> Result<Vec<String>, String> {
         .collect())
 }
 
-/// The OpenCode plugins: every directory under `opencode/` that looks like
+/// The OpenCode plugins: every directory under `opencode/plugins/` that looks like
 /// one. OpenCode has no marketplace manifest, so the directory listing is the
 /// iteration source here exactly as in `publish` — and read from the working
 /// tree on purpose, so a change that adds a plugin has it measured.
 fn opencode_plugins() -> Result<Vec<String>, String> {
-    let entries = std::fs::read_dir("opencode")
-        .map_err(|e| format!("reading the opencode directory: {e}"))?;
+    let entries = std::fs::read_dir("opencode/plugins")
+        .map_err(|e| format!("reading the opencode/plugins directory: {e}"))?;
     let mut out = Vec::new();
     for entry in entries {
-        let entry = entry.map_err(|e| format!("reading the opencode directory: {e}"))?;
+        let entry = entry.map_err(|e| format!("reading the opencode/plugins directory: {e}"))?;
         let path = entry.path();
         if path.is_dir() && looks_like_a_plugin(&path) {
             if let Some(name) = path.file_name().and_then(|n| n.to_str()) {

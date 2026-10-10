@@ -19,7 +19,7 @@ cd "$(dirname "$0")/.."
 
 manifest=.claude-plugin/marketplace.json
 
-# claude-code/example is a reference implementation people read, not something
+# claude-code/plugins/example is a reference implementation people read, not something
 # anyone installs; it is deliberately absent from the marketplace.
 not_published="example"
 
@@ -68,7 +68,7 @@ entries=$(jqr '.plugins[].name' "$manifest")
 checked=0
 for name in $entries; do
     checked=$((checked + 1))
-    plugin_json="claude-code/$name/.claude-plugin/plugin.json"
+    plugin_json="claude-code/plugins/$name/.claude-plugin/plugin.json"
 
     if [ ! -f "$plugin_json" ]; then
         fail "$name: no such plugin ($plugin_json missing)"
@@ -108,16 +108,16 @@ for name in $entries; do
     fi
 done
 
-# The reverse direction: a plugin added to claude-code/ and never listed here is
+# The reverse direction: a plugin added to claude-code/plugins/ and never listed here is
 # a plugin nobody can install, and nothing else in CI would notice.
-for dir in claude-code/*/; do
+for dir in claude-code/plugins/*/; do
     name=$(basename "$dir")
     [ -f "$dir.claude-plugin/plugin.json" ] || continue
     case " $not_published " in
         *" $name "*) continue ;;
     esac
     printf '%s\n' "$entries" | grep -qxF "$name" ||
-        fail "$name: exists in claude-code/ but is not listed in $manifest"
+        fail "$name: exists in claude-code/plugins/ but is not listed in $manifest"
 done
 
 if [ "$failures" -gt 0 ]; then

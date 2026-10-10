@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Exercise each opencode/ plugin's setup path without an OpenCode install.
+# Exercise each opencode/plugins/ plugin's setup path without an OpenCode install.
 #
 # plugin.ts imports the real @opencode/plugin runtime (installed per plugin
 # via `bun install`, as in the opencode-test CI job), so bun can import the
@@ -43,7 +43,7 @@ cp "$mock_bin" "$work/rtk$exe"
 chmod +x "$work/rtk$exe"
 export PATH="$work:$PATH"
 
-for dir in opencode/*/; do
+for dir in opencode/plugins/*/; do
     name=$(basename "$dir")
     echo "== $name"
 
