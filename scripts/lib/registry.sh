@@ -31,7 +31,7 @@ if [ "${1:-}" = "--self-test" ]; then
     failures=0
     [ "$(registry_plugins claude-code | tr '\n' ' ')" = "rtk-mcp-cc re-ghidra-mcp-cc " ] \
         || { echo "FAIL plugins claude-code"; failures=$((failures + 1)); }
-    [ "$(registry_manifest_path qwen rtk-mcp-qwen)" = "qwen/rtk-mcp-qwen/qwen-extension.json" ] \
+    [ "$(registry_manifest_path qwen rtk-mcp-qwen)" = "qwen/plugins/rtk-mcp-qwen/qwen-extension.json" ] \
         || { echo "FAIL manifest path"; failures=$((failures + 1)); }
     registry_is_excluded qwen example \
         || { echo "FAIL exclusion"; failures=$((failures + 1)); }

@@ -245,7 +245,7 @@ fn resolve(
     // invisible while the plugin directory is absolute — the substituted path is
     // then absolute too and `Path::join` replaces rather than appends — and
     // wrong the moment it is relative, which is the normal case:
-    // `plugin-footprint measure claude-code/re-ghidra-mcp-cc`.
+    // `plugin-footprint measure claude-code/plugins/re-ghidra-mcp-cc`.
     //
     // A command with no placeholder is interpreted relative to the plugin, which
     // is what the join is for.
@@ -387,7 +387,10 @@ mod tests {
 
         assert!(!looks_like_a_plugin(repo));
         assert!(looks_like_a_plugin(
-            &repo.join("claude-code").join("re-ghidra-mcp-cc")
+            &repo
+                .join("claude-code")
+                .join("plugins")
+                .join("re-ghidra-mcp-cc")
         ));
     }
 
@@ -544,7 +547,10 @@ mod tests {
             .nth(2)
             .expect("crate sits two levels below the repo root");
         assert!(looks_like_a_plugin(
-            &repo.join("opencode").join("rtk-mcp-opencode")
+            &repo
+                .join("opencode")
+                .join("plugins")
+                .join("rtk-mcp-opencode")
         ));
     }
 }

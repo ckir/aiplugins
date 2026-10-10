@@ -9,7 +9,7 @@
 
 The architecture follows a **shared engine + agent-specific front** pattern:
 - `shared/` — Agent-agnostic crates used by multiple plugins
-- `claude-code/`, `qwen/`, `antigravity/` — Thin agent-specific plugin wrappers (manifests, skills, hooks, settings)
+- `claude-code/plugins/`, `qwen/plugins/`, `antigravity/plugins/` — Thin agent-specific plugin wrappers (manifests, skills, hooks, settings)
 
 ### Shared Crates
 
@@ -23,9 +23,9 @@ The architecture follows a **shared engine + agent-specific front** pattern:
 
 | Agent | re-ghidra-mcp | rtk-mcp |
 |---|---|---|
-| Claude Code | `claude-code/re-ghidra-mcp-cc` | `claude-code/rtk-mcp-cc` |
-| Qwen Code | `qwen/re-ghidra-mcp-qwen` | `qwen/rtk-mcp-qwen` |
-| Antigravity | `antigravity/re-ghidra-mcp-agy` | `antigravity/rtk-mcp-agy` |
+| Claude Code | `claude-code/plugins/re-ghidra-mcp-cc` | `claude-code/plugins/rtk-mcp-cc` |
+| Qwen Code | `qwen/plugins/re-ghidra-mcp-qwen` | `qwen/plugins/rtk-mcp-qwen` |
+| Antigravity | `antigravity/plugins/re-ghidra-mcp-agy` | `antigravity/plugins/rtk-mcp-agy` |
 
 ## Key Technologies
 
@@ -76,7 +76,7 @@ Installs dev tools (`cargo-nextest`, `cargo-deny`, `bacon`, `typos-cli`, `leftho
 ### Building Individual Plugin Binaries
 
 ```bash
-just build-claude-example   # claude-code/example plugin
+just build-claude-example   # claude-code/plugins/example plugin
 just build-rtk-mcp-cc       # Claude Code rtk plugin
 just build-re-ghidra-mcp-cc # Claude Code ghidra plugin
 ```
@@ -102,9 +102,12 @@ Regenerates the committed SKILL.md copies for all agent plugins from the canonic
 ```
 aiplugins/
 ├── .claude-plugin/        # marketplace.json — what `claude plugin marketplace add` reads
-├── claude-code/           # Claude Code plugins (re-ghidra-mcp-cc, rtk-mcp-cc, example)
-├── antigravity/           # Antigravity plugins
-├── qwen/                  # Qwen Code extensions
+├── claude-code/plugins/    # Claude Code plugins (re-ghidra-mcp-cc, rtk-mcp-cc, example)
+├── claude-code/{agents,skills,commands,models,themes,hooks}/  # Standalone components
+├── antigravity/plugins/    # Antigravity plugins
+├── antigravity/{agents,skills,commands,models,themes,hooks}/
+├── qwen/plugins/           # Qwen Code extensions
+├── qwen/{agents,skills,commands,models,themes,hooks}/
 ├── shared/                # Agent-agnostic crates (ghidra-ipc, ghidra-worker-ctl, ghidra-mcp)
 ├── scripts/               # CI and justfile verification scripts
 ├── .agents/skills/        # Qwen Code skills (brainstorming, debugging, TDD, etc.)

@@ -20,7 +20,7 @@ artifact_suffix=$(registry_field "$agent" artifactSuffix)
 
 manifest=.qwen-plugin/marketplace.json
 
-# qwen/example is a reference implementation people read, not something
+# qwen/plugins/example is a reference implementation people read, not something
 # anyone installs; it is deliberately absent from the marketplace. The
 # exclusion list lives in agents.json (notPublished); registry_is_excluded
 # below is the only read path.

@@ -2,56 +2,56 @@
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "include-component-in-tag": true,
   "packages": {
-    "claude-code/rtk-mcp-cc": {
+    "claude-code/plugins/rtk-mcp-cc": {
       "release-type": "rust",
       "component": "rtk-mcp-cc",
       "extra-files": [
         ".claude-plugin/plugin.json"
       ]
     },
-    "claude-code/re-ghidra-mcp-cc": {
+    "claude-code/plugins/re-ghidra-mcp-cc": {
       "release-type": "rust",
       "component": "re-ghidra-mcp-cc",
       "extra-files": [
         ".claude-plugin/plugin.json"
       ]
     },
-    "qwen/rtk-mcp-qwen": {
+    "qwen/plugins/rtk-mcp-qwen": {
       "release-type": "rust",
       "component": "rtk-mcp-qwen",
       "extra-files": [
         "qwen-extension.json"
       ]
     },
-    "qwen/re-ghidra-mcp-qwen": {
+    "qwen/plugins/re-ghidra-mcp-qwen": {
       "release-type": "rust",
       "component": "re-ghidra-mcp-qwen",
       "extra-files": [
         "qwen-extension.json"
       ]
     },
-    "opencode/rtk-mcp-opencode": {
+    "opencode/plugins/rtk-mcp-opencode": {
       "release-type": "simple",
       "component": "rtk-mcp-opencode",
       "extra-files": [
         "package.json"
       ]
     },
-    "opencode/re-ghidra-mcp-opencode": {
+    "opencode/plugins/re-ghidra-mcp-opencode": {
       "release-type": "simple",
       "component": "re-ghidra-mcp-opencode",
       "extra-files": [
         "package.json"
       ]
     },
-    "antigravity/rtk-mcp-agy": {
+    "antigravity/plugins/rtk-mcp-agy": {
       "release-type": "rust",
       "component": "rtk-mcp-agy",
       "extra-files": [
         "plugin.json"
       ]
     },
-    "antigravity/re-ghidra-mcp-agy": {
+    "antigravity/plugins/re-ghidra-mcp-agy": {
       "release-type": "rust",
       "component": "re-ghidra-mcp-agy",
       "extra-files": [

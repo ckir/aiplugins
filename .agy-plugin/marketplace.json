@@ -18,7 +18,7 @@
       "author": {
         "name": "AI Plugins Marketplace Contributors"
       },
-      "homepage": "https://github.com/ckir/aiplugins/tree/main/antigravity/rtk-mcp-agy",
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/antigravity/plugins/rtk-mcp-agy",
       "license": "PolyForm-Noncommercial-1.0.0",
       "category": "development",
       "keywords": [
@@ -40,7 +40,7 @@
       "author": {
         "name": "AI Plugins Marketplace Contributors"
       },
-      "homepage": "https://github.com/ckir/aiplugins/tree/main/antigravity/re-ghidra-mcp-agy",
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/antigravity/plugins/re-ghidra-mcp-agy",
       "license": "PolyForm-Noncommercial-1.0.0",
       "category": "development",
       "keywords": [
