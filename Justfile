@@ -423,6 +423,7 @@ clean:
 
 versions:
     bash scripts/check-package-versions.sh
+    bash scripts/check-release-manifest.sh
 
 # Report working-copy files checked out as CRLF against an `eol=lf` pin.
 # A stale Windows checkout fails byte-identity gates (wiring `cmp`, footprint

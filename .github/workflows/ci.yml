@@ -102,6 +102,8 @@ jobs:
         run: bash scripts/check-package-versions.sh
       - name: Check release-please packages match the registry
         run: bash scripts/gen-release-please-packages.sh --check
+      - name: Check release manifest matches the registry
+        run: bash scripts/check-release-manifest.sh
       - name: Check plugin wiring
         run: bash scripts/check-plugin-wiring.sh
 
