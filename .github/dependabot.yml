@@ -22,7 +22,7 @@ updates:
 
   # Maintain OpenCode plugins (npm/bun)
   - package-ecosystem: "npm"
-    directory: "/opencode/re-ghidra-mcp-opencode"
+    directory: "/opencode/plugins/re-ghidra-mcp-opencode"
     schedule:
       interval: "weekly"
     groups:
@@ -31,7 +31,7 @@ updates:
           - "*"
 
   - package-ecosystem: "npm"
-    directory: "/opencode/rtk-mcp-opencode"
+    directory: "/opencode/plugins/rtk-mcp-opencode"
     schedule:
       interval: "weekly"
     groups:

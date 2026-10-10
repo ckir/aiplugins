@@ -27,7 +27,10 @@ fn repo_root() -> PathBuf {
 
 #[test]
 fn measures_re_ghidra_mcp_cc_from_its_own_manifest() {
-    let plugin = repo_root().join("claude-code").join("re-ghidra-mcp-cc");
+    let plugin = repo_root()
+        .join("claude-code")
+        .join("plugins")
+        .join("re-ghidra-mcp-cc");
 
     let servers = read_mcp_servers(&plugin).expect("the shipped manifest reads and is confined");
     assert_eq!(servers.len(), 1, "re-ghidra-mcp-cc declares one MCP server");

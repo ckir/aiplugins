@@ -439,9 +439,9 @@ fn publish() -> ExitCode {
         // decides the tree: Claude and OpenCode plugin names are distinct —
         // a name in both would already collide in `docs/footprints/`.
         let dir = if opencode.contains(plugin) {
-            "opencode"
+            "opencode/plugins"
         } else {
-            "claude-code"
+            "claude-code/plugins"
         };
         let path = format!("{dir}/{plugin}/README.md");
         if let Err(e) = rewrite_region(&path, &region) {
@@ -496,17 +496,17 @@ fn published_plugins() -> Result<Vec<String>, String> {
         .collect())
 }
 
-/// The OpenCode plugins: every directory under `opencode/` that looks like
+/// The OpenCode plugins: every directory under `opencode/plugins/` that looks like
 /// one. OpenCode has no marketplace manifest — installation is a file copy —
-/// so the directory listing is the iteration source, the same `opencode/*/`
+/// so the directory listing is the iteration source, the same `opencode/plugins/*/`
 /// glob the regen loop and `just test-opencode` use. Sorted, so the root
 /// comparison table does not inherit readdir order.
 fn opencode_plugins() -> Result<Vec<String>, String> {
-    let entries = std::fs::read_dir("opencode")
-        .map_err(|e| format!("reading the opencode directory: {e}"))?;
+    let entries = std::fs::read_dir("opencode/plugins")
+        .map_err(|e| format!("reading the opencode/plugins directory: {e}"))?;
     let mut out = Vec::new();
     for entry in entries {
-        let entry = entry.map_err(|e| format!("reading the opencode directory: {e}"))?;
+        let entry = entry.map_err(|e| format!("reading the opencode/plugins directory: {e}"))?;
         let path = entry.path();
         if path.is_dir() && looks_like_a_plugin(&path) {
             if let Some(name) = path.file_name().and_then(|n| n.to_str()) {

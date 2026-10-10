@@ -24,9 +24,9 @@ failures=0
 checked=0
 fail() { echo "  FAIL  $1" >&2; failures=$((failures + 1)); }
 
-# Sorted: the old opencode/*/ glob expanded alphabetically.
+# Sorted: the old opencode/plugins/*/ glob expanded alphabetically.
 for name in $(registry_plugins opencode | sort); do
-    dir="opencode/$name/"
+    dir="opencode/plugins/$name/"
     plugin_ts="$dir/plugin.ts"
     jsonc="$dir/opencode.jsonc"
     pkg="$dir/package.json"
@@ -97,10 +97,10 @@ done
 # catches a forgotten opencode regen (or a hand-edit) with no build, while the
 # generator side stays pinned by `skill_emit.rs` (which covers both copies).
 for pair in \
-    "claude-code/rtk-mcp-cc/skills/rtk-policy/SKILL.md:opencode/rtk-mcp-opencode/skills/rtk-policy/SKILL.md" \
-    "claude-code/rtk-mcp-cc/skills/gain/SKILL.md:opencode/rtk-mcp-opencode/skills/gain/SKILL.md" \
-    "claude-code/re-ghidra-mcp-cc/skills/doctor/SKILL.md:opencode/re-ghidra-mcp-opencode/skills/doctor/SKILL.md" \
-    "claude-code/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md:opencode/re-ghidra-mcp-opencode/skills/ghidra-re-driver/SKILL.md" \
+    "claude-code/plugins/rtk-mcp-cc/skills/rtk-policy/SKILL.md:opencode/plugins/rtk-mcp-opencode/skills/rtk-policy/SKILL.md" \
+    "claude-code/plugins/rtk-mcp-cc/skills/gain/SKILL.md:opencode/plugins/rtk-mcp-opencode/skills/gain/SKILL.md" \
+    "claude-code/plugins/re-ghidra-mcp-cc/skills/doctor/SKILL.md:opencode/plugins/re-ghidra-mcp-opencode/skills/doctor/SKILL.md" \
+    "claude-code/plugins/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md:opencode/plugins/re-ghidra-mcp-opencode/skills/ghidra-re-driver/SKILL.md" \
 ; do
     src=${pair%%:*}; dst=${pair#*:}
     checked=$((checked + 1))
@@ -118,7 +118,7 @@ done
 # instead of passing silently.
 pin_ref=""
 for name in $(registry_plugins opencode | sort); do
-    pkg="opencode/$name/package.json"
+    pkg="opencode/plugins/$name/package.json"
     [ -f "$pkg" ] || continue
     pin=$(jqr '.dependencies["@opencode/plugin"] // ""' "$pkg" 2>/dev/null || echo "")
     if [ -z "$pin" ]; then

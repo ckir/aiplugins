@@ -19,7 +19,7 @@ docs/footprints/*.json text eol=lf
 
 # Task 1 spike contract: the recorded V2 shell event shape. Must stay LF so
 # `jq` checks and freshness diffs behave identically on every platform.
-opencode/rtk-mcp-opencode/tests/shell-shape.json text eol=lf
+opencode/plugins/rtk-mcp-opencode/tests/shell-shape.json text eol=lf
 
 # OpenCode plugin sources: skills frontmatter, opencode.jsonc, and TS are all
 # parsed by line-oriented checks (`jq`, wiring greps, frontmatter readers), so
@@ -41,8 +41,8 @@ shared/ghidra-mcp/skill/SKILL.md text eol=lf
 # carry the same pin as their source: without it a Windows checkout holds CRLF
 # copies while the (now LF) emitter prints LF, failing the byte-identity tests
 # on a correct tree. (The opencode copy is already covered by opencode/**/*.md.)
-claude-code/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md text eol=lf
-qwen/re-ghidra-mcp-qwen/skills/ghidra-re-driver/SKILL.md text eol=lf
+claude-code/plugins/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md text eol=lf
+qwen/plugins/re-ghidra-mcp-qwen/skills/ghidra-re-driver/SKILL.md text eol=lf
 
 # Every skill/agent source: compared byte-for-byte across fronts and read by
 # line-oriented tooling (frontmatter readers, footprint measurement), so all

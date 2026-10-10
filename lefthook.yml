@@ -19,4 +19,4 @@ pre-push:
     clippy:
       run: cargo clippy --workspace --all-targets --all-features -- -D warnings
     mlc:
-      run: mlc --offline --ignore-path "./node_modules,./opencode/re-ghidra-mcp-opencode/node_modules,./opencode/rtk-mcp-opencode/node_modules,./target"
+      run: mlc --offline --ignore-path "./node_modules,./opencode/plugins/re-ghidra-mcp-opencode/node_modules,./opencode/plugins/rtk-mcp-opencode/node_modules,./target"
