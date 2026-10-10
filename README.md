@@ -77,13 +77,13 @@ This repository is structured as a monorepo. It will contain specialized package
 aiplugins/
 ├── .claude-plugin/  # marketplace.json — what `claude plugin marketplace add` reads
 ├── claude-code/plugins/   # Plugins specifically for Claude Code
-├── claude-code/{agents,skills,commands,models,themes}/  # Standalone components (plugin-embedded ones stay in plugins/*/)
+├── claude-code/{agents,skills,commands,models,themes,hooks}/  # Standalone components (plugin-embedded ones stay in plugins/*/)
 ├── antigravity/plugins/   # Plugins specifically for Antigravity
-├── antigravity/{agents,skills,commands,models,themes}/
+├── antigravity/{agents,skills,commands,models,themes,hooks}/
 ├── qwen/plugins/          # Plugins specifically for Qwen
-├── qwen/{agents,skills,commands,models,themes}/
+├── qwen/{agents,skills,commands,models,themes,hooks}/
 ├── opencode/plugins/      # Plugins specifically for OpenCode
-├── opencode/{agents,skills,commands,models,themes}/
+├── opencode/{agents,skills,commands,models,themes,hooks}/
 ├── shared/        # Agent-agnostic crates that several plugins front
 ├── scripts/       # Repository checks run by CI and `just check`
 └── README.md      # Project overview

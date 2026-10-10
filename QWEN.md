@@ -103,11 +103,11 @@ Regenerates the committed SKILL.md copies for all agent plugins from the canonic
 aiplugins/
 ├── .claude-plugin/        # marketplace.json — what `claude plugin marketplace add` reads
 ├── claude-code/plugins/    # Claude Code plugins (re-ghidra-mcp-cc, rtk-mcp-cc, example)
-├── claude-code/{agents,skills,commands,models,themes}/  # Standalone components
+├── claude-code/{agents,skills,commands,models,themes,hooks}/  # Standalone components
 ├── antigravity/plugins/    # Antigravity plugins
-├── antigravity/{agents,skills,commands,models,themes}/
+├── antigravity/{agents,skills,commands,models,themes,hooks}/
 ├── qwen/plugins/           # Qwen Code extensions
-├── qwen/{agents,skills,commands,models,themes}/
+├── qwen/{agents,skills,commands,models,themes,hooks}/
 ├── shared/                # Agent-agnostic crates (ghidra-ipc, ghidra-worker-ctl, ghidra-mcp)
 ├── scripts/               # CI and justfile verification scripts
 ├── .agents/skills/        # Qwen Code skills (brainstorming, debugging, TDD, etc.)
