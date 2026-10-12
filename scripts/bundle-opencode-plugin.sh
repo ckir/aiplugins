@@ -22,7 +22,7 @@
 #
 # Usage: scripts/bundle-opencode-plugin.sh <plugin-dir> <out-dir>
 #
-#   <plugin-dir>  the opencode plugin source tree (e.g. opencode/rtk-mcp-opencode)
+#   <plugin-dir>  the opencode plugin source tree (e.g. opencode/plugins/rtk-mcp-opencode)
 #   <out-dir>     receives <name>-opencode.zip, built from a staging tree of the
 #                 same name that is left in place for inspection.
 set -euo pipefail
