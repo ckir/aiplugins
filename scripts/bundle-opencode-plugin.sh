@@ -101,6 +101,17 @@ fi
 if [ -f "$plugindir/tui.tsx" ]; then
     cp "$plugindir/tui.tsx" "$stage/tui.tsx"
 fi
+# A tui.tsx entry is transpiled with the plugin's own JSX settings: without
+# tsconfig.json the host falls back to react/jsx-dev-runtime, which is not
+# installed. Ship it alongside tui.tsx — and refuse to ship tui.tsx without
+# it (todov2-opencode 0.5.0 did exactly that).
+if [ -f "$plugindir/tui.tsx" ]; then
+    [ -f "$plugindir/tsconfig.json" ] || {
+        echo "ERROR: $plugindir/tui.tsx without tsconfig.json — the bundle would fail to load." >&2
+        exit 1
+    }
+    cp "$plugindir/tsconfig.json" "$stage/tsconfig.json"
+fi
 
 zipfile="$outdir/$name-opencode.zip"
 rm -f "$zipfile"
@@ -153,6 +164,8 @@ fi
 if [ -f "$plugindir/tui.tsx" ]; then
     printf '%s\n' "$listing" | grep -qxF "tui.tsx" ||
         report "tui.tsx"
+    printf '%s\n' "$listing" | grep -qxF "tsconfig.json" ||
+        report "tsconfig.json (tui.tsx needs its JSX settings)"
 else
     printf '%s\n' "$listing" | grep -qxF "tui.tsx" &&
         { echo "  FORBIDDEN  tui.tsx (source has none)" >&2; fail=$((fail + 1)); } || true
