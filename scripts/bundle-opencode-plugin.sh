@@ -5,11 +5,13 @@
 # `opencode` loads a plugin directory containing `plugin.ts` + `opencode.jsonc`
 # directly, so unlike the Claude Code bundler there are no per-target binaries
 # to ship: the zip carries versioned source only (plugin.ts, opencode.jsonc,
-# package.json, skills/, agents/ when present, README.md, INSTALL.md).
+# package.json, README.md, INSTALL.md, plus skills/ and agents/ when present,
+# plus tool/ and tui.tsx when the plugin is multi-file TypeScript rather than
+# a single plugin.ts).
 #
 # The layout that makes the zip installable:
 #
-#   plugin.ts opencode.jsonc package.json README.md INSTALL.md skills/... agents/...
+#   plugin.ts opencode.jsonc package.json README.md INSTALL.md [skills/...] [agents/...] [tool/...] [tui.tsx]
 #
 # i.e. the top level of the zip IS the plugin directory — extracting yields
 # `plugin.ts`, `opencode.jsonc`, … directly, with no wrapper folder.
@@ -60,7 +62,7 @@ esac
 
 name=$(basename "$plugindir")
 
-for required in plugin.ts opencode.jsonc package.json README.md INSTALL.md skills; do
+for required in plugin.ts opencode.jsonc package.json README.md INSTALL.md; do
     [ -e "$plugindir/$required" ] || {
         echo "ERROR: $plugindir/$required not found — is '$name' an opencode plugin?" >&2
         exit 1
@@ -79,9 +81,25 @@ mkdir -p "$stage"
 cp "$plugindir/plugin.ts" "$plugindir/opencode.jsonc" \
     "$plugindir/package.json" "$plugindir/README.md" \
     "$plugindir/INSTALL.md" "$stage/"
-cp -r "$plugindir/skills" "$stage/skills"
+# skills/ is required for hook/MCP plugins but not for pure-TypeScript ones
+# (todov2-opencode ships no skills); copy it only when the source has it.
+if [ -d "$plugindir/skills" ]; then
+    cp -r "$plugindir/skills" "$stage/skills"
+fi
 if [ -d "$plugindir/agents" ]; then
     cp -r "$plugindir/agents" "$stage/agents"
+fi
+# Multi-file TypeScript plugins keep their imports beside the entry points
+# (todov2-opencode's plugin.ts imports ./tool/*, and tui.tsx is its second
+# entry). A single-file copy would break those imports at install time.
+if [ -d "$plugindir/tool" ]; then
+    cp -r "$plugindir/tool" "$stage/tool"
+    # Test files are not needed at install time (the top-level tests/ dir is
+    # forbidden for the same reason); the tool/ sources themselves must stay.
+    find "$stage/tool" -name '*.test.ts' -delete
+fi
+if [ -f "$plugindir/tui.tsx" ]; then
+    cp "$plugindir/tui.tsx" "$stage/tui.tsx"
 fi
 
 zipfile="$outdir/$name-opencode.zip"
@@ -106,8 +124,13 @@ for required in plugin.ts opencode.jsonc package.json README.md INSTALL.md; do
     printf '%s\n' "$listing" | grep -qxF "$required" ||
         report "$required"
 done
-printf '%s\n' "$listing" | grep -q '^skills/' ||
-    report "skills/"
+if [ -d "$plugindir/skills" ]; then
+    printf '%s\n' "$listing" | grep -q '^skills/' ||
+        report "skills/"
+else
+    printf '%s\n' "$listing" | grep -q '^skills/' &&
+        { echo "  FORBIDDEN  skills/ (source has none)" >&2; fail=$((fail + 1)); } || true
+fi
 
 for forbidden in bin/ node_modules/ tests/ examples/ bun.lock; do
     printf '%s\n' "$listing" | grep -q "^$forbidden" &&
@@ -119,6 +142,20 @@ if [ -d "$plugindir/agents" ]; then
 else
     printf '%s\n' "$listing" | grep -q '^agents/' &&
         { echo "  FORBIDDEN  agents/ (source has none)" >&2; fail=$((fail + 1)); } || true
+fi
+if [ -d "$plugindir/tool" ]; then
+    printf '%s\n' "$listing" | grep -q '^tool/' ||
+        report "tool/"
+else
+    printf '%s\n' "$listing" | grep -q '^tool/' &&
+        { echo "  FORBIDDEN  tool/ (source has none)" >&2; fail=$((fail + 1)); } || true
+fi
+if [ -f "$plugindir/tui.tsx" ]; then
+    printf '%s\n' "$listing" | grep -qxF "tui.tsx" ||
+        report "tui.tsx"
+else
+    printf '%s\n' "$listing" | grep -qxF "tui.tsx" &&
+        { echo "  FORBIDDEN  tui.tsx (source has none)" >&2; fail=$((fail + 1)); } || true
 fi
 
 if [ "$fail" -gt 0 ]; then

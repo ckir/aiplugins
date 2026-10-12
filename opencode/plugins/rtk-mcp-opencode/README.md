@@ -9,19 +9,19 @@ Claude Code and `qwen/plugins/rtk-mcp-qwen` for Qwen Code. The rewriting engine 
 MCP server binary are shared with the Claude Code sibling; only the host
 integration (this `plugin.ts`) is OpenCode-specific.
 
-Tested with OpenCode **v2.0.20** and `@opencode/plugin` **2.0.21**. The V2 plugin
+Tested with OpenCode **v2.0.20** and `@opencode/plugin` **2.0.24**. The V2 plugin
 API is explicitly beta and will churn — re-test on bump.
 
 <!-- footprint:begin -->
 ### Context footprint
 
-Installing this plugin adds **≥ 3,690 bytes** to every request, for the whole session. A further **≥ 6,091 bytes** load only when one of its skills or agents is actually invoked. Its `plugin.ts` setup module adds **≥ 6,035 bytes**, loaded in-process with the host on every request and counted separately below so the TypeScript tier stays comparable across releases.
+Installing this plugin adds **≥ 3,696 bytes** to every request, for the whole session. A further **≥ 6,129 bytes** load only when one of its skills or agents is actually invoked. Its `plugin.ts` setup module adds **≥ 6,504 bytes**, loaded in-process with the host on every request and counted separately below so the TypeScript tier stays comparable across releases.
 
 | Tier | Bytes | When you pay it |
 |---|---|---|
-| Resident | ≥ 3,690 | Every request, for the whole session |
-| Invocation | ≥ 6,091 | Only when that skill or agent runs |
-| Setup | ≥ 6,035 | Every request — `plugin.ts` loads in-process with the host |
+| Resident | ≥ 3,696 | Every request, for the whole session |
+| Invocation | ≥ 6,129 | Only when that skill or agent runs |
+| Setup | ≥ 6,504 | Every request — `plugin.ts` loads in-process with the host |
 
 **Bytes, not tokens.** This is the exact serialised size of what the host loads, measured by probing the plugin's own MCP server and reading its skill and agent frontmatter. It is not a token count and does not convert to one at a fixed rate — treat it as a figure you can compare between plugins, not as a context budget.
 
@@ -97,7 +97,7 @@ needs that package resolvable. From the project root (or
 `~/.config/opencode/` for a global install):
 
 ```bash
-bun add @opencode/plugin@2.0.21
+bun add @opencode/plugin@2.0.24
 ```
 
 Use the version under "Tested with" at the top of this README if it names a
@@ -116,8 +116,10 @@ That builds `rtk-cc-mcp` into `opencode/plugins/rtk-mcp-opencode/bin/`
 `cargo-dist`. Alternatively, unpack `rtk-mcp-cc-plugin.zip` from the latest
 release, which carries the binaries for every supported platform. Either way,
 stage the built (or release-unpacked) binary at `.opencode/bin/rtk-cc-mcp` next
-to the snippet's merge target — the `./bin/rtk-cc-mcp` command in
-`opencode.jsonc` is relative to the installed plugin copy.
+to the snippet's merge target — and write the merged `command` as an absolute
+path (`<DEST>/bin/rtk-cc-mcp`, `.exe` on Windows). A relative `./bin/...` does
+NOT resolve against the config dir: the host spawns it against the session
+directory and fails with `NotFound: ChildProcess.spawn`.
 
 ## Configuration
 

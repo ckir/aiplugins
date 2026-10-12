@@ -411,6 +411,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+ "windows",
 ]
 
 [[package]]
@@ -431,7 +432,6 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "uuid",
- "windows",
 ]
 
 [[package]]

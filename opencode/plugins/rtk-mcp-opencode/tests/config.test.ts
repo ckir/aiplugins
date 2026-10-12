@@ -4,8 +4,12 @@ import {
   configFromMarkdown,
   applyEnv,
   hookArgs,
+  loadConfig,
   type RtkConfig,
 } from "../plugin.ts";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 const get =
   (vars: Record<string, string>) =>
@@ -62,5 +66,36 @@ describe("config", () => {
     expect(hookArgs(defaultConfig())).toEqual(["hook", "claude"]);
     const config: RtkConfig = { ...defaultConfig(), ultraCompact: true, skipEnv: true };
     expect(hookArgs(config)).toEqual(["hook", "claude", "--ultra-compact", "--skip-env"]);
+  });
+
+  test("setup snapshot plus per-call env: file loads once, env stays live", () => {
+    const dir = mkdtempSync(join(tmpdir(), "rtk-cfg-"));
+    try {
+      mkdirSync(join(dir, ".opencode"));
+      writeFileSync(
+        join(dir, ".opencode", "rtk-mcp-opencode.local.md"),
+        "---\nenabled: false\nrtk_bin: /cached/rtk\n---\n"
+      );
+      // What setup() holds: the file layer with no env applied.
+      const snapshot = loadConfig(dir, () => undefined);
+      expect(snapshot.enabled).toBe(false);
+      expect(snapshot.rtkBin).toBe("/cached/rtk");
+      // What each hook call derives: env layers on a clone, snapshot unmutated.
+      const live = applyEnv({ ...snapshot }, get({ RTK_BIN: "/env/rtk" }));
+      expect(live.rtkBin).toBe("/env/rtk");
+      expect(live.enabled).toBe(false);
+      expect(snapshot.rtkBin).toBe("/cached/rtk");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("loadConfig falls back to defaults when the file is missing or unreadable", () => {
+    const dir = mkdtempSync(join(tmpdir(), "rtk-cfg-"));
+    try {
+      expect(loadConfig(dir, get({}))).toEqual(defaultConfig());
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

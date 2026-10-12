@@ -44,7 +44,7 @@ spellcheck:
 # does not filter them on Windows (mlc 1.2.2); extend the list when a new
 # node_modules/ or build-output dir appears.
 links:
-    mlc --offline --ignore-path "./node_modules,./opencode/plugins/re-ghidra-mcp-opencode/node_modules,./opencode/plugins/rtk-mcp-opencode/node_modules,./target"
+    mlc --offline --ignore-path "./node_modules,./opencode/plugins/re-ghidra-mcp-opencode/node_modules,./opencode/plugins/rtk-mcp-opencode/node_modules,./opencode/plugins/todov2-opencode/node_modules,./target"
 
 # Verify plugin configs point at binaries this workspace actually builds.
 # Nothing else checks those strings: rename a [[bin]] and every test still
@@ -77,7 +77,7 @@ test-opencode:
     #!/usr/bin/env bash
     set -euo pipefail
     for dir in opencode/plugins/*/; do
-        (cd "$dir" && bun install && bun test tests/)
+        (cd "$dir" && bun install && bun test)
     done
 
 # Regenerate the committed footprint document for every published plugin, and
@@ -214,8 +214,9 @@ smoke:
         bash scripts/smoke-bundle.sh "$plugin"
     done
 
-# Run all pre-flight checks (what CI and lefthook would run)
-check: fmt lint test deny spellcheck links versions wiring marketplace dispatch smoke footprint opencode-wiring
+# Run all pre-flight checks (what CI and lefthook run; see ci.yml — `links`
+# is hook-only and `gen-* --check` + opencode suites run in CI but not here)
+check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace dispatch smoke footprint opencode-wiring
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
@@ -401,7 +402,7 @@ clean-stale:
         done
     done
     # Staged plugin binaries are copies, so they go stale the same way.
-    for staged in claude-code/plugins/*/bin/* opencode/plugins/*/bin/*; do
+    for staged in claude-code/plugins/*/bin/* opencode/plugins/*/bin/* qwen/plugins/*/bin/* antigravity/plugins/*/bin/*; do
         [ -f "$staged" ] || continue
         name=$(basename "$staged"); name="${name%.exe}"
         if ! printf '%s\n' "$known" | grep -qxF "$name"; then
@@ -417,7 +418,7 @@ clean-stale:
 # full rebuild.
 clean:
     cargo clean
-    rm -rf claude-code/plugins/example/bin claude-code/plugins/rtk-mcp-cc/bin claude-code/plugins/re-ghidra-mcp-cc/bin opencode/plugins/rtk-mcp-opencode/bin opencode/plugins/re-ghidra-mcp-opencode/bin
+    rm -rf claude-code/plugins/example/bin claude-code/plugins/rtk-mcp-cc/bin claude-code/plugins/re-ghidra-mcp-cc/bin opencode/plugins/rtk-mcp-opencode/bin opencode/plugins/re-ghidra-mcp-opencode/bin qwen/plugins/*/bin antigravity/plugins/*/bin
     @echo "Removed target/ and staged plugin binaries."
 
 

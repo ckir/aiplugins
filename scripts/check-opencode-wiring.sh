@@ -87,7 +87,7 @@ done
 
 # 7. Copy-staleness: verbatim copies must still be byte-identical to sources.
 #
-# NOTE (Task 5 deviation from the plan): the fourth pair does NOT point at the
+# NOTE (Task 5 deviation from the plan): the pair does NOT point at the
 # canonical `shared/ghidra-mcp/skill/SKILL.md`. That file carries a 9-line HTML
 # license header that `emit-skill` strips, so every committed plugin copy is 261
 # lines against the canonical 270 and a raw `cmp` against it fails on a correct
@@ -96,10 +96,13 @@ done
 # recipe, so the sibling Claude Code copy is the correct oracle here: it
 # catches a forgotten opencode regen (or a hand-edit) with no build, while the
 # generator side stays pinned by `skill_emit.rs` (which covers both copies).
+#
+# Only `ghidra-re-driver` is pinned here. `rtk-policy`, `gain` and `doctor`
+# used to be verbatim Claude copies too, but they carried Claude-only names
+# (`RTK_CC_DISABLE`, `/rtk-mcp-cc:gain`, `${CLAUDE_PLUGIN_ROOT}`, `pwsh`-only
+# commands) that are wrong on the OpenCode host — so the opencode variants are
+# deliberately host-ported docs now, not copies, and must NOT be cmp'd.
 for pair in \
-    "claude-code/plugins/rtk-mcp-cc/skills/rtk-policy/SKILL.md:opencode/plugins/rtk-mcp-opencode/skills/rtk-policy/SKILL.md" \
-    "claude-code/plugins/rtk-mcp-cc/skills/gain/SKILL.md:opencode/plugins/rtk-mcp-opencode/skills/gain/SKILL.md" \
-    "claude-code/plugins/re-ghidra-mcp-cc/skills/doctor/SKILL.md:opencode/plugins/re-ghidra-mcp-opencode/skills/doctor/SKILL.md" \
     "claude-code/plugins/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md:opencode/plugins/re-ghidra-mcp-opencode/skills/ghidra-re-driver/SKILL.md" \
 ; do
     src=${pair%%:*}; dst=${pair#*:}

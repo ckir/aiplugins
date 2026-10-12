@@ -5,6 +5,7 @@
   "qwen/plugins/re-ghidra-mcp-qwen": "0.8.0",
   "opencode/plugins/rtk-mcp-opencode": "0.7.3",
   "opencode/plugins/re-ghidra-mcp-opencode": "0.7.3",
+  "opencode/plugins/todov2-opencode": "0.3.0",
   "antigravity/plugins/rtk-mcp-agy": "0.8.0",
   "antigravity/plugins/re-ghidra-mcp-agy": "0.8.0"
 }

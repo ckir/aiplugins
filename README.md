@@ -35,6 +35,7 @@ TypeScript itself. Per plugin (full steps in its README):
 |---|---|---|
 | [`rtk-mcp-opencode`](opencode/plugins/rtk-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/`, `skills/*` → `.opencode/skills/` | `just build-rtk-mcp-opencode` |
 | [`re-ghidra-mcp-opencode`](opencode/plugins/re-ghidra-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/`, `skills/*` → `.opencode/skills/`, `agents/*` → `.opencode/agents/` | `just build-re-ghidra-mcp-opencode` |
+| [`todov2-opencode`](opencode/plugins/todov2-opencode/) | whole folder → `.opencode/plugins/todov2-opencode/` (multi-file: `plugin.ts`, `tui.tsx`, `tool/`) | none (pure TypeScript, no binary) |
 
 Merge each plugin's `opencode.jsonc` into `.opencode/opencode.jsonc`; the
 `./bin/<name>` command in it is relative to the installed plugin copy, so
@@ -47,6 +48,7 @@ verification) and asks whether to install project-local or global first:
 
 - `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/plugins/rtk-mcp-opencode/INSTALL.md`
 - `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/plugins/re-ghidra-mcp-opencode/INSTALL.md`
+- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/plugins/todov2-opencode/INSTALL.md`
 
 ## What each plugin costs a context window
 
@@ -54,9 +56,10 @@ verification) and asks whether to install project-local or global first:
 | Plugin | Resident bytes | Invocation bytes |
 |---|---|---|
 | `re-ghidra-mcp-cc` | ≥ 21,631 | ≥ 36,903 |
-| `re-ghidra-mcp-opencode` | ≥ 21,327 | ≥ 36,903 |
+| `re-ghidra-mcp-opencode` | ≥ 21,297 | ≥ 37,131 |
 | `rtk-mcp-cc` | ≥ 3,690 | ≥ 6,091 |
-| `rtk-mcp-opencode` | ≥ 3,690 | ≥ 6,091 |
+| `rtk-mcp-opencode` | ≥ 3,696 | ≥ 6,129 |
+| `todov2-opencode` | ≥ 0 | ≥ 0 |
 
 **Resident** is what the host holds in every request, for the whole session — the MCP tool schemas plus the frontmatter it reads to decide what each skill and agent is for. **Invocation** loads only when one of them actually runs.
 
@@ -120,5 +123,6 @@ Plugin and example READMEs, by agent directory:
 - `opencode/plugins/`
   - [`re-ghidra-mcp-opencode`](opencode/plugins/re-ghidra-mcp-opencode/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools, plus session hooks.
   - [`rtk-mcp-opencode`](opencode/plugins/rtk-mcp-opencode/) — `rtk` shell-command rewriting for OpenCode, plus analytics MCP tools.
+  - [`todov2-opencode`](opencode/plugins/todov2-opencode/) — the V2-removed `todowrite` session tool plus a live todo sidebar list.
 
 *More details and plugin guidelines will be added soon.*

@@ -6,5 +6,8 @@
   "license": "PolyForm-Noncommercial-1.0.0",
   "dependencies": {
     "@opencode/plugin": "2.0.24"
+  },
+  "scripts": {
+    "test": "bun test tests/"
   }
 }

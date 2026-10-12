@@ -152,6 +152,7 @@ export function runRtk(rtkBin: string, args: string[], payload: string): string 
       input: payload,
       encoding: "utf8",
       timeout: 10000,
+      maxBuffer: 4 * 1024 * 1024, // verdicts are small JSON; overflow throws -> fail open
     });
     if (out.status !== 0) return null;
     return typeof out.stdout === "string" ? out.stdout : null;
@@ -187,6 +188,11 @@ export function applyVerdict(
 export default Plugin.define({
   id: "rtk-mcp-opencode",
   async setup(ctx) {
+    // File config loads once here, not per hook: a disk read+parse on every
+    // shell execution is a per-command tax, and the hook event carries no
+    // directory (host cwd is the only source). Env still layers per call, so
+    // session overrides stay live; the clone keeps applyEnv from mutating it.
+    const fileConfig = loadConfig(process.cwd(), () => undefined);
     await ctx.tool.hook("execute.before", (event) => {
       const tool = (event as unknown as { tool?: unknown }).tool;
       if (tool !== SHELL_TOOL) return;
@@ -196,7 +202,7 @@ export default Plugin.define({
       if (!input || typeof input[COMMAND_FIELD] !== "string") return;
       const command = input[COMMAND_FIELD] as string;
       if (command.trim() === "") return;
-      const config = loadConfig(process.cwd(), (key) => process.env[key]);
+      const config = applyEnv({ ...fileConfig }, (key) => process.env[key]);
       if (!config.enabled) return;
       const envelope = JSON.stringify({ tool_name: "Bash", tool_input: { command } });
       const verdict = delegate(envelope, config, (args, payload) =>

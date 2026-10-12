@@ -46,16 +46,45 @@ pub fn instance_log_path() -> PathBuf {
 mod tests {
     use super::*;
 
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Hold while mutating `GHIDRA_MCP_HOME`: the env is process-global and
+    /// the test runner executes tests on parallel threads, so an unguarded
+    /// `remove_var` in one test can yank the value out from under another.
+    /// Restores the prior value (or absence) on drop, so a panicking assert
+    /// cannot leak a mutation into the next test either.
+    struct HomeGuard {
+        _lock: std::sync::MutexGuard<'static, ()>,
+        prior: Option<String>,
+    }
+
+    impl HomeGuard {
+        fn set(value: &str) -> Self {
+            let lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+            let prior = std::env::var("GHIDRA_MCP_HOME").ok();
+            std::env::set_var("GHIDRA_MCP_HOME", value);
+            Self { _lock: lock, prior }
+        }
+    }
+
+    impl Drop for HomeGuard {
+        fn drop(&mut self) {
+            match self.prior.take() {
+                Some(v) => std::env::set_var("GHIDRA_MCP_HOME", v),
+                None => std::env::remove_var("GHIDRA_MCP_HOME"),
+            }
+        }
+    }
+
     #[test]
     fn ghidra_mcp_home_env_overrides_base() {
-        std::env::set_var("GHIDRA_MCP_HOME", r"C:\tmp\gh");
+        let _guard = HomeGuard::set(r"C:\tmp\gh");
         assert_eq!(data_dir(), PathBuf::from(r"C:\tmp\gh"));
-        std::env::remove_var("GHIDRA_MCP_HOME");
     }
 
     #[test]
     fn versioned_script_dir_is_under_scripts_and_hash_named() {
-        std::env::set_var("GHIDRA_MCP_HOME", r"C:\tmp\gh");
+        let _guard = HomeGuard::set(r"C:\tmp\gh");
         let d = versioned_script_dir();
         assert!(d.starts_with(r"C:\tmp\gh"));
         assert!(d.to_string_lossy().contains("scripts"));
@@ -63,16 +92,14 @@ mod tests {
         let leaf = d.file_name().unwrap().to_string_lossy().into_owned();
         assert_eq!(leaf.len(), 16);
         assert!(leaf.chars().all(|c| c.is_ascii_hexdigit()));
-        std::env::remove_var("GHIDRA_MCP_HOME");
     }
 
     #[test]
     fn instance_log_path_names_this_pid() {
-        std::env::set_var("GHIDRA_MCP_HOME", r"C:\tmp\gh");
+        let _guard = HomeGuard::set(r"C:\tmp\gh");
         let p = instance_log_path();
         assert!(p
             .to_string_lossy()
             .contains(&format!("worker-{}", std::process::id())));
-        std::env::remove_var("GHIDRA_MCP_HOME");
     }
 }

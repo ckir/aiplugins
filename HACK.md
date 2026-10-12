@@ -3,11 +3,14 @@
 ## Adding or removing a supported agent
 
 The set of supported agents lives in one place: `agents.json` at the repo
-root. Every wiring and marketplace check (`scripts/check-marketplace.sh`,
+root. Every registry-driven wiring and marketplace check (`scripts/check-marketplace.sh`,
 `scripts/check-qwen-marketplace.sh`, `scripts/check-plugin-wiring.sh`,
 `scripts/check-opencode-wiring.sh`, via `scripts/lib/registry.sh`) enumerates
-agents from that registry, so a new agent needs no script edits — register it
-and every check picks it up.
+agents from that registry, so a new agent needs no edits *to those checks* —
+register it and they pick it up. Two places still hardcode per-agent detail
+and need a line each: `scripts/check-package-versions.sh` (the crate↔manifest
+pairs) and the `Justfile` `footprint-regen`/`smoke` recipes (which enumerate
+the Claude marketplace plus `opencode/plugins/*/`).
 
 ### To add an agent
 
@@ -25,7 +28,9 @@ and every check picks it up.
 4. Run the Task 6 gate command — `bash scripts/gen-marketplaces.sh --check`
    (the same step CI runs, plus the `just gen-marketplaces` recipe) — and the
    wiring checks (`just marketplace qwen-marketplace wiring opencode-wiring`).
-   Every check picks the new agent up with no script edits.
+   The registry-driven checks pick the new agent up with no script edits;
+   add its line to `check-package-versions.sh` and its footprint/smoke
+   coverage to the Justfile (see above).
 
 ### To remove an agent
 
@@ -60,7 +65,7 @@ merge message (see the `footprint` recipe notes in the Justfile).
 Marketplace `source.url` entries are tag-pinned
 (`releases/download/<package>-v<version>/<file>`), rendered from each
 package's own manifest by `bash scripts/gen-marketplaces.sh`. There is no
-`latest` anywhere: one repo-wide `latest` cannot serve eight packages.
+`latest` anywhere: one repo-wide `latest` cannot serve nine packages.
 
 After every release-please bump PR, the committed marketplaces are stale by
 construction (manifests moved, urls did not), and CI fails the bump PR on

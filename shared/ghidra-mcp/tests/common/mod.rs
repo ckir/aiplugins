@@ -120,13 +120,24 @@ pub fn fixture_state_ephemeral() -> (EphemeralFixture, Arc<ServerState>) {
 /// already-mutated ephemeral copy — the second leg of the hard-restart oracle). CAPTURE + RESTORE the
 /// original value (agy plan-review): set_var is process-global, so leaving it mutated would make the NEXT
 /// fixture_state_ephemeral() copy this temp dir instead of the pristine source, cascading corruption
-/// under -j1.
+/// under -j1. The restore runs on Drop so a panicking boot cannot leak the override either.
 pub fn fixture_state_at(dir: &std::path::Path) -> Arc<ServerState> {
-    let orig =
-        std::env::var("GHIDRA_MCP_FIXTURE_PROJECT_DIR").expect("GHIDRA_MCP_FIXTURE_PROJECT_DIR");
+    struct RestoreProjectDir {
+        prior: Option<String>,
+    }
+    impl Drop for RestoreProjectDir {
+        fn drop(&mut self) {
+            match self.prior.take() {
+                Some(v) => std::env::set_var("GHIDRA_MCP_FIXTURE_PROJECT_DIR", v),
+                None => std::env::remove_var("GHIDRA_MCP_FIXTURE_PROJECT_DIR"),
+            }
+        }
+    }
+    let _restore = RestoreProjectDir {
+        prior: std::env::var("GHIDRA_MCP_FIXTURE_PROJECT_DIR").ok(),
+    };
     std::env::set_var("GHIDRA_MCP_FIXTURE_PROJECT_DIR", dir);
     let state = fixture_state(); // reads the env var during boot
-    std::env::set_var("GHIDRA_MCP_FIXTURE_PROJECT_DIR", orig); // restore before returning
     state
 }
 
