@@ -90,7 +90,7 @@ jobs:
       - name: Assemble plugin bundles
         run: |
           for name in ${{ steps.plugins.outputs.names }}; do
-            bash scripts/bundle-opencode-plugin.sh "opencode/$name" bundles
+            bash scripts/bundle-opencode-plugin.sh "opencode/plugins/$name" bundles
           done
 
       - name: Upload bundles to the release
