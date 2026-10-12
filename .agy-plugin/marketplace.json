@@ -34,7 +34,7 @@
       "name": "re-ghidra-mcp-agy",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-agy-v0.8.0/re-ghidra-mcp-agy-agy-plugin.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-agy-v0.9.0/re-ghidra-mcp-agy-agy-plugin.zip"
       },
       "description": "An Antigravity plugin for Ghidra reverse engineering",
       "author": {
