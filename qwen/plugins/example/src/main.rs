@@ -20,7 +20,7 @@ fn main() -> anyhow::Result<()> {
                         },
                         "serverInfo": {
                             "name": "qwen-example-mcp",
-                            "version": "0.1.0"
+                            "version": env!("CARGO_PKG_VERSION")
                         }
                     })
                 }

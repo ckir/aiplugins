@@ -4,5 +4,6 @@ pub mod address;
 pub mod error;
 pub mod error_map;
 pub mod frame;
+pub mod owner_only;
 pub mod protocol;
 pub mod rpc;

@@ -146,3 +146,181 @@ pub fn parse_java_major(version_output: &str) -> Option<u32> {
         Some(first)
     }
 }
+
+#[cfg(test)]
+mod preflight_tests {
+    use super::*;
+
+    fn complete() -> RawConfig {
+        RawConfig {
+            ghidra_install_dir: Some("C:/ghidra".into()),
+            project_dir: Some("C:/re".into()),
+            project_name: Some("p".into()),
+            bootstrap_program: Some("add.exe".into()),
+            ..Default::default()
+        }
+    }
+
+    fn good_probe() -> Probe {
+        Probe {
+            launcher_present: true,
+            java_major: Some(21),
+        }
+    }
+
+    /// The silent path. If this ever starts reporting something, the hook goes
+    /// from invisible to noisy on every single session.
+    #[test]
+    fn fully_configured_reports_nothing() {
+        assert!(preflight(&complete(), &good_probe()).is_empty());
+    }
+
+    #[test]
+    fn install_dir_set_but_not_a_ghidra_root_is_reported() {
+        let probe = Probe {
+            launcher_present: false,
+            ..good_probe()
+        };
+        let f = preflight(&complete(), &probe);
+        assert_eq!(f.len(), 1);
+        assert!(f[0].contains("analyzeHeadless"), "{}", f[0]);
+    }
+
+    #[test]
+    fn old_java_is_reported_with_its_version() {
+        let probe = Probe {
+            java_major: Some(17),
+            ..good_probe()
+        };
+        let f = preflight(&complete(), &probe);
+        assert_eq!(f.len(), 1);
+        assert!(f[0].contains("17") && f[0].contains("21"), "{}", f[0]);
+    }
+
+    #[test]
+    fn absent_java_is_reported() {
+        let probe = Probe {
+            java_major: None,
+            ..good_probe()
+        };
+        assert!(preflight(&complete(), &probe)[0].contains("No `java` on PATH"));
+    }
+
+    /// The three per-project values collapse into one finding, naming exactly
+    /// the ones that are missing.
+    #[test]
+    fn missing_project_values_are_one_finding_naming_each() {
+        let cfg = RawConfig {
+            project_name: None,
+            bootstrap_program: None,
+            ..complete()
+        };
+        let f = preflight(&cfg, &good_probe());
+        assert_eq!(f.len(), 1);
+        assert!(f[0].contains("project_name"), "{}", f[0]);
+        assert!(f[0].contains("bootstrap_program"), "{}", f[0]);
+        assert!(!f[0].contains("project_dir,"), "{}", f[0]);
+    }
+
+    /// The agy finding names the agy settings file, not the Claude one — the
+    /// one intentional content difference between the fronts.
+    #[test]
+    fn missing_project_values_name_the_agy_settings_file() {
+        let cfg = RawConfig {
+            project_dir: None,
+            ..complete()
+        };
+        let f = preflight(&cfg, &good_probe());
+        assert_eq!(f.len(), 1);
+        assert!(
+            f[0].contains(".agents/re-ghidra-mcp-agy.local.md"),
+            "{}",
+            f[0]
+        );
+    }
+
+    #[test]
+    fn parses_modern_and_legacy_java_version_strings() {
+        assert_eq!(
+            parse_java_major("openjdk version \"21.0.2\" 2024-01-16"),
+            Some(21)
+        );
+        assert_eq!(
+            parse_java_major("java version \"1.8.0_412\"\nJava(TM) SE Runtime"),
+            Some(8)
+        );
+        assert_eq!(
+            parse_java_major("openjdk version \"25\" 2025-09-16"),
+            Some(25)
+        );
+    }
+
+    /// Unparseable output must read as "unknown", never as a low version — the
+    /// latter would produce a confidently wrong "upgrade your JDK" message.
+    #[test]
+    fn unrecognized_version_output_is_none() {
+        assert_eq!(parse_java_major("command not found"), None);
+        assert_eq!(parse_java_major("openjdk version \"weird\""), None);
+        assert_eq!(parse_java_major(""), None);
+    }
+}
+
+#[cfg(test)]
+mod settings_tests {
+    use super::*;
+
+    const SAMPLE: &str = "---\nproject_dir: C:\\re\\projects\nproject_name: crackme\nbootstrap_program: add.exe\n---\n\n# notes\n";
+
+    #[test]
+    fn reads_the_frontmatter_keys() {
+        let c = settings_from_markdown(SAMPLE);
+        assert_eq!(c.project_dir.as_deref(), Some("C:\\re\\projects"));
+        assert_eq!(c.project_name.as_deref(), Some("crackme"));
+        assert_eq!(c.bootstrap_program.as_deref(), Some("add.exe"));
+        assert_eq!(c.max_heap, None);
+    }
+
+    #[test]
+    fn crlf_and_bom_still_parse() {
+        let crlf = format!("\u{feff}{}", SAMPLE.replace('\n', "\r\n"));
+        let c = settings_from_markdown(&crlf);
+        assert_eq!(c.project_name.as_deref(), Some("crackme"));
+    }
+
+    /// A file with no frontmatter, or an unterminated block, contributes
+    /// nothing rather than half-parsing into a confusing partial config.
+    #[test]
+    fn no_frontmatter_yields_nothing() {
+        assert!(settings_from_markdown("# just a heading\n")
+            .project_name
+            .is_none());
+        assert!(settings_from_markdown("---\nproject_name: x\n")
+            .project_name
+            .is_none());
+    }
+
+    /// A key present but blank must not resolve to an empty project name — that
+    /// would pass the "is it set?" check and then fail deep inside Ghidra.
+    #[test]
+    fn blank_value_is_not_a_value() {
+        assert!(settings_from_markdown("---\nproject_name:   \n---\n")
+            .project_name
+            .is_none());
+    }
+
+    #[test]
+    fn unknown_keys_are_ignored() {
+        let c = settings_from_markdown("---\nfuture_key: 1\nproject_name: p\n---\n");
+        assert_eq!(c.project_name.as_deref(), Some("p"));
+    }
+
+    /// Pins the one path that legitimately differs per agent.
+    #[test]
+    fn settings_path_is_the_agy_file() {
+        let p = settings_path(Path::new("C:/work/proj"));
+        assert_eq!(
+            p,
+            Path::new("C:/work/proj/.agents/re-ghidra-mcp-agy.local.md")
+        );
+    }
+}

@@ -31,12 +31,6 @@ tracing = { workspace = true }
 tracing-appender = { workspace = true }
 tracing-subscriber = { workspace = true }
 
-# The log file is created owner-only (`logging.rs`), which needs the Win32 ACL
-# API. Non-Windows falls back to the umask default.
-[target.'cfg(windows)'.dependencies.windows]
-workspace = true
-features = ["Win32_Security_Authorization"]
-
 [dev-dependencies]
 # The protocol test drives this crate's own server with rmcp's in-process
 # client, so the MCP handshake and tool dispatch are exercised for real.
