@@ -44,7 +44,7 @@ spellcheck:
 # does not filter them on Windows (mlc 1.2.2); extend the list when a new
 # node_modules/ or build-output dir appears.
 links:
-    mlc --offline --ignore-path "./node_modules,./opencode/plugins/re-ghidra-mcp-opencode/node_modules,./opencode/plugins/rtk-mcp-opencode/node_modules,./target"
+    mlc --offline --ignore-path "./node_modules,./opencode/plugins/re-ghidra-mcp-opencode/node_modules,./opencode/plugins/rtk-mcp-opencode/node_modules,./opencode/plugins/todov2-opencode/node_modules,./target"
 
 # Verify plugin configs point at binaries this workspace actually builds.
 # Nothing else checks those strings: rename a [[bin]] and every test still
