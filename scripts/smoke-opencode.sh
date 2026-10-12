@@ -51,7 +51,11 @@ for dir in opencode/plugins/*/; do
 import plugin from './$dir/plugin.ts';
 const hooks = {};
 const ctx = {
-  tool: { hook: async (n, f) => { (hooks['tool:' + n] ??= []).push(f); } },
+  options: {},
+  tool: {
+    hook: async (n, f) => { (hooks['tool:' + n] ??= []).push(f); },
+    transform: async (f) => { await f({ add: (t) => { (hooks['tool:registered'] ??= []).push(t.name); } }); },
+  },
   session: { hook: async (n, f) => { (hooks['session:' + n] ??= []).push(f); } },
   storage: { get: async () => undefined, set: async () => {} },
 };
@@ -66,6 +70,7 @@ console.log('  hooks: ' + names);
 import plugin from './$dir/plugin.ts';
 let seen = '';
 const ctx = {
+  options: {},
   tool: { hook: async (n, f) => {
     if (n !== 'execute.before') return;
     const event = { tool: 'shell', input: { command: 'cat README.md' } };

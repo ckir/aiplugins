@@ -77,7 +77,7 @@ test-opencode:
     #!/usr/bin/env bash
     set -euo pipefail
     for dir in opencode/plugins/*/; do
-        (cd "$dir" && bun install && bun test tests/)
+        (cd "$dir" && bun install && bun test)
     done
 
 # Regenerate the committed footprint document for every published plugin, and
