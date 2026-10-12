@@ -2,14 +2,14 @@
 
 ## Project Overview
 
-**AI Plugins Marketplace** is a Rust monorepo that builds, manages, and distributes plugins for autonomous AI agents — initially **Claude Code**, **Antigravity**, and **Qwen Code**. The project provides two flagship reverse-engineering plugins:
+**AI Plugins Marketplace** is a Rust monorepo that builds, manages, and distributes plugins for autonomous AI agents — **Claude Code**, **Antigravity**, **Qwen Code**, and **OpenCode**. The project provides two flagship reverse-engineering plugins:
 
 1. **re-ghidra-mcp** — Drives a persistent headless Ghidra JVM from an AI agent via MCP, providing 19 reverse-engineering tools (decompile, navigate, search, durable rename/comment/write operations).
 2. **rtk-mcp** — A PreToolUse hook that transparently rewrites shell commands through `rtk` (Rust Token Killer) for 60-90% token savings, plus analytics as MCP tools.
 
 The architecture follows a **shared engine + agent-specific front** pattern:
 - `shared/` — Agent-agnostic crates used by multiple plugins
-- `claude-code/plugins/`, `qwen/plugins/`, `antigravity/plugins/` — Thin agent-specific plugin wrappers (manifests, skills, hooks, settings)
+- `claude-code/plugins/`, `qwen/plugins/`, `antigravity/plugins/`, `opencode/plugins/` — Thin agent-specific plugin wrappers (manifests, skills, hooks, settings)
 
 ### Shared Crates
 
@@ -26,6 +26,7 @@ The architecture follows a **shared engine + agent-specific front** pattern:
 | Claude Code | `claude-code/plugins/re-ghidra-mcp-cc` | `claude-code/plugins/rtk-mcp-cc` |
 | Qwen Code | `qwen/plugins/re-ghidra-mcp-qwen` | `qwen/plugins/rtk-mcp-qwen` |
 | Antigravity | `antigravity/plugins/re-ghidra-mcp-agy` | `antigravity/plugins/rtk-mcp-agy` |
+| OpenCode | `opencode/plugins/re-ghidra-mcp-opencode` | `opencode/plugins/rtk-mcp-opencode` (plus `opencode/plugins/todov2-opencode`: todowrite tool + TUI sidebar) |
 
 ## Key Technologies
 
@@ -53,7 +54,7 @@ The architecture follows a **shared engine + agent-specific front** pattern:
 just setup
 ```
 
-Installs dev tools (`cargo-nextest`, `cargo-deny`, `bacon`, `typos-cli`, `lefthook`) and git hooks.
+Installs dev tools (`cargo-nextest`, `cargo-deny`, `bacon`, `typos-cli`, `lefthook`, `mlc`) and git hooks.
 
 ### Common Tasks
 
@@ -69,7 +70,7 @@ Installs dev tools (`cargo-nextest`, `cargo-deny`, `bacon`, `typos-cli`, `leftho
 | Marketplace manifest | `just marketplace` | Verify root manifest matches plugins |
 | Dispatch check | `just dispatch` | Test bin dispatcher branches |
 | Smoke test | `just smoke` | Assemble and start bundled plugins |
-| Full check | `just check` | All pre-flight checks (CI-equivalent) |
+| Full check | `just check` | All local pre-flight checks (CI runs these plus generated-manifest `--check` gates and the opencode suites — see the `check` recipe comment) |
 | Clean stale | `just clean-stale` | Remove orphaned executables |
 | Full clean | `just clean` | Remove all build artifacts |
 
@@ -108,10 +109,13 @@ aiplugins/
 ├── antigravity/{agents,skills,commands,models,themes,hooks}/
 ├── qwen/plugins/           # Qwen Code extensions
 ├── qwen/{agents,skills,commands,models,themes,hooks}/
+├── opencode/plugins/        # OpenCode plugins (re-ghidra-mcp-opencode, rtk-mcp-opencode, todov2-opencode)
+├── opencode/{agents,skills,commands,models,themes,hooks}/
 ├── shared/                # Agent-agnostic crates (ghidra-ipc, ghidra-worker-ctl, ghidra-mcp)
+├── tools/                 # Maintainer tooling (plugin-footprint)
 ├── scripts/               # CI and justfile verification scripts
 ├── .agents/skills/        # Qwen Code skills (brainstorming, debugging, TDD, etc.)
-├── .github/workflows/     # CI: ci.yml, plugin-bundles.yml
+├── .github/workflows/     # CI: ci.yml, plugin-bundles.yml, qwen-extension-bundles.yml, agy-bundles.yml, opencode-bundles.yml, release.yml, release-please.yml, docs.yml, e2e-ghidra.yml, footprint-freshness.yml
 ├── Cargo.toml             # Workspace root
 ├── Justfile               # Task runner
 ├── deny.toml              # cargo deny configuration
@@ -135,8 +139,8 @@ aiplugins/
 - Live Ghidra tests are gated behind `GHIDRA_MCP_E2E` env var; without it they early-return and pass
 
 ### Git Hooks
-- `lefthook` manages pre-commit hooks (formatting, linting, tests)
-- CI runs the same checks as `just check`
+- `lefthook` manages pre-commit hooks (formatting, linting, typos) and pre-push hooks (formatting, linting, `mlc` link check)
+- `just check` is the local gate; CI runs the same core checks plus generated-manifest `--check` gates, the opencode test/smoke suites, and deny/typos jobs (link checking stays hook-only)
 
 ### Plugin Bundle Distribution
 - Plugins are distributed as release assets: `<plugin-name>-*.zip` and `<plugin-name>-*.tar.xz`
@@ -158,7 +162,7 @@ aiplugins/
 
 ## Version
 
-Current version: **0.6.3** (2026-09-01)
+Workspace: **0.7.2**. Plugin releases are per-package: **0.8.0** (Claude/Qwen/Antigravity ghidra + rtk), **0.7.3** (`rtk-mcp-opencode`, `re-ghidra-mcp-opencode`), **0.3.0** (`todov2-opencode`). See `.release-please-manifest.json` for the registry.
 
 License: **PolyForm-Noncommercial-1.0.0**
 

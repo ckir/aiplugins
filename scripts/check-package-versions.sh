@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Per-package version agreement across the eight registry packages.
+# Per-package version agreement across the nine registry packages.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 failures=0
@@ -10,7 +10,7 @@ check_pair() { # $1 = label, $2 = crate Cargo.toml, $3 = host manifest, $4 = jq 
         # (asserts presence and form, keeps all eight packages in one table).
         crate_v=$(jq -r '.version // ""' "$2" | tr -d '\r')
     else
-        crate_v=$(sed -n 's/^version = "\(.*\)"$/\1/p' "$2" | head -n 1)
+        crate_v=$(tr -d '\r' < "$2" | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1)
     fi
     manifest_v=$(jq -r "$4 // \"\"" "$3" | tr -d '\r')
     if [ "$crate_v" != "$manifest_v" ]; then
