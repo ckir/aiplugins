@@ -27,6 +27,7 @@
   "files": [
     "plugin.ts",
     "tui.tsx",
+    "tsconfig.json",
     "tool"
   ],
   "scripts": {
