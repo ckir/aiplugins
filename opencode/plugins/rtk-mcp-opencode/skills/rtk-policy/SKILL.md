@@ -6,8 +6,9 @@ description: Explains how rtk (Rust Token Killer) rewrites shell commands in thi
 # Working with rtk
 
 `rtk` (Rust Token Killer) rewrites shell commands into token-cheaper
-equivalents. This plugin installs it as a `PreToolUse` hook, so the rewrite
-happens **between** the command being written and the command being run.
+equivalents. This plugin installs it as an `execute.before` hook on the `shell`
+tool, so the rewrite happens **between** the command being written and the
+command being run.
 
 ## The one rule that matters
 
@@ -70,8 +71,8 @@ When a rewrite genuinely gets in the way:
 - **One command, unfiltered but still counted** — call the `rtk_proxy` MCP tool
   with an argv vector. It runs the command without rewriting while keeping it in
   rtk's statistics. It executes, so use it deliberately.
-- **A whole session** — set `RTK_CC_DISABLE=1`, or put `enabled: false` in
-  `.claude/rtk-mcp-cc.local.md`. Both make the hook pass every command through
+- **A whole session** — set `RTK_OPENCODE_DISABLE=1`, or put `enabled: false` in
+  `.opencode/rtk-mcp-opencode.local.md`. Both make the hook pass every command through
   untouched.
 
 ## When rtk is not installed

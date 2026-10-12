@@ -4,8 +4,14 @@ import {
   configFromMarkdown,
   applyEnv,
   hookArgs,
+  loadConfig,
+  loadFileConfig,
+  clearConfigCache,
   type RtkConfig,
 } from "../plugin.ts";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 const get =
   (vars: Record<string, string>) =>
@@ -62,5 +68,39 @@ describe("config", () => {
     expect(hookArgs(defaultConfig())).toEqual(["hook", "claude"]);
     const config: RtkConfig = { ...defaultConfig(), ultraCompact: true, skipEnv: true };
     expect(hookArgs(config)).toEqual(["hook", "claude", "--ultra-compact", "--skip-env"]);
+  });
+
+  test("loadConfig reads the project file once, then serves it from cache", () => {
+    const dir = mkdtempSync(join(tmpdir(), "rtk-cfg-"));
+    try {
+      mkdirSync(join(dir, ".opencode"));
+      writeFileSync(
+        join(dir, ".opencode", "rtk-mcp-opencode.local.md"),
+        "---\nenabled: false\nrtk_bin: /cached/rtk\n---\n"
+      );
+      clearConfigCache();
+      const first = loadConfig(dir, get({}));
+      expect(first.enabled).toBe(false);
+      expect(first.rtkBin).toBe("/cached/rtk");
+      // Second call hits the mtime cache: equal value, fresh object.
+      const second = loadConfig(dir, get({}));
+      expect(second).toEqual(first);
+      // Env still layers per call on top of the cached file.
+      const over = loadConfig(dir, get({ RTK_BIN: "/env/rtk" }));
+      expect(over.rtkBin).toBe("/env/rtk");
+      expect(over.enabled).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("loadConfig falls back to defaults when the file is missing or unreadable", () => {
+    const dir = mkdtempSync(join(tmpdir(), "rtk-cfg-"));
+    try {
+      clearConfigCache();
+      expect(loadFileConfig(dir)).toEqual(defaultConfig());
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

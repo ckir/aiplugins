@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { validateTodos } from "./validate"
+import { MAX_ACTIVE_FORM_LENGTH, MAX_CONTENT_LENGTH, MAX_TODOS, validateTodos } from "./validate"
 
 describe("validateTodos", () => {
   it("accepts a valid list", () => {
@@ -69,5 +69,34 @@ describe("validateTodos", () => {
       ],
     })
     expect(result.ok).toBe(true)
+  })
+
+  it("rejects lists past the per-round injection cap", () => {
+    const big = Array.from({ length: MAX_TODOS + 1 }, (_, i) => ({
+      content: `task ${i}`,
+      status: "pending",
+      priority: "low",
+    }))
+    expect(validateTodos({ todos: big }).ok).toBe(false)
+    const atCap = big.slice(0, MAX_TODOS)
+    expect(validateTodos({ todos: atCap }).ok).toBe(true)
+  })
+
+  it("rejects oversized content and activeForm", () => {
+    const longContent = validateTodos({
+      todos: [{ content: "x".repeat(MAX_CONTENT_LENGTH + 1), status: "pending", priority: "low" }],
+    })
+    expect(longContent.ok).toBe(false)
+    const longForm = validateTodos({
+      todos: [
+        {
+          content: "a",
+          status: "in_progress",
+          priority: "low",
+          activeForm: "y".repeat(MAX_ACTIVE_FORM_LENGTH + 1),
+        },
+      ],
+    })
+    expect(longForm.ok).toBe(false)
   })
 })

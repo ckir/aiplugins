@@ -4,9 +4,12 @@ import { parseTodo, type Todo } from "./schema"
 /**
  * Plugin `ctx.storage` is plugin-scoped, not session-scoped.
  * Keys are `todos/<sessionID>` so concurrent sessions stay isolated.
+ * The id is sanitized to a KV-safe alphabet so `/`, `..` or empty ids
+ * cannot collide with or span keys.
  */
 export function todosKey(sessionID: string) {
-  return `todos/${sessionID}`
+  const safe = sessionID.replace(/[^A-Za-z0-9_-]/g, "_") || "unknown"
+  return `todos/${safe}`
 }
 
 export async function saveTodos(ctx: Plugin.Context, sessionID: string, todos: readonly Todo[]) {

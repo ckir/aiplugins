@@ -1,6 +1,6 @@
 import { Plugin } from "@opencode/plugin";
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 export interface RtkConfig {
@@ -104,14 +104,33 @@ export function loadConfig(
   projectDir: string,
   get: (key: string) => string | undefined
 ): RtkConfig {
+  return applyEnv(loadFileConfig(projectDir), get);
+}
+
+// File layer, cached by path+mtime so every shell hook does one stat instead
+// of a read+parse. Env still applies per call (see loadConfig) — env is cheap
+// and must reflect the current process state.
+const fileConfigCache = new Map<string, { mtimeMs: number; config: RtkConfig }>();
+
+export function loadFileConfig(projectDir: string): RtkConfig {
   const path = join(projectDir, ".opencode", "rtk-mcp-opencode.local.md");
-  let config = defaultConfig();
   try {
-    if (existsSync(path)) config = configFromMarkdown(readFileSync(path, "utf8"));
+    const mtimeMs = statSync(path).mtimeMs;
+    const hit = fileConfigCache.get(path);
+    if (hit && hit.mtimeMs === mtimeMs) return { ...hit.config };
+    const config = existsSync(path)
+      ? configFromMarkdown(readFileSync(path, "utf8"))
+      : defaultConfig();
+    fileConfigCache.set(path, { mtimeMs, config: { ...config } });
+    return config;
   } catch {
-    config = defaultConfig();
+    return defaultConfig();
   }
-  return applyEnv(config, get);
+}
+
+/** Test seam: drop the file-config cache between cases that share a path. */
+export function clearConfigCache(): void {
+  fileConfigCache.clear();
 }
 
 export function hookArgs(config: RtkConfig): string[] {
@@ -152,6 +171,12 @@ export function runRtk(rtkBin: string, args: string[], payload: string): string 
       input: payload,
       encoding: "utf8",
       timeout: 10000,
+      // Bound the buffer: rtk answers are small JSON verdicts, so anything past
+      // this is a misbehaving child. Overflow throws → caught → fail open.
+      // NOTE: spawnSync still blocks the host event loop while the child runs
+      // (up to `timeout`); an async spawn with kill is the follow-up if this
+      // ever shows up as a stall.
+      maxBuffer: 4 * 1024 * 1024,
     });
     if (out.status !== 0) return null;
     return typeof out.stdout === "string" ? out.stdout : null;
@@ -196,6 +221,10 @@ export default Plugin.define({
       if (!input || typeof input[COMMAND_FIELD] !== "string") return;
       const command = input[COMMAND_FIELD] as string;
       if (command.trim() === "") return;
+      // NOTE: host cwd, not necessarily the session/project dir — the recorded
+      // hook event carries no directory, so a per-project .local.md is missed
+      // when they differ. No better source is exposed today; revisit if the
+      // hook event gains one.
       const config = loadConfig(process.cwd(), (key) => process.env[key]);
       if (!config.enabled) return;
       const envelope = JSON.stringify({ tool_name: "Bash", tool_input: { command } });

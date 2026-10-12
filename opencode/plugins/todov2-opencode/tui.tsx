@@ -14,8 +14,15 @@ type Todo = {
 
 function View(props: { context: Plugin.Context; sessionID: string }) {
   const [open, setOpen] = createSignal(true)
-  const theme = props.context.theme
-  const todos = createMemo(() => latestTodos(props.context.data.session.message.list(props.sessionID)))
+  const palette = readPalette(props.context.theme)
+  const todos = createMemo(() => {
+    try {
+      return latestTodos(props.context.data.session.message.list(props.sessionID))
+    } catch {
+      // Host shape drift must blank the sidebar, never crash it.
+      return []
+    }
+  })
   const done = createMemo(() => todos().filter((todo) => todo.status === "completed").length)
   const hidden = createMemo(() => todos().length > 0 && todos().every((todo) => todo.status === "completed"))
 
@@ -24,11 +31,11 @@ function View(props: { context: Plugin.Context; sessionID: string }) {
       <box>
         <box flexDirection="row" gap={1} onMouseDown={() => todos().length > 2 && setOpen((value) => !value)}>
           <Show when={todos().length > 2}>
-            <text fg={theme.text.default}>{open() ? "▼" : "▶"}</text>
+            <text fg={palette.def}>{open() ? "▼" : "▶"}</text>
           </Show>
-          <text fg={theme.text.default}>
+          <text fg={palette.def}>
             <b>Todos</b>
-            <span style={{ fg: theme.text.subdued }}>
+            <span style={{ fg: palette.subdued }}>
               {todos().length === 0 ? "" : ` (${done()}/${todos().length} done)`}
             </span>
           </text>
@@ -36,17 +43,17 @@ function View(props: { context: Plugin.Context; sessionID: string }) {
         <Show
           when={todos().length > 0}
           fallback={
-            <text fg={theme.text.subdued}>none yet</text>
+            <text fg={palette.subdued}>none yet</text>
           }
         >
           <Show when={todos().length <= 2 || open()}>
             <For each={todos()}>
               {(todo) => (
                 <box flexDirection="row" gap={1} minWidth={0}>
-                  <text flexShrink={0} fg={markerColor(theme, todo.status)}>
+                  <text flexShrink={0} fg={markerColor(palette, todo.status)}>
                     {marker(todo.status)}
                   </text>
-                  <text fg={lineColor(theme, todo.status)} wrapMode="none" truncate flexGrow={1} flexShrink={1} minWidth={0}>
+                  <text fg={lineColor(palette, todo.status)} wrapMode="none" truncate flexGrow={1} flexShrink={1} minWidth={0}>
                     {todo.content}
                     {todo.priority ? ` (${todo.priority})` : ""}
                     {todo.status === "in_progress" && todo.activeForm ? ` currently: ${todo.activeForm}` : ""}
@@ -73,7 +80,10 @@ export default Plugin.define({
 })
 
 function latestTodos(messages: ReadonlyArray<{ type?: unknown; content?: unknown }>): Todo[] {
-  for (let index = messages.length - 1; index >= 0; index--) {
+  // Bound the scan: the newest todowrite verdict is near the tail, and a long
+  // session would otherwise pay O(history) parsing on every render.
+  const start = Math.max(0, messages.length - MAX_SCAN_MESSAGES)
+  for (let index = messages.length - 1; index >= start; index--) {
     const message = messages[index]
     if (!message || message.type !== "assistant" || !Array.isArray(message.content)) continue
     for (let partIndex = message.content.length - 1; partIndex >= 0; partIndex--) {
@@ -179,17 +189,48 @@ function marker(status: TodoStatus) {
   return "[ ]"
 }
 
-function markerColor(theme: Plugin.Context["theme"], status: TodoStatus) {
-  if (status === "completed") return theme.text.feedback.success.default
-  if (status === "in_progress") return theme.text.feedback.warning.default
-  if (status === "cancelled") return theme.text.subdued
-  return theme.text.default
+type Palette = { def: string; subdued: string; ok: string; warn: string }
+
+/** Newest transcript window scanned per render (see latestTodos). */
+const MAX_SCAN_MESSAGES = 50
+
+/**
+ * Read theme colors defensively: a theme/API shape drift must blank colors,
+ * never crash the whole sidebar.
+ */
+function readPalette(theme: unknown): Palette {
+  const blank = { def: "", subdued: "", ok: "", warn: "" }
+  try {
+    const text = (theme as { text?: unknown })?.text as
+      | {
+          default?: unknown
+          subdued?: unknown
+          feedback?: { success?: { default?: unknown }; warning?: { default?: unknown } }
+        }
+      | undefined
+    const str = (value: unknown) => (typeof value === "string" ? value : "")
+    return {
+      def: str(text?.default),
+      subdued: str(text?.subdued),
+      ok: str(text?.feedback?.success?.default),
+      warn: str(text?.feedback?.warning?.default),
+    }
+  } catch {
+    return blank
+  }
 }
 
-function lineColor(theme: Plugin.Context["theme"], status: TodoStatus) {
-  if (status === "completed" || status === "cancelled") return theme.text.subdued
-  if (status === "in_progress") return theme.text.feedback.warning.default
-  return theme.text.default
+function markerColor(palette: Palette, status: TodoStatus) {
+  if (status === "completed") return palette.ok
+  if (status === "in_progress") return palette.warn
+  if (status === "cancelled") return palette.subdued
+  return palette.def
+}
+
+function lineColor(palette: Palette, status: TodoStatus) {
+  if (status === "completed" || status === "cancelled") return palette.subdued
+  if (status === "in_progress") return palette.warn
+  return palette.def
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

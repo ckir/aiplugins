@@ -20,7 +20,12 @@ export function registerTodoWrite(ctx: Plugin.Context) {
         }
       }
       const todos = result.todos
-      await saveTodos(ctx, toolCtx.sessionID, todos)
+      try {
+        await saveTodos(ctx, toolCtx.sessionID, todos)
+      } catch {
+        // A KV blip must read like invalid input, not an unhandled rejection.
+        return { content: "todowrite storage unavailable; list not saved" }
+      }
       return {
         output: { todos },
         content: formatTodos(todos),

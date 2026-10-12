@@ -78,14 +78,14 @@ export function parseTodo(value: unknown): Todo | undefined {
   if (typeof value.priority !== "string" || !isTodoPriority(value.priority)) return
   if (!("activeForm" in value) || value.activeForm === undefined) {
     return {
-      content: value.content,
+      content: value.content.trim(),
       status: value.status,
       priority: value.priority,
     }
   }
   if (typeof value.activeForm !== "string") return
   return {
-    content: value.content,
+    content: value.content.trim(),
     status: value.status,
     priority: value.priority,
     activeForm: value.activeForm,

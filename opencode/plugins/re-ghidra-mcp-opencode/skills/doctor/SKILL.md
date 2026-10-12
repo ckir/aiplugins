@@ -1,11 +1,10 @@
 ---
 name: doctor
-description: Diagnoses why the Ghidra MCP server will not start or will not attach to a project. Use when the user runs /re-ghidra-mcp-cc:doctor, when a re-ghidra-mcp-cc tool call fails with GHIDRA_NOT_FOUND, PROJECT_NOT_FOUND, JDK_NOT_FOUND, PROJECT_LOCKED, WORKER_INCOMPATIBLE, WORKER_UNAVAILABLE or a boot timeout, when the plugin's tools are listed but every call fails with a configuration error, when the plugin's tools do not appear at all, or when the user asks why Ghidra will not connect, why the worker will not boot, or how to check their Ghidra setup.
+description: Diagnoses why the Ghidra MCP server will not start or will not attach to a project. Use when the user runs /re-ghidra-mcp-opencode:doctor, when a ghidra server tool call fails with GHIDRA_NOT_FOUND, PROJECT_NOT_FOUND, JDK_NOT_FOUND, PROJECT_LOCKED, WORKER_INCOMPATIBLE, WORKER_UNAVAILABLE or a boot timeout, when the plugin's tools are listed but every call fails with a configuration error, when the plugin's tools do not appear at all, or when the user asks why Ghidra will not connect, why the worker will not boot, or how to check their Ghidra setup.
 argument-hint: "[verbose]"
-allowed-tools: Bash, Read, Write
 ---
 
-# Diagnose a re-ghidra-mcp-cc setup
+# Diagnose a re-ghidra-mcp-opencode setup
 
 Work through the five prerequisites in order and report which one is broken.
 **Order matters** — each check is meaningless if the one before it failed, so
@@ -16,21 +15,20 @@ Report findings as you go. Do not fix anything without asking first: three of
 these five involve the user's own Ghidra projects and installs.
 
 If the invocation includes `verbose`, also print the resolved value of every
-configuration key in `examples/re-ghidra-mcp-cc.local.md`'s table, not just the
+configuration key in this plugin's README table, not just the
 ones that are wrong.
 
-## Run the commands in PowerShell
+## Run the commands in a shell (PowerShell shown)
 
-This plugin runs on Windows only, and the paths in these variables are
-backslash paths. Use `pwsh` for every command below. A POSIX shell here fails
-for shell reasons — path translation, glob semantics — and a shell failure is
+The commands below are PowerShell (Windows). On macOS/Linux translate them to
+the POSIX shell — same checks, `/` paths. A shell failure is
 indistinguishable in the report from a failed prerequisite, which is the exact
-misdiagnosis this skill exists to prevent.
+misdiagnosis this skill exists to prevent, so get the shell right first.
 
 ## 1. The plugin's binaries exist and the server is running
 
-`.mcp.json` points at `${CLAUDE_PLUGIN_ROOT}/bin/re-ghidra-cc-mcp`, and that
-directory is gitignored — a fresh clone has no binaries. Claude Code cannot
+`opencode.jsonc` points at `<DEST>/bin/re-ghidra-cc-mcp` (`.exe` on Windows),
+and that directory is not in git — a fresh copy has no binaries. OpenCode cannot
 report a server it never managed to launch.
 
 **If you can see the plugin's tools, the server started** — skip to check 2.
@@ -44,13 +42,14 @@ tools at all.
 Two different failures look identical from inside the session, and they have
 different fixes, so separate them:
 
-- **Never built.** Check whether the binaries are on disk. `${CLAUDE_PLUGIN_ROOT}`
-  is expanded by Claude Code in config files but **not** in a shell command, so
-  it will be empty in Bash — look for `bin/re-ghidra-cc-mcp.exe` under the
-  plugin directory by path instead. If absent, the fix is `just build-re-ghidra-mcp-cc`
-  followed by a restart of Claude Code.
+- **Never built.** Check whether the binaries are on disk. `<DEST>` is the
+  absolute install dir from this plugin's INSTALL.md (project-local or global
+  config dir) — it is not expanded by the host, so look for
+  `bin/re-ghidra-cc-mcp(.exe)` under the installed plugin copy by path instead.
+  If absent, the fix is `just build-re-ghidra-mcp-opencode`
+  followed by a restart of OpenCode.
 - **Built, but the server died on launch.** The binaries exist, yet no
-  `re-ghidra-mcp-cc` MCP tools are available in this session. A configuration
+  `ghidra` MCP tools are available in this session. A configuration
   problem can no longer put you here — see above — so this is a crashing or
   unloadable binary. Tell the user to
   run `/mcp` to see whether the server is registered but failing, and go to the
@@ -62,9 +61,10 @@ below describes a server that is not running.
 
 ## 2. Ghidra is installed, and the plugin can find it
 
-The install root can come from either `GHIDRA_INSTALL_DIR` **or** the
-`ghidra_install_dir` key in `.claude/re-ghidra-mcp-cc.local.md`, with the
-environment winning. Read both before concluding anything — reporting a hard
+The install root can come from the `GHIDRA_INSTALL_DIR` environment variable
+**or** the `ghidra_install_dir` key in `.claude/re-ghidra-mcp-cc.local.md` in the
+session directory (a fallback layer from the shared server binary, which this
+plugin reuses), with the environment winning. Read both before concluding anything — reporting a hard
 failure here when the settings file supplied a valid path would stop the
 diagnosis three checks early.
 
@@ -127,8 +127,10 @@ exists. Both `21.0.x` and a bare `25` are fine; `1.8.0_x` is Java 8 and is not.
 
 ## 4. The project is configured
 
-Read `.claude/re-ghidra-mcp-cc.local.md` in the project root if it exists, and
-check the environment:
+Read the `GHIDRA_MCP_*` environment first, then `.claude/re-ghidra-mcp-cc.local.md`
+in the session directory if it exists (fallback layer from the shared server
+binary — the primary documented config on this host is the environment; see
+this plugin's README table):
 
 ```powershell
 Get-ChildItem Env: | Where-Object Name -like 'GHIDRA_MCP_*'
@@ -146,9 +148,8 @@ The environment wins over the file — but an **empty** variable counts as unset
 and falls through to the file. `GHIDRA_MCP_PROJECT_NAME=` is not a configured
 empty name; do not report it as one.
 
-If nothing is set from either source, point the user at the template in the
-plugin's `examples/` directory and offer to write
-`.claude/re-ghidra-mcp-cc.local.md` for them.
+If nothing is set from either source, point the user at the configuration table in
+the plugin's README and offer to set the environment for them.
 
 Then confirm the project actually exists where it claims to:
 
@@ -252,4 +253,4 @@ loopback bind, and a project that was never fully auto-analyzed in the GUI.
 
 A `WORKER_INCOMPATIBLE` error is a different thing entirely — it means the
 extracted worker script does not match this binary, and its pinned advice is to
-reinstall the plugin. Rebuild with `just build-re-ghidra-mcp-cc` and restart.
+reinstall the plugin. Rebuild with `just build-re-ghidra-mcp-opencode` and restart.

@@ -1,6 +1,6 @@
 ---
 name: gain
-description: Reports rtk's token savings for this project or all projects, and the optimization opportunities being missed. Use when the user runs /rtk-mcp-cc:gain or asks how many tokens rtk has saved, what rtk savings look like, whether rtk is actually working, or which commands could be optimized but are not.
+description: Reports rtk's token savings for this project or all projects, and the optimization opportunities being missed. Use when the user runs /rtk-mcp-opencode:gain or asks how many tokens rtk has saved, what rtk savings look like, whether rtk is actually working, or which commands could be optimized but are not.
 argument-hint: "[history] [discover] [project|all]"
 allowed-tools: Bash
 ---
@@ -20,12 +20,12 @@ Show what rtk has saved, and what it is still leaving on the table.
 
 ## Steps
 
-1. **Summary.** Call the `rtk_gain` tool from this plugin's `rtk-mcp-cc` MCP
+1. **Summary.** Call the `rtk_gain` tool from this plugin's `rtk` MCP
    server. Pass `history: true` when the user asked for it, and
    `project_only: true` unless they asked for `all`.
 
    If that tool is unavailable — the plugin's binaries have not been built —
-   say so, tell the user to run `just build-rtk-mcp-cc`, and fall back to
+   say so, tell the user to run `just build-rtk-mcp-opencode`, and fall back to
    running `rtk gain` through `Bash` so the request is still answered.
 
 2. **Missed savings.** Only when the user asked for `discover`, call

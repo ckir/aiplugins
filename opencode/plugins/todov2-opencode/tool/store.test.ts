@@ -25,6 +25,13 @@ describe("todosKey", () => {
     expect(todosKey("abc")).toBe("todos/abc")
     expect(todosKey("abc")).not.toBe(todosKey("def"))
   })
+
+  it("sanitizes hostile ids to a KV-safe alphabet", () => {
+    expect(todosKey("../../etc")).toBe("todos/______etc")
+    expect(todosKey("a/b")).toBe("todos/a_b")
+    expect(todosKey("")).toBe("todos/unknown")
+    expect(todosKey("s1")).toBe("todos/s1")
+  })
 })
 
 describe("saveTodos / loadTodos", () => {
