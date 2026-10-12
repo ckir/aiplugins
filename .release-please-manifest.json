@@ -3,9 +3,9 @@
   "claude-code/plugins/re-ghidra-mcp-cc": "0.8.0",
   "qwen/plugins/rtk-mcp-qwen": "0.8.0",
   "qwen/plugins/re-ghidra-mcp-qwen": "0.8.0",
-  "opencode/plugins/rtk-mcp-opencode": "0.8.0",
-  "opencode/plugins/re-ghidra-mcp-opencode": "0.8.0",
-  "opencode/plugins/todov2-opencode": "0.4.0",
+  "opencode/plugins/rtk-mcp-opencode": "0.9.0",
+  "opencode/plugins/re-ghidra-mcp-opencode": "0.9.0",
+  "opencode/plugins/todov2-opencode": "0.5.0",
   "antigravity/plugins/rtk-mcp-agy": "0.8.0",
-  "antigravity/plugins/re-ghidra-mcp-agy": "0.9.0"
+  "antigravity/plugins/re-ghidra-mcp-agy": "0.10.0"
 }
