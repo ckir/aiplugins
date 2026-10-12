@@ -15,10 +15,11 @@ name: Release Refresh
 # pushed. Scoped to the release-please branch only — every other PR is
 # skipped before any tool runs.
 #
-# GITHUB_TOKEN is enough: the release branch is unprotected, and nothing
-# created here must trigger further workflows (a refresh commit retriggering
-# CI is intended; tag and bundle workflows key off tags and release PR
-# merges, neither of which this produces).
+# The push MUST authenticate with RELEASE_PLEASE_TOKEN, not GITHUB_TOKEN:
+# pushes made with GITHUB_TOKEN trigger no workflows, so the refresh commit
+# would land without CI and the release PR could never go green. (Same
+# reason release-please itself runs under the PAT. Tag and bundle workflows
+# key off tags and release PR merges, neither of which this produces.)
 
 on:
   pull_request:
@@ -36,6 +37,11 @@ jobs:
     if: github.head_ref == 'release-please--branches--main'
     runs-on: ubuntu-latest
     steps:
+# GITHUB_TOKEN is deliberately NOT enough here: pushes made with it do not
+# trigger any workflows, so a refresh commit would land without CI and the
+# release PR could never go green. The PAT push retriggers CI (and this
+# workflow, which then converges with no further push). This is the same
+# reason release-please itself runs under RELEASE_PLEASE_TOKEN.
       - uses: actions/checkout@v7
         with:
           # The PR head itself, not the merge commit: the commit below must
@@ -43,6 +49,7 @@ jobs:
           ref: ${{ github.head_ref }}
           # A shallow checkout cannot push a new commit onto the branch.
           fetch-depth: 0
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
