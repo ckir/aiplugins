@@ -20,7 +20,7 @@ Tasks tracked here (existing `tasks/plan.md`/`todo.md` belong to the completed r
 ### Phase 2: OpenCode TS
 - [x] Task 6: Wrong-host skill docs (rtk-policy, gain, doctor) + wiring cmp scope fix
 - [x] Task 7: `opencode.jsonc` relative-command note + package.json alignment (version text, test scripts, todov2 dup dep)
-- [x] Task 8: rtk hook: `maxBuffer`, config-load cache, cwd note
+- [x] Task 8: rtk hook: `maxBuffer`, setup-once file config + per-call env, cwd note (mtime cache dropped: +1432 setup bytes tripped the 500 delta cap; setup-once matches sibling fronts)
 - [x] Task 9: todov2 bounds + guards (maxTodos/caps, sessionID sanitize, hook guards, bool coerce, tui scan cap, trim unify, theme guards)
 
 ### Checkpoint: Phase 2

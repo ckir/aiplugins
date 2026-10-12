@@ -7,13 +7,13 @@ OpenCode V2 plugin that restores the `todowrite` tool and shows a live todo list
 <!-- footprint:begin -->
 ### Context footprint
 
-Installing this plugin adds **≥ 0 bytes** to every request, for the whole session. A further **≥ 0 bytes** load only when one of its skills or agents is actually invoked. Its `plugin.ts` setup module adds **≥ 659 bytes**, loaded in-process with the host on every request and counted separately below so the TypeScript tier stays comparable across releases.
+Installing this plugin adds **≥ 0 bytes** to every request, for the whole session. A further **≥ 0 bytes** load only when one of its skills or agents is actually invoked. Its `plugin.ts` setup module adds **≥ 1,603 bytes**, loaded in-process with the host on every request and counted separately below so the TypeScript tier stays comparable across releases.
 
 | Tier | Bytes | When you pay it |
 |---|---|---|
 | Resident | ≥ 0 | Every request, for the whole session |
 | Invocation | ≥ 0 | Only when that skill or agent runs |
-| Setup | ≥ 659 | Every request — `plugin.ts` loads in-process with the host |
+| Setup | ≥ 1,603 | Every request — `plugin.ts` loads in-process with the host |
 
 **Bytes, not tokens.** This is the exact serialised size of what the host loads, measured by probing the plugin's own MCP server and reading its skill and agent frontmatter. It is not a token count and does not convert to one at a fixed rate — treat it as a figure you can compare between plugins, not as a context budget.
 

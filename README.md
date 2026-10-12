@@ -56,9 +56,9 @@ verification) and asks whether to install project-local or global first:
 | Plugin | Resident bytes | Invocation bytes |
 |---|---|---|
 | `re-ghidra-mcp-cc` | ≥ 21,631 | ≥ 36,903 |
-| `re-ghidra-mcp-opencode` | ≥ 21,327 | ≥ 36,903 |
+| `re-ghidra-mcp-opencode` | ≥ 21,297 | ≥ 37,131 |
 | `rtk-mcp-cc` | ≥ 3,690 | ≥ 6,091 |
-| `rtk-mcp-opencode` | ≥ 3,690 | ≥ 6,091 |
+| `rtk-mcp-opencode` | ≥ 3,696 | ≥ 6,129 |
 | `todov2-opencode` | ≥ 0 | ≥ 0 |
 
 **Resident** is what the host holds in every request, for the whole session — the MCP tool schemas plus the frontmatter it reads to decide what each skill and agent is for. **Invocation** loads only when one of them actually runs.
