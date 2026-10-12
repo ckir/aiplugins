@@ -27,6 +27,7 @@ for spec in \
     "re-ghidra-mcp-qwen|qwen/plugins/re-ghidra-mcp-qwen/Cargo.toml|qwen/plugins/re-ghidra-mcp-qwen/qwen-extension.json|.version" \
     "rtk-mcp-opencode|opencode/plugins/rtk-mcp-opencode/package.json|opencode/plugins/rtk-mcp-opencode/package.json|.version" \
     "re-ghidra-mcp-opencode|opencode/plugins/re-ghidra-mcp-opencode/package.json|opencode/plugins/re-ghidra-mcp-opencode/package.json|.version" \
+    "todov2-opencode|opencode/plugins/todov2-opencode/package.json|opencode/plugins/todov2-opencode/package.json|.version" \
     "rtk-mcp-agy|antigravity/plugins/rtk-mcp-agy/Cargo.toml|antigravity/plugins/rtk-mcp-agy/plugin.json|.version" \
     "re-ghidra-mcp-agy|antigravity/plugins/re-ghidra-mcp-agy/Cargo.toml|antigravity/plugins/re-ghidra-mcp-agy/plugin.json|.version" \
 ; do

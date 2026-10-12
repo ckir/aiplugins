@@ -37,7 +37,8 @@
       "dir": "opencode/plugins",
       "plugins": [
         "rtk-mcp-opencode",
-        "re-ghidra-mcp-opencode"
+        "re-ghidra-mcp-opencode",
+        "todov2-opencode"
       ],
       "marketplace": ".opencode-plugin/marketplace.json",
       "manifestPattern": "opencode/plugins/{plugin}/package.json",

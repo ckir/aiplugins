@@ -44,6 +44,13 @@
         "package.json"
       ]
     },
+    "opencode/plugins/todov2-opencode": {
+      "release-type": "simple",
+      "component": "todov2-opencode",
+      "extra-files": [
+        "package.json"
+      ]
+    },
     "antigravity/plugins/rtk-mcp-agy": {
       "release-type": "rust",
       "component": "rtk-mcp-agy",

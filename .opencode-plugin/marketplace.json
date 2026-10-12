@@ -51,6 +51,29 @@
         "mcp",
         "rust"
       ]
+    },
+    {
+      "name": "todov2-opencode",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/todov2-opencode-v0.3.0/todov2-opencode-opencode.zip"
+      },
+      "description": "Restore the V2-removed todowrite tool and a TUI sidebar list for OpenCode sessions",
+      "author": {
+        "name": "AI Plugins Marketplace Contributors"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/opencode/plugins/todov2-opencode",
+      "license": "MIT",
+      "category": "development",
+      "keywords": [
+        "opencode",
+        "opencode-plugin",
+        "plugin",
+        "todo",
+        "tasks",
+        "ai",
+        "agent"
+      ]
     }
   ]
 }
