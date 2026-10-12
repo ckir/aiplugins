@@ -201,4 +201,4 @@ Each call replaces the full session list. An empty `todos: []` clears it.
 
 ## License
 
-MIT
+[PolyForm-Noncommercial-1.0.0](../../../LICENSE) — same as every plugin in this repository.

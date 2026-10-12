@@ -63,7 +63,7 @@
         "name": "AI Plugins Marketplace Contributors"
       },
       "homepage": "https://github.com/ckir/aiplugins/tree/main/opencode/plugins/todov2-opencode",
-      "license": "MIT",
+      "license": "PolyForm-Noncommercial-1.0.0",
       "category": "development",
       "keywords": [
         "opencode",

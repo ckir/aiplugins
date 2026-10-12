@@ -3,7 +3,7 @@
   "version": "0.3.0",
   "description": "Restore the V2-removed todowrite tool and a TUI sidebar list for OpenCode sessions",
   "type": "module",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "keywords": [
     "opencode",
     "opencode-plugin",
