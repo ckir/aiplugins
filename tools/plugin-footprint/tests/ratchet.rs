@@ -94,7 +94,7 @@ fn ratchet(doc: &Path, budgets: &Path) -> std::process::Output {
 #[test]
 fn a_plugin_absent_from_the_budgets_file_is_seeded_at_measured_plus_headroom() {
     let fx = Fixture::new("seed");
-    let doc = fx.write("m.json", &measured("newcomer", "ok", 10_000));
+    let doc = fx.write("newcomer.json", &measured("newcomer", "ok", 10_000));
 
     // Deliberately no budgets file at all: this is the very first run.
     let out = ratchet(&doc, &fx.path("budgets.json"));
@@ -122,7 +122,7 @@ fn a_hand_set_policy_value_survives_regeneration() {
     // docs/footprints/, the freshness check then failed the build as "stale".
     // The two mechanisms together made a reviewed threshold change impossible.
     let fx = Fixture::new("policy");
-    let doc = fx.write("m.json", &measured("x", "ok", 10_000));
+    let doc = fx.write("x.json", &measured("x", "ok", 10_000));
     let budgets = fx.write(
         "budgets.json",
         r#"{"x":{"residentBytes":12000,"headroomBytes":3000,"deltaBytes":1500}}"#,
@@ -148,7 +148,7 @@ fn the_hysteresis_uses_the_plugins_own_headroom_not_the_default() {
     let fx = Fixture::new("hyst");
     // headroom 3000, so the ceiling follows only a measurement 2*3000 below it.
     // 12000 - 6000 = 6000: a measurement of exactly 6000 moves it, to 9000.
-    let doc = fx.write("m.json", &measured("x", "ok", 6_000));
+    let doc = fx.write("x.json", &measured("x", "ok", 6_000));
     let budgets = fx.write(
         "budgets.json",
         r#"{"x":{"residentBytes":12000,"headroomBytes":3000,"deltaBytes":500}}"#,
@@ -164,7 +164,7 @@ fn an_unchanged_measurement_does_not_move_the_ceiling() {
     // A ratchet that moved on every run would churn the committed file, and the
     // freshness check would then fail on nothing at all.
     let fx = Fixture::new("stable");
-    let doc = fx.write("m.json", &measured("x", "ok", 10_000));
+    let doc = fx.write("x.json", &measured("x", "ok", 10_000));
     let budgets = fx.write(
         "budgets.json",
         r#"{"x":{"residentBytes":12000,"headroomBytes":2000,"deltaBytes":500}}"#,
@@ -181,7 +181,7 @@ fn a_budgets_file_that_is_not_an_object_is_refused_rather_than_panicking() {
     // ... in JSON array". Under `set -e` in footprint-regen that aborts the run
     // with a backtrace note and no statement of what is actually wrong.
     let fx = Fixture::new("notobject");
-    let doc = fx.write("m.json", &measured("x", "ok", 10_000));
+    let doc = fx.write("x.json", &measured("x", "ok", 10_000));
     let budgets = fx.write("budgets.json", "[]");
 
     let out = ratchet(&doc, &budgets);
@@ -203,7 +203,7 @@ fn a_failed_probe_never_moves_a_threshold() {
     // Its tiers are absent, so the measurement reads as zero — and ratcheting
     // every budget to the floor would fail every subsequent change.
     let fx = Fixture::new("failed");
-    let doc = fx.write("m.json", &measured("x", "failed", 0));
+    let doc = fx.write("x.json", &measured("x", "failed", 0));
     let budgets = fx.write(
         "budgets.json",
         r#"{"x":{"residentBytes":12000,"headroomBytes":2000,"deltaBytes":500}}"#,
@@ -219,7 +219,10 @@ fn a_plugin_with_no_mcp_server_may_still_seed_a_threshold() {
     // budget like any other. Refusing it would leave skills-only plugins
     // permanently ungated.
     let fx = Fixture::new("noserver");
-    let doc = fx.write("m.json", &measured("skillsonly", "no_server", 4_000));
+    let doc = fx.write(
+        "skillsonly.json",
+        &measured("skillsonly", "no_server", 4_000),
+    );
 
     let out = ratchet(&doc, &fx.path("budgets.json"));
     assert!(
@@ -240,7 +243,10 @@ fn a_setup_tier_seeds_a_setup_ceiling_from_the_first_measurement() {
     // where its `plugin.ts` already is, plus headroom — the same rule as the
     // Resident tier.
     let fx = Fixture::new("setupseed");
-    let doc = fx.write("m.json", &measured_with_setup("x-opencode", 10_000, 5_000));
+    let doc = fx.write(
+        "x-opencode.json",
+        &measured_with_setup("x-opencode", 10_000, 5_000),
+    );
 
     let out = ratchet(&doc, &fx.path("budgets.json"));
     assert!(
@@ -261,7 +267,7 @@ fn a_document_without_a_setup_tier_writes_no_setup_key() {
     // The byte-identical promise at the budgets layer: re-ratcheting a Claude
     // Code document must not add a `setupBytes` key its entry never had.
     let fx = Fixture::new("nosetupkey");
-    let doc = fx.write("m.json", &measured("x", "ok", 10_000));
+    let doc = fx.write("x.json", &measured("x", "ok", 10_000));
     let budgets = fx.write(
         "budgets.json",
         r#"{"x":{"residentBytes":12000,"headroomBytes":2000,"deltaBytes":500}}"#,
@@ -287,11 +293,11 @@ fn the_setup_ceiling_tightens_only_past_the_same_hysteresis() {
         r#"{"x":{"residentBytes":12000,"headroomBytes":2000,"deltaBytes":500,"setupBytes":10000}}"#,
     );
 
-    let far = fx.write("m.json", &measured_with_setup("x", 10_000, 6_000));
+    let far = fx.write("x.json", &measured_with_setup("x", 10_000, 6_000));
     assert!(ratchet(&far, &budgets).status.success());
     assert_eq!(fx.read("budgets.json")["x"]["setupBytes"], 8_000);
 
-    let near = fx.write("m.json", &measured_with_setup("x", 10_000, 7_000));
+    let near = fx.write("x.json", &measured_with_setup("x", 10_000, 7_000));
     assert!(ratchet(&near, &budgets).status.success());
     assert_eq!(
         fx.read("budgets.json")["x"]["setupBytes"],
@@ -307,7 +313,7 @@ fn an_existing_setup_ceiling_survives_a_measurement_without_one() {
     // documents never share one with an OpenCode plugin — but the ratchet
     // must preserve policy it did not measure regardless.)
     let fx = Fixture::new("setuppreserve");
-    let doc = fx.write("m.json", &measured("x", "ok", 10_000));
+    let doc = fx.write("x.json", &measured("x", "ok", 10_000));
     let budgets = fx.write(
         "budgets.json",
         r#"{"x":{"residentBytes":12000,"headroomBytes":2000,"deltaBytes":500,"setupBytes":7000}}"#,
@@ -315,4 +321,29 @@ fn an_existing_setup_ceiling_survives_a_measurement_without_one() {
 
     assert!(ratchet(&doc, &budgets).status.success());
     assert_eq!(fx.read("budgets.json")["x"]["setupBytes"], 7_000);
+}
+
+#[test]
+fn budgets_are_keyed_by_the_document_file_stem_not_its_plugin_field() {
+    // A skills-only plugin is published as `aiplugins-devtools` but lives at
+    // `aiplugins-devtools-cc`; the gate looks budgets up by the latter.
+    let fx = Fixture::new("stemkey");
+    let doc = fx.write(
+        "aiplugins-devtools-cc.json",
+        &measured("aiplugins-devtools", "no_server", 369),
+    );
+
+    let out = ratchet(&doc, &fx.path("budgets.json"));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let budgets = fx.read("budgets.json");
+    assert_eq!(budgets["aiplugins-devtools-cc"]["residentBytes"], 2_369);
+    assert!(
+        budgets.get("aiplugins-devtools").is_none(),
+        "the published name must not become a budget key"
+    );
 }

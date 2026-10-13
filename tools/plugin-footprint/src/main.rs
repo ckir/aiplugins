@@ -271,7 +271,15 @@ fn ratchet(measured_path: &Path, budgets_path: &Path) -> ExitCode {
         return ExitCode::from(1);
     }
 
-    let plugin = document["plugin"].as_str().unwrap_or_default().to_string();
+    // Keyed by the document's file stem — the registry key, which is what the
+    // gate iterates — NOT its `plugin` field, which is the published name and
+    // differs for a skills-only plugin (`aiplugins-devtools` vs
+    // `aiplugins-devtools-cc`). For every other plugin the two are equal.
+    let plugin = measured_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or_default()
+        .to_string();
     let measured = document["tiers"]["resident"]["bytes"].as_u64().unwrap_or(0);
     // `None` for every Claude Code document: they carry no Setup tier, and
     // must come out of the ratchet with their entries byte-identical.
