@@ -214,8 +214,12 @@ smoke:
         bash scripts/smoke-bundle.sh "$plugin"
     done
 
+# Check the canonical aiplugins-devtools skill source (content, attribution)
+devtools-skills:
+    bash scripts/check-devtools-skills.sh
+
 # Run all pre-flight checks (what CI and lefthook would run)
-check: fmt lint test deny spellcheck links versions wiring marketplace dispatch smoke footprint opencode-wiring
+check: fmt lint test deny spellcheck links versions wiring marketplace dispatch smoke footprint opencode-wiring devtools-skills
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
