@@ -224,6 +224,10 @@ emit-devtools-skills:
     rm -rf claude-code/aiplugins-devtools-cc/skills
     mkdir -p claude-code/aiplugins-devtools-cc/skills
     cp -r "$src"/. claude-code/aiplugins-devtools-cc/skills/
+    # qwen
+    rm -rf qwen/aiplugins-devtools-qwen/skills
+    mkdir -p qwen/aiplugins-devtools-qwen/skills
+    cp -r "$src"/. qwen/aiplugins-devtools-qwen/skills/
 
 # Check the canonical aiplugins-devtools skill source (content, attribution)
 devtools-skills:
@@ -326,7 +330,7 @@ bundle-plugins tag:
 bundle-qwen tag:
     #!/usr/bin/env bash
     set -euo pipefail
-    names=$(jq -r '.plugins[].name' .qwen-plugin/marketplace.json | tr -d '\r')
+    names=$(bash scripts/registry-plugins.sh qwen --exclude-skills-only | tr -d '\r')
     rm -rf target/qwen-assets target/qwen-bundles
     mkdir -p target/qwen-assets
     for name in $names; do

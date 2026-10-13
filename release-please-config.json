@@ -37,6 +37,13 @@
         "qwen-extension.json"
       ]
     },
+    "qwen/aiplugins-devtools-qwen": {
+      "release-type": "simple",
+      "component": "aiplugins-devtools-qwen",
+      "extra-files": [
+        "qwen-extension.json"
+      ]
+    },
     "opencode/rtk-mcp-opencode": {
       "release-type": "simple",
       "component": "rtk-mcp-opencode",

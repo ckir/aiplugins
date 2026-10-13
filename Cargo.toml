@@ -11,7 +11,7 @@ members = [
     "tools/*"
 ]
 # Skills-only source for the aiplugins-devtools plugin: markdown, no crate.
-exclude = ["shared/devtools", "claude-code/aiplugins-devtools-cc"]
+exclude = ["shared/devtools", "claude-code/aiplugins-devtools-cc", "qwen/aiplugins-devtools-qwen"]
 
 [workspace.package]
 version = "0.7.2"

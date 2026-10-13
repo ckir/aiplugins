@@ -55,6 +55,7 @@ fi
 # Each emitted per-agent copy must equal the canonical skill directory.
 for copy in \
     claude-code/aiplugins-devtools-cc/skills/code-review-and-quality \
+    qwen/aiplugins-devtools-qwen/skills/code-review-and-quality \
 ; do
     if [ ! -d "$copy" ] || ! diff -r "$skill" "$copy" >/dev/null 2>&1; then
         bad "stale copy: $copy"

@@ -28,7 +28,8 @@
       "dir": "qwen",
       "plugins": [
         "rtk-mcp-qwen",
-        "re-ghidra-mcp-qwen"
+        "re-ghidra-mcp-qwen",
+        "aiplugins-devtools-qwen"
       ],
       "marketplace": ".qwen-plugin/marketplace.json",
       "manifestPattern": "qwen/{plugin}/qwen-extension.json",
@@ -37,7 +38,13 @@
       "notPublished": [
         "example"
       ],
-      "versionedSourceUrl": true
+      "versionedSourceUrl": true,
+      "publishedNames": {
+        "aiplugins-devtools-qwen": "aiplugins-devtools"
+      },
+      "skillsOnly": [
+        "aiplugins-devtools-qwen"
+      ]
     },
     {
       "id": "opencode",

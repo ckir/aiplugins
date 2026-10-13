@@ -26,6 +26,7 @@ for spec in \
     "aiplugins-devtools-cc|claude-code/aiplugins-devtools-cc/.claude-plugin/plugin.json|claude-code/aiplugins-devtools-cc/.claude-plugin/plugin.json|.version" \
     "rtk-mcp-qwen|qwen/rtk-mcp-qwen/Cargo.toml|qwen/rtk-mcp-qwen/qwen-extension.json|.version" \
     "re-ghidra-mcp-qwen|qwen/re-ghidra-mcp-qwen/Cargo.toml|qwen/re-ghidra-mcp-qwen/qwen-extension.json|.version" \
+    "aiplugins-devtools-qwen|qwen/aiplugins-devtools-qwen/qwen-extension.json|qwen/aiplugins-devtools-qwen/qwen-extension.json|.version" \
     "rtk-mcp-opencode|opencode/rtk-mcp-opencode/package.json|opencode/rtk-mcp-opencode/package.json|.version" \
     "re-ghidra-mcp-opencode|opencode/re-ghidra-mcp-opencode/package.json|opencode/re-ghidra-mcp-opencode/package.json|.version" \
     "rtk-mcp-agy|antigravity/rtk-mcp-agy/Cargo.toml|antigravity/rtk-mcp-agy/plugin.json|.version" \
