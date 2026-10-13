@@ -7,7 +7,9 @@
 # the repo LICENSE. The top level of the zip IS the plugin directory — no
 # wrapper folder.
 #
-# The staging tree's children are zipped by name rather than `.`: some zip
+# The bundle is staged in a script-owned mktemp dir inside <out-dir> that is
+# removed on exit (it is not left in place); only the zip remains. The staging
+# dir's children are zipped by name rather than `.`: some zip
 # implementations keep the `./` prefix, and installers look for the manifest
 # by exact entry name.
 #
@@ -15,8 +17,8 @@
 #
 #   <agent-id>    agent id in agents.json (e.g. claude-code)
 #   <plugin-key>  plugin key; must be listed in that agent's skillsOnly
-#   <out-dir>     receives <plugin-key><artifactSuffix>, built from a staging
-#                 tree named <plugin-key> that is left in place for inspection
+#   <out-dir>     receives <plugin-key><artifactSuffix> only; the staging
+#                 dir (.stage.XXXXXX) is temporary and removed on exit
 #   <plugin-dir>  optional source override (default <dir>/<plugin-key>), so
 #                 tests can bundle a throwaway copy
 set -euo pipefail
@@ -80,28 +82,42 @@ physpath() {
     printf '%s%s\n' "$(cd -P -- "$p" && pwd -P)" "$tail"
 }
 
-# The staging dir is rm -rf'd below: refuse any overlap with the source tree.
-stage_phys="$(physpath "$outdir")/$key"
-case "$stage_phys/" in
-    "$src"/* | "$src/")
-        echo "ERROR: staging dir $stage_phys overlaps the source $src (inside or equal)." >&2
-        exit 1
-        ;;
-esac
-case "$src/" in
-    "$stage_phys"/*)
-        echo "ERROR: staging dir $stage_phys overlaps the source $src (contains it)." >&2
-        exit 1
-        ;;
-esac
+# Defense in depth: refuse an out-dir that overlaps the source tree. The
+# structural protection is that the script only ever deletes a staging dir it
+# created itself with mktemp (below), never a pre-existing path.
+check_overlap() {
+    local out_phys=$1
+    case "$out_phys/" in
+        "$src"/*)
+            echo "ERROR: out-dir $out_phys overlaps the source $src (inside or equal)." >&2
+            exit 1
+            ;;
+    esac
+    case "$src/" in
+        "$out_phys"/*)
+            echo "ERROR: out-dir $out_phys overlaps the source $src (contains it)." >&2
+            exit 1
+            ;;
+    esac
+}
+check_overlap "$(physpath "$outdir")"
 
 mkdir -p -- "$outdir"
 outdir=$(cd -P -- "$outdir" && pwd -P)
-stage="$outdir/$key"
+# Re-check on the real path: spellings such as `missing/..` only resolve to
+# their true location once the directory exists.
+check_overlap "$outdir"
 zipfile="$outdir/$key$suffix"
-rm -rf "$stage"
-rm -f "$zipfile"
-mkdir -p "$stage"
+if [ -e "$zipfile" ] && [ ! -f "$zipfile" ]; then
+    echo "ERROR: $zipfile exists and is not a regular file." >&2
+    exit 1
+fi
+
+# The staging dir is a fresh mktemp dir owned by this script, removed on every
+# exit. Nothing that pre-existed is ever rm -rf'd.
+stage=$(mktemp -d "$outdir/.stage.XXXXXX")
+trap 'rm -rf -- "$stage"' EXIT
+rm -f -- "$zipfile"
 
 # Copy the source minus tests/ and .gitignore.
 tar -C "$src" --exclude=./tests --exclude=./.gitignore -cf - . | tar -C "$stage" -xf -

@@ -99,6 +99,22 @@ for ctl in d e; do
         bad "control ($ctl): error does not name the containment problem"
 done
 
+# Controls (g)/(h): out-dir spellings that resolve to the source's parent only
+# after mkdir (`nonexist/..`) or via `..` must never delete the source. Exit
+# status may be 0 or 1; the source must be byte-identical either way.
+for ctl in g h; do
+    ct="$tmp/ctl-$ctl"
+    mkdir -p "$ct/p"
+    cp -r claude-code/aiplugins-devtools-cc "$ct/p/aiplugins-devtools-cc"
+    srcdir="$ct/p/aiplugins-devtools-cc"
+    if [ "$ctl" = g ]; then od="$ct/p/nonexist/.."; else od="$srcdir/.."; fi
+    rc=0
+    bash scripts/bundle-skills-plugin.sh claude-code aiplugins-devtools-cc "$od" "$srcdir" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -le 1 ] || bad "control ($ctl): exited $rc"
+    diff -r claude-code/aiplugins-devtools-cc "$srcdir" >/dev/null 2>&1 ||
+        bad "control ($ctl): source tree was modified or deleted"
+done
+
 if [ "$fail" -gt 0 ]; then
     echo "Skills bundles inconsistent: $fail problem(s)." >&2
     exit 1
