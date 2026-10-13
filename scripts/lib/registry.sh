@@ -72,6 +72,14 @@ if [ "${1:-}" = "--self-test" ]; then
         || { echo "FAIL plugin-for-published devtools"; failures=$((failures + 1)); }
     [ "$(bash "$(dirname "${BASH_SOURCE[0]}")/../registry-plugins.sh" claude-code | tr '\n' ' ')" = "rtk-mcp-cc re-ghidra-mcp-cc aiplugins-devtools-cc " ] \
         || { echo "FAIL registry-plugins real"; failures=$((failures + 1)); }
+    # registry-plugins.sh argument validation: usage + exit 2, and no self-test leak.
+    rp="$(dirname "${BASH_SOURCE[0]}")/../registry-plugins.sh"
+    rc=0; bash "$rp" no-such-agent >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 2 ] || { echo "FAIL registry-plugins unknown agent (rc=$rc)"; failures=$((failures + 1)); }
+    rc=0; bash "$rp" claude-code --bogus >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 2 ] || { echo "FAIL registry-plugins bogus flag (rc=$rc)"; failures=$((failures + 1)); }
+    rc=0; bash "$rp" --self-test >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 2 ] || { echo "FAIL registry-plugins --self-test leak (rc=$rc)"; failures=$((failures + 1)); }
     # Mapped cases run against a scratch copy that adds the two optional fields.
     scratch=$(mktemp)
     jq '(.agents[] | select(.id == "claude-code")) += {publishedNames: {"rtk-mcp-cc": "demo"}, skillsOnly: ["rtk-mcp-cc"]}' \
