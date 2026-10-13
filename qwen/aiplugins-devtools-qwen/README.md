@@ -25,18 +25,18 @@ qwen extensions install https://github.com/ckir/aiplugins/releases/download/aipl
    |---|---|
    | All | https://github.com/ckir/aiplugins/releases/download/aiplugins-devtools-qwen-v0.1.0/aiplugins-devtools-qwen-extension.zip |
 
-2. Extract it to your Qwen extensions directory:
+2. Extract it to your Qwen extensions directory. The installed directory is named after the manifest `name` (`aiplugins-devtools`), not after this repository folder:
 
    ```bash
    # Linux / macOS
-   mkdir -p ~/.qwen/extensions/aiplugins-devtools-qwen
-   unzip aiplugins-devtools-qwen-extension.zip -d ~/.qwen/extensions/aiplugins-devtools-qwen/
+   mkdir -p ~/.qwen/extensions/aiplugins-devtools
+   unzip aiplugins-devtools-qwen-extension.zip -d ~/.qwen/extensions/aiplugins-devtools/
    ```
 
    ```powershell
    # Windows (PowerShell)
-   New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.qwen\extensions\aiplugins-devtools-qwen"
-   Expand-Archive -Path aiplugins-devtools-qwen-extension.zip -DestinationPath "$env:USERPROFILE\.qwen\extensions\aiplugins-devtools-qwen" -Force
+   New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.qwen\extensions\aiplugins-devtools"
+   Expand-Archive -Path aiplugins-devtools-qwen-extension.zip -DestinationPath "$env:USERPROFILE\.qwen\extensions\aiplugins-devtools" -Force
    ```
 
 3. Verify it was detected:
