@@ -16,6 +16,13 @@
         ".claude-plugin/plugin.json"
       ]
     },
+    "claude-code/aiplugins-devtools-cc": {
+      "release-type": "simple",
+      "component": "aiplugins-devtools-cc",
+      "extra-files": [
+        ".claude-plugin/plugin.json"
+      ]
+    },
     "qwen/rtk-mcp-qwen": {
       "release-type": "rust",
       "component": "rtk-mcp-qwen",

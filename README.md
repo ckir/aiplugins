@@ -53,6 +53,7 @@ verification) and asks whether to install project-local or global first:
 <!-- footprint:begin -->
 | Plugin | Resident bytes | Invocation bytes |
 |---|---|---|
+| `aiplugins-devtools-cc` | ≥ 369 | ≥ 20,674 |
 | `re-ghidra-mcp-cc` | ≥ 21,631 | ≥ 36,903 |
 | `re-ghidra-mcp-opencode` | ≥ 21,327 | ≥ 36,903 |
 | `rtk-mcp-cc` | ≥ 3,690 | ≥ 6,091 |

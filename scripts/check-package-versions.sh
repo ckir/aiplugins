@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Per-package version agreement across the eight registry packages.
+# Per-package version agreement across the registry packages.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 failures=0
 check_pair() { # $1 = label, $2 = crate Cargo.toml, $3 = host manifest, $4 = jq field
     local crate_v manifest_v
     if [[ "$2" == *.json ]]; then
-        # opencode ships no crates: compare package.json version to itself
-        # (asserts presence and form, keeps all eight packages in one table).
+        # opencode and the skills-only plugin ship no crates: compare package.json version to itself
+        # (asserts presence and form, keeps all registry packages in one table).
         crate_v=$(jq -r '.version // ""' "$2" | tr -d '\r')
     else
         crate_v=$(sed -n 's/^version = "\(.*\)"$/\1/p' "$2" | head -n 1)
@@ -23,6 +23,7 @@ check_pair() { # $1 = label, $2 = crate Cargo.toml, $3 = host manifest, $4 = jq 
 for spec in \
     "rtk-mcp-cc|claude-code/rtk-mcp-cc/Cargo.toml|claude-code/rtk-mcp-cc/.claude-plugin/plugin.json|.version" \
     "re-ghidra-mcp-cc|claude-code/re-ghidra-mcp-cc/Cargo.toml|claude-code/re-ghidra-mcp-cc/.claude-plugin/plugin.json|.version" \
+    "aiplugins-devtools-cc|claude-code/aiplugins-devtools-cc/.claude-plugin/plugin.json|claude-code/aiplugins-devtools-cc/.claude-plugin/plugin.json|.version" \
     "rtk-mcp-qwen|qwen/rtk-mcp-qwen/Cargo.toml|qwen/rtk-mcp-qwen/qwen-extension.json|.version" \
     "re-ghidra-mcp-qwen|qwen/re-ghidra-mcp-qwen/Cargo.toml|qwen/re-ghidra-mcp-qwen/qwen-extension.json|.version" \
     "rtk-mcp-opencode|opencode/rtk-mcp-opencode/package.json|opencode/rtk-mcp-opencode/package.json|.version" \

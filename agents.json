@@ -5,7 +5,8 @@
       "dir": "claude-code",
       "plugins": [
         "rtk-mcp-cc",
-        "re-ghidra-mcp-cc"
+        "re-ghidra-mcp-cc",
+        "aiplugins-devtools-cc"
       ],
       "marketplace": ".claude-plugin/marketplace.json",
       "manifestPattern": "claude-code/{plugin}/.claude-plugin/plugin.json",
@@ -14,7 +15,13 @@
       "notPublished": [
         "example"
       ],
-      "versionedSourceUrl": true
+      "versionedSourceUrl": true,
+      "publishedNames": {
+        "aiplugins-devtools-cc": "aiplugins-devtools"
+      },
+      "skillsOnly": [
+        "aiplugins-devtools-cc"
+      ]
     },
     {
       "id": "qwen",

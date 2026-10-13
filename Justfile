@@ -86,7 +86,7 @@ test-opencode:
 footprint-regen:
     #!/usr/bin/env bash
     set -euo pipefail
-    for plugin in $(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r'); do
+    for plugin in $(bash scripts/registry-plugins.sh claude-code | tr -d '\r'); do
         cargo run -q -p plugin-footprint --bin plugin-footprint -- measure "claude-code/$plugin" \
             --out "docs/footprints/$plugin.json"
         cargo run -q -p plugin-footprint --bin plugin-footprint -- ratchet \
@@ -210,9 +210,20 @@ dispatch:
 smoke:
     #!/usr/bin/env bash
     set -euo pipefail
-    for plugin in $(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r'); do
+    for plugin in $(bash scripts/registry-plugins.sh claude-code --exclude-skills-only | tr -d '\r'); do
         bash scripts/smoke-bundle.sh "$plugin"
     done
+
+# Copy the canonical aiplugins-devtools skills into each agent's plugin folder
+# (one block per agent; scripts/check-devtools-skills.sh fails on drift)
+emit-devtools-skills:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    src=shared/devtools/skills
+    # claude-code
+    rm -rf claude-code/aiplugins-devtools-cc/skills
+    mkdir -p claude-code/aiplugins-devtools-cc/skills
+    cp -r "$src"/. claude-code/aiplugins-devtools-cc/skills/
 
 # Check the canonical aiplugins-devtools skill source (content, attribution)
 devtools-skills:
@@ -295,7 +306,7 @@ build-re-ghidra-mcp-opencode:
 bundle-plugins tag:
     #!/usr/bin/env bash
     set -euo pipefail
-    names=$(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r')
+    names=$(bash scripts/registry-plugins.sh claude-code --exclude-skills-only | tr -d '\r')
     rm -rf target/plugin-assets target/plugin-bundles
     mkdir -p target/plugin-assets
     for name in $names; do

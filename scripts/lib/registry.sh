@@ -46,7 +46,7 @@ registry_field() {
 
 if [ "${1:-}" = "--self-test" ]; then
     failures=0
-    [ "$(registry_plugins claude-code | tr '\n' ' ')" = "rtk-mcp-cc re-ghidra-mcp-cc " ] \
+    [ "$(registry_plugins claude-code | tr '\n' ' ')" = "rtk-mcp-cc re-ghidra-mcp-cc aiplugins-devtools-cc " ] \
         || { echo "FAIL plugins claude-code"; failures=$((failures + 1)); }
     [ "$(registry_manifest_path qwen rtk-mcp-qwen)" = "qwen/rtk-mcp-qwen/qwen-extension.json" ] \
         || { echo "FAIL manifest path"; failures=$((failures + 1)); }
@@ -66,7 +66,11 @@ if [ "${1:-}" = "--self-test" ]; then
     ! registry_is_skills_only claude-code no-such-plugin \
         || { echo "FAIL skills-only unknown plugin"; failures=$((failures + 1)); }
     real_registry=$REGISTRY
-    [ "$(bash "$(dirname "${BASH_SOURCE[0]}")/../registry-plugins.sh" claude-code | tr '\n' ' ')" = "rtk-mcp-cc re-ghidra-mcp-cc " ] \
+    [ "$(registry_published_name claude-code aiplugins-devtools-cc)" = "aiplugins-devtools" ] \
+        || { echo "FAIL published name devtools"; failures=$((failures + 1)); }
+    [ "$(registry_plugin_for_published claude-code aiplugins-devtools)" = "aiplugins-devtools-cc" ] \
+        || { echo "FAIL plugin-for-published devtools"; failures=$((failures + 1)); }
+    [ "$(bash "$(dirname "${BASH_SOURCE[0]}")/../registry-plugins.sh" claude-code | tr '\n' ' ')" = "rtk-mcp-cc re-ghidra-mcp-cc aiplugins-devtools-cc " ] \
         || { echo "FAIL registry-plugins real"; failures=$((failures + 1)); }
     # Mapped cases run against a scratch copy that adds the two optional fields.
     scratch=$(mktemp)
@@ -83,7 +87,7 @@ if [ "${1:-}" = "--self-test" ]; then
         || { echo "FAIL skills-only listed"; failures=$((failures + 1)); }
     ! registry_is_skills_only claude-code re-ghidra-mcp-cc \
         || { echo "FAIL skills-only unlisted sibling"; failures=$((failures + 1)); }
-    [ "$(REGISTRY=$scratch bash "$(dirname "${BASH_SOURCE[0]}")/../registry-plugins.sh" claude-code --exclude-skills-only | tr '\n' ' ')" = "re-ghidra-mcp-cc " ] \
+    [ "$(REGISTRY=$scratch bash "$(dirname "${BASH_SOURCE[0]}")/../registry-plugins.sh" claude-code --exclude-skills-only | tr '\n' ' ')" = "re-ghidra-mcp-cc aiplugins-devtools-cc " ] \
         || { echo "FAIL registry-plugins exclude"; failures=$((failures + 1)); }
     REGISTRY=$real_registry
     rm -f "$scratch"
