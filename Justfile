@@ -249,8 +249,12 @@ emit-devtools-skills:
 devtools-skills:
     bash scripts/check-devtools-skills.sh
 
+# Build every skills-only plugin bundle and check zip names, manifests and skills
+skills-bundles:
+    bash scripts/check-skills-bundles.sh
+
 # Run all pre-flight checks (what CI and lefthook would run)
-check: fmt lint test deny spellcheck links versions wiring marketplace dispatch smoke footprint opencode-wiring devtools-skills
+check: fmt lint test deny spellcheck links versions wiring marketplace dispatch smoke footprint opencode-wiring devtools-skills skills-bundles
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
