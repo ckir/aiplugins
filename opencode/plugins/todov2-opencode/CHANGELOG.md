@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/ckir/aiplugins/compare/todov2-opencode-v0.5.0...todov2-opencode-v0.5.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* ship tsconfig.json in the todov2-opencode bundle ([9685008](https://github.com/ckir/aiplugins/commit/96850084a8c72204a7ffdd03796215d96c97657a))
+* ship tsconfig.json in the todov2-opencode bundle ([f532e2f](https://github.com/ckir/aiplugins/commit/f532e2fbb5411d4c597b407f9b5015e66a054abb))
+
 ## [0.5.0](https://github.com/ckir/aiplugins/compare/todov2-opencode-v0.4.0...todov2-opencode-v0.5.0) (2026-10-12)
 
 
