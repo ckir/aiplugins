@@ -484,16 +484,9 @@ fn rewrite_region(path: &str, region: &str) -> Result<(), String> {
 /// The plugins the marketplace publishes — the same iteration source the gate
 /// and `just smoke` use.
 fn published_plugins() -> Result<Vec<String>, String> {
-    let text = std::fs::read_to_string(".claude-plugin/marketplace.json")
-        .map_err(|e| format!("reading the marketplace manifest: {e}"))?;
-    let manifest: serde_json::Value = serde_json::from_str(&text)
-        .map_err(|e| format!("parsing the marketplace manifest: {e}"))?;
-    Ok(manifest["plugins"]
-        .as_array()
-        .ok_or("the marketplace manifest declares no plugins array")?
-        .iter()
-        .filter_map(|p| p["name"].as_str().map(str::to_string))
-        .collect())
+    let text = std::fs::read_to_string("agents.json")
+        .map_err(|e| format!("reading the plugin registry: {e}"))?;
+    plugin_footprint::registry::published_plugin_keys(&text)
 }
 
 /// The OpenCode plugins: every directory under `opencode/` that looks like
