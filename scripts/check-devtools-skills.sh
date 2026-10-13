@@ -63,6 +63,16 @@ for copy in \
     fi
 done
 
+# OpenCode keys skills by folder name, so its copy is renamed: the folder is
+# prefixed and SKILL.md's frontmatter `name:` line is rewritten to match; nothing
+# else may differ. Compare the renamed canonical SKILL.md, then everything else.
+oc=opencode/aiplugins-devtools-opencode/skills/aiplugins-devtools-code-review-and-quality
+if [ ! -d "$oc" ] \
+    || ! diff <(sed 's/^name: code-review-and-quality$/name: aiplugins-devtools-code-review-and-quality/' "$skill/SKILL.md") "$oc/SKILL.md" >/dev/null 2>&1 \
+    || ! diff -r -x SKILL.md "$skill" "$oc" >/dev/null 2>&1; then
+    bad "stale copy: $oc"
+fi
+
 if [ "$fail" -ne 0 ]; then
     exit 1
 fi

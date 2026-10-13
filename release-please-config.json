@@ -58,6 +58,13 @@
         "package.json"
       ]
     },
+    "opencode/aiplugins-devtools-opencode": {
+      "release-type": "simple",
+      "component": "aiplugins-devtools-opencode",
+      "extra-files": [
+        "package.json"
+      ]
+    },
     "antigravity/rtk-mcp-agy": {
       "release-type": "rust",
       "component": "rtk-mcp-agy",

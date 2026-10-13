@@ -29,6 +29,7 @@ for spec in \
     "aiplugins-devtools-qwen|qwen/aiplugins-devtools-qwen/qwen-extension.json|qwen/aiplugins-devtools-qwen/qwen-extension.json|.version" \
     "rtk-mcp-opencode|opencode/rtk-mcp-opencode/package.json|opencode/rtk-mcp-opencode/package.json|.version" \
     "re-ghidra-mcp-opencode|opencode/re-ghidra-mcp-opencode/package.json|opencode/re-ghidra-mcp-opencode/package.json|.version" \
+    "aiplugins-devtools-opencode|opencode/aiplugins-devtools-opencode/package.json|opencode/aiplugins-devtools-opencode/package.json|.version" \
     "rtk-mcp-agy|antigravity/rtk-mcp-agy/Cargo.toml|antigravity/rtk-mcp-agy/plugin.json|.version" \
     "re-ghidra-mcp-agy|antigravity/re-ghidra-mcp-agy/Cargo.toml|antigravity/re-ghidra-mcp-agy/plugin.json|.version" \
     "aiplugins-devtools-agy|antigravity/aiplugins-devtools-agy/plugin.json|antigravity/aiplugins-devtools-agy/plugin.json|.version" \
