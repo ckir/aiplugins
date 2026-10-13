@@ -228,6 +228,10 @@ emit-devtools-skills:
     rm -rf qwen/aiplugins-devtools-qwen/skills
     mkdir -p qwen/aiplugins-devtools-qwen/skills
     cp -r "$src"/. qwen/aiplugins-devtools-qwen/skills/
+    # antigravity
+    rm -rf antigravity/aiplugins-devtools-agy/skills
+    mkdir -p antigravity/aiplugins-devtools-agy/skills
+    cp -r "$src"/. antigravity/aiplugins-devtools-agy/skills/
 
 # Check the canonical aiplugins-devtools skill source (content, attribution)
 devtools-skills:

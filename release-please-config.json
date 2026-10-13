@@ -71,6 +71,13 @@
       "extra-files": [
         "plugin.json"
       ]
+    },
+    "antigravity/aiplugins-devtools-agy": {
+      "release-type": "simple",
+      "component": "aiplugins-devtools-agy",
+      "extra-files": [
+        "plugin.json"
+      ]
     }
   }
 }

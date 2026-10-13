@@ -31,6 +31,7 @@ for spec in \
     "re-ghidra-mcp-opencode|opencode/re-ghidra-mcp-opencode/package.json|opencode/re-ghidra-mcp-opencode/package.json|.version" \
     "rtk-mcp-agy|antigravity/rtk-mcp-agy/Cargo.toml|antigravity/rtk-mcp-agy/plugin.json|.version" \
     "re-ghidra-mcp-agy|antigravity/re-ghidra-mcp-agy/Cargo.toml|antigravity/re-ghidra-mcp-agy/plugin.json|.version" \
+    "aiplugins-devtools-agy|antigravity/aiplugins-devtools-agy/plugin.json|antigravity/aiplugins-devtools-agy/plugin.json|.version" \
 ; do
     IFS='|' read -r label crate manifest field <<< "$spec"
     check_pair "$label" "$crate" "$manifest" "$field"

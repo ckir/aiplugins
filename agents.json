@@ -65,14 +65,21 @@
       "dir": "antigravity",
       "plugins": [
         "rtk-mcp-agy",
-        "re-ghidra-mcp-agy"
+        "re-ghidra-mcp-agy",
+        "aiplugins-devtools-agy"
       ],
       "marketplace": ".agy-plugin/marketplace.json",
       "manifestPattern": "antigravity/{plugin}/plugin.json",
       "artifactSuffix": "-agy-plugin.zip",
       "sourceUrlBase": "https://github.com/ckir/aiplugins/releases/download",
       "versionedSourceUrl": true,
-      "notPublished": []
+      "notPublished": [],
+      "publishedNames": {
+        "aiplugins-devtools-agy": "aiplugins-devtools"
+      },
+      "skillsOnly": [
+        "aiplugins-devtools-agy"
+      ]
     }
   ]
 }
