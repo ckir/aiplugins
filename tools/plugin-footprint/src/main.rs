@@ -393,7 +393,7 @@ fn ratchet(measured_path: &Path, budgets_path: &Path) -> ExitCode {
 /// Write the published figure into every README region (spec §7).
 ///
 /// Run from the repository root, like `footprint-gate`, and driven by the same
-/// marketplace manifest the gate and `just smoke` iterate — so what is published
+/// plugin registry (`agents.json`) the gate and `just smoke` iterate — so what is published
 /// cannot drift from what ships.
 ///
 /// The ROOT region is rendered from ALL committed documents at once, never from
@@ -489,8 +489,8 @@ fn rewrite_region(path: &str, region: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// The plugins the marketplace publishes — the same iteration source the gate
-/// and `just smoke` use.
+/// The plugins the registry (`agents.json`, via `registry::published_plugin_keys`)
+/// publishes — the same iteration source the gate and `just smoke` use.
 fn published_plugins() -> Result<Vec<String>, String> {
     let text = std::fs::read_to_string("agents.json")
         .map_err(|e| format!("reading the plugin registry: {e}"))?;

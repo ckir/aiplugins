@@ -309,8 +309,8 @@ fn the_setup_ceiling_tightens_only_past_the_same_hysteresis() {
 #[test]
 fn an_existing_setup_ceiling_survives_a_measurement_without_one() {
     // Dropping a cap on a re-measure is how thresholds silently disappear.
-    // (Unreachable in practice — entries are keyed by plugin name and Claude
-    // documents never share one with an OpenCode plugin — but the ratchet
+    // (Unreachable in practice — entries are keyed by the measured document's
+    // file stem and Claude documents never share one with an OpenCode plugin — but the ratchet
     // must preserve policy it did not measure regardless.)
     let fx = Fixture::new("setuppreserve");
     let doc = fx.write("x.json", &measured("x", "ok", 10_000));

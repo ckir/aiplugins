@@ -47,7 +47,7 @@ fn main() -> ExitCode {
         return ExitCode::from(1);
     }
 
-    // The plugin list comes from the marketplace manifest, the same source
+    // The plugin list comes from the plugin registry (agents.json), the same source
     // `just smoke` and the bundle-smoke job iterate. Reading it from the working
     // tree is deliberate: a change that ADDS a plugin must have it measured.
     //
@@ -177,11 +177,12 @@ fn main() -> ExitCode {
     }
 }
 
-/// The plugins the marketplace actually publishes.
+/// The plugins the registry actually publishes: `agents.json`, read through
+/// `registry::published_plugin_keys`.
 ///
 /// The same iteration source `just smoke` and the `bundle-smoke` CI job use, so
 /// the gate cannot drift from what ships. Note the interaction with §6.2's
-/// bypass: a change that removes a plugin from this manifest removes it from
+/// bypass: a change that removes a plugin from the registry removes it from
 /// the gate. `scripts/check-marketplace.sh` is what keeps the manifest honest
 /// about the plugins present, and it already runs in CI.
 fn published_plugins() -> Result<Vec<String>, String> {
