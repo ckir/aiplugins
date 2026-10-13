@@ -81,6 +81,24 @@ bash scripts/bundle-skills-plugin.sh claude-code rtk-mcp-cc "$neg/o3" >/dev/null
 [ "$rc" -eq 1 ] || bad "control (c): non-skills-only exited $rc, expected 1"
 [ ! -e "$neg/o3/rtk-mcp-cc-plugin.zip" ] || bad "control (c): zip left behind"
 
+# Controls (d)/(e): the staging dir must never coincide with, sit inside, or
+# contain the source tree (the bundler rm -rf's its staging dir).
+for ctl in d e; do
+    ct="$tmp/ctl-$ctl"
+    mkdir -p "$ct/p"
+    cp -r claude-code/aiplugins-devtools-cc "$ct/p/aiplugins-devtools-cc"
+    srcdir="$ct/p/aiplugins-devtools-cc"
+    before=$(find "$srcdir" -type f | wc -l)
+    if [ "$ctl" = d ]; then od="$ct/p"; else od="$srcdir/out"; fi
+    rc=0
+    msg=$(bash scripts/bundle-skills-plugin.sh claude-code aiplugins-devtools-cc "$od" "$srcdir" 2>&1) || rc=$?
+    after=$(find "$srcdir" -type f -not -path "$srcdir/out/*" | wc -l)
+    [ "$rc" -eq 1 ] || bad "control ($ctl): overlapping out-dir exited $rc, expected 1"
+    [ "$before" = "$after" ] || bad "control ($ctl): source files $before -> $after"
+    printf '%s' "$msg" | grep -q 'overlaps the source' ||
+        bad "control ($ctl): error does not name the containment problem"
+done
+
 if [ "$fail" -gt 0 ]; then
     echo "Skills bundles inconsistent: $fail problem(s)." >&2
     exit 1

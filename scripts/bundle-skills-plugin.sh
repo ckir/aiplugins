@@ -67,10 +67,36 @@ src=${4:-"$repo/$dir/$key"}
     echo "ERROR: plugin directory $src not found." >&2
     exit 1
 }
-src=$(cd "$src" && pwd)
+src=$(cd -P -- "$src" && pwd -P)
 
-mkdir -p "$outdir"
-outdir=$(cd "$outdir" && pwd)
+# Physical absolute path of a possibly-not-yet-existing directory: resolve the
+# nearest existing ancestor with `pwd -P`, then re-append the missing tail.
+physpath() {
+    local p=$1 tail=""
+    while [ ! -d "$p" ]; do
+        tail="/$(basename -- "$p")$tail"
+        p=$(dirname -- "$p")
+    done
+    printf '%s%s\n' "$(cd -P -- "$p" && pwd -P)" "$tail"
+}
+
+# The staging dir is rm -rf'd below: refuse any overlap with the source tree.
+stage_phys="$(physpath "$outdir")/$key"
+case "$stage_phys/" in
+    "$src"/* | "$src/")
+        echo "ERROR: staging dir $stage_phys overlaps the source $src (inside or equal)." >&2
+        exit 1
+        ;;
+esac
+case "$src/" in
+    "$stage_phys"/*)
+        echo "ERROR: staging dir $stage_phys overlaps the source $src (contains it)." >&2
+        exit 1
+        ;;
+esac
+
+mkdir -p -- "$outdir"
+outdir=$(cd -P -- "$outdir" && pwd -P)
 stage="$outdir/$key"
 zipfile="$outdir/$key$suffix"
 rm -rf "$stage"
