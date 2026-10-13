@@ -77,6 +77,8 @@ test-opencode:
     #!/usr/bin/env bash
     set -euo pipefail
     for dir in opencode/*/; do
+        # skills-only plugins have no plugin.ts; check-opencode-wiring.sh check 1 is what fails loudly for a real plugin that lost its plugin.ts
+        [ -f "$dir/plugin.ts" ] || continue
         (cd "$dir" && bun install && bun test tests/)
     done
 
@@ -95,6 +97,8 @@ footprint-regen:
         echo "regenerated docs/footprints/$plugin.json"
     done
     for dir in opencode/*/; do
+        # skills-only plugins have no plugin.ts; check-opencode-wiring.sh check 1 is what fails loudly for a real plugin that lost its plugin.ts
+        [ -f "$dir/plugin.ts" ] || continue
         name=$(basename "$dir")
         cargo run -q -p plugin-footprint --bin plugin-footprint -- measure "$dir" \
             --out "docs/footprints/$name.json"
@@ -232,6 +236,14 @@ emit-devtools-skills:
     rm -rf antigravity/aiplugins-devtools-agy/skills
     mkdir -p antigravity/aiplugins-devtools-agy/skills
     cp -r "$src"/. antigravity/aiplugins-devtools-agy/skills/
+    # opencode: skills are keyed by folder name, so the folder is prefixed and the
+    # one frontmatter `name:` line is rewritten to match (nothing else changes)
+    oc=opencode/aiplugins-devtools-opencode/skills
+    rm -rf "$oc"
+    mkdir -p "$oc"
+    cp -r "$src/code-review-and-quality" "$oc/aiplugins-devtools-code-review-and-quality"
+    sed -i 's/^name: code-review-and-quality$/name: aiplugins-devtools-code-review-and-quality/' \
+        "$oc/aiplugins-devtools-code-review-and-quality/SKILL.md"
 
 # Check the canonical aiplugins-devtools skill source (content, attribution)
 devtools-skills:

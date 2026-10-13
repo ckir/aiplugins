@@ -44,6 +44,8 @@ chmod +x "$work/rtk$exe"
 export PATH="$work:$PATH"
 
 for dir in opencode/*/; do
+    # skills-only plugins have no plugin.ts; check-opencode-wiring.sh check 1 is what fails loudly for a real plugin that lost its plugin.ts
+    [ -f "$dir/plugin.ts" ] || continue
     name=$(basename "$dir")
     echo "== $name"
 
