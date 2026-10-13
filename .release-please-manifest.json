@@ -6,5 +6,9 @@
   "opencode/rtk-mcp-opencode": "0.7.3",
   "opencode/re-ghidra-mcp-opencode": "0.7.3",
   "antigravity/rtk-mcp-agy": "0.8.0",
-  "antigravity/re-ghidra-mcp-agy": "0.8.0"
+  "antigravity/re-ghidra-mcp-agy": "0.8.0",
+  "claude-code/aiplugins-devtools-cc": "0.1.0",
+  "qwen/aiplugins-devtools-qwen": "0.1.0",
+  "opencode/aiplugins-devtools-opencode": "0.1.0",
+  "antigravity/aiplugins-devtools-agy": "0.1.0"
 }
