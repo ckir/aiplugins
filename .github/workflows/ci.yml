@@ -127,9 +127,11 @@ jobs:
       - name: Check skills bundles
         run: bash scripts/check-skills-bundles.sh
 
-      # The release-wiring check parses the workflow YAML.
+      # The release-wiring check parses the workflow YAML. ubuntu-24.04's system
+      # Python is externally managed (PEP 668) and may refuse a plain pip install;
+      # the runner is ephemeral, so overriding that is safe.
       - name: Install PyYAML
-        run: python3 -m pip install pyyaml
+        run: python3 -c 'import yaml' 2>/dev/null || python3 -m pip install --break-system-packages pyyaml
 
       - name: Check skills release wiring
         run: bash scripts/check-skills-release-wiring.sh

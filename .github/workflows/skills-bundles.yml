@@ -47,14 +47,16 @@ jobs:
       - name: Resolve plugin
         id: plugin
         run: |
+          # `| tr -d '\r'` on every jq capture: the jq on the Windows runner
+          # image writes CRLF, and a CR-polluted value matches nothing.
           key="${TAG%-v*}"
           agent=$(jq -r --arg k "$key" \
-            '[.agents[] | select((.plugins | index($k)) and ((.skillsOnly // []) | index($k)))][0].id // empty' agents.json)
+            '[.agents[] | select((.plugins | index($k)) and ((.skillsOnly // []) | index($k)))][0].id // empty' agents.json | tr -d '\r')
           if [ -z "$agent" ]; then
             echo "ERROR: $key (from tag $TAG) is not a skills-only plugin in agents.json" >&2
             exit 1
           fi
-          suffix=$(jq -r --arg a "$agent" '.agents[] | select(.id == $a) | .artifactSuffix' agents.json)
+          suffix=$(jq -r --arg a "$agent" '.agents[] | select(.id == $a) | .artifactSuffix' agents.json | tr -d '\r')
           {
             echo "agent=$agent"
             echo "key=$key"
@@ -105,12 +107,12 @@ jobs:
         run: |
           key="${TAG%-v*}"
           agent=$(jq -r --arg k "$key" \
-            '[.agents[] | select((.plugins | index($k)) and ((.skillsOnly // []) | index($k)))][0].id // empty' agents.json)
+            '[.agents[] | select((.plugins | index($k)) and ((.skillsOnly // []) | index($k)))][0].id // empty' agents.json | tr -d '\r')
           if [ -z "$agent" ]; then
             echo "ERROR: $key (from tag $TAG) is not a skills-only plugin in agents.json" >&2
             exit 1
           fi
-          suffix=$(jq -r --arg a "$agent" '.agents[] | select(.id == $a) | .artifactSuffix' agents.json)
+          suffix=$(jq -r --arg a "$agent" '.agents[] | select(.id == $a) | .artifactSuffix' agents.json | tr -d '\r')
           {
             echo "agent=$agent"
             echo "key=$key"
@@ -154,8 +156,8 @@ jobs:
           AGENT: ${{ steps.plugin.outputs.agent }}
           KEY: ${{ steps.plugin.outputs.key }}
         run: |
-          pattern=$(jq -r --arg a "$AGENT" '.agents[] | select(.id == $a) | .manifestPattern' agents.json)
-          dir=$(jq -r --arg a "$AGENT" '.agents[] | select(.id == $a) | .dir' agents.json)
+          pattern=$(jq -r --arg a "$AGENT" '.agents[] | select(.id == $a) | .manifestPattern' agents.json | tr -d '\r')
+          dir=$(jq -r --arg a "$AGENT" '.agents[] | select(.id == $a) | .dir' agents.json | tr -d '\r')
           full="${pattern//\{plugin\}/$KEY}"
           manifest="extracted/${full#"$dir/$KEY/"}"
           test -f "$manifest" || { echo "ERROR: $manifest missing from the bundle" >&2; find extracted | head -50; exit 1; }

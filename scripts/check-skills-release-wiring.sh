@@ -80,7 +80,7 @@ done
 
 # (b) skills-bundles.yml structure.
 if ! python3 - "$wf/skills-bundles.yml" <<'PY'
-import sys, yaml
+import re, sys, yaml
 d = yaml.safe_load(open(sys.argv[1]))
 errs = []
 jobs = d.get("jobs") or {}
@@ -99,6 +99,50 @@ for j in ("bundle", "verify"):
     for k in ("GH_TOKEN", "TAG"):
         if k not in env:
             errs.append("jobs.%s.env lacks %s" % (j, k))
+for j in ("bundle", "verify"):
+    tag = str(((jobs.get(j) or {}).get("env") or {}).get("TAG", ""))
+    if "inputs.tag" not in tag:
+        errs.append("jobs.%s.env.TAG must contain inputs.tag (workflow_dispatch), got %r" % (j, tag))
+
+def runs(job):
+    return "\n".join(st["run"] for st in (job.get("steps") or []) if "run" in st)
+
+# The bundle job must create a missing release before it uploads to it, and the
+# upload must overwrite (re-cuts).
+b = runs(jobs.get("bundle") or {})
+pv, pc, pu = b.find("gh release view"), b.find("gh release create"), b.find("gh release upload")
+if pv < 0 or pc < 0 or pu < 0 or not (pv < pc < pu):
+    errs.append("jobs.bundle run: needs `gh release view`, then `gh release create`, then `gh release upload`")
+if pu >= 0 and "--clobber" not in b[pu:].split("\n", 1)[0]:
+    errs.append("jobs.bundle: `gh release upload` must pass --clobber")
+
+# Every $(jq -r ...) capture must strip CR (the Windows image's jq writes CRLF).
+def substitutions(text):
+    i = 0
+    while True:
+        i = text.find("$(", i)
+        if i < 0:
+            return
+        j, depth, q = i + 2, 1, None
+        while j < len(text) and depth:
+            c = text[j]
+            if q:
+                if c == q:
+                    q = None
+            elif c in "'\"":
+                q = c
+            elif c == "(":
+                depth += 1
+            elif c == ")":
+                depth -= 1
+            j += 1
+        yield text[i + 2:j - 1]
+        i += 2
+
+for jn in ("bundle", "verify"):
+    for body in substitutions(runs(jobs.get(jn) or {})):
+        if body.lstrip().startswith("jq -r") and not re.search(r"\|\s*tr -d '\\r'\s*$", body):
+            errs.append("jobs.%s: jq -r capture lacks `| tr -d '\\r'`: %s" % (jn, " ".join(body.split())[:70]))
 for e in errs:
     print("  FAIL  skills-bundles.yml: " + e, file=sys.stderr)
 sys.exit(1 if errs else 0)
