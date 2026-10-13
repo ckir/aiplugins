@@ -1,0 +1,165 @@
+name: Skills Bundles
+
+# Publish the installable zips of the crate-less, skills-only plugins
+# (aiplugins-devtools-cc|qwen|agy|opencode), cut from tags like
+# aiplugins-devtools-cc-v0.1.0.
+#
+# Why a workflow of its own:
+#  1. The per-agent bundle workflows (plugin-bundles.yml and its siblings) chain
+#     onto the dist-generated Release workflow, which cannot parse a tag whose
+#     package has no Cargo crate, and opencode-bundles.yml assumes a plugin.ts
+#     and a binary. A skills-only plugin has neither, so none of them fits.
+#  2. release.yml and opencode-bundles.yml therefore exclude
+#     aiplugins-devtools-*-v* tags (see their `push.tags`), and this workflow
+#     triggers on the tag push directly. A hand-pushed tag has no GitHub
+#     Release, so the bundle job creates one when it is missing.
+#
+# scripts/bundle-skills-plugin.sh does the assembly; the verify job downloads
+# what was actually published and checks the manifest and skills are in it.
+
+on:
+  push:
+    tags:
+      - 'aiplugins-devtools-*-v*'
+  # Backfill a release, or re-cut a bundle after a fix to the bundling script.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to bundle (e.g. aiplugins-devtools-cc-v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    name: Bundle & upload
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+
+      - name: Resolve plugin
+        id: plugin
+        run: |
+          key="${TAG%-v*}"
+          agent=$(jq -r --arg k "$key" \
+            '[.agents[] | select((.plugins | index($k)) and ((.skillsOnly // []) | index($k)))][0].id // empty' agents.json)
+          if [ -z "$agent" ]; then
+            echo "ERROR: $key (from tag $TAG) is not a skills-only plugin in agents.json" >&2
+            exit 1
+          fi
+          suffix=$(jq -r --arg a "$agent" '.agents[] | select(.id == $a) | .artifactSuffix' agents.json)
+          {
+            echo "agent=$agent"
+            echo "key=$key"
+            echo "artifact=${key}${suffix}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Assemble
+        env:
+          AGENT: ${{ steps.plugin.outputs.agent }}
+          KEY: ${{ steps.plugin.outputs.key }}
+        run: |
+          bash scripts/bundle-skills-plugin.sh "$AGENT" "$KEY" bundles
+
+      # A hand-pushed tag has no GitHub Release (only release-please-created
+      # ones do), and `gh release upload` aborts with "release not found".
+      - name: Ensure the release exists
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 \
+            || gh release create "$TAG" --title "$TAG" --notes "Skills-only bundle for $TAG"
+
+      - name: Upload
+        env:
+          ARTIFACT: ${{ steps.plugin.outputs.artifact }}
+        run: |
+          gh release upload "$TAG" "bundles/$ARTIFACT" --clobber
+
+  # Downloads what was actually published, extracts it the way an install does,
+  # and checks the manifest and a skill are present on each OS.
+  verify:
+    name: Verify published bundle (${{ matrix.os }})
+    needs: bundle
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+
+      - name: Resolve plugin
+        id: plugin
+        shell: bash
+        run: |
+          key="${TAG%-v*}"
+          agent=$(jq -r --arg k "$key" \
+            '[.agents[] | select((.plugins | index($k)) and ((.skillsOnly // []) | index($k)))][0].id // empty' agents.json)
+          if [ -z "$agent" ]; then
+            echo "ERROR: $key (from tag $TAG) is not a skills-only plugin in agents.json" >&2
+            exit 1
+          fi
+          suffix=$(jq -r --arg a "$agent" '.agents[] | select(.id == $a) | .artifactSuffix' agents.json)
+          {
+            echo "agent=$agent"
+            echo "key=$key"
+            echo "artifact=${key}${suffix}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Download the published bundle
+        shell: bash
+        env:
+          ARTIFACT: ${{ steps.plugin.outputs.artifact }}
+        run: |
+          mkdir -p bundles
+          gh release download "$TAG" -D bundles -p "$ARTIFACT" --clobber
+          ls -la bundles
+
+      - name: Extract
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          ARTIFACT: ${{ steps.plugin.outputs.artifact }}
+        run: |
+          mkdir -p extracted
+          unzip -q "bundles/$ARTIFACT" -d extracted
+
+      # Expand-Archive, not unzip: under MSYS a path with no extension resolves
+      # to its sibling .exe, so `unzip` can prompt to overwrite a file when it
+      # reaches one with the same stem. The host's own extractor has no such
+      # magic, and neither does this one.
+      - name: Extract (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          ARTIFACT: ${{ steps.plugin.outputs.artifact }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          Expand-Archive -Path "bundles\$env:ARTIFACT" -DestinationPath extracted
+
+      - name: Check the manifest and skills
+        shell: bash
+        env:
+          AGENT: ${{ steps.plugin.outputs.agent }}
+          KEY: ${{ steps.plugin.outputs.key }}
+        run: |
+          pattern=$(jq -r --arg a "$AGENT" '.agents[] | select(.id == $a) | .manifestPattern' agents.json)
+          dir=$(jq -r --arg a "$AGENT" '.agents[] | select(.id == $a) | .dir' agents.json)
+          full="${pattern//\{plugin\}/$KEY}"
+          manifest="extracted/${full#"$dir/$KEY/"}"
+          test -f "$manifest" || { echo "ERROR: $manifest missing from the bundle" >&2; find extracted | head -50; exit 1; }
+          jq -e . "$manifest" >/dev/null || { echo "ERROR: $manifest is not valid JSON" >&2; exit 1; }
+          skills=$(find extracted -path '*/skills/*/SKILL.md' -o -path 'extracted/skills/*/SKILL.md' | head -1)
+          test -n "$skills" || { echo "ERROR: no skills/*/SKILL.md in the bundle" >&2; find extracted | head -50; exit 1; }
+          echo "OK: $manifest, $skills"

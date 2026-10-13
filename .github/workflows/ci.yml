@@ -121,6 +121,19 @@ jobs:
       - name: Check opencode wiring
         run: bash scripts/check-opencode-wiring.sh
 
+      - name: Check devtools skills
+        run: bash scripts/check-devtools-skills.sh
+
+      - name: Check skills bundles
+        run: bash scripts/check-skills-bundles.sh
+
+      # The release-wiring check parses the workflow YAML.
+      - name: Install PyYAML
+        run: python3 -m pip install pyyaml
+
+      - name: Check skills release wiring
+        run: bash scripts/check-skills-release-wiring.sh
+
       # The dispatcher shipped as bin/<name> in every plugin bundle picks the
       # binary for the running platform, so any one machine covers exactly one
       # of its branches. This fakes the rest.

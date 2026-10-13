@@ -33,6 +33,9 @@ on:
   push:
     tags:
       - '*-opencode-v*'
+      # The devtools OpenCode plugin is skills-only (no plugin.ts, no binary);
+      # skills-bundles.yml bundles it.
+      - '!aiplugins-devtools-*-v*'
   # Backfill a release that predates this workflow, or re-cut bundles after a
   # fix to the bundling script.
   workflow_dispatch:

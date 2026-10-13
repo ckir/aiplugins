@@ -11,6 +11,8 @@ setup:
     cargo install cargo-binstall
     @echo "Installing dev tools..."
     cargo binstall cargo-nextest cargo-deny bacon typos-cli lefthook mlc -y
+    @echo "Installing PyYAML (skills-release-wiring check)..."
+    python3 -m pip install --user pyyaml
     @echo "Installing git hooks..."
     lefthook install
 
@@ -253,8 +255,12 @@ devtools-skills:
 skills-bundles:
     bash scripts/check-skills-bundles.sh
 
+# Check the release plumbing for crate-less skills-only plugin tags
+skills-release-wiring:
+    bash scripts/check-skills-release-wiring.sh
+
 # Run all pre-flight checks (what CI and lefthook would run)
-check: fmt lint test deny spellcheck links versions wiring marketplace dispatch smoke footprint opencode-wiring devtools-skills skills-bundles
+check: fmt lint test deny spellcheck links versions wiring marketplace dispatch smoke footprint opencode-wiring devtools-skills skills-bundles skills-release-wiring
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
