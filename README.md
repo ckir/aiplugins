@@ -101,7 +101,7 @@ and is usually a thin front end.
 
 Fronted today by [`claude-code/re-ghidra-mcp-cc`](claude-code/re-ghidra-mcp-cc/).
 
-`shared/devtools/` is not a crate (it is excluded from the Cargo workspace). It holds the canonical copy of the skills that the four `aiplugins-devtools-*` plugins ship; `just emit-devtools-skills` copies them into each plugin and `just devtools-skills` checks them.
+`shared/devtools/` is not a crate (it is excluded from the Cargo workspace). It holds the canonical copy of the skills that the four `aiplugins-devtools-*` plugins ship; `just emit-devtools-skills` copies them into each plugin and `just devtools-skills` checks them (maintainer notes: [`shared/devtools/README.md`](shared/devtools/README.md)).
 
 ## Documentation index
 
