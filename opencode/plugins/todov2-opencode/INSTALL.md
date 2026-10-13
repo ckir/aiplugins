@@ -73,11 +73,12 @@ cp -r /tmp/todov2-opencode-stage "$DEST/plugins/todov2-opencode"
 ```
 
 The zip's top level IS the plugin directory (`plugin.ts`, `tui.tsx`,
-`tool/`, `package.json`, `opencode.jsonc` — no wrapper folder), so the
+`tsconfig.json`, `tool/`, `package.json`, `opencode.jsonc` — no wrapper folder), so the
 copy lands the files exactly where the config entries in Step 4 point.
 Every download and copy must exit 0; verify afterwards that
 `$DEST/plugins/todov2-opencode/plugin.ts`,
-`$DEST/plugins/todov2-opencode/tui.tsx`, and
+`$DEST/plugins/todov2-opencode/tui.tsx`,
+`$DEST/plugins/todov2-opencode/tsconfig.json`, and
 `$DEST/plugins/todov2-opencode/tool/index.ts` all exist and are non-empty
 (`wc -c` on each).
 
