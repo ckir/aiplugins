@@ -37,19 +37,24 @@ marketplace entries on `main` point at
 are created, so until then `claude plugin install aiplugins-devtools@aiplugins`
 fails (404).
 
-Create the four tags by hand BEFORE merging any release-please PR. Push at most
-three tags at a time: GitHub drops tag-push events when more than three tags
-land on one commit (see the comment in `.github/workflows/release.yml`). For
-example:
+Create the four tags by hand BEFORE the change that seeds them merges to
+`main`, or immediately after it. The Release Please workflow runs on every push
+to `main` and looks up a release for each seeded package; until
+`aiplugins-devtools-<x>-v0.1.0` exists it fails ("Missing 4 paths" in its log).
+This was measured on the first merge. Push at most three tags at a time: GitHub
+drops tag-push events when more than three tags land on one commit (see the
+comment in `.github/workflows/release.yml`). For example:
 
 ```text
-git tag aiplugins-devtools-cc-v0.1.0 <commit>
+git tag -a aiplugins-devtools-cc-v0.1.0 <commit>
 git push origin aiplugins-devtools-cc-v0.1.0
 ```
 
 `.github/workflows/skills-bundles.yml` then builds and uploads each zip and
-creates the GitHub Release if it is missing. How release-please treats these
-seeded packages afterwards has NOT been tested.
+creates the GitHub Release if it is missing (exercised on the first release: all
+four runs succeeded and each Release carries its zip). With the tags in place
+release-please finds all its releases; a later failure while it walks the merge
+commits ended with an empty error message and is not yet explained.
 
 ## What has been exercised
 
@@ -57,4 +62,6 @@ Validated with `claude plugin validate --strict`, by loading the bundle zip with
 `claude --plugin-dir` (init lists `aiplugins-devtools:code-review-and-quality`),
 and with `agy plugin validate`.
 
-NOT exercised: OpenCode, Qwen Code, GitHub Actions, release-please.
+NOT exercised: OpenCode and Qwen Code themselves, and release-please creating a
+release PR for these packages. The `skills-bundles.yml` workflow has run for all
+four tags.
