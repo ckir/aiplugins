@@ -124,7 +124,9 @@ tar -C "$src" --exclude=./tests --exclude=./.gitignore -cf - . | tar -C "$stage"
 cp "$repo/LICENSE" "$stage/LICENSE"
 
 # `ls -A` emits children in sorted order, keeping entry order deterministic.
-mapfile -t children < <(cd "$stage" && ls -A)
+# (a read loop, not `mapfile`: stock macOS ships bash 3.2, which has no mapfile)
+children=()
+while IFS= read -r child; do children+=("$child"); done < <(cd "$stage" && ls -A)
 (cd "$stage" && zip -q -r "$zipfile" -- "${children[@]}")
 
 # Everything below is verification. A bundle wrong in any of these ways
