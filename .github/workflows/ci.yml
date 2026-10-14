@@ -123,6 +123,9 @@ jobs:
       - name: Check opencode wiring
         run: bash scripts/check-opencode-wiring.sh
 
+      - name: Check footprint budgets
+        run: bash scripts/check-footprint-budgets.sh
+
       - name: Check devtools skills
         run: bash scripts/check-devtools-skills.sh
 

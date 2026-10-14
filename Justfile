@@ -247,6 +247,10 @@ emit-devtools-skills:
     sed -i 's/^name: code-review-and-quality$/name: aiplugins-devtools-code-review-and-quality/' \
         "$oc/aiplugins-devtools-code-review-and-quality/SKILL.md"
 
+# Check that every key in docs/footprints/budgets.json names a live plugin
+footprint-budgets:
+    bash scripts/check-footprint-budgets.sh
+
 # Check the canonical aiplugins-devtools skill source (content, attribution)
 devtools-skills:
     bash scripts/check-devtools-skills.sh
@@ -261,7 +265,7 @@ skills-release-wiring:
 
 # Run all pre-flight checks (what CI and lefthook run; see ci.yml — `links`
 # is hook-only and `gen-* --check` + opencode suites run in CI but not here)
-check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace dispatch smoke footprint opencode-wiring devtools-skills skills-bundles skills-release-wiring
+check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace dispatch smoke footprint opencode-wiring footprint-budgets devtools-skills skills-bundles skills-release-wiring
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
