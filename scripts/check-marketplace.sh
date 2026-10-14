@@ -79,7 +79,8 @@ entries=$(jqr '.plugins[].name' "$manifest")
 checked=0
 for name in $entries; do
     checked=$((checked + 1))
-    plugin_json=$(registry_manifest_path "$agent" "$name")
+    key=$(registry_plugin_for_published "$agent" "$name")
+    plugin_json=$(registry_manifest_path "$agent" "$key")
 
     if [ ! -f "$plugin_json" ]; then
         fail "$name: no such plugin ($plugin_json missing)"
@@ -97,11 +98,16 @@ for name in $entries; do
     # manifest version selects the release. It sat three releases behind before
     # this check. Per-package releases bump crates independently, so the
     # crate — never the workspace version — is the oracle here.
-    crate_version=$(tr -d '\r' < "$agent_dir/$name/Cargo.toml" | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1)
-    [ -n "$crate_version" ] || fail "$name: no version in $agent_dir/$name/Cargo.toml"
     manifest_version=$(jqr '.version // ""' "$plugin_json")
-    [ "$manifest_version" = "$crate_version" ] ||
-        fail "$name: plugin.json says $manifest_version, crate is $crate_version"
+    if registry_is_skills_only "$agent" "$key"; then
+        # Crate-less package: its version lives in the manifest alone.
+        [ -n "$manifest_version" ] || fail "$name: no version in $plugin_json"
+    else
+        crate_version=$([ -f "$agent_dir/$key/Cargo.toml" ] && tr -d '\r' < "$agent_dir/$key/Cargo.toml" | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1 || true)
+        [ -n "$crate_version" ] || fail "$name: no version in $agent_dir/$key/Cargo.toml"
+        [ "$manifest_version" = "$crate_version" ] ||
+            fail "$name: plugin.json says $manifest_version, crate is $crate_version"
+    fi
 
     for field in description license; do
         want=$(jqr --arg f "$field" '.[$f] // ""' "$plugin_json")
@@ -109,7 +115,7 @@ for name in $entries; do
         [ "$want" = "$got" ] || fail "$name: $field differs from $plugin_json"
     done
 
-    want_url="$source_base/$name-v$manifest_version/$name$artifact_suffix"
+    want_url="$source_base/$key-v$manifest_version/$key$artifact_suffix"
     got_url=$(jqr '.source.url // ""' <<< "$entry")
     [ "$want_url" = "$got_url" ] ||
         fail "$name: source url is '$got_url', expected '$want_url'"
@@ -129,7 +135,7 @@ for dir in "$agent_dir"/*/; do
     name=$(basename "$dir")
     [ -f "$(registry_manifest_path "$agent" "$name")" ] || continue
     if registry_is_excluded "$agent" "$name"; then continue; fi
-    printf '%s\n' "$entries" | grep -qxF "$name" ||
+    printf '%s\n' "$entries" | grep -qxF "$(registry_published_name "$agent" "$name")" ||
         fail "$name: exists in $agent_dir/ but is not listed in $manifest"
 done
 

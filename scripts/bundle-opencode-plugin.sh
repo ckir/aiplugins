@@ -72,6 +72,16 @@ done
 mkdir -p "$outdir"
 outdir=$(cd "$outdir" && pwd)
 stage="$outdir/$name"
+# The rm -rf below deletes $stage. Refuse a stage that is, contains, or sits inside the
+# plugin source, so an out-dir such as the plugin's parent cannot delete the source tree.
+src_phys=$(cd -P -- "$plugindir" && pwd -P)
+stage_phys="$(cd -P -- "$outdir" && pwd -P)/$name"
+case "$stage_phys/" in
+    "$src_phys"/*) echo "ERROR: staging dir $stage_phys overlaps the source $src_phys (inside or equal)." >&2; exit 1 ;;
+esac
+case "$src_phys/" in
+    "$stage_phys"/*) echo "ERROR: staging dir $stage_phys overlaps the source $src_phys (contains it)." >&2; exit 1 ;;
+esac
 rm -rf "$stage"
 mkdir -p "$stage"
 
@@ -119,7 +129,12 @@ rm -f "$zipfile"
 # implementations keep the "./" prefix, and the installer looks for
 # `opencode.jsonc` by exact entry name. `ls -A` emits children in sorted
 # order, keeping the archive entry order deterministic.
-(cd "$stage" && zip -q -r "$zipfile" -- $(ls -A))
+(
+    cd "$stage"
+    shopt -s dotglob nullglob
+    children=(*)
+    zip -q -r "$zipfile" -- "${children[@]}"
+)
 
 # Everything below is verification. A bundle wrong in any of these ways
 # installs without complaint and fails later, on someone else's machine.

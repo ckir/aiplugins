@@ -5,7 +5,8 @@
       "dir": "claude-code/plugins",
       "plugins": [
         "rtk-mcp-cc",
-        "re-ghidra-mcp-cc"
+        "re-ghidra-mcp-cc",
+        "aiplugins-devtools-cc"
       ],
       "marketplace": ".claude-plugin/marketplace.json",
       "manifestPattern": "claude-code/plugins/{plugin}/.claude-plugin/plugin.json",
@@ -14,14 +15,21 @@
       "notPublished": [
         "example"
       ],
-      "versionedSourceUrl": true
+      "versionedSourceUrl": true,
+      "publishedNames": {
+        "aiplugins-devtools-cc": "aiplugins-devtools"
+      },
+      "skillsOnly": [
+        "aiplugins-devtools-cc"
+      ]
     },
     {
       "id": "qwen",
       "dir": "qwen/plugins",
       "plugins": [
         "rtk-mcp-qwen",
-        "re-ghidra-mcp-qwen"
+        "re-ghidra-mcp-qwen",
+        "aiplugins-devtools-qwen"
       ],
       "marketplace": ".qwen-plugin/marketplace.json",
       "manifestPattern": "qwen/plugins/{plugin}/qwen-extension.json",
@@ -30,7 +38,13 @@
       "notPublished": [
         "example"
       ],
-      "versionedSourceUrl": true
+      "versionedSourceUrl": true,
+      "publishedNames": {
+        "aiplugins-devtools-qwen": "aiplugins-devtools"
+      },
+      "skillsOnly": [
+        "aiplugins-devtools-qwen"
+      ]
     },
     {
       "id": "opencode",
@@ -38,28 +52,42 @@
       "plugins": [
         "rtk-mcp-opencode",
         "re-ghidra-mcp-opencode",
-        "todov2-opencode"
+        "todov2-opencode",
+        "aiplugins-devtools-opencode"
       ],
       "marketplace": ".opencode-plugin/marketplace.json",
       "manifestPattern": "opencode/plugins/{plugin}/package.json",
       "artifactSuffix": "-opencode.zip",
       "sourceUrlBase": "https://github.com/ckir/aiplugins/releases/download",
       "versionedSourceUrl": true,
-      "notPublished": []
+      "notPublished": [],
+      "publishedNames": {
+        "aiplugins-devtools-opencode": "aiplugins-devtools"
+      },
+      "skillsOnly": [
+        "aiplugins-devtools-opencode"
+      ]
     },
     {
       "id": "antigravity",
       "dir": "antigravity/plugins",
       "plugins": [
         "rtk-mcp-agy",
-        "re-ghidra-mcp-agy"
+        "re-ghidra-mcp-agy",
+        "aiplugins-devtools-agy"
       ],
       "marketplace": ".agy-plugin/marketplace.json",
       "manifestPattern": "antigravity/plugins/{plugin}/plugin.json",
       "artifactSuffix": "-agy-plugin.zip",
       "sourceUrlBase": "https://github.com/ckir/aiplugins/releases/download",
       "versionedSourceUrl": true,
-      "notPublished": []
+      "notPublished": [],
+      "publishedNames": {
+        "aiplugins-devtools-agy": "aiplugins-devtools"
+      },
+      "skillsOnly": [
+        "aiplugins-devtools-agy"
+      ]
     }
   ]
 }

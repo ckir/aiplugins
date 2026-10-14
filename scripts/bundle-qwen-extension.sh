@@ -112,6 +112,16 @@ binaries=$(
 mkdir -p "$outdir"
 outdir=$(cd "$outdir" && pwd)
 stage="$outdir/$ext"
+# The rm -rf below deletes $stage. Refuse a stage that is, contains, or sits inside the
+# plugin source, so an out-dir such as the plugin's parent cannot delete the source tree.
+src_phys=$(cd -P -- "$src" && pwd -P)
+stage_phys="$(cd -P -- "$outdir" && pwd -P)/$ext"
+case "$stage_phys/" in
+    "$src_phys"/*) echo "ERROR: staging dir $stage_phys overlaps the source $src_phys (inside or equal)." >&2; exit 1 ;;
+esac
+case "$src_phys/" in
+    "$stage_phys"/*) echo "ERROR: staging dir $stage_phys overlaps the source $src_phys (contains it)." >&2; exit 1 ;;
+esac
 rm -rf "$stage"
 mkdir -p "$stage/bin"
 
@@ -198,7 +208,12 @@ rm -f "$zipfile"
 # Zip the staging tree's children by name rather than `.`: some zip
 # implementations keep the "./" prefix, and the installer looks for
 # `qwen-extension.json` by exact entry name.
-(cd "$stage" && zip -q -r "$zipfile" -- $(ls -A))
+(
+    cd "$stage"
+    shopt -s dotglob nullglob
+    children=(*)
+    zip -q -r "$zipfile" -- "${children[@]}"
+)
 rm -rf "$outdir/.extract"
 
 # Everything below is verification. A bundle wrong in any of these ways installs

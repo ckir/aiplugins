@@ -51,6 +51,25 @@
         "mcp",
         "rust"
       ]
+    },
+    {
+      "name": "aiplugins-devtools",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/aiplugins-devtools-cc-v0.1.0/aiplugins-devtools-cc-plugin.zip"
+      },
+      "description": "Dev-tool skills container for AI coding agents; first skill: code-review-and-quality, a multi-axis code review.",
+      "author": {
+        "name": "AI Plugins Marketplace Contributors"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/claude-code/plugins/aiplugins-devtools-cc",
+      "license": "PolyForm-Noncommercial-1.0.0",
+      "category": "development",
+      "keywords": [
+        "skills",
+        "code-review",
+        "devtools"
+      ]
     }
   ]
 }

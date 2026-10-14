@@ -16,6 +16,13 @@
         ".claude-plugin/plugin.json"
       ]
     },
+    "claude-code/plugins/aiplugins-devtools-cc": {
+      "release-type": "simple",
+      "component": "aiplugins-devtools-cc",
+      "extra-files": [
+        ".claude-plugin/plugin.json"
+      ]
+    },
     "qwen/plugins/rtk-mcp-qwen": {
       "release-type": "rust",
       "component": "rtk-mcp-qwen",
@@ -26,6 +33,13 @@
     "qwen/plugins/re-ghidra-mcp-qwen": {
       "release-type": "rust",
       "component": "re-ghidra-mcp-qwen",
+      "extra-files": [
+        "qwen-extension.json"
+      ]
+    },
+    "qwen/plugins/aiplugins-devtools-qwen": {
+      "release-type": "simple",
+      "component": "aiplugins-devtools-qwen",
       "extra-files": [
         "qwen-extension.json"
       ]
@@ -51,6 +65,13 @@
         "package.json"
       ]
     },
+    "opencode/plugins/aiplugins-devtools-opencode": {
+      "release-type": "simple",
+      "component": "aiplugins-devtools-opencode",
+      "extra-files": [
+        "package.json"
+      ]
+    },
     "antigravity/plugins/rtk-mcp-agy": {
       "release-type": "rust",
       "component": "rtk-mcp-agy",
@@ -61,6 +82,13 @@
     "antigravity/plugins/re-ghidra-mcp-agy": {
       "release-type": "rust",
       "component": "re-ghidra-mcp-agy",
+      "extra-files": [
+        "plugin.json"
+      ]
+    },
+    "antigravity/plugins/aiplugins-devtools-agy": {
+      "release-type": "simple",
+      "component": "aiplugins-devtools-agy",
       "extra-files": [
         "plugin.json"
       ]

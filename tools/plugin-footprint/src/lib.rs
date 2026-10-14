@@ -11,4 +11,5 @@ pub mod gate;
 pub mod manifest;
 pub mod probe;
 pub mod publish;
+pub mod registry;
 pub mod sources;

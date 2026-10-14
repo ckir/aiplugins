@@ -1,0 +1,16 @@
+{
+  "name": "aiplugins-devtools",
+  "version": "0.1.0",
+  "description": "Dev-tool skills container for AI coding agents; first skill: code-review-and-quality, a multi-axis code review.",
+  "author": {
+    "name": "AI Plugins Marketplace Contributors"
+  },
+  "homepage": "https://github.com/ckir/aiplugins",
+  "repository": "https://github.com/ckir/aiplugins",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "keywords": [
+    "skills",
+    "code-review",
+    "devtools"
+  ]
+}

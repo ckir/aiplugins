@@ -31,12 +31,19 @@ for name in $(registry_plugins opencode | sort); do
     jsonc="$dir/opencode.jsonc"
     pkg="$dir/package.json"
 
-    [ -f "$plugin_ts" ] || { fail "$name: $plugin_ts missing"; continue; }
-    [ -f "$jsonc" ] || { fail "$name: $jsonc missing"; continue; }
+    # A skills-only plugin ships no plugin.ts, opencode.jsonc or MCP command, so
+    # checks 1, 3 and 4 (and the pin check 8) skip it; 2 and 5 still apply.
+    skills_only=0
+    registry_is_skills_only opencode "$name" && skills_only=1
 
-    # 1. The Plugin.define id matches the directory.
-    id=$(sed -n 's/^[[:space:]]*id:[[:space:]]*"\([^"]*\)".*$/\1/p' "$plugin_ts" | head -n 1)
-    [ "$id" = "$name" ] || fail "$name: plugin.ts id is '$id'"
+    if [ "$skills_only" -eq 0 ]; then
+        [ -f "$plugin_ts" ] || { fail "$name: $plugin_ts missing"; continue; }
+        [ -f "$jsonc" ] || { fail "$name: $jsonc missing"; continue; }
+
+        # 1. The Plugin.define id matches the directory.
+        id=$(sed -n 's/^[[:space:]]*id:[[:space:]]*"\([^"]*\)".*$/\1/p' "$plugin_ts" | head -n 1)
+        [ "$id" = "$name" ] || fail "$name: plugin.ts id is '$id'"
+    fi
 
     # 2. package.json carries a well-formed semver version. Per-package
     # releases bump it independently (the workspace version is not any
@@ -46,26 +53,28 @@ for name in $(registry_plugins opencode | sort); do
     [[ "$pkg_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]] ||
         fail "$name: package.json version '$pkg_version' is not semver"
 
-    # 3. opencode.jsonc parses (kept comment-free so jq reads it) and carries
-    #    V2-native shapes only.
-    jqr -e . "$jsonc" > /dev/null || { fail "$name: $jsonc is not valid JSON"; continue; }
-    for legacy in '"plugin"' '"mcpServers"' '"enabled":' '"attachment"'; do
-        if grep -q "$legacy" "$jsonc"; then
-            fail "$name: $jsonc carries a V1/legacy key ($legacy)"
-        fi
-    done
+    if [ "$skills_only" -eq 0 ]; then
+        # 3. opencode.jsonc parses (kept comment-free so jq reads it) and carries
+        #    V2-native shapes only.
+        jqr -e . "$jsonc" > /dev/null || { fail "$name: $jsonc is not valid JSON"; continue; }
+        for legacy in '"plugin"' '"mcpServers"' '"enabled":' '"attachment"'; do
+            if grep -q "$legacy" "$jsonc"; then
+                fail "$name: $jsonc carries a V1/legacy key ($legacy)"
+            fi
+        done
 
-    # 4. Every local MCP command resolves to a [[bin]] this workspace builds.
-    while IFS= read -r command; do
-        [ -n "$command" ] || continue
-        bin=$(basename "$command")
-        checked=$((checked + 1))
-        if printf '%s\n' "$known" | grep -qxF "$bin"; then
-            printf '  ok       %-20s <- %s\n' "$bin" "$jsonc"
-        else
-            fail "$name: mcp command '$command' names no built binary"
-        fi
-    done < <(jqr '.mcp.servers // {} | .[] | select(.type == "local") | .command[0] // empty' "$jsonc")
+        # 4. Every local MCP command resolves to a [[bin]] this workspace builds.
+        while IFS= read -r command; do
+            [ -n "$command" ] || continue
+            bin=$(basename "$command")
+            checked=$((checked + 1))
+            if printf '%s\n' "$known" | grep -qxF "$bin"; then
+                printf '  ok       %-20s <- %s\n' "$bin" "$jsonc"
+            else
+                fail "$name: mcp command '$command' names no built binary"
+            fi
+        done < <(jqr '.mcp.servers // {} | .[] | select(.type == "local") | .command[0] // empty' "$jsonc")
+    fi
 
     # 5. Skill frontmatter names match their directories.
     for skill in "$dir"skills/*/SKILL.md; do
@@ -123,6 +132,7 @@ pin_ref=""
 for name in $(registry_plugins opencode | sort); do
     pkg="opencode/plugins/$name/package.json"
     [ -f "$pkg" ] || continue
+    registry_is_skills_only opencode "$name" && continue
     pin=$(jqr '.dependencies["@opencode/plugin"] // ""' "$pkg" 2>/dev/null || echo "")
     if [ -z "$pin" ]; then
         fail "$pkg pins no @opencode/plugin version"

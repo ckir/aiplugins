@@ -271,7 +271,15 @@ fn ratchet(measured_path: &Path, budgets_path: &Path) -> ExitCode {
         return ExitCode::from(1);
     }
 
-    let plugin = document["plugin"].as_str().unwrap_or_default().to_string();
+    // Keyed by the document's file stem — the registry key, which is what the
+    // gate iterates — NOT its `plugin` field, which is the published name and
+    // differs for a skills-only plugin (`aiplugins-devtools` vs
+    // `aiplugins-devtools-cc`). For every other plugin the two are equal.
+    let plugin = measured_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or_default()
+        .to_string();
     let measured = document["tiers"]["resident"]["bytes"].as_u64().unwrap_or(0);
     // `None` for every Claude Code document: they carry no Setup tier, and
     // must come out of the ratchet with their entries byte-identical.
@@ -385,7 +393,7 @@ fn ratchet(measured_path: &Path, budgets_path: &Path) -> ExitCode {
 /// Write the published figure into every README region (spec §7).
 ///
 /// Run from the repository root, like `footprint-gate`, and driven by the same
-/// marketplace manifest the gate and `just smoke` iterate — so what is published
+/// plugin registry (`agents.json`) the gate and `just smoke` iterate — so what is published
 /// cannot drift from what ships.
 ///
 /// The ROOT region is rendered from ALL committed documents at once, never from
@@ -481,19 +489,12 @@ fn rewrite_region(path: &str, region: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// The plugins the marketplace publishes — the same iteration source the gate
-/// and `just smoke` use.
+/// The plugins the registry (`agents.json`, via `registry::published_plugin_keys`)
+/// publishes — the same iteration source the gate and `just smoke` use.
 fn published_plugins() -> Result<Vec<String>, String> {
-    let text = std::fs::read_to_string(".claude-plugin/marketplace.json")
-        .map_err(|e| format!("reading the marketplace manifest: {e}"))?;
-    let manifest: serde_json::Value = serde_json::from_str(&text)
-        .map_err(|e| format!("parsing the marketplace manifest: {e}"))?;
-    Ok(manifest["plugins"]
-        .as_array()
-        .ok_or("the marketplace manifest declares no plugins array")?
-        .iter()
-        .filter_map(|p| p["name"].as_str().map(str::to_string))
-        .collect())
+    let text = std::fs::read_to_string("agents.json")
+        .map_err(|e| format!("reading the plugin registry: {e}"))?;
+    plugin_footprint::registry::published_plugin_keys(&text)
 }
 
 /// The OpenCode plugins: every directory under `opencode/plugins/` that looks like

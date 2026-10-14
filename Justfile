@@ -11,6 +11,8 @@ setup:
     cargo install cargo-binstall
     @echo "Installing dev tools..."
     cargo binstall cargo-nextest cargo-deny bacon typos-cli lefthook mlc -y
+    @echo "Installing PyYAML (skills-release-wiring check)..."
+    python3 -m pip install --user pyyaml
     @echo "Installing git hooks..."
     lefthook install
 
@@ -77,6 +79,8 @@ test-opencode:
     #!/usr/bin/env bash
     set -euo pipefail
     for dir in opencode/plugins/*/; do
+        # skills-only plugins have no plugin.ts; check-opencode-wiring.sh check 1 is what fails loudly for a real plugin that lost its plugin.ts
+        [ -f "$dir/plugin.ts" ] || continue
         (cd "$dir" && bun install && bun test)
     done
 
@@ -86,7 +90,7 @@ test-opencode:
 footprint-regen:
     #!/usr/bin/env bash
     set -euo pipefail
-    for plugin in $(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r'); do
+    for plugin in $(bash scripts/registry-plugins.sh claude-code | tr -d '\r'); do
         cargo run -q -p plugin-footprint --bin plugin-footprint -- measure "claude-code/plugins/$plugin" \
             --out "docs/footprints/$plugin.json"
         cargo run -q -p plugin-footprint --bin plugin-footprint -- ratchet \
@@ -95,6 +99,8 @@ footprint-regen:
         echo "regenerated docs/footprints/$plugin.json"
     done
     for dir in opencode/plugins/*/; do
+        # skills-only plugins have no plugin.ts; check-opencode-wiring.sh check 1 is what fails loudly for a real plugin that lost its plugin.ts
+        [ -f "$dir/plugin.ts" ] || continue
         name=$(basename "$dir")
         cargo run -q -p plugin-footprint --bin plugin-footprint -- measure "$dir" \
             --out "docs/footprints/$name.json"
@@ -210,13 +216,56 @@ dispatch:
 smoke:
     #!/usr/bin/env bash
     set -euo pipefail
-    for plugin in $(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r'); do
+    for plugin in $(bash scripts/registry-plugins.sh claude-code --exclude-skills-only | tr -d '\r'); do
         bash scripts/smoke-bundle.sh "$plugin"
     done
 
+# Copy the canonical aiplugins-devtools skills into each agent's plugin folder
+# (one block per agent; scripts/check-devtools-skills.sh fails on drift)
+emit-devtools-skills:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    src=shared/devtools/skills
+    # claude-code
+    rm -rf claude-code/plugins/aiplugins-devtools-cc/skills
+    mkdir -p claude-code/plugins/aiplugins-devtools-cc/skills
+    cp -r "$src"/. claude-code/plugins/aiplugins-devtools-cc/skills/
+    # qwen
+    rm -rf qwen/plugins/aiplugins-devtools-qwen/skills
+    mkdir -p qwen/plugins/aiplugins-devtools-qwen/skills
+    cp -r "$src"/. qwen/plugins/aiplugins-devtools-qwen/skills/
+    # antigravity
+    rm -rf antigravity/plugins/aiplugins-devtools-agy/skills
+    mkdir -p antigravity/plugins/aiplugins-devtools-agy/skills
+    cp -r "$src"/. antigravity/plugins/aiplugins-devtools-agy/skills/
+    # opencode: skills are keyed by folder name, so the folder is prefixed and the
+    # one frontmatter `name:` line is rewritten to match (nothing else changes)
+    oc=opencode/plugins/aiplugins-devtools-opencode/skills
+    rm -rf "$oc"
+    mkdir -p "$oc"
+    cp -r "$src/code-review-and-quality" "$oc/aiplugins-devtools-code-review-and-quality"
+    sed -i 's/^name: code-review-and-quality$/name: aiplugins-devtools-code-review-and-quality/' \
+        "$oc/aiplugins-devtools-code-review-and-quality/SKILL.md"
+
+# Check that every key in docs/footprints/budgets.json names a live plugin
+footprint-budgets:
+    bash scripts/check-footprint-budgets.sh
+
+# Check the canonical aiplugins-devtools skill source (content, attribution)
+devtools-skills:
+    bash scripts/check-devtools-skills.sh
+
+# Build every skills-only plugin bundle and check zip names, manifests and skills
+skills-bundles:
+    bash scripts/check-skills-bundles.sh
+
+# Check the release plumbing for crate-less skills-only plugin tags
+skills-release-wiring:
+    bash scripts/check-skills-release-wiring.sh
+
 # Run all pre-flight checks (what CI and lefthook run; see ci.yml — `links`
 # is hook-only and `gen-* --check` + opencode suites run in CI but not here)
-check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace dispatch smoke footprint opencode-wiring
+check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace dispatch smoke footprint opencode-wiring footprint-budgets devtools-skills skills-bundles skills-release-wiring
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
@@ -292,7 +341,7 @@ build-re-ghidra-mcp-opencode:
 bundle-plugins tag:
     #!/usr/bin/env bash
     set -euo pipefail
-    names=$(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r')
+    names=$(bash scripts/registry-plugins.sh claude-code --exclude-skills-only | tr -d '\r')
     rm -rf target/plugin-assets target/plugin-bundles
     mkdir -p target/plugin-assets
     for name in $names; do
@@ -312,7 +361,7 @@ bundle-plugins tag:
 bundle-qwen tag:
     #!/usr/bin/env bash
     set -euo pipefail
-    names=$(jq -r '.plugins[].name' .qwen-plugin/marketplace.json | tr -d '\r')
+    names=$(bash scripts/registry-plugins.sh qwen --exclude-skills-only | tr -d '\r')
     rm -rf target/qwen-assets target/qwen-bundles
     mkdir -p target/qwen-assets
     for name in $names; do

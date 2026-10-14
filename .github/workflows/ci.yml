@@ -79,6 +79,8 @@ jobs:
       - name: Run opencode plugin tests
         run: |
           for dir in opencode/plugins/*/; do
+            # skills-only plugins have no plugin.ts; check-opencode-wiring.sh check 1 is what fails loudly for a real plugin that lost its plugin.ts
+            [ -f "$dir/plugin.ts" ] || continue
             (cd "$dir" && bun install && bun test)
           done
         shell: bash
@@ -120,6 +122,24 @@ jobs:
       # and skill copies still agree with the sources they copy.
       - name: Check opencode wiring
         run: bash scripts/check-opencode-wiring.sh
+
+      - name: Check footprint budgets
+        run: bash scripts/check-footprint-budgets.sh
+
+      - name: Check devtools skills
+        run: bash scripts/check-devtools-skills.sh
+
+      - name: Check skills bundles
+        run: bash scripts/check-skills-bundles.sh
+
+      # The release-wiring check parses the workflow YAML. ubuntu-24.04's system
+      # Python is externally managed (PEP 668) and may refuse a plain pip install;
+      # the runner is ephemeral, so overriding that is safe.
+      - name: Install PyYAML
+        run: python3 -c 'import yaml' 2>/dev/null || python3 -m pip install --break-system-packages pyyaml
+
+      - name: Check skills release wiring
+        run: bash scripts/check-skills-release-wiring.sh
 
       # The dispatcher shipped as bin/<name> in every plugin bundle picks the
       # binary for the running platform, so any one machine covers exactly one
@@ -237,7 +257,7 @@ jobs:
         run: |
           # tr -d: the jq on the Windows image writes CRLF, and a plugin name
           # with a carriage return attached makes every path built from it wrong.
-          for plugin in $(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr -d '\r'); do
+          for plugin in $(bash scripts/registry-plugins.sh claude-code --exclude-skills-only | tr -d '\r'); do
             bash scripts/smoke-bundle.sh "$plugin"
           done
 

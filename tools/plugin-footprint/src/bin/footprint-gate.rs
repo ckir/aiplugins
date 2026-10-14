@@ -47,7 +47,7 @@ fn main() -> ExitCode {
         return ExitCode::from(1);
     }
 
-    // The plugin list comes from the marketplace manifest, the same source
+    // The plugin list comes from the plugin registry (agents.json), the same source
     // `just smoke` and the bundle-smoke job iterate. Reading it from the working
     // tree is deliberate: a change that ADDS a plugin must have it measured.
     //
@@ -177,24 +177,18 @@ fn main() -> ExitCode {
     }
 }
 
-/// The plugins the marketplace actually publishes.
+/// The plugins the registry actually publishes: `agents.json`, read through
+/// `registry::published_plugin_keys`.
 ///
 /// The same iteration source `just smoke` and the `bundle-smoke` CI job use, so
 /// the gate cannot drift from what ships. Note the interaction with §6.2's
-/// bypass: a change that removes a plugin from this manifest removes it from
+/// bypass: a change that removes a plugin from the registry removes it from
 /// the gate. `scripts/check-marketplace.sh` is what keeps the manifest honest
 /// about the plugins present, and it already runs in CI.
 fn published_plugins() -> Result<Vec<String>, String> {
-    let text = std::fs::read_to_string(".claude-plugin/marketplace.json")
-        .map_err(|e| format!("reading the marketplace manifest: {e}"))?;
-    let manifest: serde_json::Value = serde_json::from_str(&text)
-        .map_err(|e| format!("parsing the marketplace manifest: {e}"))?;
-    Ok(manifest["plugins"]
-        .as_array()
-        .ok_or("the marketplace manifest declares no plugins array")?
-        .iter()
-        .filter_map(|p| p["name"].as_str().map(str::to_string))
-        .collect())
+    let text = std::fs::read_to_string("agents.json")
+        .map_err(|e| format!("reading the plugin registry: {e}"))?;
+    plugin_footprint::registry::published_plugin_keys(&text)
 }
 
 /// The OpenCode plugins: every directory under `opencode/plugins/` that looks like
