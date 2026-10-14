@@ -97,7 +97,7 @@ for name in $entries; do
         # Crate-less package: its version lives in the manifest alone.
         [ -n "$manifest_version" ] || fail "$name: no version in $ext_json"
     else
-        crate_version=$(tr -d '\r' < "$agent_dir/$key/Cargo.toml" | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1)
+        crate_version=$([ -f "$agent_dir/$key/Cargo.toml" ] && tr -d '\r' < "$agent_dir/$key/Cargo.toml" | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1 || true)
         [ -n "$crate_version" ] || fail "$name: no version in $agent_dir/$key/Cargo.toml"
         [ "$manifest_version" = "$crate_version" ] ||
             fail "$name: qwen-extension.json says $manifest_version, crate is $crate_version"
