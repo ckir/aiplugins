@@ -20,8 +20,12 @@ on purpose, so the drift check ignores it.
 
 Nothing discovers skills automatically. Edit by hand:
 
+- the `emit-devtools-skills` recipe in the `Justfile`, which hardcodes
+  `code-review-and-quality` for the OpenCode copy (prefixed folder plus the
+  `name:` rewrite);
 - the copies list in `scripts/check-devtools-skills.sh`;
-- the `pairs` list in `scripts/check-skills-bundles.sh`;
+- note that `scripts/check-skills-bundles.sh` needs no edit: its `pairs` list
+  names the four host plugins, and it finds skills with `find`;
 - note that the drift check only compares the named skill folder, so a new skill
   is not covered until it is added to that list.
 
