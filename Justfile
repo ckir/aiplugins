@@ -244,8 +244,11 @@ emit-devtools-skills:
     rm -rf "$oc"
     mkdir -p "$oc"
     cp -r "$src/code-review-and-quality" "$oc/aiplugins-devtools-code-review-and-quality"
-    sed -i 's/^name: code-review-and-quality$/name: aiplugins-devtools-code-review-and-quality/' \
-        "$oc/aiplugins-devtools-code-review-and-quality/SKILL.md"
+    # (temp file plus mv, not `sed -i`: GNU and BSD sed disagree on its argument)
+    skill_md="$oc/aiplugins-devtools-code-review-and-quality/SKILL.md"
+    sed 's/^name: code-review-and-quality$/name: aiplugins-devtools-code-review-and-quality/' \
+        "$skill_md" > "$skill_md.tmp"
+    mv "$skill_md.tmp" "$skill_md"
 
 # Check that every key in docs/footprints/budgets.json names a live plugin
 footprint-budgets:
