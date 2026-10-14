@@ -13,7 +13,11 @@ check_pair() { # $1 = label, $2 = crate Cargo.toml, $3 = host manifest, $4 = jq 
         crate_v=$(tr -d '\r' < "$2" | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1)
     fi
     manifest_v=$(jq -r "$4 // \"\"" "$3" | tr -d '\r')
-    if [ "$crate_v" != "$manifest_v" ]; then
+    if [[ "$2" == *.json ]] &&
+        ! [[ "$crate_v" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+        echo "  FAIL  $1: version '$crate_v' in $2 is missing or not semver" >&2
+        failures=$((failures + 1))
+    elif [ "$crate_v" != "$manifest_v" ]; then
         echo "  FAIL  $1: crate says $crate_v, manifest says $manifest_v" >&2
         failures=$((failures + 1))
     else

@@ -75,6 +75,10 @@ if [ ! -d "$oc" ] \
     bad "stale copy: $oc"
 fi
 
+# --- registry helpers ---
+# Run as a child process: sourcing registry.sh would make it read this script's $1.
+bash scripts/lib/registry.sh --self-test >/dev/null 2>&1 || bad "registry self-test failed: bash scripts/lib/registry.sh --self-test"
+
 if [ "$fail" -ne 0 ]; then
     exit 1
 fi

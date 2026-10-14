@@ -63,6 +63,14 @@ done
 neg="$tmp/neg"
 mkdir -p "$neg"
 
+oc_src=$(registry_field opencode dir)/aiplugins-devtools-opencode
+cp -r "$oc_src" "$neg/noinstall"
+rm -f "$neg/noinstall/INSTALL.md"
+rc=0
+bash scripts/bundle-skills-plugin.sh opencode aiplugins-devtools-opencode "$neg/o-install" "$neg/noinstall" >/dev/null 2>&1 || rc=$?
+[ "$rc" -eq 1 ] || bad "control (i): opencode copy without INSTALL.md exited $rc, expected 1"
+[ -z "$(find "$neg/o-install" -name '*.zip' 2>/dev/null)" ] || bad "control (i): a zip was left behind"
+
 cp -r "$cc_src" "$neg/noskills"
 rm -rf "$neg/noskills/skills"
 rc=0
