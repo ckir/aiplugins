@@ -2,84 +2,91 @@
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "include-component-in-tag": true,
   "packages": {
-    "claude-code/rtk-mcp-cc": {
+    "claude-code/plugins/rtk-mcp-cc": {
       "release-type": "rust",
       "component": "rtk-mcp-cc",
       "extra-files": [
         ".claude-plugin/plugin.json"
       ]
     },
-    "claude-code/re-ghidra-mcp-cc": {
+    "claude-code/plugins/re-ghidra-mcp-cc": {
       "release-type": "rust",
       "component": "re-ghidra-mcp-cc",
       "extra-files": [
         ".claude-plugin/plugin.json"
       ]
     },
-    "claude-code/aiplugins-devtools-cc": {
+    "claude-code/plugins/aiplugins-devtools-cc": {
       "release-type": "simple",
       "component": "aiplugins-devtools-cc",
       "extra-files": [
         ".claude-plugin/plugin.json"
       ]
     },
-    "qwen/rtk-mcp-qwen": {
+    "qwen/plugins/rtk-mcp-qwen": {
       "release-type": "rust",
       "component": "rtk-mcp-qwen",
       "extra-files": [
         "qwen-extension.json"
       ]
     },
-    "qwen/re-ghidra-mcp-qwen": {
+    "qwen/plugins/re-ghidra-mcp-qwen": {
       "release-type": "rust",
       "component": "re-ghidra-mcp-qwen",
       "extra-files": [
         "qwen-extension.json"
       ]
     },
-    "qwen/aiplugins-devtools-qwen": {
+    "qwen/plugins/aiplugins-devtools-qwen": {
       "release-type": "simple",
       "component": "aiplugins-devtools-qwen",
       "extra-files": [
         "qwen-extension.json"
       ]
     },
-    "opencode/rtk-mcp-opencode": {
+    "opencode/plugins/rtk-mcp-opencode": {
       "release-type": "simple",
       "component": "rtk-mcp-opencode",
       "extra-files": [
         "package.json"
       ]
     },
-    "opencode/re-ghidra-mcp-opencode": {
+    "opencode/plugins/re-ghidra-mcp-opencode": {
       "release-type": "simple",
       "component": "re-ghidra-mcp-opencode",
       "extra-files": [
         "package.json"
       ]
     },
-    "opencode/aiplugins-devtools-opencode": {
+    "opencode/plugins/todov2-opencode": {
+      "release-type": "simple",
+      "component": "todov2-opencode",
+      "extra-files": [
+        "package.json"
+      ]
+    },
+    "opencode/plugins/aiplugins-devtools-opencode": {
       "release-type": "simple",
       "component": "aiplugins-devtools-opencode",
       "extra-files": [
         "package.json"
       ]
     },
-    "antigravity/rtk-mcp-agy": {
+    "antigravity/plugins/rtk-mcp-agy": {
       "release-type": "rust",
       "component": "rtk-mcp-agy",
       "extra-files": [
         "plugin.json"
       ]
     },
-    "antigravity/re-ghidra-mcp-agy": {
+    "antigravity/plugins/re-ghidra-mcp-agy": {
       "release-type": "rust",
       "component": "re-ghidra-mcp-agy",
       "extra-files": [
         "plugin.json"
       ]
     },
-    "antigravity/aiplugins-devtools-agy": {
+    "antigravity/plugins/aiplugins-devtools-agy": {
       "release-type": "simple",
       "component": "aiplugins-devtools-agy",
       "extra-files": [

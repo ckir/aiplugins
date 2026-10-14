@@ -3,6 +3,8 @@
 # Section `source`: the vendored skill is complete, self-contained and attributed.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# shellcheck source=lib/registry.sh disable=SC1091
+source scripts/lib/registry.sh
 
 fail=0
 bad() {
@@ -54,9 +56,9 @@ fi
 # --- copies ---
 # Each emitted per-agent copy must equal the canonical skill directory.
 for copy in \
-    claude-code/aiplugins-devtools-cc/skills/code-review-and-quality \
-    qwen/aiplugins-devtools-qwen/skills/code-review-and-quality \
-    antigravity/aiplugins-devtools-agy/skills/code-review-and-quality \
+    "$(registry_field claude-code dir)/aiplugins-devtools-cc/skills/code-review-and-quality" \
+    "$(registry_field qwen dir)/aiplugins-devtools-qwen/skills/code-review-and-quality" \
+    "$(registry_field antigravity dir)/aiplugins-devtools-agy/skills/code-review-and-quality" \
 ; do
     if [ ! -d "$copy" ] || ! diff -r "$skill" "$copy" >/dev/null 2>&1; then
         bad "stale copy: $copy"
@@ -66,7 +68,7 @@ done
 # OpenCode keys skills by folder name, so its copy is renamed: the folder is
 # prefixed and SKILL.md's frontmatter `name:` line is rewritten to match; nothing
 # else may differ. Compare the renamed canonical SKILL.md, then everything else.
-oc=opencode/aiplugins-devtools-opencode/skills/aiplugins-devtools-code-review-and-quality
+oc="$(registry_field opencode dir)/aiplugins-devtools-opencode/skills/aiplugins-devtools-code-review-and-quality"
 if [ ! -d "$oc" ] \
     || ! diff <(sed 's/^name: code-review-and-quality$/name: aiplugins-devtools-code-review-and-quality/' "$skill/SKILL.md") "$oc/SKILL.md" >/dev/null 2>&1 \
     || ! diff -r -x SKILL.md "$skill" "$oc" >/dev/null 2>&1; then

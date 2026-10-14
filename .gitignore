@@ -28,7 +28,7 @@ target
 # Node modules installed by bun/npm. The pre-commit typos hook globs `*`,
 # and an unignored node_modules/ makes every commit scan third-party code
 # (measured: 173s failure on untracked deps). Per-plugin installs land in
-# opencode/*/node_modules/; this one rule covers those and the root.
+# opencode/plugins/*/node_modules/; this one rule covers those and the root.
 node_modules/
 
 # Per-session scratch written by the Qwen CLI. The directory is named after a
@@ -39,7 +39,7 @@ node_modules/
 # Per-developer Claude Code state, not shared configuration:
 #   settings.local.json  — which plugins this developer has enabled
 #   *.local.md           — per-project plugin settings, the convention both
-#                          claude-code/example and claude-code/rtk-mcp-cc
+#                          claude-code/plugins/example and claude-code/plugins/rtk-mcp-cc
 #                          document ("belongs in .gitignore") but nothing here
 #                          previously enforced
 #
@@ -53,4 +53,4 @@ node_modules/
 dist/
 
 # Staged OpenCode plugin binaries, produced by `just build-*-opencode`.
-opencode/*/bin/
+opencode/plugins/*/bin/

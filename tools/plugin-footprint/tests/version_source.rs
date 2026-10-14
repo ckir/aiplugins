@@ -16,10 +16,13 @@ fn repo_root() -> PathBuf {
 fn each_host_reports_its_own_manifest_version() {
     let root = repo_root();
     let cases = [
-        ("claude-code/rtk-mcp-cc", ".claude-plugin/plugin.json"),
-        ("qwen/rtk-mcp-qwen", "qwen-extension.json"),
-        ("opencode/rtk-mcp-opencode", "package.json"),
-        ("antigravity/rtk-mcp-agy", "plugin.json"),
+        (
+            "claude-code/plugins/rtk-mcp-cc",
+            ".claude-plugin/plugin.json",
+        ),
+        ("qwen/plugins/rtk-mcp-qwen", "qwen-extension.json"),
+        ("opencode/plugins/rtk-mcp-opencode", "package.json"),
+        ("antigravity/plugins/rtk-mcp-agy", "plugin.json"),
     ];
     for (dir, manifest) in cases {
         let plugin = root.join(dir);

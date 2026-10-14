@@ -12,13 +12,13 @@
       "name": "rtk-mcp-opencode",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/rtk-mcp-opencode-v0.7.3/rtk-mcp-opencode-opencode.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/rtk-mcp-opencode-v0.9.0/rtk-mcp-opencode-opencode.zip"
       },
       "description": "OpenCode V2 integration for rtk (Rust Token Killer): rewrites shell commands through rtk for 60-90% token savings, plus rtk analytics as MCP tools.",
       "author": {
         "name": "AI Plugins Marketplace Contributors"
       },
-      "homepage": "https://github.com/ckir/aiplugins/tree/main/opencode/rtk-mcp-opencode",
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/opencode/plugins/rtk-mcp-opencode",
       "license": "PolyForm-Noncommercial-1.0.0",
       "category": "development",
       "keywords": [
@@ -34,13 +34,13 @@
       "name": "re-ghidra-mcp-opencode",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-opencode-v0.7.3/re-ghidra-mcp-opencode-opencode.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-opencode-v0.9.0/re-ghidra-mcp-opencode-opencode.zip"
       },
       "description": "OpenCode V2 integration for Ghidra reverse engineering: existing 19-tool MCP server plus session hooks that preserve RE state across compaction and point at the driver skill.",
       "author": {
         "name": "AI Plugins Marketplace Contributors"
       },
-      "homepage": "https://github.com/ckir/aiplugins/tree/main/opencode/re-ghidra-mcp-opencode",
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/opencode/plugins/re-ghidra-mcp-opencode",
       "license": "PolyForm-Noncommercial-1.0.0",
       "category": "development",
       "keywords": [
@@ -53,6 +53,29 @@
       ]
     },
     {
+      "name": "todov2-opencode",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/todov2-opencode-v0.5.1/todov2-opencode-opencode.zip"
+      },
+      "description": "Restore the V2-removed todowrite tool and a TUI sidebar list for OpenCode sessions",
+      "author": {
+        "name": "AI Plugins Marketplace Contributors"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/opencode/plugins/todov2-opencode",
+      "license": "PolyForm-Noncommercial-1.0.0",
+      "category": "development",
+      "keywords": [
+        "opencode",
+        "opencode-plugin",
+        "plugin",
+        "todo",
+        "tasks",
+        "ai",
+        "agent"
+      ]
+    },
+    {
       "name": "aiplugins-devtools",
       "source": {
         "source": "archive",
@@ -62,7 +85,7 @@
       "author": {
         "name": "AI Plugins Marketplace Contributors"
       },
-      "homepage": "https://github.com/ckir/aiplugins/tree/main/opencode/aiplugins-devtools-opencode",
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/opencode/plugins/aiplugins-devtools-opencode",
       "license": "PolyForm-Noncommercial-1.0.0",
       "category": "development",
       "keywords": [

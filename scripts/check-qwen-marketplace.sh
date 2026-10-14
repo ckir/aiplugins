@@ -20,7 +20,7 @@ artifact_suffix=$(registry_field "$agent" artifactSuffix)
 
 manifest=.qwen-plugin/marketplace.json
 
-# qwen/example is a reference implementation people read, not something
+# qwen/plugins/example is a reference implementation people read, not something
 # anyone installs; it is deliberately absent from the marketplace. The
 # exclusion list lives in agents.json (notPublished); registry_is_excluded
 # below is the only read path.
@@ -48,7 +48,7 @@ jq -e . "$manifest" > /dev/null || {
 
 # The repository the release assets come from, taken from the workspace manifest
 # so the url in the marketplace cannot quietly point at a different repo.
-repo_url=$(sed -n 's/^repository = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+repo_url=$(tr -d '\r' < Cargo.toml | sed -n 's/^repository = "\(.*\)"$/\1/p' | head -n 1)
 [ -n "$repo_url" ] || {
     echo "ERROR: no [workspace.package] repository found in Cargo.toml." >&2
     exit 1

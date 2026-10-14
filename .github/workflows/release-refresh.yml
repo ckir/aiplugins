@@ -1,0 +1,102 @@
+name: Release Refresh
+
+# Keeps version-derived files fresh on the release-please branch.
+#
+# Release-please bumps versions (plugin manifests, CHANGELOGs) but does not
+# regenerate the files this repo derives from those versions: the tag-pinned
+# source URLs in the generated marketplace manifests, and the `pluginVersion`
+# stamps in the committed footprint documents. Without a refresh, every
+# release PR fails `gen-marketplaces.sh --check` and the footprint freshness
+# gate on its first CI run — red through no fault of the release content.
+#
+# This job runs the two generators against the release branch and commits
+# the result back to it when they change anything. It converges: the push
+# retriggers this workflow, regeneration finds no diff, and nothing is
+# pushed. Scoped to the release-please branch only — every other PR is
+# skipped before any tool runs.
+#
+# The push MUST authenticate with RELEASE_PLEASE_TOKEN, not GITHUB_TOKEN:
+# pushes made with GITHUB_TOKEN trigger no workflows, so the refresh commit
+# would land without CI and the release PR could never go green. (Same
+# reason release-please itself runs under the PAT. Tag and bundle workflows
+# key off tags and release PR merges, neither of which this produces.)
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    name: Refresh derived files
+    # The release-please branch only. Every other PR skips here, costing a
+    # few seconds of scheduling and nothing else.
+    if: github.head_ref == 'release-please--branches--main'
+    runs-on: ubuntu-latest
+    steps:
+# GITHUB_TOKEN is deliberately NOT enough here: pushes made with it do not
+# trigger any workflows, so a refresh commit would land without CI and the
+# release PR could never go green. The PAT push retriggers CI (and this
+# workflow, which then converges with no further push). This is the same
+# reason release-please itself runs under RELEASE_PLEASE_TOKEN.
+      - uses: actions/checkout@v7
+        with:
+          # The PR head itself, not the merge commit: the commit below must
+          # land on the release branch release-please force-updates.
+          ref: ${{ github.head_ref }}
+          # A shallow checkout cannot push a new commit onto the branch.
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install just
+        uses: taiki-e/install-action@just
+
+      # Same builds the footprint job needs: `footprint-regen` measures the
+      # plugin binaries where the manifests point, so without staging them
+      # it measures nothing.
+      - name: Build plugin binaries
+        run: |
+          just build-rtk-mcp-cc
+          just build-re-ghidra-mcp-cc
+          just build-rtk-mcp-opencode
+          just build-re-ghidra-mcp-opencode
+
+      - name: Regenerate derived files
+        run: |
+          bash scripts/gen-marketplaces.sh
+          just footprint-regen
+
+      - name: Commit refresh
+        run: |
+          # Only the generated paths: marketplaces, footprint documents and
+          # budgets, and the README regions footprint-regen publishes. A
+          # release branch never carries hand-written changes, but an
+          # unrestricted `git add -A` would commit them silently if it ever
+          # did — and a refresh commit must never smuggle content into a
+          # release.
+          git add \
+            .claude-plugin/marketplace.json \
+            .qwen-plugin/marketplace.json \
+            .agy-plugin/marketplace.json \
+            .opencode-plugin/marketplace.json \
+            docs/footprints/ \
+            README.md \
+            claude-code/plugins/*/README.md \
+            opencode/plugins/*/README.md
+          if git diff --cached --quiet; then
+            echo "Derived files already fresh; nothing to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore: refresh derived files on release branch"
+            git push origin HEAD:${{ github.head_ref }}
+          fi

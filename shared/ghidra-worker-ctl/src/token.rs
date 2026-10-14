@@ -45,9 +45,9 @@ impl ConnectionToken {
 
     /// Write the token to `path` as its raw hex string (no trailing newline), restricting the file
     /// to the current user. On Unix this is a real `0600`; on Windows `set_permissions` cannot
-    /// express `0600`, so the caller (boot.rs) places the file in a host-created private per-boot
-    /// dir and deletes it immediately after the handshake — the transient-file posture the spec
-    /// §6 hardening note defers full DACL lockdown to.
+    /// express `0600`, so the caller (boot.rs) owner-locks the per-boot dir via
+    /// `ghidra_ipc::owner_only::restrict_to_owner` before writing, and deletes the dir immediately
+    /// after the handshake.
     pub fn write_to_file(&self, path: &Path) -> io::Result<()> {
         std::fs::write(path, self.0.as_bytes())?;
         #[cfg(unix)]

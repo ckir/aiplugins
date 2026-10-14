@@ -12,8 +12,9 @@
 #
 # Enumeration comes from agents.json via scripts/lib/registry.sh: every agent
 # with a non-null `marketplace` gets its manifest regenerated, in registry
-# plugin order. Agents with null marketplace (opencode, antigravity) are
-# skipped, so a future agent only needs a registry row to join in.
+# plugin order (currently all four: claude-code, qwen, opencode, antigravity).
+# An agent with a null marketplace would be skipped, so a future agent only
+# needs a registry row to join in.
 #
 # Field provenance per entry (key order: name, source, description, author,
 # homepage, license, category, keywords):
@@ -57,20 +58,20 @@ jqr() {
 
 # The repository the release assets come from, taken from the workspace
 # manifest (same sed extraction the marketplace checks use).
-repo_url=$(sed -n 's/^repository = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+repo_url=$(tr -d '\r' < Cargo.toml | sed -n 's/^repository = "\(.*\)"$/\1/p' | head -n 1)
 [ -n "$repo_url" ] || {
     echo "ERROR: no [workspace.package] repository found in Cargo.toml." >&2
     exit 1
 }
 repo_url=${repo_url%.git}
 
-workspace_author=$(sed -n 's/^authors = \["\(.*\)"\]$/\1/p' Cargo.toml | head -n 1)
+workspace_author=$(tr -d '\r' < Cargo.toml | sed -n 's/^authors = \["\(.*\)"\]$/\1/p' | head -n 1)
 [ -n "$workspace_author" ] || {
     echo "ERROR: no [workspace.package] authors found in Cargo.toml." >&2
     exit 1
 }
 
-workspace_license=$(sed -n 's/^license = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+workspace_license=$(tr -d '\r' < Cargo.toml | sed -n 's/^license = "\(.*\)"$/\1/p' | head -n 1)
 [ -n "$workspace_license" ] || {
     echo "ERROR: no [workspace.package] license found in Cargo.toml." >&2
     exit 1

@@ -10,7 +10,7 @@ check_pair() { # $1 = label, $2 = crate Cargo.toml, $3 = host manifest, $4 = jq 
         # (asserts presence and form, keeps all registry packages in one table).
         crate_v=$(jq -r '.version // ""' "$2" | tr -d '\r')
     else
-        crate_v=$(sed -n 's/^version = "\(.*\)"$/\1/p' "$2" | head -n 1)
+        crate_v=$(tr -d '\r' < "$2" | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1)
     fi
     manifest_v=$(jq -r "$4 // \"\"" "$3" | tr -d '\r')
     if [ "$crate_v" != "$manifest_v" ]; then
@@ -21,26 +21,27 @@ check_pair() { # $1 = label, $2 = crate Cargo.toml, $3 = host manifest, $4 = jq 
     fi
 }
 for spec in \
-    "rtk-mcp-cc|claude-code/rtk-mcp-cc/Cargo.toml|claude-code/rtk-mcp-cc/.claude-plugin/plugin.json|.version" \
-    "re-ghidra-mcp-cc|claude-code/re-ghidra-mcp-cc/Cargo.toml|claude-code/re-ghidra-mcp-cc/.claude-plugin/plugin.json|.version" \
-    "aiplugins-devtools-cc|claude-code/aiplugins-devtools-cc/.claude-plugin/plugin.json|claude-code/aiplugins-devtools-cc/.claude-plugin/plugin.json|.version" \
-    "rtk-mcp-qwen|qwen/rtk-mcp-qwen/Cargo.toml|qwen/rtk-mcp-qwen/qwen-extension.json|.version" \
-    "re-ghidra-mcp-qwen|qwen/re-ghidra-mcp-qwen/Cargo.toml|qwen/re-ghidra-mcp-qwen/qwen-extension.json|.version" \
-    "aiplugins-devtools-qwen|qwen/aiplugins-devtools-qwen/qwen-extension.json|qwen/aiplugins-devtools-qwen/qwen-extension.json|.version" \
-    "rtk-mcp-opencode|opencode/rtk-mcp-opencode/package.json|opencode/rtk-mcp-opencode/package.json|.version" \
-    "re-ghidra-mcp-opencode|opencode/re-ghidra-mcp-opencode/package.json|opencode/re-ghidra-mcp-opencode/package.json|.version" \
-    "aiplugins-devtools-opencode|opencode/aiplugins-devtools-opencode/package.json|opencode/aiplugins-devtools-opencode/package.json|.version" \
-    "rtk-mcp-agy|antigravity/rtk-mcp-agy/Cargo.toml|antigravity/rtk-mcp-agy/plugin.json|.version" \
-    "re-ghidra-mcp-agy|antigravity/re-ghidra-mcp-agy/Cargo.toml|antigravity/re-ghidra-mcp-agy/plugin.json|.version" \
-    "aiplugins-devtools-agy|antigravity/aiplugins-devtools-agy/plugin.json|antigravity/aiplugins-devtools-agy/plugin.json|.version" \
+    "rtk-mcp-cc|claude-code/plugins/rtk-mcp-cc/Cargo.toml|claude-code/plugins/rtk-mcp-cc/.claude-plugin/plugin.json|.version" \
+    "re-ghidra-mcp-cc|claude-code/plugins/re-ghidra-mcp-cc/Cargo.toml|claude-code/plugins/re-ghidra-mcp-cc/.claude-plugin/plugin.json|.version" \
+    "aiplugins-devtools-cc|claude-code/plugins/aiplugins-devtools-cc/.claude-plugin/plugin.json|claude-code/plugins/aiplugins-devtools-cc/.claude-plugin/plugin.json|.version" \
+    "rtk-mcp-qwen|qwen/plugins/rtk-mcp-qwen/Cargo.toml|qwen/plugins/rtk-mcp-qwen/qwen-extension.json|.version" \
+    "re-ghidra-mcp-qwen|qwen/plugins/re-ghidra-mcp-qwen/Cargo.toml|qwen/plugins/re-ghidra-mcp-qwen/qwen-extension.json|.version" \
+    "aiplugins-devtools-qwen|qwen/plugins/aiplugins-devtools-qwen/qwen-extension.json|qwen/plugins/aiplugins-devtools-qwen/qwen-extension.json|.version" \
+    "rtk-mcp-opencode|opencode/plugins/rtk-mcp-opencode/package.json|opencode/plugins/rtk-mcp-opencode/package.json|.version" \
+    "re-ghidra-mcp-opencode|opencode/plugins/re-ghidra-mcp-opencode/package.json|opencode/plugins/re-ghidra-mcp-opencode/package.json|.version" \
+    "todov2-opencode|opencode/plugins/todov2-opencode/package.json|opencode/plugins/todov2-opencode/package.json|.version" \
+    "aiplugins-devtools-opencode|opencode/plugins/aiplugins-devtools-opencode/package.json|opencode/plugins/aiplugins-devtools-opencode/package.json|.version" \
+    "rtk-mcp-agy|antigravity/plugins/rtk-mcp-agy/Cargo.toml|antigravity/plugins/rtk-mcp-agy/plugin.json|.version" \
+    "re-ghidra-mcp-agy|antigravity/plugins/re-ghidra-mcp-agy/Cargo.toml|antigravity/plugins/re-ghidra-mcp-agy/plugin.json|.version" \
+    "aiplugins-devtools-agy|antigravity/plugins/aiplugins-devtools-agy/plugin.json|antigravity/plugins/aiplugins-devtools-agy/plugin.json|.version" \
 ; do
     IFS='|' read -r label crate manifest field <<< "$spec"
     check_pair "$label" "$crate" "$manifest" "$field"
 done
 # Shippable crates must NOT inherit the workspace version anymore.
-for crate in claude-code/rtk-mcp-cc/Cargo.toml claude-code/re-ghidra-mcp-cc/Cargo.toml \
-    qwen/rtk-mcp-qwen/Cargo.toml qwen/re-ghidra-mcp-qwen/Cargo.toml \
-    antigravity/rtk-mcp-agy/Cargo.toml antigravity/re-ghidra-mcp-agy/Cargo.toml; do
+for crate in claude-code/plugins/rtk-mcp-cc/Cargo.toml claude-code/plugins/re-ghidra-mcp-cc/Cargo.toml \
+    qwen/plugins/rtk-mcp-qwen/Cargo.toml qwen/plugins/re-ghidra-mcp-qwen/Cargo.toml \
+    antigravity/plugins/rtk-mcp-agy/Cargo.toml antigravity/plugins/re-ghidra-mcp-agy/Cargo.toml; do
     if grep -q '^version\.workspace' "$crate"; then
         echo "  FAIL  $crate still inherits the workspace version" >&2
         failures=$((failures + 1))

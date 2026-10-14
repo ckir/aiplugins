@@ -39,8 +39,10 @@ pub async fn call_worker(
     params: Value,
 ) -> Result<(Value, AddressCanonicalizer), ErrorEnvelope> {
     // 1) PRE-LOCK poison check (§4.3 round-7 seat-1).
+    // `into_inner` on poisoning: a panic while holding this guard must not wedge every later
+    // tool call — serve the (possibly stale) set instead of panicking the server.
     {
-        let mut p = state.poison.lock().unwrap();
+        let mut p = state.poison.lock().unwrap_or_else(|e| e.into_inner());
         if p.contains(tool, selector) {
             return Err(poison_terminal());
         }
@@ -188,7 +190,11 @@ async fn respawn_and_retry(
         }
         RpcOutcome::Crash => {
             drop(fresh);
-            state.poison.lock().unwrap().insert(tool, selector);
+            state
+                .poison
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .insert(tool, selector);
             reset_booting_to_empty(state, &mut guard).await;
             Err(poison_terminal())
         }

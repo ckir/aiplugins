@@ -9,6 +9,8 @@ cd "$repo"
 # shellcheck source=lib/registry.sh disable=SC1091
 source scripts/lib/registry.sh
 
+cc_src="$(registry_field claude-code dir)/aiplugins-devtools-cc"
+
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
@@ -61,14 +63,14 @@ done
 neg="$tmp/neg"
 mkdir -p "$neg"
 
-cp -r claude-code/aiplugins-devtools-cc "$neg/noskills"
+cp -r "$cc_src" "$neg/noskills"
 rm -rf "$neg/noskills/skills"
 rc=0
 bash scripts/bundle-skills-plugin.sh claude-code aiplugins-devtools-cc "$neg/o1" "$neg/noskills" >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 1 ] || bad "control (a): copy without skills/ exited $rc, expected 1"
 [ ! -e "$neg/o1/aiplugins-devtools-cc-plugin.zip" ] || bad "control (a): zip left behind"
 
-cp -r claude-code/aiplugins-devtools-cc "$neg/withbin"
+cp -r "$cc_src" "$neg/withbin"
 mkdir -p "$neg/withbin/bin"
 echo x > "$neg/withbin/bin/x"
 rc=0
@@ -86,7 +88,7 @@ bash scripts/bundle-skills-plugin.sh claude-code rtk-mcp-cc "$neg/o3" >/dev/null
 for ctl in d e; do
     ct="$tmp/ctl-$ctl"
     mkdir -p "$ct/p"
-    cp -r claude-code/aiplugins-devtools-cc "$ct/p/aiplugins-devtools-cc"
+    cp -r "$cc_src" "$ct/p/aiplugins-devtools-cc"
     srcdir="$ct/p/aiplugins-devtools-cc"
     before=$(find "$srcdir" -type f | wc -l)
     if [ "$ctl" = d ]; then od="$ct/p"; else od="$srcdir/out"; fi
@@ -105,13 +107,13 @@ done
 for ctl in g h; do
     ct="$tmp/ctl-$ctl"
     mkdir -p "$ct/p"
-    cp -r claude-code/aiplugins-devtools-cc "$ct/p/aiplugins-devtools-cc"
+    cp -r "$cc_src" "$ct/p/aiplugins-devtools-cc"
     srcdir="$ct/p/aiplugins-devtools-cc"
     if [ "$ctl" = g ]; then od="$ct/p/nonexist/.."; else od="$srcdir/.."; fi
     rc=0
     bash scripts/bundle-skills-plugin.sh claude-code aiplugins-devtools-cc "$od" "$srcdir" >/dev/null 2>&1 || rc=$?
     [ "$rc" -le 1 ] || bad "control ($ctl): exited $rc"
-    diff -r claude-code/aiplugins-devtools-cc "$srcdir" >/dev/null 2>&1 ||
+    diff -r "$cc_src" "$srcdir" >/dev/null 2>&1 ||
         bad "control ($ctl): source tree was modified or deleted"
 done
 

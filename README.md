@@ -33,9 +33,10 @@ TypeScript itself. Per plugin (full steps in its README):
 
 | Plugin | Copies | Binary staging |
 |---|---|---|
-| [`aiplugins-devtools-opencode`](opencode/aiplugins-devtools-opencode/) | `skills/*` → `.opencode/skills/` | none (skills only, no binary) |
-| [`rtk-mcp-opencode`](opencode/rtk-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/`, `skills/*` → `.opencode/skills/` | `just build-rtk-mcp-opencode` |
-| [`re-ghidra-mcp-opencode`](opencode/re-ghidra-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/`, `skills/*` → `.opencode/skills/`, `agents/*` → `.opencode/agents/` | `just build-re-ghidra-mcp-opencode` |
+| [`aiplugins-devtools-opencode`](opencode/plugins/aiplugins-devtools-opencode/) | `skills/*` → `.opencode/skills/` | none (skills only, no binary) |
+| [`rtk-mcp-opencode`](opencode/plugins/rtk-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/`, `skills/*` → `.opencode/skills/` | `just build-rtk-mcp-opencode` |
+| [`re-ghidra-mcp-opencode`](opencode/plugins/re-ghidra-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/`, `skills/*` → `.opencode/skills/`, `agents/*` → `.opencode/agents/` | `just build-re-ghidra-mcp-opencode` |
+| [`todov2-opencode`](opencode/plugins/todov2-opencode/) | whole folder → `.opencode/plugins/todov2-opencode/` (multi-file: `plugin.ts`, `tui.tsx`, `tool/`) | none (pure TypeScript, no binary) |
 
 Merge each plugin's `opencode.jsonc` into `.opencode/opencode.jsonc`; the
 `./bin/<name>` command in it is relative to the installed plugin copy, so
@@ -46,9 +47,10 @@ document for the plugin you want — it performs the whole procedure
 (prerequisites, file copies, dependency, binary, config merge,
 verification) and asks whether to install project-local or global first:
 
-- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/aiplugins-devtools-opencode/INSTALL.md`
-- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/rtk-mcp-opencode/INSTALL.md`
-- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/re-ghidra-mcp-opencode/INSTALL.md`
+- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/plugins/aiplugins-devtools-opencode/INSTALL.md`
+- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/plugins/rtk-mcp-opencode/INSTALL.md`
+- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/plugins/re-ghidra-mcp-opencode/INSTALL.md`
+- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/plugins/todov2-opencode/INSTALL.md`
 
 ## What each plugin costs a context window
 
@@ -57,9 +59,10 @@ verification) and asks whether to install project-local or global first:
 |---|---|---|
 | `aiplugins-devtools-cc` | ≥ 369 | ≥ 20,674 |
 | `re-ghidra-mcp-cc` | ≥ 21,631 | ≥ 36,903 |
-| `re-ghidra-mcp-opencode` | ≥ 21,327 | ≥ 36,903 |
+| `re-ghidra-mcp-opencode` | ≥ 21,297 | ≥ 37,131 |
 | `rtk-mcp-cc` | ≥ 3,690 | ≥ 6,091 |
-| `rtk-mcp-opencode` | ≥ 3,690 | ≥ 6,091 |
+| `rtk-mcp-opencode` | ≥ 3,696 | ≥ 6,129 |
+| `todov2-opencode` | ≥ 0 | ≥ 0 |
 
 **Resident** is what the host holds in every request, for the whole session — the MCP tool schemas plus the frontmatter it reads to decide what each skill and agent is for. **Invocation** loads only when one of them actually runs.
 
@@ -79,10 +82,14 @@ This repository is structured as a monorepo. It will contain specialized package
 ```text
 aiplugins/
 ├── .claude-plugin/  # marketplace.json — what `claude plugin marketplace add` reads
-├── claude-code/   # Plugins specifically for Claude Code
-├── antigravity/   # Plugins specifically for Antigravity
-├── qwen/          # Plugins specifically for Qwen
-├── opencode/      # Plugins specifically for OpenCode
+├── claude-code/plugins/   # Plugins specifically for Claude Code
+├── claude-code/{agents,skills,commands,models,themes,hooks}/  # Standalone components (plugin-embedded ones stay in plugins/*/)
+├── antigravity/plugins/   # Plugins specifically for Antigravity
+├── antigravity/{agents,skills,commands,models,themes,hooks}/
+├── qwen/plugins/          # Plugins specifically for Qwen
+├── qwen/{agents,skills,commands,models,themes,hooks}/
+├── opencode/plugins/      # Plugins specifically for OpenCode
+├── opencode/{agents,skills,commands,models,themes,hooks}/
 ├── shared/        # Agent-agnostic crates that several plugins front
 ├── scripts/       # Repository checks run by CI and `just check`
 └── README.md      # Project overview
@@ -99,7 +106,7 @@ and is usually a thin front end.
 | `shared/ghidra-worker-ctl` | Headless Ghidra JVM lifecycle: boot, launch, connection, Windows Job Object containment |
 | `shared/ghidra-mcp` | The MCP server and its 19 reverse-engineering tools, plus the embedded Ghidra worker script and driver skill |
 
-Fronted today by [`claude-code/re-ghidra-mcp-cc`](claude-code/re-ghidra-mcp-cc/).
+Fronted today by [`claude-code/plugins/re-ghidra-mcp-cc`](claude-code/plugins/re-ghidra-mcp-cc/).
 
 `shared/devtools/` is not a crate (it is excluded from the Cargo workspace). It holds the canonical copy of the skills that the four `aiplugins-devtools-*` plugins ship; `just emit-devtools-skills` copies them into each plugin and `just devtools-skills` checks them (maintainer notes: [`shared/devtools/README.md`](shared/devtools/README.md)).
 
@@ -107,23 +114,24 @@ Fronted today by [`claude-code/re-ghidra-mcp-cc`](claude-code/re-ghidra-mcp-cc/)
 
 Plugin and example READMEs, by agent directory:
 
-- `claude-code/`
-  - [`aiplugins-devtools-cc`](claude-code/aiplugins-devtools-cc/) — dev-tool skills container published as `aiplugins-devtools`; first skill `code-review-and-quality` (multi-axis code review).
-  - [`re-ghidra-mcp-cc`](claude-code/re-ghidra-mcp-cc/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
-  - [`rtk-mcp-cc`](claude-code/rtk-mcp-cc/) — `rtk` shell-command rewriting for 60–90% fewer output tokens, plus analytics MCP tools.
-  - [`example`](claude-code/example/) — template Rust Claude Code plugin (TODO/FIXME/HACK tracker).
-- `antigravity/`
-  - [`aiplugins-devtools-agy`](antigravity/aiplugins-devtools-agy/) — dev-tool skills container published as `aiplugins-devtools`; first skill `code-review-and-quality` (multi-axis code review).
-  - [`re-ghidra-mcp-agy`](antigravity/re-ghidra-mcp-agy/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
-  - [`rtk-mcp-agy`](antigravity/rtk-mcp-agy/) — `rtk` shell-command rewriting via MCP proxy plus `PreInvocation` hook.
-- `qwen/`
-  - [`aiplugins-devtools-qwen`](qwen/aiplugins-devtools-qwen/) — dev-tool skills container published as `aiplugins-devtools`; first skill `code-review-and-quality` (multi-axis code review).
-  - [`re-ghidra-mcp-qwen`](qwen/re-ghidra-mcp-qwen/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
-  - [`rtk-mcp-qwen`](qwen/rtk-mcp-qwen/) — `rtk` `PreToolUse` hook rewriting `run_shell_command` calls.
-  - [`example`](qwen/example/) — example Rust-based MCP server extension.
-- `opencode/`
-  - [`aiplugins-devtools-opencode`](opencode/aiplugins-devtools-opencode/) — dev-tool skills container published as `aiplugins-devtools`; first skill `code-review-and-quality` (multi-axis code review).
-  - [`re-ghidra-mcp-opencode`](opencode/re-ghidra-mcp-opencode/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools, plus session hooks.
-  - [`rtk-mcp-opencode`](opencode/rtk-mcp-opencode/) — `rtk` shell-command rewriting for OpenCode, plus analytics MCP tools.
+- `claude-code/plugins/`
+  - [`aiplugins-devtools-cc`](claude-code/plugins/aiplugins-devtools-cc/) — dev-tool skills container published as `aiplugins-devtools`; first skill `code-review-and-quality` (multi-axis code review).
+  - [`re-ghidra-mcp-cc`](claude-code/plugins/re-ghidra-mcp-cc/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
+  - [`rtk-mcp-cc`](claude-code/plugins/rtk-mcp-cc/) — `rtk` shell-command rewriting for 60–90% fewer output tokens, plus analytics MCP tools.
+  - [`example`](claude-code/plugins/example/) — template Rust Claude Code plugin (TODO/FIXME/HACK tracker).
+- `antigravity/plugins/`
+  - [`aiplugins-devtools-agy`](antigravity/plugins/aiplugins-devtools-agy/) — dev-tool skills container published as `aiplugins-devtools`; first skill `code-review-and-quality` (multi-axis code review).
+  - [`re-ghidra-mcp-agy`](antigravity/plugins/re-ghidra-mcp-agy/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
+  - [`rtk-mcp-agy`](antigravity/plugins/rtk-mcp-agy/) — `rtk` shell-command rewriting via MCP proxy plus `PreInvocation` hook.
+- `qwen/plugins/`
+  - [`aiplugins-devtools-qwen`](qwen/plugins/aiplugins-devtools-qwen/) — dev-tool skills container published as `aiplugins-devtools`; first skill `code-review-and-quality` (multi-axis code review).
+  - [`re-ghidra-mcp-qwen`](qwen/plugins/re-ghidra-mcp-qwen/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
+  - [`rtk-mcp-qwen`](qwen/plugins/rtk-mcp-qwen/) — `rtk` `PreToolUse` hook rewriting `run_shell_command` calls.
+  - [`example`](qwen/plugins/example/) — example Rust-based MCP server extension.
+- `opencode/plugins/`
+  - [`aiplugins-devtools-opencode`](opencode/plugins/aiplugins-devtools-opencode/) — dev-tool skills container published as `aiplugins-devtools`; first skill `code-review-and-quality` (multi-axis code review).
+  - [`re-ghidra-mcp-opencode`](opencode/plugins/re-ghidra-mcp-opencode/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools, plus session hooks.
+  - [`rtk-mcp-opencode`](opencode/plugins/rtk-mcp-opencode/) — `rtk` shell-command rewriting for OpenCode, plus analytics MCP tools.
+  - [`todov2-opencode`](opencode/plugins/todov2-opencode/) — the V2-removed `todowrite` session tool plus a live todo sidebar list.
 
 *More details and plugin guidelines will be added soon.*

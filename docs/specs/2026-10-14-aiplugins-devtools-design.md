@@ -1,3 +1,5 @@
+Layout note: after the repository restructure the plugins live under `<agent>/plugins/`; paths below are the original ones
+
 # aiplugins-devtools: a skills container plugin, first skill `code-review-and-quality`
 
 Status: draft for owner approval. Date: 2026-10-14.

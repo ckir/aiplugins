@@ -201,7 +201,13 @@ fn parse_flags(args: &[String]) -> HashMap<String, String> {
 /// to stderr. Needs a real Ghidra install and the `GHIDRA_MCP_FIXTURE_*` vars.
 async fn boot_smoke() {
     let script_dir = std::env::temp_dir().join("ghidra-mcp-smoke-scripts");
-    crate::worker_asset_extract(&script_dir);
+    if let Err(e) = crate::worker_asset_extract(&script_dir) {
+        eprintln!(
+            "boot-smoke: cannot extract worker script to {}: {e}",
+            script_dir.display()
+        );
+        std::process::exit(1);
+    }
     let cfg = ghidra_worker_ctl::config::WorkerConfig {
         ghidra_install_dir: PathBuf::from(env("GHIDRA_INSTALL_DIR")),
         project_dir: PathBuf::from(env("GHIDRA_MCP_FIXTURE_PROJECT_DIR")),
@@ -212,9 +218,14 @@ async fn boot_smoke() {
         max_heap: None,
         boot_timeout: Duration::from_secs(120),
     };
-    let mut w = ghidra_worker_ctl::boot::boot_worker(&cfg)
-        .await
-        .expect("worker boots (if it hangs on Windows, check EDR/firewall on the loopback bind)");
+    let mut w = match ghidra_worker_ctl::boot::boot_worker(&cfg).await {
+        Ok(w) => w,
+        Err(e) => {
+            eprintln!("boot-smoke: worker failed to boot: {e}");
+            eprintln!("(if it hangs on Windows, check EDR/firewall on the loopback bind)");
+            std::process::exit(1);
+        }
+    };
     eprintln!("booted worker: {:?}", w.announce);
     let program = env("GHIDRA_MCP_FIXTURE_PROGRAM");
     let func = env("GHIDRA_MCP_FIXTURE_FUNCTION");
@@ -242,7 +253,12 @@ async fn boot_smoke() {
 }
 
 fn env(name: &str) -> String {
-    std::env::var(name).unwrap_or_else(|_| panic!("missing env var {name}"))
+    // Dev-only helper, but still a shipped binary: report + exit(2) so a missing
+    // fixture var reads as bad usage, not a panic backtrace.
+    std::env::var(name).unwrap_or_else(|_| {
+        eprintln!("boot-smoke: missing env var {name}");
+        std::process::exit(2);
+    })
 }
 
 fn mk(id: i64, method: &str, params: serde_json::Value) -> ghidra_ipc::rpc::RpcRequest {

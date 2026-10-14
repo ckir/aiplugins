@@ -182,6 +182,10 @@ pub async fn boot_worker(cfg: &WorkerConfig) -> Result<BootedWorker, BootError> 
     let _token_dir = TokenDir(boot_dir.clone());
 
     std::fs::create_dir_all(&boot_dir)?;
+    // Owner-only the boot dir BEFORE writing the secret: on Windows a fresh temp dir inherits
+    // ambient `Users` read grants, so without this any local user could read worker.token during
+    // the handshake window. Same helper as the server log dir (ghidra_ipc::owner_only).
+    ghidra_ipc::owner_only::restrict_to_owner(&boot_dir)?;
     token.write_to_file(&token_file)?;
     let argv = cfg.build_argv(port, &token_file);
     let mut process =

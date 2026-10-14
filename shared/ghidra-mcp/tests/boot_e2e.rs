@@ -29,7 +29,7 @@ async fn boot_attach_decompile_end_to_end() {
         return;
     }
     let script_dir = std::env::temp_dir().join("ghidra-mcp-e2e-scripts");
-    ghidra_mcp::worker_asset_extract(&script_dir);
+    ghidra_mcp::worker_asset_extract(&script_dir).expect("extract worker script");
 
     // `GHIDRA_MCP_FIXTURE_PROGRAM` is the program's absolute VFS path (e.g. `/add.exe`) — the form
     // `attach_program`'s `getFile()` requires ("Absolute path must begin with '/'"). But Ghidra's

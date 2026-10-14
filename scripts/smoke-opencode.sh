@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Exercise each opencode/ plugin's setup path without an OpenCode install.
+# Exercise each opencode/plugins/ plugin's setup path without an OpenCode install.
 #
 # plugin.ts imports the real @opencode/plugin runtime (installed per plugin
 # via `bun install`, as in the opencode-test CI job), so bun can import the
@@ -43,7 +43,7 @@ cp "$mock_bin" "$work/rtk$exe"
 chmod +x "$work/rtk$exe"
 export PATH="$work:$PATH"
 
-for dir in opencode/*/; do
+for dir in opencode/plugins/*/; do
     # skills-only plugins have no plugin.ts; check-opencode-wiring.sh check 1 is what fails loudly for a real plugin that lost its plugin.ts
     [ -f "$dir/plugin.ts" ] || continue
     name=$(basename "$dir")
@@ -53,7 +53,11 @@ for dir in opencode/*/; do
 import plugin from './$dir/plugin.ts';
 const hooks = {};
 const ctx = {
-  tool: { hook: async (n, f) => { (hooks['tool:' + n] ??= []).push(f); } },
+  options: {},
+  tool: {
+    hook: async (n, f) => { (hooks['tool:' + n] ??= []).push(f); },
+    transform: async (f) => { await f({ add: (t) => { (hooks['tool:registered'] ??= []).push(t.name); } }); },
+  },
   session: { hook: async (n, f) => { (hooks['session:' + n] ??= []).push(f); } },
   storage: { get: async () => undefined, set: async () => {} },
 };
@@ -68,6 +72,7 @@ console.log('  hooks: ' + names);
 import plugin from './$dir/plugin.ts';
 let seen = '';
 const ctx = {
+  options: {},
   tool: { hook: async (n, f) => {
     if (n !== 'execute.before') return;
     const event = { tool: 'shell', input: { command: 'cat README.md' } };

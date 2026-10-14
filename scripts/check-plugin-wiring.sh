@@ -17,7 +17,7 @@ source scripts/lib/registry.sh
 claude_dir=$(registry_field claude-code dir)
 agy_dir=$(registry_field antigravity dir)
 
-# registry_plugins lists the published plugins; claude-code/example still
+# registry_plugins lists the published plugins; claude-code/plugins/example still
 # ships hooks/mcp configs that name binaries, so the check enumerates the
 # registry's notPublished entries too. Callers sort: the old directory globs
 # expanded alphabetically.

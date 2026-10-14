@@ -1,0 +1,63 @@
+{
+  "name": "todov2-opencode",
+  "version": "0.5.1",
+  "description": "Restore the V2-removed todowrite tool and a TUI sidebar list for OpenCode sessions",
+  "type": "module",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "plugin",
+    "todo",
+    "tasks",
+    "ai",
+    "agent"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ckir/aiplugins.git"
+  },
+  "homepage": "https://github.com/ckir/aiplugins/tree/main/opencode/plugins/todov2-opencode#readme",
+  "bugs": "https://github.com/ckir/aiplugins/issues",
+  "exports": {
+    ".": "./plugin.ts",
+    "./tui": "./tui.tsx"
+  },
+  "main": "./plugin.ts",
+  "files": [
+    "plugin.ts",
+    "tui.tsx",
+    "tsconfig.json",
+    "tool"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@opencode/plugin": "2.0.26"
+  },
+  "peerDependencies": {
+    "@opentui/core": ">=0.5.8",
+    "@opentui/solid": ">=0.5.8",
+    "solid-js": ">=1.9.0"
+  },
+  "peerDependenciesMeta": {
+    "@opentui/core": {
+      "optional": true
+    },
+    "@opentui/solid": {
+      "optional": true
+    },
+    "solid-js": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@opentui/core": "0.5.8",
+    "@opentui/solid": "0.5.8",
+    "@types/bun": "^1.4.0",
+    "solid-js": "1.9.10",
+    "typescript": "^5.9.2"
+  }
+}

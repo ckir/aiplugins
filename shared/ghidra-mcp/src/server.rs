@@ -60,7 +60,7 @@
 //!     `rmcp::schemars` when its own `schemars` feature is on, pulled in transitively by
 //!     `server` — `rmcp-3.1.4/src/lib.rs` — but this file no longer relies on that re-export,
 //!     matching the direct-dependency style used elsewhere in this workspace, e.g.
-//!     `claude-code/rtk-mcp-cc/src/bin/mcp.rs`.)
+//!     `claude-code/plugins/rtk-mcp-cc/src/bin/mcp.rs`.)
 //!   - `rmcp::handler::server::router::tool::ToolRouter<Self>` is the field type
 //!     `#[tool_router]` expects by default (field literally named `tool_router`) — the module
 //!     moved one level deeper than 0.8's `rmcp::handler::server::tool::ToolRouter` (now under

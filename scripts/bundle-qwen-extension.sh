@@ -50,7 +50,7 @@ assets=$(cd "$2" && pwd)
 outdir=$3
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
-src="$repo/qwen/$ext"
+src="$repo/qwen/plugins/$ext"
 
 for tool in jq tar unzip zip zipinfo; do
     command -v "$tool" >/dev/null 2>&1 || {

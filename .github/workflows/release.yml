@@ -9,6 +9,11 @@
 # still emits v6, so `dist init` WILL revert this. Every other action this file
 # uses is already current (download-artifact@v8, upload-artifact@v7). Drop this
 # patch once a dist release emits v7 on its own.
+# 2. "Create GitHub Release" is create-if-missing plus upload --clobber.
+# Release-please creates the release when its PR merges, before any tag build
+# finishes; the emitted `gh release create` fails with "a release with the
+# same tag name already exists" and the built artifacts are never uploaded.
+# Re-running the job cannot help (tag pushes reuse this file from the tag).
 #
 # CI that:
 #
@@ -299,7 +304,15 @@ jobs:
           # Write and read notes from a file to avoid quoting breaking things
           echo "$ANNOUNCEMENT_BODY" > $RUNNER_TEMP/notes.txt
 
-          gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
+          # Release-please creates the release when its PR merges, long
+          # before the tag builds finish — creating unconditionally fails
+          # with "a release with the same tag name already exists" and the
+          # artifacts are never uploaded. Create only when missing, then
+          # upload (idempotent, so re-runs and backfills converge).
+          if ! gh release view "${{ needs.plan.outputs.tag }}" >/dev/null 2>&1; then
+            gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt"
+          fi
+          gh release upload "${{ needs.plan.outputs.tag }}" artifacts/* --clobber
 
   announce:
     needs:

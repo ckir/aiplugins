@@ -17,9 +17,11 @@ pub mod state;
 pub mod tools;
 pub mod worker_asset;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-/// Extract the embedded worker script into `dir` (panics on IO error — test/boot helper).
-pub fn worker_asset_extract(dir: &Path) {
-    worker_asset::extract_worker(dir).expect("extract worker script");
+/// Extract the embedded worker script into `dir`. Returns the script path; IO
+/// failures (full disk, read-only temp dir) are returned, never panicked —
+/// the shipped `boot-smoke` path calls this on a real filesystem.
+pub fn worker_asset_extract(dir: &Path) -> std::io::Result<PathBuf> {
+    worker_asset::extract_worker(dir)
 }

@@ -15,7 +15,9 @@ pub struct PoisonSet {
 impl PoisonSet {
     pub fn new(capacity: usize) -> Self {
         Self {
-            cache: LruCache::new(NonZeroUsize::new(capacity.max(1)).unwrap()),
+            cache: LruCache::new(
+                NonZeroUsize::new(capacity.max(1)).expect("capacity.max(1) is always non-zero"),
+            ),
         }
     }
 

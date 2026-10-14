@@ -1,3 +1,12 @@
+[files]
+extend-exclude = [
+    # CHANGELOG.md files are release-please-generated (version headers plus
+    # commit-SHA links). Typos scans the SHAs as prose — e.g. `ba` inside
+    # `[3ec43ba](.../commit/3ec43ba...)` — failing every release PR for its
+    # own generated content. Hand-written prose stays checked everywhere else.
+    "**/CHANGELOG.md",
+]
+
 [default]
 extend-ignore-re = [
     # Ignore hex strings or specific patterns if needed

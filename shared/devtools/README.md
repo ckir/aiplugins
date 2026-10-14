@@ -7,8 +7,8 @@ on purpose, so the drift check ignores it.
 
 - `shared/devtools/skills/<skill>/` is the single source of the skills.
 - `just emit-devtools-skills` copies it into the four plugins
-  (`claude-code/aiplugins-devtools-cc`, `qwen/aiplugins-devtools-qwen`,
-  `antigravity/aiplugins-devtools-agy`, `opencode/aiplugins-devtools-opencode`).
+  (`claude-code/plugins/aiplugins-devtools-cc`, `qwen/plugins/aiplugins-devtools-qwen`,
+  `antigravity/plugins/aiplugins-devtools-agy`, `opencode/plugins/aiplugins-devtools-opencode`).
   OpenCode gets the prefixed folder name (`aiplugins-devtools-<skill>`) and one
   rewritten `name:` line in its `SKILL.md`.
 - Checks: `just devtools-skills` (source and copies), `just skills-bundles`
