@@ -6,7 +6,8 @@
       "plugins": [
         "rtk-mcp-cc",
         "re-ghidra-mcp-cc",
-        "aiplugins-devtools-cc"
+        "aiplugins-devtools-cc",
+        "repo-user-guide-cc"
       ],
       "marketplace": ".claude-plugin/marketplace.json",
       "manifestPattern": "claude-code/plugins/{plugin}/.claude-plugin/plugin.json",
@@ -17,10 +18,12 @@
       ],
       "versionedSourceUrl": true,
       "publishedNames": {
-        "aiplugins-devtools-cc": "aiplugins-devtools"
+        "aiplugins-devtools-cc": "aiplugins-devtools",
+        "repo-user-guide-cc": "repo-user-guide"
       },
       "skillsOnly": [
-        "aiplugins-devtools-cc"
+        "aiplugins-devtools-cc",
+        "repo-user-guide-cc"
       ]
     },
     {

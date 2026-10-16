@@ -66,6 +66,7 @@ on:
       # Crate-less skills-only plugins: dist has no package to build for them.
       # They are bundled by skills-bundles.yml on the tag push.
       - '!aiplugins-devtools-*-v*'
+      - '!repo-user-guide-*-v*'
 
 jobs:
   # Run 'dist plan' (or host) to determine what tasks we need to do

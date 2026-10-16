@@ -60,6 +60,7 @@ verification) and asks whether to install project-local or global first:
 | `aiplugins-devtools-cc` | ≥ 369 | ≥ 20,674 |
 | `re-ghidra-mcp-cc` | ≥ 21,631 | ≥ 36,903 |
 | `re-ghidra-mcp-opencode` | ≥ 21,297 | ≥ 37,131 |
+| `repo-user-guide-cc` | ≥ 468 | ≥ 5,393 |
 | `rtk-mcp-cc` | ≥ 3,690 | ≥ 6,091 |
 | `rtk-mcp-opencode` | ≥ 3,696 | ≥ 6,129 |
 | `todov2-opencode` | ≥ 0 | ≥ 0 |

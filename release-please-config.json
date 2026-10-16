@@ -23,6 +23,13 @@
         ".claude-plugin/plugin.json"
       ]
     },
+    "claude-code/plugins/repo-user-guide-cc": {
+      "release-type": "simple",
+      "component": "repo-user-guide-cc",
+      "extra-files": [
+        ".claude-plugin/plugin.json"
+      ]
+    },
     "qwen/plugins/rtk-mcp-qwen": {
       "release-type": "rust",
       "component": "rtk-mcp-qwen",
