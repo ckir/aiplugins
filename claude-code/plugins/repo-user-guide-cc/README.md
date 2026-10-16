@@ -4,6 +4,14 @@ A Claude Code plugin that ships the `repo-user-guide` skill: it produces a PDF
 user guide for a code repository, with usage examples that are run and verified
 before they go into the guide.
 
+Requirements:
+
+- **Chrome or Chromium** on the machine: the guide is rendered to PDF with headless Chrome.
+  Without it the skill leaves the HTML and says so.
+- **poppler** (`pdftoppm`, `pdftotext`, `pdfinfo`) is recommended: the skill uses it to check
+  the rendered pages. Without it, it falls back to a Chrome screenshot of the HTML.
+- **Python 3**, for the two small helper scripts (`escape_pre.py`, `check_pre.py`).
+
 Install:
 
 ```
@@ -13,12 +21,12 @@ claude plugin install repo-user-guide@aiplugins
 <!-- footprint:begin -->
 ### Context footprint
 
-Installing this plugin adds **≥ 468 bytes** to every request, for the whole session. A further **≥ 5,393 bytes** load only when one of its skills or agents is actually invoked.
+Installing this plugin adds **≥ 468 bytes** to every request, for the whole session. A further **≥ 11,474 bytes** load only when one of its skills or agents is actually invoked.
 
 | Tier | Bytes | When you pay it |
 |---|---|---|
 | Resident | ≥ 468 | Every request, for the whole session |
-| Invocation | ≥ 5,393 | Only when that skill or agent runs |
+| Invocation | ≥ 11,474 | Only when that skill or agent runs |
 
 **Bytes, not tokens.** This is the exact serialised size of what the host loads, measured by probing the plugin's own MCP server and reading its skill and agent frontmatter. It is not a token count and does not convert to one at a fixed rate — treat it as a figure you can compare between plugins, not as a context budget.
 
