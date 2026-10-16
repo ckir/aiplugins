@@ -1,6 +1,6 @@
 {
   "name": "repo-user-guide",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Create a PDF user guide for a code repository, with practical usage examples that are run and verified.",
   "author": {
     "name": "AI Plugins Marketplace Contributors"
