@@ -21,6 +21,7 @@ on:
   push:
     tags:
       - 'aiplugins-devtools-*-v*'
+      - 'repo-user-guide-*-v*'
   # Backfill a release, or re-cut a bundle after a fix to the bundling script.
   workflow_dispatch:
     inputs:

@@ -1,0 +1,17 @@
+{
+  "name": "repo-user-guide",
+  "version": "0.1.0",
+  "description": "Create a PDF user guide for a code repository, with practical usage examples that are run and verified.",
+  "author": {
+    "name": "AI Plugins Marketplace Contributors"
+  },
+  "homepage": "https://github.com/ckir/aiplugins",
+  "repository": "https://github.com/ckir/aiplugins",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "keywords": [
+    "documentation",
+    "user-guide",
+    "pdf",
+    "skills"
+  ]
+}

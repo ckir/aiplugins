@@ -70,6 +70,26 @@
         "code-review",
         "devtools"
       ]
+    },
+    {
+      "name": "repo-user-guide",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/repo-user-guide-cc-v0.1.0/repo-user-guide-cc-plugin.zip"
+      },
+      "description": "Create a PDF user guide for a code repository, with practical usage examples that are run and verified.",
+      "author": {
+        "name": "AI Plugins Marketplace Contributors"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/claude-code/plugins/repo-user-guide-cc",
+      "license": "PolyForm-Noncommercial-1.0.0",
+      "category": "development",
+      "keywords": [
+        "documentation",
+        "user-guide",
+        "pdf",
+        "skills"
+      ]
     }
   ]
 }

@@ -144,8 +144,12 @@ has "$manifest_rel" || report "$manifest_rel"
 has README.md || report "README.md"
 printf '%s\n' "$listing" | grep -q '^skills/[^/]*/SKILL\.md$' ||
     report "skills/*/SKILL.md"
-printf '%s\n' "$listing" | grep -q '^skills/.*THIRD-PARTY-NOTICE\.md$' ||
-    report "skills/**/THIRD-PARTY-NOTICE.md"
+# The devtools skills are adapted from upstream and must carry its notice;
+# repo-user-guide-cc ships none.
+if [ "$key" != repo-user-guide-cc ]; then
+    printf '%s\n' "$listing" | grep -q '^skills/.*THIRD-PARTY-NOTICE\.md$' ||
+        report "skills/**/THIRD-PARTY-NOTICE.md"
+fi
 has LICENSE || report "LICENSE"
 if [ "$agent" = opencode ]; then
     has INSTALL.md || report "INSTALL.md"
