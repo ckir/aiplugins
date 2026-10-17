@@ -34,7 +34,7 @@
       "name": "re-ghidra-mcp-cc",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-cc-v0.8.0/re-ghidra-mcp-cc-plugin.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-cc-v0.9.0/re-ghidra-mcp-cc-plugin.zip"
       },
       "description": "Drive a persistent headless Ghidra JVM from Claude Code: 19 reverse-engineering tools over MCP — decompile, navigate and search a program, plus durable rename/comment/set-datatype/set-prototype/set-local writes saved to the project.",
       "author": {
