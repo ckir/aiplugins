@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.0](https://github.com/ckir/aiplugins/compare/rtk-mcp-opencode-v0.9.0...rtk-mcp-opencode-v0.10.0) (2026-10-17)
+
+
+### Features
+
+* **opencode:** claude-code parity G1-G8 (repo-user-guide port, host-aware settings, footprint/CI/pin/doc hygiene) ([04f59be](https://github.com/ckir/aiplugins/commit/04f59be7b70df6938feac0b70a368cc596189cf9))
+
+
+### Bug Fixes
+
+* **opencode:** sync @opencode/plugin pins to 2.0.26 and gate doc claims (G5) ([359f742](https://github.com/ckir/aiplugins/commit/359f74214ff4fda6f16f4b9136b5dd74de106e8e))
+
 ## [0.9.0](https://github.com/ckir/aiplugins/compare/rtk-mcp-opencode-v0.8.0...rtk-mcp-opencode-v0.9.0) (2026-10-12)
 
 
