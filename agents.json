@@ -88,7 +88,9 @@
       "artifactSuffix": "-agy-plugin.zip",
       "sourceUrlBase": "https://github.com/ckir/aiplugins/releases/download",
       "versionedSourceUrl": true,
-      "notPublished": [],
+      "notPublished": [
+        "example"
+      ],
       "publishedNames": {
         "aiplugins-devtools-agy": "aiplugins-devtools",
         "repo-user-guide-agy": "repo-user-guide"

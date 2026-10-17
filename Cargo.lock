@@ -5,6 +5,16 @@ version = 4
 [[package]]
 name = "agy-example"
 version = "0.7.2"
+dependencies = [
+ "anyhow",
+ "rmcp",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "aho-corasick"

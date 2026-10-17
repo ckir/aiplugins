@@ -10,8 +10,15 @@ members = [
     # plugins FRONT — this is fronted by none.
     "tools/*"
 ]
-# Skills-only source for the aiplugins-devtools plugin: markdown, no crate.
-exclude = ["shared/devtools", "claude-code/plugins/aiplugins-devtools-cc", "claude-code/plugins/repo-user-guide-cc", "qwen/plugins/aiplugins-devtools-qwen", "antigravity/plugins/aiplugins-devtools-agy"]
+# Skills-only sources: markdown, no crate.
+exclude = [
+    "shared/devtools",
+    "claude-code/plugins/aiplugins-devtools-cc",
+    "claude-code/plugins/repo-user-guide-cc",
+    "qwen/plugins/aiplugins-devtools-qwen",
+    "antigravity/plugins/aiplugins-devtools-agy",
+    "antigravity/plugins/repo-user-guide-agy",
+]
 
 [workspace.package]
 version = "0.7.2"

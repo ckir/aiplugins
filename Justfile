@@ -288,6 +288,19 @@ build-claude-example:
     done
     @echo "Plugin binaries staged in claude-code/plugins/example/bin/"
 
+# Build the example Antigravity plugin's binaries into its bin/ directory.
+build-agy-example:
+    cargo build -p agy-example --release --bin agy-example-mcp --bin agy-example-hook
+    mkdir -p antigravity/plugins/example/bin
+    for b in agy-example-mcp agy-example-hook; do \
+        if [ -f "target/release/$b.exe" ]; then \
+            cp "target/release/$b.exe" antigravity/plugins/example/bin/; \
+        else \
+            cp "target/release/$b" antigravity/plugins/example/bin/; \
+        fi; \
+    done
+    @echo "Plugin binaries staged in antigravity/plugins/example/bin/"
+
 # Build the rtk-mcp-cc Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
 build-rtk-mcp-cc:
