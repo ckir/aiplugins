@@ -379,6 +379,19 @@ bundle-qwen tag:
         bash scripts/bundle-qwen-extension.sh "$name" target/qwen-assets target/qwen-bundles
     done
 
+# Assemble the installable OpenCode plugin zips from a working tree — the
+# local pre-tag counterpart of opencode-bundles.yml (no releases involved:
+# bundle-opencode-plugin.sh stages versioned source only).
+bundle-opencode:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    names=$(bash scripts/registry-plugins.sh opencode --exclude-skills-only | tr -d '\r')
+    rm -rf target/opencode-bundles
+    mkdir -p target/opencode-bundles
+    for name in $names; do
+        bash scripts/bundle-opencode-plugin.sh "opencode/plugins/$name" target/opencode-bundles
+    done
+
 # Regenerate EVERY plugin's committed copy of the ghidra-re-driver skill from
 # the binary that embeds it.
 #
