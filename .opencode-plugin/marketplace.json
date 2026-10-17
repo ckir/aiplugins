@@ -12,7 +12,7 @@
       "name": "rtk-mcp-opencode",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/rtk-mcp-opencode-v0.9.0/rtk-mcp-opencode-opencode.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/rtk-mcp-opencode-v0.10.0/rtk-mcp-opencode-opencode.zip"
       },
       "description": "OpenCode V2 integration for rtk (Rust Token Killer): rewrites shell commands through rtk for 60-90% token savings, plus rtk analytics as MCP tools.",
       "author": {
@@ -34,7 +34,7 @@
       "name": "re-ghidra-mcp-opencode",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-opencode-v0.9.0/re-ghidra-mcp-opencode-opencode.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-opencode-v0.10.0/re-ghidra-mcp-opencode-opencode.zip"
       },
       "description": "OpenCode V2 integration for Ghidra reverse engineering: existing 19-tool MCP server plus session hooks that preserve RE state across compaction and point at the driver skill.",
       "author": {
@@ -56,7 +56,7 @@
       "name": "todov2-opencode",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/todov2-opencode-v0.5.1/todov2-opencode-opencode.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/todov2-opencode-v0.6.0/todov2-opencode-opencode.zip"
       },
       "description": "Restore the V2-removed todowrite tool and a TUI sidebar list for OpenCode sessions",
       "author": {
@@ -79,7 +79,7 @@
       "name": "aiplugins-devtools",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/aiplugins-devtools-opencode-v0.1.0/aiplugins-devtools-opencode-opencode.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/aiplugins-devtools-opencode-v0.2.0/aiplugins-devtools-opencode-opencode.zip"
       },
       "description": "Dev-tool skills container for AI coding agents; first skill: code-review-and-quality, a multi-axis code review.",
       "author": {
@@ -98,7 +98,7 @@
       "name": "repo-user-guide",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/repo-user-guide-opencode-v0.2.0/repo-user-guide-opencode-opencode.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/repo-user-guide-opencode-v0.3.0/repo-user-guide-opencode-opencode.zip"
       },
       "description": "Create a PDF user guide for a code repository, with usage examples that are run and verified against the repository.",
       "author": {
