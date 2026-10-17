@@ -418,13 +418,16 @@ bundle-opencode:
 # re-ghidra-mcp-qwen::skill_emit.
 emit-ghidra-skill: build-re-ghidra-mcp-cc
     cargo build -p re-ghidra-mcp-qwen --release --bin re-ghidra-qwen-mcp
+    mkdir -p antigravity/plugins/re-ghidra-mcp-agy/skills/ghidra-re-driver
     ./claude-code/plugins/re-ghidra-mcp-cc/bin/re-ghidra-cc-mcp emit-skill \
         > claude-code/plugins/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md
     ./target/release/re-ghidra-qwen-mcp emit-skill \
         > qwen/plugins/re-ghidra-mcp-qwen/skills/ghidra-re-driver/SKILL.md
     ./claude-code/plugins/re-ghidra-mcp-cc/bin/re-ghidra-cc-mcp emit-skill \
         > opencode/plugins/re-ghidra-mcp-opencode/skills/ghidra-re-driver/SKILL.md
-    @echo "Regenerated the committed ghidra-re-driver skill copies (claude-code, qwen, opencode)"
+    ./claude-code/plugins/re-ghidra-mcp-cc/bin/re-ghidra-cc-mcp emit-skill \
+        > antigravity/plugins/re-ghidra-mcp-agy/skills/ghidra-re-driver/SKILL.md
+    @echo "Regenerated the committed ghidra-re-driver skill copies (claude-code, qwen, opencode, antigravity)"
 
 # Run the live Ghidra suite. Needs a real Ghidra 12.1.2 + JDK 21 and an analyzed
 # fixture project; see shared/ghidra-mcp/tests/fixtures/README.md to build one.
