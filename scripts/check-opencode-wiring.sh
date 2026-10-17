@@ -126,8 +126,8 @@ for pair in \
 done
 
 # The repo-user-guide skill is a byte-copy of the Claude original: host-portable,
-# unlike the rtk/doctor skills above, which carry host-specific names and so are
-# compared per-content instead. A drift here means the port drifted apart.
+# hence `diff -r`. Unlike the host-ported skills named in the NOTE above
+# (rtk-policy, gain, doctor), it IS compared: a drift here means the port drifted apart.
 src_skills="claude-code/plugins/repo-user-guide-cc/skills"
 dst_skills="opencode/plugins/repo-user-guide-opencode/skills"
 checked=$((checked + 1))
