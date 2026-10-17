@@ -276,7 +276,11 @@ mod preflight_tests {
         );
         let f = preflight(&cfg, &good_probe(), Host::Claude);
         assert_eq!(f.len(), 1);
-        assert!(f[0].contains(".claude/re-ghidra-mcp-cc.local.md"), "{}", f[0]);
+        assert!(
+            f[0].contains(".claude/re-ghidra-mcp-cc.local.md"),
+            "{}",
+            f[0]
+        );
     }
 
     #[test]
@@ -393,8 +397,7 @@ mod settings_tests {
     #[test]
     fn settings_path_is_per_host() {
         let dir = Path::new("/proj");
-        assert!(settings_path(dir, Host::Claude)
-            .ends_with(".claude/re-ghidra-mcp-cc.local.md"));
+        assert!(settings_path(dir, Host::Claude).ends_with(".claude/re-ghidra-mcp-cc.local.md"));
         assert!(settings_path(dir, Host::Opencode)
             .ends_with(".opencode/re-ghidra-mcp-opencode.local.md"));
     }

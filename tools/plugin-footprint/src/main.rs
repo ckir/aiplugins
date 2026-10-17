@@ -74,7 +74,10 @@ fn measure(plugin_dir: &Path, out: Option<&Path>) -> ExitCode {
     // selects the branch: no Claude Code plugin carries one.
     let is_opencode = plugin_dir.join("opencode.jsonc").is_file()
         || (plugin_dir.join("package.json").is_file()
-            && !plugin_dir.join(".claude-plugin").join("plugin.json").is_file());
+            && !plugin_dir
+                .join(".claude-plugin")
+                .join("plugin.json")
+                .is_file());
     let servers = match if is_opencode {
         read_opencode_servers(plugin_dir)
     } else {
