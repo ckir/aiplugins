@@ -232,6 +232,10 @@ smoke:
         bash scripts/smoke-bundle.sh "$plugin"
     done
 
+# Assemble a host-only bundle for each Antigravity plugin and test entry points.
+smoke-agy:
+    bash scripts/smoke-agy-bundle.sh
+
 # Copy the canonical aiplugins-devtools skills into each agent's plugin folder
 # (one block per agent; scripts/check-devtools-skills.sh fails on drift)
 emit-devtools-skills:

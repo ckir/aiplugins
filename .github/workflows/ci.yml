@@ -123,6 +123,12 @@ jobs:
       - name: Check opencode wiring
         run: bash scripts/check-opencode-wiring.sh
 
+      - name: Check antigravity wiring
+        run: bash scripts/check-agy-wiring.sh
+
+      - name: Check antigravity marketplace
+        run: bash scripts/check-agy-marketplace.sh
+
       - name: Check footprint budgets
         run: bash scripts/check-footprint-budgets.sh
 
@@ -315,6 +321,26 @@ jobs:
       - uses: actions/checkout@v7
       - name: Assemble and verify every opencode plugin bundle
         run: bash scripts/smoke-opencode-bundle.sh
+
+  agy-bundle-smoke:
+    name: Antigravity Bundle Smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Assemble and probe each Antigravity plugin
+        shell: bash
+        run: bash scripts/smoke-agy-bundle.sh
 
   deny:
     name: Dependency Audit
