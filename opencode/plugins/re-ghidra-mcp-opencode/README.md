@@ -53,9 +53,12 @@ hooks:
 - `context` pushes a pointer at the `ghidra-re-driver` skill only when a
   Ghidra tool is among the request's tools, so idle sessions pay nothing.
 
-Both handlers are stateless — no `ctx.storage` use. The `SessionStart`
-preflight (`re-ghidra-cc-hook`) is deliberately NOT ported: interactive
-diagnosis belongs to the `doctor` skill.
+Both handlers are stateless — no `ctx.storage` use.
+
+The `SessionStart` hook itself is Claude Code-shaped and stays there — but its
+diagnosis is ported: `plugin.ts` runs the same preflight (install dir, Java,
+project values) once per session and, only when something is wrong, appends a
+finding to the first session context. Silent when healthy, never blocks.
 
 ### The 19 tools
 
@@ -94,6 +97,21 @@ The server reads the same environment as its Claude Code sibling:
 | VFS path, if the program is in a subfolder | `GHIDRA_MCP_BOOTSTRAP_PROGRAM_PATH` |
 | JVM `-Xmx` | `GHIDRA_MCP_MAX_HEAP` |
 | Data directory (logs, worker scripts) | `GHIDRA_MCP_HOME` |
+
+#### Settings layer (`.opencode/re-ghidra-mcp-opencode.local.md`)
+
+Why a settings file matters more for this plugin than for most: **one server
+is one Ghidra project.** The project directory, project name and bootstrap
+program are per-workspace by nature, so without a settings layer every repo
+would duplicate the plugin's registration in an `opencode.jsonc` just to carry
+three strings.
+
+Copy `examples/re-ghidra-mcp-opencode.local.md` to
+`.opencode/re-ghidra-mcp-opencode.local.md` in the project root. Precedence is
+CLI flag > `GHIDRA_*` environment > this file (decided by the shared config
+resolver). The MCP server picks the file with `RE_GHIDRA_HOST=opencode`, which
+`opencode.jsonc` sets — an OpenCode session never reads
+`.claude/re-ghidra-mcp-cc.local.md`.
 
 **One server = one Ghidra project.** Two servers on the same project — or
 one server and an open GUI — collide on Ghidra's `project.lock`. Different
