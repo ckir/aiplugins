@@ -80,7 +80,8 @@
       "plugins": [
         "rtk-mcp-agy",
         "re-ghidra-mcp-agy",
-        "aiplugins-devtools-agy"
+        "aiplugins-devtools-agy",
+        "repo-user-guide-agy"
       ],
       "marketplace": ".agy-plugin/marketplace.json",
       "manifestPattern": "antigravity/plugins/{plugin}/plugin.json",
@@ -89,10 +90,12 @@
       "versionedSourceUrl": true,
       "notPublished": [],
       "publishedNames": {
-        "aiplugins-devtools-agy": "aiplugins-devtools"
+        "aiplugins-devtools-agy": "aiplugins-devtools",
+        "repo-user-guide-agy": "repo-user-guide"
       },
       "skillsOnly": [
-        "aiplugins-devtools-agy"
+        "aiplugins-devtools-agy",
+        "repo-user-guide-agy"
       ]
     }
   ]

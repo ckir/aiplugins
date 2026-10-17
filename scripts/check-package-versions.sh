@@ -40,6 +40,7 @@ for spec in \
     "rtk-mcp-agy|antigravity/plugins/rtk-mcp-agy/Cargo.toml|antigravity/plugins/rtk-mcp-agy/plugin.json|.version" \
     "re-ghidra-mcp-agy|antigravity/plugins/re-ghidra-mcp-agy/Cargo.toml|antigravity/plugins/re-ghidra-mcp-agy/plugin.json|.version" \
     "aiplugins-devtools-agy|antigravity/plugins/aiplugins-devtools-agy/plugin.json|antigravity/plugins/aiplugins-devtools-agy/plugin.json|.version" \
+    "repo-user-guide-agy|antigravity/plugins/repo-user-guide-agy/plugin.json|antigravity/plugins/repo-user-guide-agy/plugin.json|.version" \
 ; do
     IFS='|' read -r label crate manifest field <<< "$spec"
     check_pair "$label" "$crate" "$manifest" "$field"

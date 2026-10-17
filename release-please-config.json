@@ -106,6 +106,13 @@
       "extra-files": [
         "plugin.json"
       ]
+    },
+    "antigravity/plugins/repo-user-guide-agy": {
+      "release-type": "simple",
+      "component": "repo-user-guide-agy",
+      "extra-files": [
+        "plugin.json"
+      ]
     }
   }
 }
