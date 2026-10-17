@@ -16,13 +16,11 @@ source scripts/lib/registry.sh
 
 budgets=${1:-docs/footprints/budgets.json}
 
-# Live plugins: the claude-code registry keys, plus every OpenCode plugin that
-# has a plugin.ts (the keys footprint-regen measures and ratchets).
+# Live plugins: every registry key on both fronts. Skills-only plugins are
+# measured too — a footprint doc without a budget key is unguarded.
 live=$(
     bash scripts/registry-plugins.sh claude-code | tr -d '\r'
-    for dir in "$(registry_field opencode dir)"/*/; do
-        [ -f "$dir/plugin.ts" ] && basename "$dir"
-    done
+    bash scripts/registry-plugins.sh opencode | tr -d '\r'
 )
 
 failures=0

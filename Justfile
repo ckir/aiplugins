@@ -98,16 +98,14 @@ footprint-regen:
             --budgets docs/footprints/budgets.json
         echo "regenerated docs/footprints/$plugin.json"
     done
-    for dir in opencode/plugins/*/; do
-        # skills-only plugins have no plugin.ts; check-opencode-wiring.sh check 1 is what fails loudly for a real plugin that lost its plugin.ts
-        [ -f "$dir/plugin.ts" ] || continue
-        name=$(basename "$dir")
+    for plugin in $(bash scripts/registry-plugins.sh opencode | tr -d '\r'); do
+        dir="opencode/plugins/$plugin"
         cargo run -q -p plugin-footprint --bin plugin-footprint -- measure "$dir" \
-            --out "docs/footprints/$name.json"
+            --out "docs/footprints/$plugin.json"
         cargo run -q -p plugin-footprint --bin plugin-footprint -- ratchet \
-            --measured "docs/footprints/$name.json" \
+            --measured "docs/footprints/$plugin.json" \
             --budgets docs/footprints/budgets.json
-        echo "regenerated docs/footprints/$name.json"
+        echo "regenerated docs/footprints/$plugin.json"
     done
     # The published figure (spec §7), rewritten from ALL documents at once —
     # never per-plugin, which would rewrite the root comparison table with a

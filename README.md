@@ -58,9 +58,11 @@ verification) and asks whether to install project-local or global first:
 | Plugin | Resident bytes | Invocation bytes |
 |---|---|---|
 | `aiplugins-devtools-cc` | ≥ 369 | ≥ 20,674 |
+| `aiplugins-devtools-opencode` | ≥ 388 | ≥ 20,674 |
 | `re-ghidra-mcp-cc` | ≥ 21,631 | ≥ 36,903 |
-| `re-ghidra-mcp-opencode` | ≥ 21,297 | ≥ 37,131 |
+| `re-ghidra-mcp-opencode` | ≥ 21,297 | ≥ 37,147 |
 | `repo-user-guide-cc` | ≥ 468 | ≥ 11,474 |
+| `repo-user-guide-opencode` | ≥ 468 | ≥ 11,474 |
 | `rtk-mcp-cc` | ≥ 3,690 | ≥ 6,091 |
 | `rtk-mcp-opencode` | ≥ 3,696 | ≥ 6,129 |
 | `todov2-opencode` | ≥ 0 | ≥ 0 |

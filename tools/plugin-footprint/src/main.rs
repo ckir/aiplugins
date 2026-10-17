@@ -49,7 +49,8 @@ fn measure(plugin_dir: &Path, out: Option<&Path>) -> ExitCode {
     // produce a confident `ok, 0 bytes`.
     if !looks_like_a_plugin(plugin_dir) {
         eprintln!(
-            "plugin-footprint: {} is not a plugin directory (no .claude-plugin/plugin.json)",
+            "plugin-footprint: {} is not a plugin directory (no .claude-plugin/plugin.json, \
+             plugin.ts+opencode.jsonc, or package.json)",
             plugin_dir.display()
         );
         return ExitCode::from(2);
@@ -71,7 +72,9 @@ fn measure(plugin_dir: &Path, out: Option<&Path>) -> ExitCode {
     // tier. The skills/agents/commands layout is identical, so
     // `read_file_sources` serves both unchanged. Presence of `opencode.jsonc`
     // selects the branch: no Claude Code plugin carries one.
-    let is_opencode = plugin_dir.join("opencode.jsonc").is_file();
+    let is_opencode = plugin_dir.join("opencode.jsonc").is_file()
+        || (plugin_dir.join("package.json").is_file()
+            && !plugin_dir.join(".claude-plugin").join("plugin.json").is_file());
     let servers = match if is_opencode {
         read_opencode_servers(plugin_dir)
     } else {
