@@ -1,9 +1,17 @@
 # Spec: OpenCode V2 support — `opencode/` marketplace dir + port of both plugins
 
-**Status:** SPEC, brainstormed 2026-10-01; unimplemented. All five design
-sections were presented and approved in chat before writing. Approach A
-(mirror the agent dirs 1:1) was chosen over a shared TS library (B) and
-npm publishing (C, deferred to a later phase).
+**Status:** IMPLEMENTED (verified 2026-10-17). Brainstormed 2026-10-01;
+all five design sections were presented and approved in chat before
+writing. Approach A (mirror the agent dirs 1:1) was chosen over a shared
+TS library (B) and npm publishing (C, deferred to a later phase).
+
+Implementation drifted from §2 in two ways, both additive:
+plugins live under `opencode/plugins/<id>/` (not directly `opencode/`),
+and two further plugins (`aiplugins-devtools-opencode`,
+`todov2-opencode`) landed alongside the two specced here — each with an
+`INSTALL.md` + `CHANGELOG.md`. All §6 gates pass (`just opencode-wiring`
+reports all references resolve; footprint budgets and the CI
+`opencode-test` / `opencode-wiring` / `opencode-smoke` jobs are green).
 
 **Date:** 2026-10-01
 **Scope:** both real plugins (`rtk-mcp`, `re-ghidra-mcp`); the `example`
