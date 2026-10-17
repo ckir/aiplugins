@@ -124,7 +124,7 @@ fn test_analytics_dispatch_with_mock_executor() {
     let resp = handle_line(&check_req, &no_rewrite, &recording_exec).expect("response");
     assert_eq!(
         resp["result"]["content"][0]["text"],
-        "output of: rtk check -- grep -rn foo src/"
+        "output of: rtk hook check -- 'grep -rn foo src/'"
     );
     assert_eq!(resp["result"]["isError"], false);
 
@@ -148,7 +148,7 @@ fn test_analytics_dispatch_with_mock_executor() {
     let resp = handle_line(&disc_req, &no_rewrite, &recording_exec).expect("response");
     assert_eq!(
         resp["result"]["content"][0]["text"],
-        "output of: rtk discover --project proj --limit 5 --since 7 --all --format text"
+        "output of: rtk discover --project 'proj' --limit 5 --since 7 --all --format text"
     );
     assert_eq!(resp["result"]["isError"], false);
 
@@ -160,15 +160,68 @@ fn test_analytics_dispatch_with_mock_executor() {
                 "/work".to_string()
             ),
             (
-                "rtk check -- grep -rn foo src/".to_string(),
+                "rtk hook check -- 'grep -rn foo src/'".to_string(),
                 "/tmp".to_string()
             ),
             (
-                "rtk discover --project proj --limit 5 --since 7 --all --format text".to_string(),
+                "rtk discover --project 'proj' --limit 5 --since 7 --all --format text".to_string(),
                 ".".to_string()
             ),
         ]
     );
+}
+
+#[test]
+fn test_unknown_tool_returns_error() {
+    let req = json!({
+        "jsonrpc": "2.0",
+        "id": 20,
+        "method": "tools/call",
+        "params": {
+            "name": "non_existent_tool",
+            "arguments": {}
+        }
+    });
+    let res = handle_request(&req).expect("response");
+    assert_eq!(res["id"], 20);
+    assert_eq!(res["result"]["isError"], true);
+    assert_eq!(
+        res["result"]["content"][0]["text"],
+        "Unknown tool: non_existent_tool"
+    );
+}
+
+#[test]
+fn test_validation_errors_return_error_response() {
+    // Empty command in rtk_check
+    let req_check = json!({
+        "jsonrpc": "2.0",
+        "id": 21,
+        "method": "tools/call",
+        "params": {
+            "name": TOOL_CHECK,
+            "arguments": { "command": "   " }
+        }
+    });
+    let res = handle_request(&req_check).expect("response");
+    assert_eq!(res["id"], 21);
+    assert_eq!(res["result"]["isError"], true);
+    assert_eq!(res["result"]["content"][0]["text"], "command must not be empty");
+
+    // Invalid format in rtk_gain
+    let req_gain = json!({
+        "jsonrpc": "2.0",
+        "id": 22,
+        "method": "tools/call",
+        "params": {
+            "name": TOOL_GAIN,
+            "arguments": { "format": "unsupported" }
+        }
+    });
+    let res = handle_request(&req_gain).expect("response");
+    assert_eq!(res["id"], 22);
+    assert_eq!(res["result"]["isError"], true);
+    assert!(res["result"]["content"][0]["text"].as_str().unwrap().contains("unsupported format"));
 }
 
 #[test]
@@ -200,6 +253,24 @@ fn test_analytics_stdio_e2e() {
                     "arguments": { "history": true }
                 }
             }),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 3,
+                "method": "tools/call",
+                "params": {
+                    "name": TOOL_CHECK,
+                    "arguments": { "command": "grep -rn foo src/" }
+                }
+            }),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 4,
+                "method": "tools/call",
+                "params": {
+                    "name": TOOL_DISCOVER,
+                    "arguments": {}
+                }
+            }),
         ];
         for req in requests {
             writeln!(stdin, "{req}").expect("write request");
@@ -215,12 +286,29 @@ fn test_analytics_stdio_e2e() {
         .map(|l| serde_json::from_str(l).expect("valid JSON line"))
         .collect();
 
-    assert_eq!(responses.len(), 2);
+    assert_eq!(responses.len(), 4);
     assert_eq!(responses[0]["id"], 1);
     let tools = responses[0]["result"]["tools"].as_array().expect("tools array");
     let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
     assert_eq!(names, vec![TOOL_NAME, TOOL_GAIN, TOOL_CHECK, TOOL_DISCOVER]);
 
+    // rtk_gain response
     assert_eq!(responses[1]["id"], 2);
     assert_eq!(responses[1]["result"]["content"][0]["type"], "text");
+    assert!(responses[1]["result"]["isError"].is_boolean());
+
+    // rtk_check response
+    assert_eq!(responses[2]["id"], 3);
+    assert_eq!(responses[2]["result"]["content"][0]["type"], "text");
+    assert!(responses[2]["result"]["isError"].is_boolean());
+
+    // rtk_discover response
+    assert_eq!(responses[3]["id"], 4);
+    assert_eq!(responses[3]["result"]["content"][0]["type"], "text");
+    assert!(responses[3]["result"]["isError"].is_boolean());
+
+    // If rtk binary is available on PATH, rtk hook check should succeed cleanly:
+    if Command::new("rtk").arg("--version").output().is_ok() {
+        assert_eq!(responses[2]["result"]["isError"], false);
+    }
 }

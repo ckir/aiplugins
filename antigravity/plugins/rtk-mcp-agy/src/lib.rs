@@ -173,6 +173,28 @@ pub fn call_arguments(request: &Value) -> (String, String) {
     (command, cwd)
 }
 
+/// Quote a string safely for inclusion in a shell command line.
+///
+/// Wraps the string in single quotes, replacing any internal single quote `'`
+/// with `'\''`. Single-quoted strings are interpreted literally by POSIX shells
+/// and PowerShell, preventing command injection and shell metacharacter expansion.
+pub fn shell_quote(s: &str) -> String {
+    let escaped = s.replace('\'', "'\\''");
+    format!("'{escaped}'")
+}
+
+fn validate_format(value: &str, allowed: &[&str]) -> Result<String, String> {
+    let lowered = value.trim().to_ascii_lowercase();
+    if allowed.contains(&lowered.as_str()) {
+        Ok(lowered)
+    } else {
+        Err(format!(
+            "unsupported format {value:?}; expected one of {}",
+            allowed.join(", ")
+        ))
+    }
+}
+
 /// Extract the `Cwd` argument or fall back to `"."`.
 pub fn extract_cwd(arguments: &Value) -> String {
     arguments
@@ -183,7 +205,7 @@ pub fn extract_cwd(arguments: &Value) -> String {
 }
 
 /// Build the command line for `rtk gain`.
-pub fn build_gain_command(arguments: &Value) -> String {
+pub fn build_gain_command(arguments: &Value) -> Result<String, String> {
     let mut cmd = "rtk gain".to_string();
     if arguments.get("history").and_then(|v| v.as_bool()).unwrap_or(false) {
         cmd.push_str(" --history");
@@ -192,31 +214,39 @@ pub fn build_gain_command(arguments: &Value) -> String {
         cmd.push_str(" --project");
     }
     if let Some(format) = arguments.get("format").and_then(|v| v.as_str()) {
-        let fmt = format.trim();
-        if !fmt.is_empty() {
+        let trimmed = format.trim();
+        if !trimmed.is_empty() {
+            let fmt = validate_format(trimmed, &["text", "json", "csv"])?;
             cmd.push_str(&format!(" --format {fmt}"));
         }
     }
-    cmd
+    Ok(cmd)
 }
 
-/// Build the command line for `rtk check`.
-pub fn build_check_command(arguments: &Value) -> String {
+/// Build the command line for `rtk hook check`.
+///
+/// The dry-run inspection subcommand in `rtk` is `hook check` (not `check`).
+/// The command argument is safely single-quoted via [`shell_quote`] to prevent
+/// arbitrary command injection when executed via a shell.
+pub fn build_check_command(arguments: &Value) -> Result<String, String> {
     let command = arguments
         .get("command")
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .trim();
-    format!("rtk check -- {command}")
+    if command.is_empty() {
+        return Err("command must not be empty".to_string());
+    }
+    Ok(format!("rtk hook check -- {}", shell_quote(command)))
 }
 
 /// Build the command line for `rtk discover`.
-pub fn build_discover_command(arguments: &Value) -> String {
+pub fn build_discover_command(arguments: &Value) -> Result<String, String> {
     let mut cmd = "rtk discover".to_string();
     if let Some(project) = arguments.get("project").and_then(|v| v.as_str()) {
         let p = project.trim();
         if !p.is_empty() {
-            cmd.push_str(&format!(" --project {p}"));
+            cmd.push_str(&format!(" --project {}", shell_quote(p)));
         }
     }
     if let Some(limit) = arguments.get("limit").and_then(|v| v.as_u64()) {
@@ -229,12 +259,13 @@ pub fn build_discover_command(arguments: &Value) -> String {
         cmd.push_str(" --all");
     }
     if let Some(format) = arguments.get("format").and_then(|v| v.as_str()) {
-        let fmt = format.trim();
-        if !fmt.is_empty() {
+        let trimmed = format.trim();
+        if !trimmed.is_empty() {
+            let fmt = validate_format(trimmed, &["text", "json"])?;
             cmd.push_str(&format!(" --format {fmt}"));
         }
     }
-    cmd
+    Ok(cmd)
 }
 
 // ── Method results ─────────────────────────────────────────────────────
@@ -310,7 +341,7 @@ pub fn tools_list() -> Value {
             },
             {
                 "name": TOOL_DISCOVER,
-                "description": "Analyze past Claude Code session history for commands that rtk could have optimized but did not, i.e. missed token savings. Read-only.",
+                "description": "Analyze past session history for commands that rtk could have optimized but did not, i.e. missed token savings. Read-only.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -377,23 +408,36 @@ where
             let cwd = extract_cwd(arguments);
 
             match tool_name {
-                TOOL_GAIN => {
-                    let cmd = build_gain_command(arguments);
-                    format_execution(&exec(&cmd, &cwd))
-                }
-                TOOL_CHECK => {
-                    let cmd = build_check_command(arguments);
-                    format_execution(&exec(&cmd, &cwd))
-                }
-                TOOL_DISCOVER => {
-                    let cmd = build_discover_command(arguments);
-                    format_execution(&exec(&cmd, &cwd))
-                }
-                _ => {
+                TOOL_GAIN => match build_gain_command(arguments) {
+                    Ok(cmd) => format_execution(&exec(&cmd, &cwd)),
+                    Err(err) => json!({
+                        "content": [{ "type": "text", "text": err }],
+                        "isError": true
+                    }),
+                },
+                TOOL_CHECK => match build_check_command(arguments) {
+                    Ok(cmd) => format_execution(&exec(&cmd, &cwd)),
+                    Err(err) => json!({
+                        "content": [{ "type": "text", "text": err }],
+                        "isError": true
+                    }),
+                },
+                TOOL_DISCOVER => match build_discover_command(arguments) {
+                    Ok(cmd) => format_execution(&exec(&cmd, &cwd)),
+                    Err(err) => json!({
+                        "content": [{ "type": "text", "text": err }],
+                        "isError": true
+                    }),
+                },
+                TOOL_NAME => {
                     let (command, cwd) = call_arguments(request);
                     let to_run = rewrite(&command).unwrap_or_else(|| command.clone());
                     format_execution(&exec(&to_run, &cwd))
                 }
+                _ => json!({
+                    "content": [{ "type": "text", "text": format!("Unknown tool: {tool_name}") }],
+                    "isError": true
+                }),
             }
         }
         _ => method_not_found(),
@@ -1009,14 +1053,23 @@ mod tests {
     // ── analytics tools tests ─────────────────────────────────────
 
     #[test]
+    fn shell_quote_protects_against_injection() {
+        assert_eq!(shell_quote("hello"), "'hello'");
+        assert_eq!(shell_quote("hello world"), "'hello world'");
+        assert_eq!(shell_quote("echo 'hi'"), "'echo '\\''hi'\\'''");
+        assert_eq!(shell_quote("foo; rm -rf /"), "'foo; rm -rf /'");
+    }
+
+    #[test]
     fn build_gain_command_handles_options() {
-        assert_eq!(build_gain_command(&json!({})), "rtk gain");
+        assert_eq!(build_gain_command(&json!({})).unwrap(), "rtk gain");
         assert_eq!(
             build_gain_command(&json!({
                 "history": true,
                 "project_only": true,
                 "format": "json"
-            })),
+            }))
+            .unwrap(),
             "rtk gain --history --project --format json"
         );
         assert_eq!(
@@ -1024,33 +1077,42 @@ mod tests {
                 "history": false,
                 "project_only": true,
                 "format": "csv"
-            })),
+            }))
+            .unwrap(),
             "rtk gain --project --format csv"
         );
+        assert!(build_gain_command(&json!({ "format": "xml" })).is_err());
     }
 
     #[test]
     fn build_check_command_formats_command() {
         assert_eq!(
-            build_check_command(&json!({ "command": "grep -rn foo src/" })),
-            "rtk check -- grep -rn foo src/"
+            build_check_command(&json!({ "command": "grep -rn foo src/" })).unwrap(),
+            "rtk hook check -- 'grep -rn foo src/'"
         );
-        assert_eq!(build_check_command(&json!({})), "rtk check -- ");
+        assert_eq!(
+            build_check_command(&json!({ "command": "echo 'hi'; rm -rf /" })).unwrap(),
+            "rtk hook check -- 'echo '\\''hi'\\''; rm -rf /'"
+        );
+        assert!(build_check_command(&json!({})).is_err());
+        assert!(build_check_command(&json!({ "command": "   " })).is_err());
     }
 
     #[test]
     fn build_discover_command_handles_options() {
-        assert_eq!(build_discover_command(&json!({})), "rtk discover");
+        assert_eq!(build_discover_command(&json!({})).unwrap(), "rtk discover");
         assert_eq!(
             build_discover_command(&json!({
-                "project": "myproject",
+                "project": "my project",
                 "limit": 5,
                 "since": 14,
                 "all_projects": true,
                 "format": "json"
-            })),
-            "rtk discover --project myproject --limit 5 --since 14 --all --format json"
+            }))
+            .unwrap(),
+            "rtk discover --project 'my project' --limit 5 --since 14 --all --format json"
         );
+        assert!(build_discover_command(&json!({ "format": "yaml" })).is_err());
     }
 
     #[test]
@@ -1073,6 +1135,7 @@ mod tests {
             &[("rtk gain --history".to_string(), "/my/repo".to_string())]
         );
         assert_eq!(response["result"]["content"][0]["text"], "done");
+        assert_eq!(response["result"]["isError"], false);
     }
 
     #[test]
@@ -1092,9 +1155,10 @@ mod tests {
         let response = handle_line(&line, &no_rewrite, &recording_exec(&log)).expect("a response");
         assert_eq!(
             log.borrow().as_slice(),
-            &[("rtk check -- ls -la".to_string(), "/my/repo".to_string())]
+            &[("rtk hook check -- 'ls -la'".to_string(), "/my/repo".to_string())]
         );
         assert_eq!(response["result"]["content"][0]["text"], "done");
+        assert_eq!(response["result"]["isError"], false);
     }
 
     #[test]
@@ -1117,6 +1181,49 @@ mod tests {
             &[("rtk discover --all".to_string(), ".".to_string())]
         );
         assert_eq!(response["result"]["content"][0]["text"], "done");
+        assert_eq!(response["result"]["isError"], false);
+    }
+
+    #[test]
+    fn tools_call_rejects_unknown_tool() {
+        let line = json!({
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "tools/call",
+            "params": {
+                "name": "not_a_real_tool",
+                "arguments": {}
+            }
+        })
+        .to_string();
+
+        let response = handle_line(&line, &no_rewrite, &never_exec).expect("a response");
+        assert_eq!(response["result"]["isError"], true);
+        assert_eq!(
+            response["result"]["content"][0]["text"],
+            "Unknown tool: not_a_real_tool"
+        );
+    }
+
+    #[test]
+    fn tools_call_surfaces_validation_errors() {
+        let line = json!({
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "tools/call",
+            "params": {
+                "name": TOOL_CHECK,
+                "arguments": { "command": "" }
+            }
+        })
+        .to_string();
+
+        let response = handle_line(&line, &no_rewrite, &never_exec).expect("a response");
+        assert_eq!(response["result"]["isError"], true);
+        assert_eq!(
+            response["result"]["content"][0]["text"],
+            "command must not be empty"
+        );
     }
 
     // ── PreInvocation payload ──────────────────────────────────────
