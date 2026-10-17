@@ -170,9 +170,12 @@ fn tools_list_advertises_rtk_run_with_its_schema() {
     }));
 
     let tools = response["result"]["tools"].as_array().expect("tools array");
-    assert_eq!(tools.len(), 1, "exactly one tool, got: {response}");
+    assert_eq!(tools.len(), 4, "four tools, got: {response}");
 
-    let tool = &tools[0];
+    let tool = tools
+        .iter()
+        .find(|t| t["name"] == "rtk_run")
+        .expect("rtk_run tool");
     assert_eq!(tool["name"], "rtk_run");
 
     let schema = &tool["inputSchema"];
@@ -406,6 +409,9 @@ fn mcp_binary_reports_version_and_help() {
 
     let help = run_flag(bin, "--help");
     assert!(help.contains("rtk_run"), "help must name the tool: {help}");
+    assert!(help.contains("rtk_gain"), "help must name rtk_gain: {help}");
+    assert!(help.contains("rtk_check"), "help must name rtk_check: {help}");
+    assert!(help.contains("rtk_discover"), "help must name rtk_discover: {help}");
 }
 
 #[test]
