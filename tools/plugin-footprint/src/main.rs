@@ -12,7 +12,7 @@
 use plugin_footprint::canonical::canonical_json;
 use plugin_footprint::document::{build, setup_tier, Tree};
 use plugin_footprint::manifest::{
-    looks_like_a_plugin, plugin_version, read_mcp_servers, read_opencode_servers,
+    looks_like_a_plugin, plugin_version, read_agy_servers, read_mcp_servers, read_opencode_servers,
 };
 use plugin_footprint::probe::{probe, Limits, Outcome, Status};
 use plugin_footprint::publish::{comparison_region, per_plugin_region, splice};
@@ -72,13 +72,21 @@ fn measure(plugin_dir: &Path, out: Option<&Path>) -> ExitCode {
     // tier. The skills/agents/commands layout is identical, so
     // `read_file_sources` serves both unchanged. Presence of `opencode.jsonc`
     // selects the branch: no Claude Code plugin carries one.
+    let is_antigravity = plugin_dir.join("plugin.json").is_file()
+        && !plugin_dir
+            .join(".claude-plugin")
+            .join("plugin.json")
+            .is_file()
+        && !plugin_dir.join("package.json").is_file();
     let is_opencode = plugin_dir.join("opencode.jsonc").is_file()
         || (plugin_dir.join("package.json").is_file()
             && !plugin_dir
                 .join(".claude-plugin")
                 .join("plugin.json")
                 .is_file());
-    let servers = match if is_opencode {
+    let servers = match if is_antigravity {
+        read_agy_servers(plugin_dir)
+    } else if is_opencode {
         read_opencode_servers(plugin_dir)
     } else {
         read_mcp_servers(plugin_dir)
@@ -180,6 +188,8 @@ fn measure(plugin_dir: &Path, out: Option<&Path>) -> ExitCode {
         if let (Some(tiers), Some(source)) = (document.tiers.as_mut(), plugin_source.as_ref()) {
             tiers.setup = Some(setup_tier(source));
         }
+    } else if is_antigravity {
+        document.agent = "antigravity";
     }
 
     let value = match serde_json::to_value(&document) {
@@ -421,9 +431,16 @@ fn publish() -> ExitCode {
             return ExitCode::from(1);
         }
     };
+    let antigravity = match antigravity_plugins() {
+        Ok(plugins) => plugins,
+        Err(e) => {
+            eprintln!("plugin-footprint: {e}");
+            return ExitCode::from(1);
+        }
+    };
 
     let mut documents = Vec::new();
-    for plugin in plugins.iter().chain(opencode.iter()) {
+    for plugin in plugins.iter().chain(opencode.iter()).chain(antigravity.iter()) {
         let path = format!("docs/footprints/{plugin}.json");
         let text = match std::fs::read_to_string(&path) {
             Ok(text) => text,
@@ -449,10 +466,12 @@ fn publish() -> ExitCode {
                 return ExitCode::from(1);
             }
         };
-        // An OpenCode document's region lives in its own README. The name
-        // decides the tree: Claude and OpenCode plugin names are distinct —
-        // a name in both would already collide in `docs/footprints/`.
-        let dir = if opencode.contains(plugin) {
+        // An OpenCode or Antigravity document's region lives in its own README.
+        // The name decides the tree: Claude, OpenCode, and Antigravity plugin names
+        // are distinct — a name in multiple would already collide in `docs/footprints/`.
+        let dir = if antigravity.contains(plugin) {
+            "antigravity/plugins"
+        } else if opencode.contains(plugin) {
             "opencode/plugins"
         } else {
             "claude-code/plugins"
@@ -478,7 +497,7 @@ fn publish() -> ExitCode {
 
     println!(
         "published the footprint region in {} README(s)",
-        plugins.len() + opencode.len() + 1
+        plugins.len() + opencode.len() + antigravity.len() + 1
     );
     ExitCode::SUCCESS
 }
@@ -501,6 +520,14 @@ fn published_plugins() -> Result<Vec<String>, String> {
     let text = std::fs::read_to_string("agents.json")
         .map_err(|e| format!("reading the plugin registry: {e}"))?;
     plugin_footprint::registry::published_plugin_keys(&text)
+}
+
+/// The Antigravity plugins the registry (`agents.json`, via `registry::antigravity_plugin_keys`)
+/// publishes — the same iteration source the gate and `just smoke` use.
+fn antigravity_plugins() -> Result<Vec<String>, String> {
+    let text = std::fs::read_to_string("agents.json")
+        .map_err(|e| format!("reading the plugin registry: {e}"))?;
+    plugin_footprint::registry::antigravity_plugin_keys(&text)
 }
 
 /// The OpenCode plugins: every directory under `opencode/plugins/` that looks like

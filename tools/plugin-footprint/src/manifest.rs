@@ -104,6 +104,7 @@ pub fn looks_like_a_plugin(dir: &Path) -> bool {
         // opencode.jsonc; package.json is its manifest (bundle-skills-plugin
         // and the registry both treat it that way).
         || dir.join("package.json").is_file()
+        || dir.join("plugin.json").is_file()
 }
 
 /// Read `<plugin_dir>/.mcp.json` and resolve every server it declares.
@@ -209,6 +210,68 @@ pub fn read_opencode_servers(plugin_dir: &Path) -> Result<Vec<ServerSpec>, Manif
             plugin_dir,
             &path,
         )?);
+    }
+    out.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(out)
+}
+
+/// Read `<plugin_dir>/mcp_config.json` and resolve every server it declares.
+///
+/// A missing file declares no servers (same rule as `.mcp.json`). Commands in
+/// Antigravity manifests are bare binary names, resolved relative to
+/// `<plugin_dir>/bin/` (and suffixed with `.exe` on Windows).
+/// Confinement is enforced to ensure the command stays inside the plugin directory.
+/// Servers come back sorted by name.
+pub fn read_agy_servers(plugin_dir: &Path) -> Result<Vec<ServerSpec>, ManifestError> {
+    let path = plugin_dir.join("mcp_config.json");
+    let text = match std::fs::read_to_string(&path) {
+        Ok(t) => t,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(source) => return Err(ManifestError::Read { path, source }),
+    };
+
+    let manifest: Manifest =
+        serde_json::from_str(&text).map_err(|source| ManifestError::Parse {
+            path: path.clone(),
+            source,
+        })?;
+
+    let mut out = Vec::new();
+    for (name, raw) in manifest.mcp_servers {
+        let command = raw.command.ok_or_else(|| ManifestError::MissingCommand {
+            server: name.clone(),
+            path: path.clone(),
+        })?;
+
+        let bin_command = if cfg!(windows) && !command.to_lowercase().ends_with(".exe") {
+            format!("{command}.exe")
+        } else {
+            command.clone()
+        };
+
+        let anchored = if let Ok(stripped) = Path::new(&bin_command).strip_prefix("bin") {
+            plugin_dir.join("bin").join(stripped)
+        } else {
+            plugin_dir.join("bin").join(&bin_command)
+        };
+
+        let resolved = absolutize(&anchored);
+
+        if !is_confined(plugin_dir, &anchored) {
+            return Err(ManifestError::CommandEscapesPluginRoot {
+                server: name,
+                command,
+                plugin_dir: plugin_dir.to_path_buf(),
+            });
+        }
+        let resolved = resolved.expect("confinement rejects a path that cannot be absolutised");
+
+        out.push(ServerSpec {
+            name,
+            command: resolved,
+            args: raw.args,
+            env: raw.env,
+        });
     }
     out.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(out)
@@ -593,6 +656,74 @@ mod tests {
                 .join("plugins")
                 .join("repo-user-guide-cc")
         ));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn an_antigravity_dir_counts_as_a_plugin() {
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .ancestors()
+            .nth(2)
+            .expect("crate sits two levels below the repo root");
+        assert!(looks_like_a_plugin(
+            &repo
+                .join("antigravity")
+                .join("plugins")
+                .join("rtk-mcp-agy")
+        ));
+
+        let dir = std::env::temp_dir().join(format!("pf-agy-plugin-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("plugin.json"), "{}").unwrap();
+        assert!(looks_like_a_plugin(&dir));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn antigravity_servers_come_from_mcp_config_json_in_bin() {
+        let dir = std::env::temp_dir().join(format!("pf-agy-basic-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("mcp_config.json"),
+            r#"{"mcpServers":{"rtkmcp":{"command":"rtk-mcp"}}}"#,
+        )
+        .unwrap();
+
+        let specs = read_agy_servers(&dir).expect("parses");
+        assert_eq!(specs.len(), 1);
+        assert_eq!(specs[0].name, "rtkmcp");
+        let expected_name = if cfg!(windows) { "rtk-mcp.exe" } else { "rtk-mcp" };
+        assert!(specs[0]
+            .command
+            .ends_with(Path::new("bin").join(expected_name)));
+        assert_eq!(specs[0].args, Vec::<String>::new());
+        assert!(specs[0].command.is_absolute());
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn antigravity_servers_missing_mcp_config_yields_empty() {
+        let dir = std::env::temp_dir().join(format!("pf-agy-empty-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let specs = read_agy_servers(&dir).expect("missing mcp_config is not an error");
+        assert!(specs.is_empty());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn antigravity_command_escaping_plugin_root_is_refused() {
+        let dir = std::env::temp_dir().join(format!("pf-agy-escape-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("mcp_config.json"),
+            r#"{"mcpServers":{"evil":{"command":"../../evil"}}}"#,
+        )
+        .unwrap();
+
+        let err = read_agy_servers(&dir).expect_err("escaped command must be refused");
+        assert!(matches!(err, ManifestError::CommandEscapesPluginRoot { .. }));
+
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

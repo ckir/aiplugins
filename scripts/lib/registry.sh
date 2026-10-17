@@ -50,6 +50,8 @@ if [ "${1:-}" = "--self-test" ]; then
         || { echo "FAIL plugins claude-code"; failures=$((failures + 1)); }
     [ "$(registry_plugins opencode | tr '\n' ' ')" = "rtk-mcp-opencode re-ghidra-mcp-opencode todov2-opencode aiplugins-devtools-opencode repo-user-guide-opencode " ] \
         || { echo "FAIL plugins opencode"; failures=$((failures + 1)); }
+    [ "$(registry_plugins antigravity | tr '\n' ' ')" = "rtk-mcp-agy re-ghidra-mcp-agy aiplugins-devtools-agy repo-user-guide-agy " ] \
+        || { echo "FAIL plugins antigravity"; failures=$((failures + 1)); }
     [ "$(registry_manifest_path qwen rtk-mcp-qwen)" = "qwen/plugins/rtk-mcp-qwen/qwen-extension.json" ] \
         || { echo "FAIL manifest path"; failures=$((failures + 1)); }
     registry_is_excluded qwen example \
