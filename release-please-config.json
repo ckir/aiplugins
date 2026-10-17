@@ -79,6 +79,13 @@
         "package.json"
       ]
     },
+    "opencode/plugins/repo-user-guide-opencode": {
+      "release-type": "simple",
+      "component": "repo-user-guide-opencode",
+      "extra-files": [
+        "package.json"
+      ]
+    },
     "antigravity/plugins/rtk-mcp-agy": {
       "release-type": "rust",
       "component": "rtk-mcp-agy",

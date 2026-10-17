@@ -56,7 +56,8 @@
         "rtk-mcp-opencode",
         "re-ghidra-mcp-opencode",
         "todov2-opencode",
-        "aiplugins-devtools-opencode"
+        "aiplugins-devtools-opencode",
+        "repo-user-guide-opencode"
       ],
       "marketplace": ".opencode-plugin/marketplace.json",
       "manifestPattern": "opencode/plugins/{plugin}/package.json",
@@ -65,10 +66,12 @@
       "versionedSourceUrl": true,
       "notPublished": [],
       "publishedNames": {
-        "aiplugins-devtools-opencode": "aiplugins-devtools"
+        "aiplugins-devtools-opencode": "aiplugins-devtools",
+        "repo-user-guide-opencode": "repo-user-guide"
       },
       "skillsOnly": [
-        "aiplugins-devtools-opencode"
+        "aiplugins-devtools-opencode",
+        "repo-user-guide-opencode"
       ]
     },
     {

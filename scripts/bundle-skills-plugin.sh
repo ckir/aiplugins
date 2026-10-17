@@ -145,11 +145,14 @@ has README.md || report "README.md"
 printf '%s\n' "$listing" | grep -q '^skills/[^/]*/SKILL\.md$' ||
     report "skills/*/SKILL.md"
 # The devtools skills are adapted from upstream and must carry its notice;
-# repo-user-guide-cc ships none.
-if [ "$key" != repo-user-guide-cc ]; then
-    printf '%s\n' "$listing" | grep -q '^skills/.*THIRD-PARTY-NOTICE\.md$' ||
-        report "skills/**/THIRD-PARTY-NOTICE.md"
-fi
+# repo-user-guide skills are this repo's own and ship none.
+case "$key" in
+    repo-user-guide-*) ;;
+    *)
+        printf '%s\n' "$listing" | grep -q '^skills/.*THIRD-PARTY-NOTICE\.md$' ||
+            report "skills/**/THIRD-PARTY-NOTICE.md"
+        ;;
+esac
 has LICENSE || report "LICENSE"
 if [ "$agent" = opencode ]; then
     has INSTALL.md || report "INSTALL.md"

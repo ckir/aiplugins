@@ -21,7 +21,6 @@ fi
 
 wf="$root/.github/workflows"
 agents="$root/agents.json"
-EXCL='!aiplugins-devtools-*-v*'
 fail=0
 bad() { echo "  FAIL  $*" >&2; fail=1; }
 
@@ -65,17 +64,19 @@ for f in release opencode-bundles skills-bundles; do
   tags_of "$wf/$f.yml" >"$scratch/$f.tags"
 done
 
-# (a) exclusion present and AFTER every positive pattern.
-for f in release opencode-bundles; do
-  excl_line="$(grep -n -x -F -e "$EXCL" "$scratch/$f.tags" | head -1 | cut -d: -f1 || true)"
-  if [ -z "$excl_line" ]; then
-    bad "$f.yml on.push.tags lacks '$EXCL'"
-    continue
-  fi
-  last_pos="$(grep -n -v '^!' "$scratch/$f.tags" | tail -1 | cut -d: -f1 || true)"
-  if [ -n "$last_pos" ] && [ "$excl_line" -le "$last_pos" ]; then
-    bad "$f.yml: '$EXCL' must come AFTER the positive tag patterns (order matters)"
-  fi
+# (a) each exclusion present and AFTER every positive pattern.
+for excl in '!aiplugins-devtools-*-v*' '!repo-user-guide-*-v*'; do
+  for f in release opencode-bundles; do
+    excl_line="$(grep -n -x -F -e "$excl" "$scratch/$f.tags" | head -1 | cut -d: -f1 || true)"
+    if [ -z "$excl_line" ]; then
+      bad "$f.yml on.push.tags lacks '$excl'"
+      continue
+    fi
+    last_pos="$(grep -n -v '^!' "$scratch/$f.tags" | tail -1 | cut -d: -f1 || true)"
+    if [ -n "$last_pos" ] && [ "$excl_line" -le "$last_pos" ]; then
+      bad "$f.yml: '$excl' must come AFTER the positive tag patterns (order matters)"
+    fi
+  done
 done
 
 # (b) skills-bundles.yml structure.
@@ -160,6 +161,7 @@ while IFS= read -r k; do
   expect no release.yml "$k-v0.1.0" release
 done < <(jq -r '.agents[].skillsOnly[]?' "$agents")
 expect no opencode-bundles.yml aiplugins-devtools-opencode-v0.1.0 opencode-bundles
+expect no opencode-bundles.yml repo-user-guide-opencode-v0.1.0 opencode-bundles
 expect yes opencode-bundles.yml rtk-mcp-opencode-v0.7.3 opencode-bundles
 expect no release.yml rtk-mcp-opencode-v0.7.3 release
 expect yes release.yml rtk-mcp-cc-v0.8.0 release

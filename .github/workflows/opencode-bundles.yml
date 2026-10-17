@@ -36,6 +36,9 @@ on:
       # The devtools OpenCode plugin is skills-only (no plugin.ts, no binary);
       # skills-bundles.yml bundles it.
       - '!aiplugins-devtools-*-v*'
+      # skills-only (no plugin.ts): bundled by skills-bundles.yml, which
+      # already carries the repo-user-guide-*-v* trigger.
+      - '!repo-user-guide-*-v*'
   # Backfill a release that predates this workflow, or re-cut bundles after a
   # fix to the bundling script.
   workflow_dispatch:
