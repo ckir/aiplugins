@@ -125,6 +125,20 @@ for pair in \
     fi
 done
 
+# The repo-user-guide skill is a byte-copy of the Claude original: host-portable,
+# unlike the rtk/doctor skills above, which carry host-specific names and so are
+# compared per-content instead. A drift here means the port drifted apart.
+src_skills="claude-code/plugins/repo-user-guide-cc/skills"
+dst_skills="opencode/plugins/repo-user-guide-opencode/skills"
+checked=$((checked + 1))
+if [ ! -d "$dst_skills" ]; then
+    fail "copy missing: $dst_skills"
+elif ! diff -r -q "$src_skills" "$dst_skills" >/dev/null 2>&1; then
+    fail "stale copy: $dst_skills differs from $src_skills"
+else
+    printf '  ok       copy %-40s\n' "$dst_skills"
+fi
+
 # 8. Pin-consistency: every opencode plugin pins the same @opencode/plugin
 # version, so one plugin drifting ahead of (or behind) the other fails loudly
 # instead of passing silently.
