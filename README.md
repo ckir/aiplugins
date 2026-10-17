@@ -115,6 +115,8 @@ Fronted by all four agents: [`claude-code/plugins/re-ghidra-mcp-cc`](claude-code
 
 ## Documentation index
 
+- [User Guide (PDF)](docs/USER_GUIDE.pdf) — install and use the marketplace and its plugins, with verified examples.
+
 Plugin and example READMEs, by agent directory:
 
 - `claude-code/plugins/`
