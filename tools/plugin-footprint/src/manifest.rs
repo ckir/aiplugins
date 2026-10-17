@@ -666,10 +666,7 @@ mod tests {
             .nth(2)
             .expect("crate sits two levels below the repo root");
         assert!(looks_like_a_plugin(
-            &repo
-                .join("antigravity")
-                .join("plugins")
-                .join("rtk-mcp-agy")
+            &repo.join("antigravity").join("plugins").join("rtk-mcp-agy")
         ));
 
         let dir = std::env::temp_dir().join(format!("pf-agy-plugin-{}", std::process::id()));
@@ -692,7 +689,11 @@ mod tests {
         let specs = read_agy_servers(&dir).expect("parses");
         assert_eq!(specs.len(), 1);
         assert_eq!(specs[0].name, "rtkmcp");
-        let expected_name = if cfg!(windows) { "rtk-mcp.exe" } else { "rtk-mcp" };
+        let expected_name = if cfg!(windows) {
+            "rtk-mcp.exe"
+        } else {
+            "rtk-mcp"
+        };
         assert!(specs[0]
             .command
             .ends_with(Path::new("bin").join(expected_name)));
@@ -722,7 +723,10 @@ mod tests {
         .unwrap();
 
         let err = read_agy_servers(&dir).expect_err("escaped command must be refused");
-        assert!(matches!(err, ManifestError::CommandEscapesPluginRoot { .. }));
+        assert!(matches!(
+            err,
+            ManifestError::CommandEscapesPluginRoot { .. }
+        ));
 
         std::fs::remove_dir_all(&dir).unwrap();
     }

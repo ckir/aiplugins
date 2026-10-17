@@ -440,7 +440,11 @@ fn publish() -> ExitCode {
     };
 
     let mut documents = Vec::new();
-    for plugin in plugins.iter().chain(opencode.iter()).chain(antigravity.iter()) {
+    for plugin in plugins
+        .iter()
+        .chain(opencode.iter())
+        .chain(antigravity.iter())
+    {
         let path = format!("docs/footprints/{plugin}.json");
         let text = match std::fs::read_to_string(&path) {
             Ok(text) => text,

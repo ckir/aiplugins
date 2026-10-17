@@ -71,7 +71,8 @@ mod tests {
 
     #[test]
     fn antigravity_returns_plugins_in_file_order() {
-        let json = r#"{"agents":[{"id":"antigravity","plugins":["rtk-mcp-agy","re-ghidra-mcp-agy"]}]}"#;
+        let json =
+            r#"{"agents":[{"id":"antigravity","plugins":["rtk-mcp-agy","re-ghidra-mcp-agy"]}]}"#;
         assert_eq!(
             antigravity_plugin_keys(json).unwrap(),
             vec!["rtk-mcp-agy", "re-ghidra-mcp-agy"]
@@ -99,7 +100,8 @@ mod tests {
     #[test]
     fn antigravity_errors_without_plugins_array() {
         let json = r#"{"agents":[{"id":"antigravity"}]}"#;
-        assert!(antigravity_plugin_keys(json).unwrap_err().contains("plugins"));
+        assert!(antigravity_plugin_keys(json)
+            .unwrap_err()
+            .contains("plugins"));
     }
 }
-

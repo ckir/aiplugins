@@ -207,10 +207,18 @@ pub fn extract_cwd(arguments: &Value) -> String {
 /// Build the command line for `rtk gain`.
 pub fn build_gain_command(arguments: &Value) -> Result<String, String> {
     let mut cmd = "rtk gain".to_string();
-    if arguments.get("history").and_then(|v| v.as_bool()).unwrap_or(false) {
+    if arguments
+        .get("history")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
         cmd.push_str(" --history");
     }
-    if arguments.get("project_only").and_then(|v| v.as_bool()).unwrap_or(false) {
+    if arguments
+        .get("project_only")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
         cmd.push_str(" --project");
     }
     if let Some(format) = arguments.get("format").and_then(|v| v.as_str()) {
@@ -255,7 +263,11 @@ pub fn build_discover_command(arguments: &Value) -> Result<String, String> {
     if let Some(since) = arguments.get("since").and_then(|v| v.as_u64()) {
         cmd.push_str(&format!(" --since {since}"));
     }
-    if arguments.get("all_projects").and_then(|v| v.as_bool()).unwrap_or(false) {
+    if arguments
+        .get("all_projects")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
         cmd.push_str(" --all");
     }
     if let Some(format) = arguments.get("format").and_then(|v| v.as_str()) {
@@ -473,15 +485,11 @@ where
 
 /// Handle a parsed JSON-RPC request using default fallback closures.
 pub fn handle_request(request: &Value) -> Option<Value> {
-    dispatch_request(
-        request,
-        &|_| None,
-        &|_, _| Execution::Ran {
-            stdout: String::new(),
-            stderr: String::new(),
-            success: true,
-        },
-    )
+    dispatch_request(request, &|_| None, &|_, _| Execution::Ran {
+        stdout: String::new(),
+        stderr: String::new(),
+        success: true,
+    })
 }
 
 /// Wrap a result body in its JSON-RPC envelope.
@@ -1155,7 +1163,10 @@ mod tests {
         let response = handle_line(&line, &no_rewrite, &recording_exec(&log)).expect("a response");
         assert_eq!(
             log.borrow().as_slice(),
-            &[("rtk hook check -- 'ls -la'".to_string(), "/my/repo".to_string())]
+            &[(
+                "rtk hook check -- 'ls -la'".to_string(),
+                "/my/repo".to_string()
+            )]
         );
         assert_eq!(response["result"]["content"][0]["text"], "done");
         assert_eq!(response["result"]["isError"], false);

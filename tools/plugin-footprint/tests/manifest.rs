@@ -229,7 +229,11 @@ fn reads_antigravity_servers_from_mcp_config_json() {
     assert_eq!(s.name, "rtkmcp");
     assert_eq!(s.args, vec!["serve".to_string()]);
     assert_eq!(s.env.get("RUST_LOG").map(String::as_str), Some("info"));
-    let expected_name = if cfg!(windows) { "rtk-mcp.exe" } else { "rtk-mcp" };
+    let expected_name = if cfg!(windows) {
+        "rtk-mcp.exe"
+    } else {
+        "rtk-mcp"
+    };
     assert_eq!(s.command, dir.join("bin").join(expected_name));
 
     std::fs::remove_dir_all(&dir).ok();

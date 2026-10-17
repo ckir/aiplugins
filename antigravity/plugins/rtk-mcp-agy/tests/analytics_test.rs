@@ -206,7 +206,10 @@ fn test_validation_errors_return_error_response() {
     let res = handle_request(&req_check).expect("response");
     assert_eq!(res["id"], 21);
     assert_eq!(res["result"]["isError"], true);
-    assert_eq!(res["result"]["content"][0]["text"], "command must not be empty");
+    assert_eq!(
+        res["result"]["content"][0]["text"],
+        "command must not be empty"
+    );
 
     // Invalid format in rtk_gain
     let req_gain = json!({
@@ -221,7 +224,10 @@ fn test_validation_errors_return_error_response() {
     let res = handle_request(&req_gain).expect("response");
     assert_eq!(res["id"], 22);
     assert_eq!(res["result"]["isError"], true);
-    assert!(res["result"]["content"][0]["text"].as_str().unwrap().contains("unsupported format"));
+    assert!(res["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap()
+        .contains("unsupported format"));
 }
 
 #[test]
@@ -288,7 +294,9 @@ fn test_analytics_stdio_e2e() {
 
     assert_eq!(responses.len(), 4);
     assert_eq!(responses[0]["id"], 1);
-    let tools = responses[0]["result"]["tools"].as_array().expect("tools array");
+    let tools = responses[0]["result"]["tools"]
+        .as_array()
+        .expect("tools array");
     let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
     assert_eq!(names, vec![TOOL_NAME, TOOL_GAIN, TOOL_CHECK, TOOL_DISCOVER]);
 
