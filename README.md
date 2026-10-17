@@ -109,7 +109,7 @@ and is usually a thin front end.
 | `shared/ghidra-worker-ctl` | Headless Ghidra JVM lifecycle: boot, launch, connection, Windows Job Object containment |
 | `shared/ghidra-mcp` | The MCP server and its 19 reverse-engineering tools, plus the embedded Ghidra worker script and driver skill |
 
-Fronted today by [`claude-code/plugins/re-ghidra-mcp-cc`](claude-code/plugins/re-ghidra-mcp-cc/).
+Fronted by all four agents: [`claude-code/plugins/re-ghidra-mcp-cc`](claude-code/plugins/re-ghidra-mcp-cc/), [`opencode/plugins/re-ghidra-mcp-opencode`](opencode/plugins/re-ghidra-mcp-opencode/), [`antigravity/plugins/re-ghidra-mcp-agy`](antigravity/plugins/re-ghidra-mcp-agy/) and [`qwen/plugins/re-ghidra-mcp-qwen`](qwen/plugins/re-ghidra-mcp-qwen/).
 
 `shared/devtools/` is not a crate (it is excluded from the Cargo workspace). It holds the canonical copy of the skills that the four `aiplugins-devtools-*` plugins ship; `just emit-devtools-skills` copies them into each plugin and `just devtools-skills` checks them (maintainer notes: [`shared/devtools/README.md`](shared/devtools/README.md)).
 
@@ -120,6 +120,7 @@ Plugin and example READMEs, by agent directory:
 - `claude-code/plugins/`
   - [`aiplugins-devtools-cc`](claude-code/plugins/aiplugins-devtools-cc/) — dev-tool skills container published as `aiplugins-devtools`; first skill `code-review-and-quality` (multi-axis code review).
   - [`re-ghidra-mcp-cc`](claude-code/plugins/re-ghidra-mcp-cc/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
+  - [`repo-user-guide-cc`](claude-code/plugins/repo-user-guide-cc/) — PDF user guides for a repository, with verified examples; published as `repo-user-guide`.
   - [`rtk-mcp-cc`](claude-code/plugins/rtk-mcp-cc/) — `rtk` shell-command rewriting for 60–90% fewer output tokens, plus analytics MCP tools.
   - [`example`](claude-code/plugins/example/) — template Rust Claude Code plugin (TODO/FIXME/HACK tracker).
 - `antigravity/plugins/`
@@ -136,5 +137,6 @@ Plugin and example READMEs, by agent directory:
   - [`re-ghidra-mcp-opencode`](opencode/plugins/re-ghidra-mcp-opencode/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools, plus session hooks.
   - [`rtk-mcp-opencode`](opencode/plugins/rtk-mcp-opencode/) — `rtk` shell-command rewriting for OpenCode, plus analytics MCP tools.
   - [`todov2-opencode`](opencode/plugins/todov2-opencode/) — the V2-removed `todowrite` session tool plus a live todo sidebar list.
+  - [`repo-user-guide-opencode`](opencode/plugins/repo-user-guide-opencode/) — PDF user guides for a repository, with verified examples; published as `repo-user-guide`.
 
 *More details and plugin guidelines will be added soon.*
