@@ -54,3 +54,6 @@ dist/
 
 # Staged OpenCode plugin binaries, produced by `just build-*-opencode`.
 opencode/plugins/*/bin/
+
+# Staged Antigravity plugin binaries, produced by `just build-*-agy`.
+antigravity/plugins/*/bin/

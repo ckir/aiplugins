@@ -190,6 +190,8 @@ jobs:
           just build-re-ghidra-mcp-cc
           just build-rtk-mcp-opencode
           just build-re-ghidra-mcp-opencode
+          just build-rtk-mcp-agy
+          just build-re-ghidra-mcp-agy
 
       # Freshness: a committed document that no longer matches a fresh
       # measurement is caught here, before any threshold is consulted.
@@ -200,7 +202,7 @@ jobs:
           # by git, because a README is mostly hand-written prose with one
           # generated region in it — see the Justfile for why that distinction
           # matters locally.
-          readmes="README.md $(ls -d claude-code/plugins/*/README.md opencode/plugins/*/README.md)"
+          readmes="README.md $(ls -d claude-code/plugins/*/README.md opencode/plugins/*/README.md antigravity/plugins/*/README.md)"
           before=$(md5sum $readmes)
 
           just footprint-regen

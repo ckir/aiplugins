@@ -121,6 +121,14 @@ footprint-regen:
             --budgets docs/footprints/budgets.json
         echo "regenerated docs/footprints/$plugin.json"
     done
+    for plugin in $(bash scripts/registry-plugins.sh antigravity | tr -d '\r'); do
+        cargo run -q -p plugin-footprint --bin plugin-footprint -- measure "antigravity/plugins/$plugin" \
+            --out "docs/footprints/$plugin.json"
+        cargo run -q -p plugin-footprint --bin plugin-footprint -- ratchet \
+            --measured "docs/footprints/$plugin.json" \
+            --budgets docs/footprints/budgets.json
+        echo "regenerated docs/footprints/$plugin.json"
+    done
     # The published figure (spec §7), rewritten from ALL documents at once —
     # never per-plugin, which would rewrite the root comparison table with a
     # single row and silently delete every other plugin's.
@@ -169,7 +177,7 @@ footprint:
     #
     # What actually indicates staleness is that REGENERATION CHANGED the file.
     # Unrelated prose edits are present before and after, so they cancel.
-    readmes="README.md $(ls -d claude-code/plugins/*/README.md opencode/plugins/*/README.md 2>/dev/null || true)"
+    readmes="README.md $(ls -d claude-code/plugins/*/README.md opencode/plugins/*/README.md antigravity/plugins/*/README.md 2>/dev/null || true)"
     before=$(md5sum $readmes)
 
     just footprint-regen
@@ -363,6 +371,32 @@ build-re-ghidra-mcp-opencode:
     fi
     @echo "Plugin binary staged in opencode/plugins/re-ghidra-mcp-opencode/bin/"
 
+# Build the rtk-mcp-agy plugin's binaries into its bin/ directory.
+build-rtk-mcp-agy:
+    cargo build -p rtk-mcp-agy --release --bin rtk-mcp --bin rtk-hook-preinvocation
+    mkdir -p antigravity/plugins/rtk-mcp-agy/bin
+    for b in rtk-mcp rtk-hook-preinvocation; do \
+        if [ -f "target/release/$b.exe" ]; then \
+            cp "target/release/$b.exe" antigravity/plugins/rtk-mcp-agy/bin/; \
+        else \
+            cp "target/release/$b" antigravity/plugins/rtk-mcp-agy/bin/; \
+        fi; \
+    done
+    @echo "Plugin binaries staged in antigravity/plugins/rtk-mcp-agy/bin/"
+
+# Build the re-ghidra-mcp-agy plugin's binaries into its bin/ directory.
+build-re-ghidra-mcp-agy:
+    cargo build -p re-ghidra-mcp-agy --release --bin re-ghidra-agy-mcp --bin re-ghidra-agy-hook
+    mkdir -p antigravity/plugins/re-ghidra-mcp-agy/bin
+    for b in re-ghidra-agy-mcp re-ghidra-agy-hook; do \
+        if [ -f "target/release/$b.exe" ]; then \
+            cp "target/release/$b.exe" antigravity/plugins/re-ghidra-mcp-agy/bin/; \
+        else \
+            cp "target/release/$b" antigravity/plugins/re-ghidra-mcp-agy/bin/; \
+        fi; \
+    done
+    @echo "Plugin binaries staged in antigravity/plugins/re-ghidra-mcp-agy/bin/"
+
 # Assemble the installable plugin zips for a published release, the same way
 # .github/workflows/plugin-bundles.yml does — for testing a change to the
 # bundling before tagging, or for rebuilding an asset by hand.
@@ -415,6 +449,21 @@ bundle-opencode:
     mkdir -p target/opencode-bundles
     for name in $names; do
         bash scripts/bundle-opencode-plugin.sh "opencode/plugins/$name" target/opencode-bundles
+    done
+
+# Assemble the installable Antigravity plugin zips for a published release.
+bundle-agy tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    names=$(bash scripts/registry-plugins.sh antigravity --exclude-skills-only | tr -d '\r')
+    rm -rf target/agy-assets target/agy-bundles
+    mkdir -p target/agy-assets
+    for name in $names; do
+        gh release download "{{ tag }}" -D target/agy-assets \
+            -p "$name-*.tar.xz" -p "$name-*.zip" --clobber
+    done
+    for name in $names; do
+        bash scripts/bundle-agy-plugin.sh "$name" target/agy-assets target/agy-bundles
     done
 
 # Regenerate EVERY plugin's committed copy of the ghidra-re-driver skill from
