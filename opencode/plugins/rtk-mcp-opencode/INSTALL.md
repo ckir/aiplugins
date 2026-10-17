@@ -17,7 +17,7 @@ You will install `rtk-mcp-opencode`: a PreToolUse-style hook that rewrites
 OpenCode shell commands through `rtk` (60–90% token savings) plus four MCP
 analytics tools. Install is a file copy plus a config merge — no registry,
 no build of the TypeScript itself. Tested with OpenCode **v2.0.20** and
-`@opencode/plugin` **2.0.26**; if the user runs anything older, say so
+`@opencode/plugin` **2.0.29**; if the user runs anything older, say so
 before continuing.
 
 This document is the executable form of `README.md`'s Installing section.
@@ -143,13 +143,13 @@ the destination config dir needs that package resolvable. OpenCode runs
 not rely on a later restart — install it now:
 
 ```bash
-cd "$DEST/.." && bun add @opencode/plugin@2.0.26
+cd "$DEST/.." && bun add @opencode/plugin@2.0.29
 ```
 
 That is: run it in `.opencode/`'s parent for a project-local install
 (creates/updates `<project>/.opencode/package.json`), or in
 `~/.config/opencode/` for a global install. If the README's "Tested with"
-pins name a newer `@opencode/plugin` than `2.0.26`, use the README's
+pins name a newer `@opencode/plugin` than `2.0.29`, use the README's
 version instead of the one above and say so. Verify
 `$DEST/../node_modules/@opencode/plugin/package.json` exists afterwards
 (`$DEST/node_modules/...` when `DEST` itself is the config dir — i.e. the

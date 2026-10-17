@@ -13,7 +13,7 @@ reverse-engineering engine lives in `shared/ghidra-mcp` behind the existing
 `re-ghidra-cc-mcp` binary; only the host integration (this `plugin.ts`) is
 OpenCode-specific.
 
-Tested with OpenCode **v2.0.20** and `@opencode/plugin` **2.0.26**. The V2
+Tested with OpenCode **v2.0.20** and `@opencode/plugin` **2.0.29**. The V2
 plugin API is explicitly beta and will churn — re-test on bump.
 
 <!-- footprint:begin -->
@@ -145,7 +145,7 @@ needs that package resolvable. From the project root (or
 `~/.config/opencode/` for a global install):
 
 ```bash
-bun add @opencode/plugin@2.0.26
+bun add @opencode/plugin@2.0.29
 ```
 
 Use the version under "Tested with" at the top of this README if it names a
