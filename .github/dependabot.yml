@@ -38,3 +38,12 @@ updates:
       npm-rtk:
         patterns:
           - "*"
+
+  - package-ecosystem: "npm"
+    directory: "/opencode/plugins/todov2-opencode"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm-todov2:
+        patterns:
+          - "*"

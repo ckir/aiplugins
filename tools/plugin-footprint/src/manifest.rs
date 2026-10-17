@@ -93,9 +93,17 @@ struct RawServer {
 /// path. This can. Without it, pointing the tool at the wrong directory produces
 /// a confident `status: ok, bytes: 0`, which is the same false zero the probe
 /// status exists to prevent, arriving one level up.
+///
+/// The third form is a skills-only OpenCode plugin: it ships no `plugin.ts` and
+/// no `opencode.jsonc`, and its `package.json` IS its manifest (bundle-skills-plugin
+/// and the registry both treat it that way), so it is a plugin on that alone.
 pub fn looks_like_a_plugin(dir: &Path) -> bool {
     dir.join(".claude-plugin").join("plugin.json").is_file()
         || (dir.join("plugin.ts").is_file() && dir.join("opencode.jsonc").is_file())
+        // A skills-only OpenCode plugin ships no plugin.ts and no
+        // opencode.jsonc; package.json is its manifest (bundle-skills-plugin
+        // and the registry both treat it that way).
+        || dir.join("package.json").is_file()
 }
 
 /// Read `<plugin_dir>/.mcp.json` and resolve every server it declares.
@@ -379,13 +387,24 @@ mod tests {
     /// harness runs tests on threads.
     #[test]
     fn a_directory_that_is_not_a_plugin_is_recognisable() {
-        // The repo root is not a plugin; a plugin directory is.
+        // A directory carrying none of the three plugin signatures; a plugin
+        // directory with the Claude manifest is one.
         let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
             .ancestors()
             .nth(2)
             .expect("crate sits two levels below the repo root");
 
-        assert!(!looks_like_a_plugin(repo));
+        // The repo root was this assertion's anchor until skills-only plugins
+        // were accepted, but the root's workspace package.json (committed long
+        // before skills-only plugins existed) now makes it plugin-shaped under
+        // the third rule, so the anchor moved to a bare directory that no
+        // signature could claim.
+        let dir = std::env::temp_dir().join(format!("pf-not-a-plugin-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("README.md"), "# not a plugin").unwrap();
+        assert!(!looks_like_a_plugin(&dir));
+        std::fs::remove_dir_all(&dir).unwrap();
+
         assert!(looks_like_a_plugin(
             &repo
                 .join("claude-code")
@@ -552,5 +571,28 @@ mod tests {
                 .join("plugins")
                 .join("rtk-mcp-opencode")
         ));
+    }
+
+    #[test]
+    fn skills_only_opencode_package_json_looks_like_a_plugin() {
+        // The harness runs from the package root, so the brief's repo-relative
+        // plugin path is joined onto the repo root — the same way
+        // `a_directory_that_is_not_a_plugin_is_recognisable` anchors its paths.
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .ancestors()
+            .nth(2)
+            .expect("crate sits two levels below the repo root");
+
+        let dir = std::env::temp_dir().join(format!("pf-looks-like-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("package.json"), "{}").unwrap();
+        assert!(looks_like_a_plugin(&dir));
+        assert!(looks_like_a_plugin(
+            &repo
+                .join("claude-code")
+                .join("plugins")
+                .join("repo-user-guide-cc")
+        ));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

@@ -13,19 +13,19 @@ reverse-engineering engine lives in `shared/ghidra-mcp` behind the existing
 `re-ghidra-cc-mcp` binary; only the host integration (this `plugin.ts`) is
 OpenCode-specific.
 
-Tested with OpenCode **v2.0.20** and `@opencode/plugin` **2.0.24**. The V2
+Tested with OpenCode **v2.0.20** and `@opencode/plugin` **2.0.26**. The V2
 plugin API is explicitly beta and will churn — re-test on bump.
 
 <!-- footprint:begin -->
 ### Context footprint
 
-Installing this plugin adds **≥ 21,297 bytes** to every request, for the whole session. A further **≥ 37,131 bytes** load only when one of its skills or agents is actually invoked. Its `plugin.ts` setup module adds **≥ 1,785 bytes**, loaded in-process with the host on every request and counted separately below so the TypeScript tier stays comparable across releases.
+Installing this plugin adds **≥ 21,297 bytes** to every request, for the whole session. A further **≥ 37,147 bytes** load only when one of its skills or agents is actually invoked. Its `plugin.ts` setup module adds **≥ 8,580 bytes**, loaded in-process with the host on every request and counted separately below so the TypeScript tier stays comparable across releases.
 
 | Tier | Bytes | When you pay it |
 |---|---|---|
 | Resident | ≥ 21,297 | Every request, for the whole session |
-| Invocation | ≥ 37,131 | Only when that skill or agent runs |
-| Setup | ≥ 1,785 | Every request — `plugin.ts` loads in-process with the host |
+| Invocation | ≥ 37,147 | Only when that skill or agent runs |
+| Setup | ≥ 8,580 | Every request — `plugin.ts` loads in-process with the host |
 
 **Bytes, not tokens.** This is the exact serialised size of what the host loads, measured by probing the plugin's own MCP server and reading its skill and agent frontmatter. It is not a token count and does not convert to one at a fixed rate — treat it as a figure you can compare between plugins, not as a context budget.
 
@@ -53,9 +53,12 @@ hooks:
 - `context` pushes a pointer at the `ghidra-re-driver` skill only when a
   Ghidra tool is among the request's tools, so idle sessions pay nothing.
 
-Both handlers are stateless — no `ctx.storage` use. The `SessionStart`
-preflight (`re-ghidra-cc-hook`) is deliberately NOT ported: interactive
-diagnosis belongs to the `doctor` skill.
+Both handlers are stateless — no `ctx.storage` use.
+
+The `SessionStart` hook itself is Claude Code-shaped and stays there — but its
+diagnosis is ported: `plugin.ts` runs the same preflight (install dir, Java,
+project values) once per session and, only when something is wrong, appends a
+finding to the first session context. Silent when healthy, never blocks.
 
 ### The 19 tools
 
@@ -95,6 +98,21 @@ The server reads the same environment as its Claude Code sibling:
 | JVM `-Xmx` | `GHIDRA_MCP_MAX_HEAP` |
 | Data directory (logs, worker scripts) | `GHIDRA_MCP_HOME` |
 
+#### Settings layer (`.opencode/re-ghidra-mcp-opencode.local.md`)
+
+Why a settings file matters more for this plugin than for most: **one server
+is one Ghidra project.** The project directory, project name and bootstrap
+program are per-workspace by nature, so without a settings layer every repo
+would duplicate the plugin's registration in an `opencode.jsonc` just to carry
+three strings.
+
+Copy `examples/re-ghidra-mcp-opencode.local.md` to
+`.opencode/re-ghidra-mcp-opencode.local.md` in the project root. Precedence is
+CLI flag > `GHIDRA_*` environment > this file (decided by the shared config
+resolver). The MCP server picks the file with `RE_GHIDRA_HOST=opencode`, which
+`opencode.jsonc` sets — an OpenCode session never reads
+`.claude/re-ghidra-mcp-cc.local.md`.
+
 **One server = one Ghidra project.** Two servers on the same project — or
 one server and an open GUI — collide on Ghidra's `project.lock`. Different
 workspaces must target different projects.
@@ -127,7 +145,7 @@ needs that package resolvable. From the project root (or
 `~/.config/opencode/` for a global install):
 
 ```bash
-bun add @opencode/plugin@2.0.24
+bun add @opencode/plugin@2.0.26
 ```
 
 Use the version under "Tested with" at the top of this README if it names a

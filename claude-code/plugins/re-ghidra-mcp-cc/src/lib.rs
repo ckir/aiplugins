@@ -2,8 +2,9 @@
 //!
 //! The server, its 19 tools and the Ghidra worker all live in the shared
 //! `ghidra-mcp` crate. What is genuinely Claude-Code-shaped lives here: reading
-//! `.claude/re-ghidra-mcp-cc.local.md`, and the preflight the `SessionStart`
-//! hook reports.
+//! the host's settings file — `.claude/re-ghidra-mcp-cc.local.md` on Claude,
+//! `.opencode/re-ghidra-mcp-opencode.local.md` on OpenCode, selected by
+//! `RE_GHIDRA_HOST` — and the preflight the `SessionStart` hook reports.
 //!
 //! Why a settings file matters more for this plugin than for most: **one server
 //! is one Ghidra project.** The project directory, project name and bootstrap
@@ -13,6 +14,45 @@
 
 use ghidra_mcp::config::RawConfig;
 use std::path::{Path, PathBuf};
+
+// ── Host ───────────────────────────────────────────────────────────────
+
+/// Which agent front is running. The settings file is per-host: a session on
+/// one host must never read the other host's file, which is what makes
+/// `.opencode/…local.md` and `.claude/…local.md` disjoint rather than a
+/// migration path between them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Host {
+    Claude,
+    Opencode,
+}
+
+impl Host {
+    /// The settings file this host reads, relative to a project root.
+    pub fn settings_rel_path(self) -> &'static str {
+        match self {
+            Host::Claude => ".claude/re-ghidra-mcp-cc.local.md",
+            Host::Opencode => ".opencode/re-ghidra-mcp-opencode.local.md",
+        }
+    }
+}
+
+/// The host named by `RE_GHIDRA_HOST`. Unset or anything but exactly
+/// `"opencode"` means [`Host::Claude`]: the Claude front has never read this
+/// variable, so defaulting there keeps every existing install on today's
+/// behavior. OpenCode sets the variable in `opencode.jsonc`'s
+/// `mcp.servers.ghidra.environment` (Task 5).
+pub fn host_from_str(value: Option<&str>) -> Host {
+    match value {
+        Some("opencode") => Host::Opencode,
+        _ => Host::Claude,
+    }
+}
+
+/// [`host_from_str`] over the process environment.
+pub fn host_from_env() -> Host {
+    host_from_str(std::env::var("RE_GHIDRA_HOST").ok().as_deref())
+}
 
 // ── Settings ───────────────────────────────────────────────────────────
 
@@ -56,17 +96,18 @@ pub fn settings_from_markdown(source: &str) -> RawConfig {
 }
 
 /// The settings file this plugin reads, relative to a project root.
-pub fn settings_path(project_dir: &Path) -> PathBuf {
-    project_dir
-        .join(".claude")
-        .join("re-ghidra-mcp-cc.local.md")
+pub fn settings_path(project_dir: &Path, host: Host) -> PathBuf {
+    project_dir.join(host.settings_rel_path())
 }
 
 /// Load the settings layer for `project_dir`. A missing or unreadable file is
 /// not an error — it simply contributes nothing, and the environment or CLI
 /// flags supply the values instead.
-pub fn load_settings(project_dir: &Path) -> RawConfig {
-    match std::fs::read_to_string(settings_path(project_dir)) {
+///
+/// This is the lowest config layer, and the file it reads is chosen by
+/// `host`: a session never sees the other host's settings.
+pub fn load_settings(project_dir: &Path, host: Host) -> RawConfig {
+    match std::fs::read_to_string(settings_path(project_dir, host)) {
         Ok(text) => settings_from_markdown(&text),
         Err(_) => RawConfig::default(),
     }
@@ -110,7 +151,7 @@ pub const MIN_JAVA_MAJOR: u32 = 21;
 ///
 /// Deliberately *cheap*: no JVM spawn, no Ghidra project open, no lock probe.
 /// This runs on every session start, so it may cost milliseconds, not seconds.
-pub fn preflight(cfg: &RawConfig, probe: &Probe) -> Vec<String> {
+pub fn preflight(cfg: &RawConfig, probe: &Probe, host: Host) -> Vec<String> {
     let mut findings = Vec::new();
 
     match cfg.ghidra_install_dir.as_deref() {
@@ -151,11 +192,11 @@ pub fn preflight(cfg: &RawConfig, probe: &Probe) -> Vec<String> {
     .collect();
     if !missing.is_empty() {
         findings.push(format!(
-            "Unset: {}. Set them in `.claude/re-ghidra-mcp-cc.local.md` \
-             (see the plugin's examples/ directory) or as \
+            "Unset: {}. Set them in `{}` (see the plugin's examples/ directory) or as \
              GHIDRA_MCP_PROJECT_DIR / GHIDRA_MCP_PROJECT_NAME / \
              GHIDRA_MCP_BOOTSTRAP_PROGRAM.",
-            missing.join(", ")
+            missing.join(", "),
+            host.settings_rel_path()
         ));
     }
 
@@ -204,7 +245,7 @@ mod preflight_tests {
     /// from invisible to noisy on every single session.
     #[test]
     fn fully_configured_reports_nothing() {
-        assert!(preflight(&complete(), &good_probe()).is_empty());
+        assert!(preflight(&complete(), &good_probe(), Host::Claude).is_empty());
     }
 
     #[test]
@@ -213,9 +254,33 @@ mod preflight_tests {
             launcher_present: false,
             ..good_probe()
         };
-        let f = preflight(&complete(), &probe);
+        let f = preflight(&complete(), &probe, Host::Claude);
         assert_eq!(f.len(), 1);
         assert!(f[0].contains("analyzeHeadless"), "{}", f[0]);
+    }
+
+    #[test]
+    fn guidance_names_the_active_hosts_file() {
+        let cfg = RawConfig {
+            project_dir: None,
+            project_name: None,
+            bootstrap_program: None,
+            ..complete()
+        };
+        let f = preflight(&cfg, &good_probe(), Host::Opencode);
+        assert_eq!(f.len(), 1);
+        assert!(
+            f[0].contains(".opencode/re-ghidra-mcp-opencode.local.md"),
+            "{}",
+            f[0]
+        );
+        let f = preflight(&cfg, &good_probe(), Host::Claude);
+        assert_eq!(f.len(), 1);
+        assert!(
+            f[0].contains(".claude/re-ghidra-mcp-cc.local.md"),
+            "{}",
+            f[0]
+        );
     }
 
     #[test]
@@ -224,7 +289,7 @@ mod preflight_tests {
             java_major: Some(17),
             ..good_probe()
         };
-        let f = preflight(&complete(), &probe);
+        let f = preflight(&complete(), &probe, Host::Claude);
         assert_eq!(f.len(), 1);
         assert!(f[0].contains("17") && f[0].contains("21"), "{}", f[0]);
     }
@@ -235,7 +300,7 @@ mod preflight_tests {
             java_major: None,
             ..good_probe()
         };
-        assert!(preflight(&complete(), &probe)[0].contains("No `java` on PATH"));
+        assert!(preflight(&complete(), &probe, Host::Claude)[0].contains("No `java` on PATH"));
     }
 
     /// The three per-project values collapse into one finding, naming exactly
@@ -247,7 +312,7 @@ mod preflight_tests {
             bootstrap_program: None,
             ..complete()
         };
-        let f = preflight(&cfg, &good_probe());
+        let f = preflight(&cfg, &good_probe(), Host::Claude);
         assert_eq!(f.len(), 1);
         assert!(f[0].contains("project_name"), "{}", f[0]);
         assert!(f[0].contains("bootstrap_program"), "{}", f[0]);
@@ -327,5 +392,22 @@ mod settings_tests {
     fn unknown_keys_are_ignored() {
         let c = settings_from_markdown("---\nfuture_key: 1\nproject_name: p\n---\n");
         assert_eq!(c.project_name.as_deref(), Some("p"));
+    }
+
+    #[test]
+    fn settings_path_is_per_host() {
+        let dir = Path::new("/proj");
+        assert!(settings_path(dir, Host::Claude).ends_with(".claude/re-ghidra-mcp-cc.local.md"));
+        assert!(settings_path(dir, Host::Opencode)
+            .ends_with(".opencode/re-ghidra-mcp-opencode.local.md"));
+    }
+
+    #[test]
+    fn host_from_str_defaults_to_claude() {
+        assert_eq!(host_from_str(None), Host::Claude);
+        assert_eq!(host_from_str(Some("")), Host::Claude);
+        assert_eq!(host_from_str(Some("claude")), Host::Claude);
+        assert_eq!(host_from_str(Some("OPENCODE")), Host::Claude); // exact match only
+        assert_eq!(host_from_str(Some("opencode")), Host::Opencode);
     }
 }

@@ -48,6 +48,8 @@ if [ "${1:-}" = "--self-test" ]; then
     failures=0
     [ "$(registry_plugins claude-code | tr '\n' ' ')" = "rtk-mcp-cc re-ghidra-mcp-cc aiplugins-devtools-cc repo-user-guide-cc " ] \
         || { echo "FAIL plugins claude-code"; failures=$((failures + 1)); }
+    [ "$(registry_plugins opencode | tr '\n' ' ')" = "rtk-mcp-opencode re-ghidra-mcp-opencode todov2-opencode aiplugins-devtools-opencode repo-user-guide-opencode " ] \
+        || { echo "FAIL plugins opencode"; failures=$((failures + 1)); }
     [ "$(registry_manifest_path qwen rtk-mcp-qwen)" = "qwen/plugins/rtk-mcp-qwen/qwen-extension.json" ] \
         || { echo "FAIL manifest path"; failures=$((failures + 1)); }
     registry_is_excluded qwen example \

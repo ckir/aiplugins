@@ -5,6 +5,7 @@
       "ghidra": {
         "type": "local",
         "command": ["./bin/re-ghidra-cc-mcp", "serve"],
+        "environment": { "RE_GHIDRA_HOST": "opencode" },
         "disabled": false,
         "timeout": { "catalog": 30000, "execution": 30000 }
       }

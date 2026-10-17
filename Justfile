@@ -74,6 +74,12 @@ gen-marketplaces:
 opencode-wiring:
     bash scripts/check-opencode-wiring.sh
 
+# Assemble every OpenCode plugin zip locally and check its contents (PR-time
+# smoke; tag-time bundling and published-zip verification stay in
+# opencode-bundles.yml, skills-only zips in check-skills-bundles.sh).
+smoke-opencode-bundle:
+    bash scripts/smoke-opencode-bundle.sh
+
 # Run the opencode TypeScript unit tests.
 test-opencode:
     #!/usr/bin/env bash
@@ -98,16 +104,14 @@ footprint-regen:
             --budgets docs/footprints/budgets.json
         echo "regenerated docs/footprints/$plugin.json"
     done
-    for dir in opencode/plugins/*/; do
-        # skills-only plugins have no plugin.ts; check-opencode-wiring.sh check 1 is what fails loudly for a real plugin that lost its plugin.ts
-        [ -f "$dir/plugin.ts" ] || continue
-        name=$(basename "$dir")
+    for plugin in $(bash scripts/registry-plugins.sh opencode | tr -d '\r'); do
+        dir="opencode/plugins/$plugin"
         cargo run -q -p plugin-footprint --bin plugin-footprint -- measure "$dir" \
-            --out "docs/footprints/$name.json"
+            --out "docs/footprints/$plugin.json"
         cargo run -q -p plugin-footprint --bin plugin-footprint -- ratchet \
-            --measured "docs/footprints/$name.json" \
+            --measured "docs/footprints/$plugin.json" \
             --budgets docs/footprints/budgets.json
-        echo "regenerated docs/footprints/$name.json"
+        echo "regenerated docs/footprints/$plugin.json"
     done
     # The published figure (spec §7), rewritten from ALL documents at once —
     # never per-plugin, which would rewrite the root comparison table with a
@@ -373,6 +377,19 @@ bundle-qwen tag:
     done
     for name in $names; do
         bash scripts/bundle-qwen-extension.sh "$name" target/qwen-assets target/qwen-bundles
+    done
+
+# Assemble the installable OpenCode plugin zips from a working tree — the
+# local pre-tag counterpart of opencode-bundles.yml (no releases involved:
+# bundle-opencode-plugin.sh stages versioned source only).
+bundle-opencode:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    names=$(bash scripts/registry-plugins.sh opencode --exclude-skills-only | tr -d '\r')
+    rm -rf target/opencode-bundles
+    mkdir -p target/opencode-bundles
+    for name in $names; do
+        bash scripts/bundle-opencode-plugin.sh "opencode/plugins/$name" target/opencode-bundles
     done
 
 # Regenerate EVERY plugin's committed copy of the ghidra-re-driver skill from

@@ -12,5 +12,6 @@
   "claude-code/plugins/repo-user-guide-cc": "0.2.0",
   "qwen/plugins/aiplugins-devtools-qwen": "0.1.0",
   "opencode/plugins/aiplugins-devtools-opencode": "0.1.0",
+  "opencode/plugins/repo-user-guide-opencode": "0.2.0",
   "antigravity/plugins/aiplugins-devtools-agy": "0.1.0"
 }

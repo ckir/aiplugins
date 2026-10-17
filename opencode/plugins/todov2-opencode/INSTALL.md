@@ -16,7 +16,7 @@ You will install `todov2-opencode`: the `todowrite` session tool that V2
 removed, plus an optional live todo list in the session sidebar. Install is
 a file copy plus two config entries — no registry, no build of the
 TypeScript itself (opencode transpiles it at runtime). Tested against
-`@opencode/plugin` **2.0.24**; it targets OpenCode **V2** (V1 is not
+`@opencode/plugin` **2.0.26**; it targets OpenCode **V2** (V1 is not
 supported by this plugin).
 
 This document is the executable form of `README.md`'s Installing section.

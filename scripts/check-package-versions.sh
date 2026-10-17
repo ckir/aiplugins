@@ -36,6 +36,7 @@ for spec in \
     "re-ghidra-mcp-opencode|opencode/plugins/re-ghidra-mcp-opencode/package.json|opencode/plugins/re-ghidra-mcp-opencode/package.json|.version" \
     "todov2-opencode|opencode/plugins/todov2-opencode/package.json|opencode/plugins/todov2-opencode/package.json|.version" \
     "aiplugins-devtools-opencode|opencode/plugins/aiplugins-devtools-opencode/package.json|opencode/plugins/aiplugins-devtools-opencode/package.json|.version" \
+    "repo-user-guide-opencode|opencode/plugins/repo-user-guide-opencode/package.json|opencode/plugins/repo-user-guide-opencode/package.json|.version" \
     "rtk-mcp-agy|antigravity/plugins/rtk-mcp-agy/Cargo.toml|antigravity/plugins/rtk-mcp-agy/plugin.json|.version" \
     "re-ghidra-mcp-agy|antigravity/plugins/re-ghidra-mcp-agy/Cargo.toml|antigravity/plugins/re-ghidra-mcp-agy/plugin.json|.version" \
     "aiplugins-devtools-agy|antigravity/plugins/aiplugins-devtools-agy/plugin.json|antigravity/plugins/aiplugins-devtools-agy/plugin.json|.version" \

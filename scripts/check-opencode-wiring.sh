@@ -17,6 +17,20 @@ jqr() {
     jq -r "$@" | tr -d '\r'
 }
 
+# Every @opencode/plugin version a README/INSTALL claims, one per line:
+#   @opencode/plugin@2.0.26
+#   `@opencode/plugin` **2.0.26**
+#   `@opencode/plugin` than `2.0.26`
+# Anchored on the plugin token so the OpenCode release number on the same
+# line ("Tested with OpenCode v2.0.20 and …") is never captured.
+doc_pins() {
+    sed -n \
+        -e 's/.*@opencode\/plugin@\([0-9][0-9.]*\).*/\1/p' \
+        -e 's/.*@opencode\/plugin` \*\*\([0-9][0-9.]*\)\*\*.*/\1/p' \
+        -e 's/.*@opencode\/plugin` than `\([0-9][0-9.]*\)`.*/\1/p' \
+        "$1"
+}
+
 known=$(cargo metadata --no-deps --format-version 1 |
     jq -r '.packages[].targets[] | select(.kind[] == "bin") | .name' | sort -u)
 
@@ -125,6 +139,20 @@ for pair in \
     fi
 done
 
+# The repo-user-guide skill is a byte-copy of the Claude original: host-portable,
+# hence `diff -r`. Unlike the host-ported skills named in the NOTE above
+# (rtk-policy, gain, doctor), it IS compared: a drift here means the port drifted apart.
+src_skills="claude-code/plugins/repo-user-guide-cc/skills"
+dst_skills="opencode/plugins/repo-user-guide-opencode/skills"
+checked=$((checked + 1))
+if [ ! -d "$dst_skills" ]; then
+    fail "copy missing: $dst_skills"
+elif ! diff -r -q "$src_skills" "$dst_skills" >/dev/null 2>&1; then
+    fail "stale copy: $dst_skills differs from $src_skills"
+else
+    printf '  ok       copy %-40s\n' "$dst_skills"
+fi
+
 # 8. Pin-consistency: every opencode plugin pins the same @opencode/plugin
 # version, so one plugin drifting ahead of (or behind) the other fails loudly
 # instead of passing silently.
@@ -147,6 +175,25 @@ for name in $(registry_plugins opencode | sort); do
     else
         printf '  ok       @opencode/plugin %-16s <- %s\n' "$pin" "$pkg"
     fi
+done
+
+# 9. Doc pins: every @opencode/plugin version claimed in a README/INSTALL must
+#    equal package.json, so a dependency bump fails until the docs move too.
+for name in $(registry_plugins opencode | sort); do
+    dir="opencode/plugins/$name"
+    pkg="$dir/package.json"
+    [ -f "$pkg" ] || continue
+    pin=$(jqr '.dependencies["@opencode/plugin"] // ""' "$pkg" 2>/dev/null || echo "")
+    [ -n "$pin" ] || continue # skills-only plugins carry no pin (as check 8)
+    for doc in "$dir/README.md" "$dir/INSTALL.md"; do
+        [ -f "$doc" ] || continue
+        while IFS= read -r claim; do
+            [ -n "$claim" ] || continue
+            checked=$((checked + 1))
+            [ "$claim" = "$pin" ] ||
+                fail "$doc claims @opencode/plugin $claim, package.json pins $pin"
+        done < <(doc_pins "$doc")
+    done
 done
 
 if [ "$checked" -eq 0 ]; then

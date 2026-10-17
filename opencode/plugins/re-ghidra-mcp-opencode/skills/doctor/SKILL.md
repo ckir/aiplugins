@@ -62,7 +62,8 @@ below describes a server that is not running.
 ## 2. Ghidra is installed, and the plugin can find it
 
 The install root can come from the `GHIDRA_INSTALL_DIR` environment variable
-**or** the `ghidra_install_dir` key in `.claude/re-ghidra-mcp-cc.local.md` in the
+**or** the `ghidra_install_dir` key in
+`.opencode/re-ghidra-mcp-opencode.local.md` in the
 session directory (a fallback layer from the shared server binary, which this
 plugin reuses), with the environment winning. Read both before concluding anything — reporting a hard
 failure here when the settings file supplied a valid path would stop the
@@ -127,7 +128,8 @@ exists. Both `21.0.x` and a bare `25` are fine; `1.8.0_x` is Java 8 and is not.
 
 ## 4. The project is configured
 
-Read the `GHIDRA_MCP_*` environment first, then `.claude/re-ghidra-mcp-cc.local.md`
+Read the `GHIDRA_MCP_*` environment first, then
+`.opencode/re-ghidra-mcp-opencode.local.md`
 in the session directory if it exists (fallback layer from the shared server
 binary — the primary documented config on this host is the environment; see
 this plugin's README table):

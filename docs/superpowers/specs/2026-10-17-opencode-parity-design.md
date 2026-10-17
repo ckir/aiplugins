@@ -1,0 +1,318 @@
+# Spec: OpenCode V2 parity with Claude Code — port the missing pieces (G1–G8)
+
+**Status:** SPEC, brainstormed 2026-10-17; unimplemented. All four design
+sections were presented and approved in chat before writing. Approach 1
+(one spec, two workstreams) was chosen over decomposition (2) and
+hygiene-first (3).
+
+**Date:** 2026-10-17
+**Scope:** close every remaining `claude-code/` → `opencode/` parity gap
+found by the gap analysis (G1–G8). `repo-user-guide` is ported to
+**opencode only** — not qwen/antigravity (confirmed). Supersedes and
+extends `docs/specs/2026-10-01-opencode-v2-design.md`, whose shipped
+items are left untouched.
+
+---
+
+## 1. Background and goal
+
+The 2026-10-01 OpenCode V2 spec shipped the `opencode/` front: four
+plugins (`rtk-mcp-opencode`, `re-ghidra-mcp-opencode`,
+`todov2-opencode`, `aiplugins-devtools-opencode`), its own wiring gate,
+footprint, smoke, bundles, and registry-driven marketplace. A follow-up
+gap analysis against `claude-code/` found eight remaining gaps:
+
+| # | Gap |
+|---|-----|
+| G1 | `repo-user-guide-cc` has no opencode port (only plugin missing from the front) |
+| G2 | re-ghidra per-project `.local.md` settings + SessionStart preflight are Claude-only; the shared binary prints `.claude/…` guidance to opencode users (wrong host) |
+| G3 | footprint measurement skips skills-only opencode plugins (no `plugin.ts` → skipped), so `aiplugins-devtools-opencode` has no footprint or budget |
+| G4 | assembled opencode bundle zip is smoke-tested only at tag time, not on PRs |
+| G5 | README/INSTALL pin `@opencode/plugin` 2.0.24 while `package.json` pins 2.0.26; no gate catches doc-pin drift |
+| G6 | `todov2-opencode` missing from dependabot despite real devDependencies |
+| G7 | no local `just bundle-opencode` recipe (bundling exists only in the tag workflow) |
+| G8 | stale/missing docs: old spec's "unimplemented" status, `README.md:110` "fronted today by", missing `claude-code/skills/README.md`, doc index row |
+
+**Goal:** after this spec, `opencode/` is at parity with `claude-code/`
+for real functionality (G1, G2) and for every repo gate that guards the
+Claude front (G3–G8).
+
+**Non-goals:** porting `repo-user-guide` to qwen/antigravity; porting the
+`example` scaffold (explicit 2026-10-01 non-goal, reaffirmed); porting
+`todov2-opencode` back to Claude Code (Claude has `todowrite` natively);
+rewriting `shared/ghidra-mcp` engines; npm publishing; any V1 OpenCode
+shim. Rust crates, `.mcp.json`, and `hooks/hooks.json` remain absent from
+the opencode front by design — they are replaced by in-process TS hooks
+and `opencode.jsonc`, not gaps.
+
+## 2. Workstream A — functional ports
+
+### 2.1 G1: `repo-user-guide-opencode` (skills-only plugin)
+
+Port `claude-code/plugins/repo-user-guide-cc` following the
+`aiplugins-devtools-opencode` skills-only pattern.
+
+**New plugin dir** `opencode/plugins/repo-user-guide-opencode/`:
+
+- `package.json` — `name: "repo-user-guide"` (the shared family name,
+  mirroring how `aiplugins-devtools-opencode` carries `aiplugins-devtools`;
+  the marketplace entry name comes from this field and must equal the
+  registry's published name, which `check-marketplace.sh` enforces),
+  `version: 0.2.0` (matching the cc twin so `check-package-versions.sh`
+  agrees), `private: true`, license `PolyForm-Noncommercial-1.0.0`,
+  no dependencies (pure files).
+- `skills/repo-user-guide/{SKILL.md, assets/guide-template.html,
+  scripts/{check_pre.py, escape_pre.py, html_to_pdf.sh}}` —
+  **byte-identical copies** of the `repo-user-guide-cc` originals. The
+  skill body is host-portable (no Claude-specific references), so no
+  host port is needed, unlike the rtk/ghidra skills. Skill dir keeps the
+  name `repo-user-guide` (no collision with any other skill in the front,
+  so no prefix — unlike the devtools skill).
+- `README.md` — what the skill does, copy-based install (global
+  `~/.config/opencode/skills/repo-user-guide/` + project-local
+  `.opencode/skills/repo-user-guide/`), pinned tested OpenCode release
+  per repo convention, health/verification steps.
+- `INSTALL.md` — the agent-facing install script pattern used by the
+  other opencode plugins.
+- `CHANGELOG.md` — created by release-please on first release (no
+  hand-written file needed to land; matches how
+  `repo-user-guide-cc`/`todov2-opencode` started).
+
+**Registry-driven wiring** — `agents.json` stays the single source of
+truth; most downstream files derive from it:
+
+1. `agents.json` opencode entry: add `"repo-user-guide-opencode"` to
+   `plugins[]` and `skillsOnly[]`; add
+   `"repo-user-guide-opencode": "repo-user-guide"` to `publishedNames`
+   (release artifact `repo-user-guide-opencode-opencode.zip` per the
+   front's `artifactSuffix`, published name de-duplicated like the cc
+   twin).
+2. `release-please-config.json`: regenerate via
+   `scripts/gen-release-please-packages.sh` (the packages table is
+   generated from `agents.json` and CI-checked with `--check`; it must
+   not be hand-edited).
+3. `scripts/check-package-versions.sh`: add the self-compare row
+   (`package.json` vs `package.json`, as the other opencode rows do).
+4. `.opencode-plugin/marketplace.json`: regenerated by
+   `scripts/gen-marketplaces.sh` (CI `--check` validates).
+5. `scripts/check-skills-bundles.sh`: add **both** the
+   `claude-code:repo-user-guide-cc` and `opencode:repo-user-guide-opencode`
+   pairs — the check's pairs list currently covers only the devtools
+   plugins, so the cc skills bundle itself is unchecked on PRs (latent
+   Claude-side hole; fixing it here keeps the parity claim honest).
+   `bundle-skills-plugin.sh` already special-cases `repo-user-guide-cc`
+   (ships no binaries) — extend that condition to the opencode name; the
+   `repo-user-guide-*-v*` tag glob in `skills-bundles.yml` already
+   covers `repo-user-guide-opencode-v*`. **One workflow change IS
+   needed:** `opencode-bundles.yml` matches `*-opencode-v*` and would
+   also fire for the new tag, racing skills-bundles over the same
+   asset — it needs a `!repo-user-guide-*-v*` exclusion beside its
+   existing `!aiplugins-devtools-*-v*` one, and
+   `check-skills-release-wiring.sh` gains the matching assertions.
+6. `scripts/lib/registry.sh` self-tests: the claude-code front's plugin
+   list is asserted there but the opencode front's is not — add the
+   opencode assertion so the new key is guarded the same way.
+7. Footprint: enabled by the G3 fix (§2.2); regenerates
+   `docs/footprints/repo-user-guide-opencode.json` + a `budgets.json`
+   key sized from the cc twin's budget.
+
+**Staleness gate:** extend `scripts/check-opencode-wiring.sh` with a
+`cmp` byte-identity check: every file under
+`opencode/plugins/repo-user-guide-opencode/skills/` must match its
+`claude-code/plugins/repo-user-guide-cc/skills/` counterpart (same
+approach as the `ghidra-re-driver` check). Copies are synced manually —
+no canonical-source emit exists for this skill today; the gate exists so
+a stale copy fails CI instead of drifting silently.
+
+### 2.2 G2: host-aware settings + TS preflight (`re-ghidra-mcp`)
+
+**Problem.** The staged `re-ghidra-cc-mcp` binary resolves settings from
+`.claude/re-ghidra-mcp-cc.local.md` regardless of host, and its
+preflight guidance says "Set them in `.claude/…`" — wrong-host
+instructions for opencode users, whose per-project settings therefore
+cannot reach the server without touching `.claude/`. OpenCode also has
+no SessionStart-equivalent preflight: the four environmental failures
+(missing `GHIDRA_INSTALL_DIR`, non-Ghidra dir, JDK < 21, unconfigured
+project) surface only on the first tool call, from inside a JVM that
+never booted.
+
+**Chosen approach (of three considered):** host-aware Rust + TS
+preflight. Alternatives — TS-only preflight with env-only config
+(weaker parity: settings still can't reach the server) and env-only
+preflight (weakest parity) — were rejected.
+
+**Rust changes** — confined to `claude-code/plugins/re-ghidra-mcp-cc/`;
+`shared/ghidra-mcp` is untouched:
+
+- `lib.rs` gains a host concept. `settings_path()` becomes host-aware:
+  - Claude host → `.claude/re-ghidra-mcp-cc.local.md` (today's path,
+    unchanged)
+  - OpenCode host → `.opencode/re-ghidra-mcp-opencode.local.md`
+  - **Host-specific file only.** An opencode session never reads the
+    `.claude/` file and vice versa. Resolution precedence unchanged:
+    CLI flags > env > host settings file.
+- **Host selection:** `RE_GHIDRA_HOST` env var, values `claude` |
+  `opencode`. Invalid or unset → `claude` (back-compat; never a panic —
+  existing installs and the Claude front behave exactly as today). The
+  opencode front's `opencode.jsonc` `mcp.servers.ghidra` entry sets
+  `RE_GHIDRA_HOST=opencode` in the spawned server's environment.
+- Preflight findings/guidance text (`lib.rs` ~line 154) names the
+  **active host's** file: "Set them in
+  `.opencode/re-ghidra-mcp-opencode.local.md`" under the opencode host.
+- `src/bin/hook.rs` (Claude SessionStart) is behaviorally unchanged —
+  it calls the same lib with the claude host. `src/bin/mcp.rs` passes
+  the host through to `load_settings`.
+
+**OpenCode TS preflight** — `opencode/plugins/re-ghidra-mcp-opencode/plugin.ts`:
+
+- In `setup(ctx)`, run the same cheap checks the Rust preflight runs:
+  load and parse the active host's `.local.md` frontmatter in TS (same
+  key set as `settings_from_markdown`: `ghidra_install_dir`,
+  `project_dir`, `project_name`, `bootstrap_program`,
+  `bootstrap_program_path`, `max_heap`), overlay env (empty = unset),
+  then check: Ghidra launcher present
+  (`support/analyzeHeadless[.bat]`), `java -version` ≥ 21, project
+  configured.
+- **Same two rules as the Rust hook:** *silent when healthy* (a clean
+  environment produces no output — anything else is noise users learn to
+  ignore) and *never blocks* (any thrown error is swallowed; the plugin
+  always loads; a preflight that stops a session is worse than the
+  problem it reports).
+- Findings are injected **once** via the session context channel — the
+  same mechanism `driverPointer()` already uses. The exact injection
+  point on `@opencode/plugin` 2.0.26 is a **plan-time spike** (same
+  class as the 2026-10-01 shell-shape spike); documented fallback if no
+  viable channel exists: log-only reporting (preflight still runs, still
+  silent-when-healthy).
+
+**MCP environment spike (plan-time):** confirm `opencode.jsonc` local
+MCP servers accept an `environment` map to pass `RE_GHIDRA_HOST=opencode`.
+Fallback if not supported: `plugin.ts` cannot set the server's env, so
+host selection falls back to detection — documented in the plan; if
+neither path works, the design's wrong-host-guidance fix still lands via
+the Rust default-overridable path and the remaining behavior degrades to
+today's (called out as a plan decision, not silent).
+
+**Docs:**
+
+- New `opencode/plugins/re-ghidra-mcp-opencode/examples/re-ghidra-mcp-opencode.local.md`
+  documenting the opencode keys (mirrors the cc example).
+- `opencode/plugins/re-ghidra-mcp-opencode/{README,INSTALL}.md`: add the
+  `.opencode/…local.md` settings layer and `RE_GHIDRA_HOST` sections;
+  update the wrong-host guidance currently pointing at `.claude/`.
+- `claude-code/plugins/re-ghidra-mcp-cc/README.md`: note the new
+  `RE_GHIDRA_HOST` env var (default `claude`, no behavior change).
+
+**Tests:**
+
+- Rust (existing suite extended): host path selection for both hosts,
+  `RE_GHIDRA_HOST` parsing, invalid value → claude default, guidance
+  text names the active host's file, precedence unchanged.
+- Bun (existing `tests/hooks.test.ts` extended): preflight matrix —
+  healthy → silent; unset `GHIDRA_INSTALL_DIR`; fake non-Ghidra dir;
+  fake old `java` on `PATH`; unconfigured project; thrown/unexpected
+  ctx shape → silent (fail-open). Reuses the mock-via-`PATH` pattern
+  the rtk tests already use.
+
+## 3. Workstream B — gates, CI, doc hygiene (G3–G8)
+
+Each item lands as its own commit. No cross-dependencies except G3's
+regen, which runs after G1's plugin exists (ordering in §5).
+
+**G3 — footprint covers skills-only opencode plugins.** Two layers:
+the **footprint tool** must first accept such plugins —
+`looks_like_a_plugin` requires `.claude-plugin/plugin.json` or the
+`plugin.ts`+`opencode.jsonc` pair, and `measure`'s agent detection keys
+on `opencode.jsonc` presence, so a skills-only opencode dir is refused
+as "not a plugin" and (if forced) would be measured with the wrong
+agent label — both gain a `package.json` (no Claude manifest) path.
+Then `Justfile` `footprint-regen`'s opencode loop iterates the opencode
+registry (as the claude-code loop does) instead of skipping dirs
+without `plugin.ts`; same fix in `scripts/check-footprint-budgets.sh`'s
+"live" definition. Then regen: adds
+`docs/footprints/aiplugins-devtools-opencode.json` (+ G1's
+`repo-user-guide-opencode.json`) and `budgets.json` keys sized from the
+cc twins; the two plugin READMEs need the `<!-- footprint:begin/end -->`
+marker pair (publish hard-errors on a missing marker) and the root
+README table gains their rows.
+
+**G4 — PR-time bundle assembly smoke.** New
+`scripts/smoke-opencode-bundle.sh`: run `bundle-opencode-plugin.sh`,
+extract the zip to a temp dir, assert the exact expected file set
+(plugin source, `opencode.jsonc`, `package.json`, staged `bin/` where
+applicable, skill files). No OpenCode launch — full event-plumbing
+coverage stays with `smoke-opencode.sh` (CI, 3 OS) and the tag-time
+workflow, which this note in the script must state. Wire as a `ci.yml`
+job beside `opencode-smoke`; add a `just smoke-opencode-bundle` recipe.
+
+**G5 — pin-drift gate.** Fix stale pins to the actually-tested version:
+the four README/INSTALL claims of `@opencode/plugin` 2.0.24 and the
+`@opencode/plugin@2.0.21` comment in `plugin.ts`. Extend
+`check-opencode-wiring.sh`: every opencode plugin README/INSTALL
+`@opencode/plugin` pin must equal that plugin's `package.json`
+`devDependencies` value — hard `just check` failure on drift (same class
+as the existing cross-plugin pin-consistency check).
+
+**G6 — dependabot.** Add `opencode/plugins/todov2-opencode` to
+`.github/dependabot.yml` beside its two opencode siblings.
+
+**G7 — `just bundle-opencode`.** Thin recipe looping
+`scripts/bundle-opencode-plugin.sh` over the opencode registry, mirroring
+`bundle-plugins`/`bundle-qwen` — local pre-tag testing only (bundles
+themselves stay tag-workflow-owned).
+
+**G8 — doc fixes.**
+
+- `docs/specs/2026-10-01-opencode-v2-design.md` status header:
+  "unimplemented" → shipped; note supersession by this spec for the
+  items reworked here (G2 preflight/settings, marketplace manifest was
+  already superseded by the first-class bundles plan).
+- `README.md` line ~110 ("fronted today by `claude-code/plugins/re-ghidra-mcp-cc`")
+  → list all four fronts; doc index gains the `repo-user-guide` row
+  (currently missing even though the plugin is published).
+- Add `claude-code/skills/README.md` (copy of the opencode one — the
+  only category dir lacking it).
+- `scripts/lib/registry.sh` self-tests: add the opencode front's
+  expected plugin list (also required by G1; none is asserted today).
+
+## 4. Error handling (cross-cutting)
+
+- **Rust:** invalid `RE_GHIDRA_HOST` → claude default; unreadable or
+  missing settings file → contributes nothing (today's contract); no new
+  panic paths.
+- **TS preflight:** every failure path degrades to silent; never throws
+  into the host; never blocks session start.
+- **Scripts (G1/G4/G7):** `set -euo pipefail`, explicit failure
+  messages, registry-driven iteration (no hardcoded plugin lists beyond
+  the registry self-tests).
+- **G5:** doc/manifest mismatch is a hard `just check` failure.
+
+## 5. Sequencing
+
+1. **G1** port (self-contained; unblocks G3 regen).
+2. **G2** Rust host-awareness → G2 TS preflight, including both
+   plan-time spikes (MCP `environment` passthrough; session-context
+   injection channel), each with its documented fallback.
+3. **G3** footprint regen + **G5** gate/fixes + **G8** docs.
+4. **G4** bundle smoke + **G6** dependabot + **G7** recipe.
+
+**Risks:** the two G2 spikes (mitigated by fallbacks above); first
+release-please run for the new package (low — matches how
+`repo-user-guide-cc` and `todov2-opencode` were introduced); footprint
+budget sizes for the new keys (taken from the cc twins).
+
+## 6. Verification
+
+- `cargo test` — re-ghidra crate suite extended (host selection,
+  precedence, guidance text).
+- `bun test` — both touched opencode plugins (preflight matrix; existing
+  suites extended, not replaced).
+- `just check` — passes with the new G5 check, updated registry
+  self-tests, and byte-identity gate for the repo-user-guide skill
+  copies.
+- `just footprint-regen` then `just check` — clean with new footprints +
+  budgets.
+- CI — existing 3-OS jobs unchanged plus the new G4 bundle-smoke job.
+- Manual smoke — stage binaries, copy the opencode plugin into a temp
+  HOME, confirm preflight silent when healthy and findings visible when
+  the env is broken.

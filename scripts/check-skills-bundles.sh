@@ -23,7 +23,9 @@ bad() {
 pairs="claude-code:aiplugins-devtools-cc
 qwen:aiplugins-devtools-qwen
 antigravity:aiplugins-devtools-agy
-opencode:aiplugins-devtools-opencode"
+opencode:aiplugins-devtools-opencode
+claude-code:repo-user-guide-cc
+opencode:repo-user-guide-opencode"
 
 out="$tmp/out"
 for pair in $pairs; do
@@ -44,8 +46,9 @@ for pair in $pairs; do
     disk_version=$(jq -r .version "$manifest")
     zname=$(unzip -p "$zip" "$rel" | jq -r .name)
     zversion=$(unzip -p "$zip" "$rel" | jq -r .version)
-    [ "$zname" = "aiplugins-devtools" ] ||
-        bad "$agent/$key: manifest name is '$zname'"
+    expected=$(registry_published_name "$agent" "$key")
+    [ "$zname" = "$expected" ] ||
+        bad "$agent/$key: manifest name is '$zname', expected '$expected'"
     { [ "$zversion" = "$disk_version" ] && [ "$disk_version" != null ]; } ||
         bad "$agent/$key: zip version '$zversion' != disk '$disk_version'"
 

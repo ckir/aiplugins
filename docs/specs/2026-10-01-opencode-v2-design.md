@@ -1,9 +1,13 @@
 # Spec: OpenCode V2 support — `opencode/` marketplace dir + port of both plugins
 
-**Status:** IMPLEMENTED (verified 2026-10-17). Brainstormed 2026-10-01;
-all five design sections were presented and approved in chat before
-writing. Approach A (mirror the agent dirs 1:1) was chosen over a shared
-TS library (B) and npm publishing (C, deferred to a later phase).
+**Status:** SHIPPED (2026-10). All five design sections were presented
+and approved in chat before writing. Approach A (mirror the agent dirs
+1:1) was chosen over a shared TS library (B) and npm publishing (C,
+deferred). Superseded in part by
+`docs/superpowers/specs/2026-10-17-opencode-parity-design.md`: the
+"deliberately NOT ported" preflight and the `.claude`-only settings path
+are ported there, and §5's "no marketplace manifest" yielded to the
+first-class bundles plan.
 
 Implementation drifted from §2 in two ways, both additive:
 plugins live under `opencode/plugins/<id>/` (not directly `opencode/`),

@@ -145,6 +145,7 @@ default.**
 | VFS path, if the program is in a subfolder | `bootstrap_program_path` | `GHIDRA_MCP_BOOTSTRAP_PROGRAM_PATH` |
 | JVM `-Xmx` | `max_heap` | `GHIDRA_MCP_MAX_HEAP` |
 | Data directory (logs, worker scripts) | — | `GHIDRA_MCP_HOME` |
+| Which host's settings file the server reads | — | `RE_GHIDRA_HOST` |
 
 **One server = one Ghidra project.** Two servers on the same project — or one
 server and an open GUI — collide on Ghidra's `project.lock`. Different
@@ -152,6 +153,10 @@ workspaces must target different projects.
 
 The environment sits above the settings file so you can retarget one session
 without editing anything. An **empty** variable counts as unset.
+
+`RE_GHIDRA_HOST` (`claude` default) selects which host's settings file the
+server reads: `claude` → `.claude/re-ghidra-mcp-cc.local.md`, `opencode` →
+`.opencode/re-ghidra-mcp-opencode.local.md`. Only the OpenCode front sets it.
 
 ## The `re-analyst` agent
 
