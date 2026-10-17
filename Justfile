@@ -64,6 +64,10 @@ marketplace:
 qwen-marketplace:
     bash scripts/check-qwen-marketplace.sh
 
+# Verify the Antigravity marketplace manifest still matches the plugins it publishes.
+agy-marketplace:
+    bash scripts/check-agy-marketplace.sh
+
 # Regenerate the host marketplace manifests from the plugin manifests.
 # CI runs --check: committed copies must match, so a stale copy fails
 # the same way a stale footprint does.
@@ -73,6 +77,10 @@ gen-marketplaces:
 # Verify opencode/plugins/ plugin configs, ids, and skill copies.
 opencode-wiring:
     bash scripts/check-opencode-wiring.sh
+
+# Verify antigravity/plugins/ plugin configs, ids, binary resolution, and skill copies.
+agy-wiring:
+    bash scripts/check-agy-wiring.sh
 
 # Assemble every OpenCode plugin zip locally and check its contents (PR-time
 # smoke; tag-time bundling and published-zip verification stay in
@@ -272,7 +280,7 @@ skills-release-wiring:
 
 # Run all pre-flight checks (what CI and lefthook run; see ci.yml — `links`
 # is hook-only and `gen-* --check` + opencode suites run in CI but not here)
-check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace dispatch smoke footprint opencode-wiring footprint-budgets devtools-skills skills-bundles skills-release-wiring
+check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace agy-marketplace dispatch smoke footprint opencode-wiring agy-wiring footprint-budgets devtools-skills skills-bundles skills-release-wiring
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
