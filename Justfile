@@ -452,6 +452,10 @@ bundle-opencode:
     done
 
 # Assemble the installable Antigravity plugin zips for a published release.
+#
+# Unix only: the bundles carry exec bits that a Windows zip cannot record, and
+# MSYS resolves `bin/foo` to `bin/foo.exe` and would overwrite the binary with
+# the dispatcher. On a Windows machine run this from WSL.
 bundle-agy tag:
     #!/usr/bin/env bash
     set -euo pipefail
