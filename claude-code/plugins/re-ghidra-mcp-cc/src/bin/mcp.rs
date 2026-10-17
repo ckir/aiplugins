@@ -1,11 +1,13 @@
 //! `re-ghidra-cc-mcp` — the plugin's MCP server, spoken over stdio.
 //!
-//! Claude Code launches this binary via `.mcp.json` and talks JSON-RPC to it on
+//! Claude Code and OpenCode both launch this binary and talk JSON-RPC to it on
 //! stdin/stdout. It owns no reverse-engineering logic: the server, its 19
 //! tools, the config contract and the embedded Ghidra worker all live in the
-//! shared `ghidra-mcp` crate, so the future agy and qwen plugins front exactly
-//! the same code. What this binary contributes is the Claude-Code-shaped part —
-//! reading `.claude/re-ghidra-mcp-cc.local.md` as the lowest config layer.
+//! shared `ghidra-mcp` crate, so both hosts front exactly the same code. What
+//! this binary contributes is the host-shaped part — reading the host's
+//! settings file (`.claude/re-ghidra-mcp-cc.local.md` on Claude,
+//! `.opencode/re-ghidra-mcp-opencode.local.md` on OpenCode, chosen by
+//! `RE_GHIDRA_HOST`) as the lowest config layer.
 //!
 //! Two rules follow from stdio being the protocol channel, and both are easy to
 //! get wrong:
@@ -22,7 +24,8 @@ async fn main() {
     // Claude Code launches MCP servers with the workspace as the working
     // directory, so this is where the project's settings file lives.
     let project_dir = std::env::current_dir().unwrap_or_default();
-    let file_config = re_ghidra_mcp_cc::load_settings(&project_dir);
+    let file_config =
+        re_ghidra_mcp_cc::load_settings(&project_dir, re_ghidra_mcp_cc::host_from_env());
 
     let code = ghidra_mcp::cli::dispatch(
         env!("CARGO_BIN_NAME"),

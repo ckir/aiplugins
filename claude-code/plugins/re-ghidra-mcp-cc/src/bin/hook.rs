@@ -18,7 +18,7 @@
 //! Every check is filesystem-or-`java -version` cheap: no JVM boot, no Ghidra
 //! project open.
 
-use re_ghidra_mcp_cc::{load_settings, parse_java_major, preflight, Probe};
+use re_ghidra_mcp_cc::{load_settings, parse_java_major, preflight, Host, Probe};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -38,7 +38,7 @@ fn main() {
     // Same three layers the server itself resolves, minus CLI flags: there are
     // none here. Reporting on a different config than the server will use would
     // make this hook worse than useless.
-    let mut cfg = load_settings(&project_dir);
+    let mut cfg = load_settings(&project_dir, Host::Claude);
     overlay_env(&mut cfg);
 
     let probe = Probe {
@@ -49,7 +49,7 @@ fn main() {
         java_major: detect_java_major(),
     };
 
-    let findings = preflight(&cfg, &probe);
+    let findings = preflight(&cfg, &probe, Host::Claude);
     if findings.is_empty() {
         return; // The silent path.
     }
