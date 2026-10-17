@@ -304,6 +304,18 @@ jobs:
           env "CARGO_BIN_EXE_mock-rtk-cc=$(pwd)/target/debug/mock-rtk-cc$exe" \
             bash scripts/smoke-opencode.sh
 
+  # PR-time assembly: every plugin.ts plugin's zip builds and carries the file
+  # set an install needs. Tag-time bundling stays in opencode-bundles.yml;
+  # skills-only zips are covered by check-skills-bundles.sh in the checks job.
+  # Ubuntu only: both bundlers refuse Windows shells.
+  opencode-bundle-smoke:
+    name: OpenCode Bundle Smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Assemble and verify every opencode plugin bundle
+        run: bash scripts/smoke-opencode-bundle.sh
+
   deny:
     name: Dependency Audit
     runs-on: ubuntu-latest

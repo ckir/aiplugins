@@ -74,6 +74,12 @@ gen-marketplaces:
 opencode-wiring:
     bash scripts/check-opencode-wiring.sh
 
+# Assemble every OpenCode plugin zip locally and check its contents (PR-time
+# smoke; tag-time bundling and published-zip verification stay in
+# opencode-bundles.yml, skills-only zips in check-skills-bundles.sh).
+smoke-opencode-bundle:
+    bash scripts/smoke-opencode-bundle.sh
+
 # Run the opencode TypeScript unit tests.
 test-opencode:
     #!/usr/bin/env bash
