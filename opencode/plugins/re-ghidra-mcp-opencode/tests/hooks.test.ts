@@ -65,7 +65,7 @@ describe("setup", () => {
   test("compaction handler injects the RE-state reminder", async () => {
     const { hooks, ctx } = fakeCtx();
     await (plugin as unknown as SetupFn).setup(ctx, () => healthyProbe);
-    // Shape per @opencode/plugin@2.0.21 dist/promise/session.d.ts:
+    // Shape per @opencode/plugin@2.0.26 dist/promise/session.d.ts:
     // SessionCompaction carries system: SystemPart[], not context: string[].
     const event = { system: [] as SystemEntry[] };
     for (const fn of hooks["session:compaction"]) fn(event);
@@ -77,7 +77,7 @@ describe("setup", () => {
   test("context handler stays silent without Ghidra tools, points at the driver with them", async () => {
     const { hooks, ctx } = fakeCtx();
     await (plugin as unknown as SetupFn).setup(ctx, () => healthyProbe);
-    // Shape per @opencode/plugin@2.0.21 dist/promise/session.d.ts:
+    // Shape per @opencode/plugin@2.0.26 dist/promise/session.d.ts:
     // SessionContext.tools is a Record keyed by tool name, not a string[].
     const idle = { system: [] as SystemEntry[], tools: { bash: toolEntry(), read: toolEntry() } };
     for (const fn of hooks["session:context"]) fn(idle);

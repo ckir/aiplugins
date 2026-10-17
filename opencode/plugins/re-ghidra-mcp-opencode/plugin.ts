@@ -182,7 +182,7 @@ export function preflightReport(findings: string[]): string {
   ].join("\n");
 }
 
-// No `context: string[]` on SessionContext (@opencode/plugin@2.0.21):
+// No `context: string[]` on SessionContext (@opencode/plugin@2.0.26):
 // push `{ type: "text", text }` onto `event.system`; tool names via
 // `Object.keys(event.tools)`.
 export default Plugin.define({

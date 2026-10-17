@@ -17,6 +17,20 @@ jqr() {
     jq -r "$@" | tr -d '\r'
 }
 
+# Every @opencode/plugin version a README/INSTALL claims, one per line:
+#   @opencode/plugin@2.0.26
+#   `@opencode/plugin` **2.0.26**
+#   `@opencode/plugin` than `2.0.26`
+# Anchored on the plugin token so the OpenCode release number on the same
+# line ("Tested with OpenCode v2.0.20 and …") is never captured.
+doc_pins() {
+    sed -n \
+        -e 's/.*@opencode\/plugin@\([0-9][0-9.]*\).*/\1/p' \
+        -e 's/.*@opencode\/plugin` \*\*\([0-9][0-9.]*\)\*\*.*/\1/p' \
+        -e 's/.*@opencode\/plugin` than `\([0-9][0-9.]*\)`.*/\1/p' \
+        "$1"
+}
+
 known=$(cargo metadata --no-deps --format-version 1 |
     jq -r '.packages[].targets[] | select(.kind[] == "bin") | .name' | sort -u)
 
@@ -161,6 +175,25 @@ for name in $(registry_plugins opencode | sort); do
     else
         printf '  ok       @opencode/plugin %-16s <- %s\n' "$pin" "$pkg"
     fi
+done
+
+# 9. Doc pins: every @opencode/plugin version claimed in a README/INSTALL must
+#    equal package.json, so a dependency bump fails until the docs move too.
+for name in $(registry_plugins opencode | sort); do
+    dir="opencode/plugins/$name"
+    pkg="$dir/package.json"
+    [ -f "$pkg" ] || continue
+    pin=$(jqr '.dependencies["@opencode/plugin"] // ""' "$pkg" 2>/dev/null || echo "")
+    [ -n "$pin" ] || continue # skills-only plugins carry no pin (as check 8)
+    for doc in "$dir/README.md" "$dir/INSTALL.md"; do
+        [ -f "$doc" ] || continue
+        while IFS= read -r claim; do
+            [ -n "$claim" ] || continue
+            checked=$((checked + 1))
+            [ "$claim" = "$pin" ] ||
+                fail "$doc claims @opencode/plugin $claim, package.json pins $pin"
+        done < <(doc_pins "$doc")
+    done
 done
 
 if [ "$checked" -eq 0 ]; then
