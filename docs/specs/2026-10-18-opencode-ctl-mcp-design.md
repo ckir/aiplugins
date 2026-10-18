@@ -78,7 +78,9 @@ human can watch (and type into) the worker while Claude drives it. Each Claude g
   save: string[], message, metadata, source}`; forms are a second stall channel (`session.form.list`,
   `session.form.reply {answer: Form.Answer}`, `form.list`); `session.diff` (params `sessionID, from?, to?, context?`)
   returns `{data: [{file, patch, additions, deletions, status}]}` scoped to the SESSION; `vcs.status` / `vcs.diff`
-  take `location` (not `directory`), `vcs.diff` also `mode` (required), `base`, `context`; the id returned by
+  take `location` as a deepObject query parameter (`--param 'location[directory]=<dir>'`; a bare `directory`
+  param is silently ignored and resolves to the server default), `vcs.diff` also `mode` (required, `Vcs.Mode` =
+  `working | branch | committed`), `base`, `context`; the id returned by
   `session.prompt` IS the stored user message id (verified on the spike). `opencode run --model` documents the
   model string as `provider/model#variant`.
 - CLI error contract measured: a server error prints the error JSON (`{"_tag": "SessionNotFoundError", ...}`) on
@@ -210,10 +212,14 @@ Environment, read by the MCP server (inherited from Claude) and set by the launc
 | `OPENCODE_CTL_HOST` | `opencode` only, set by the OpenCode front's `opencode.jsonc` (it reuses the cc binary); the cc, qwen and agy binaries carry their host as a compile-time constant passed to `cli::dispatch`. Lifecycle tools fail CLOSED: unknown host = refused |
 
 Fallback file `~/.opencode-ctl/pair.<pair-id>.json` (directory mode 0700, files 0600, written to a temp name and
-renamed): `{"pair_id", "session_id", "directory", "server_url", "created", "tui_pid", "claude_pid"}`. The pair id is
+renamed): `{"pair_id", "session_id", "directory", "server_url", "created", "claude_pid"}` (`tui_pid` lives in its own sentinel, see below). The pair id is
 12 hex characters from a uuid v4 and the launcher refuses an id that already exists. Exit signals are SEPARATE
-sentinel files, each written once by one writer: `pair.<pair-id>.tui-exited` by the tab wrapper's exit trap and
-`pair.<pair-id>.claude-exited` by the launcher when Claude returns. Liveness is computed, not stored: `tui_alive` =
+sentinel files, each written once by one writer: `pair.<pair-id>.tui-pid` by the tab wrapper at start (its own
+`$$`; the terminal CLIENT the launcher spawns hands the tab to a daemon and exits in 0.22 s, measured, so the
+launcher's child pid is worthless for liveness), `pair.<pair-id>.tui-exited` by the same wrapper's exit trap, and
+`pair.<pair-id>.claude-exited` by the launcher when Claude returns. When Claude returns the launcher also posts a
+display-only notice into the worker session (`session.synthetic` with `resume: false`, which admits the message
+without scheduling a model turn) so the human in the TUI tab sees "controller exited". Liveness is computed, not stored: `tui_alive` =
 no tui-exited sentinel AND `tui_pid` alive; `claude_alive` likewise; an abnormal death (SIGKILL, terminal closed,
 power loss) therefore reads as dead within one pid check even though no sentinel was written. Identity comes from
 env (read once at spawn) and the file is re-read on every `pair_status` / `service_status` call for liveness only;
@@ -239,7 +245,7 @@ Common error shape: `{"error": {"code": CODE, "message": "...", "hint": "..."}}`
 | `session_wait` | `session_id?`, `after?: message_id`, `timeout_s?=25`, `poll_s?=5`, `hard?: bool=false` | `{state: idle\|failed\|interrupted\|running\|awaiting_permission\|awaiting_input\|stalled\|timeout, outcome?, elapsed_s, pending_permissions: [{id, action, resources, save, message}], pending_forms: [{id, title?}], last_assistant_text, tokens}` | no | ONE SLICE per call: `timeout_s` capped at settings `wait_max_s` (default 300); `running` means "call again"; `timeout` only with `hard: true` |
 | `session_messages` | `session_id?`, `limit?=20`, `cursor?`, `types?` (passed as the route's `type` filter), `reasoning?=false`, `tools?='summary'` (`none\|summary\|full`) | `{messages: [{id, type, outcome?, text, tools: [{name, status}]}], next_cursor, truncated}` | no | compaction (below) |
 | `session_changes` | `session_id?`, `paths?: [path]`, `patches?: bool=true` | `{directory, files: [{file, status, additions, deletions, patch?, patch_truncated?}], omitted_patches: n}` from `session.diff` (SESSION-scoped, never the whole directory) | no | with `paths` only those files' patches are returned, so a controller can fetch every patch it needs under the cap; `omitted_patches > 0` is a signal the driver skill must act on, never a pass |
-| `workspace_status` | `directory?` | `{directory, status: [{path, kind}]}` from `vcs.status` with `location` | no | directory-wide view; a non-git directory returns `{vcs: null}` |
+| `workspace_status` | `directory?` | `{directory, status: [{path, kind}]}` from `vcs.status` with `location[directory]` | no | directory-wide view; a non-git directory returns `{vcs: null}` |
 | `session_interrupt` | `session_id?` | `{interrupted: true}` | no | |
 | `session_delete` | `session_id`, `confirm: bool` | `{deleted: true}` | no | `confirm` required; never defaults to the paired session |
 | `permission_reply` | `session_id?`, `request_id`, `decision: once\|always\|reject`, `message?`, `confirm?: bool` | `{replied: true, saved: bool}` | no | `always` persists a saved rule beyond the session (the request's `save` list says what) and requires `confirm: true`; the driver skill defaults to `once` |
@@ -310,8 +316,11 @@ Measured on the spike: 5 to 7 wait children of 30 s per 2 to 3 minute turn, 0.5 
   `session.command`, `shell.*`, `experimental.fs.write`, `pty.*`, `server.experimental.persistentPty.*`,
   `vcs.init`, `permission.saved.remove`, `experimental.config.update`, `credential.*`, `integration.*`,
   `experimental.mcp.*`, `plugin.*`, `location.reload`, `debug.*`, `experimental.generate.*`,
-  `experimental.migration.*`, `experimental.session.import`. These are reachable only through curated tools (and
-  most are deliberately not offered). `event.subscribe`, the pty connect routes and any `text/event-stream` response
+  `experimental.migration.*`, `experimental.session.import`, and the whole `fs.*` group (`fs.read` returns raw
+  file bytes as `application/octet-stream` from anywhere on the host; `fs.list` / `fs.find` enumerate it). These are
+  reachable only through curated tools (and most are deliberately not offered). An operation whose declared 200
+  response is not `application/json` is refused as `NON_JSON_RESPONSE` before execution; stdout that fails to parse
+  as JSON is never returned to the model. `event.subscribe`, the pty connect routes and any `text/event-stream` response
   are `STREAMING_REFUSED`. Unknown ids are `UNKNOWN_OPERATION` with the three nearest ids as a hint. The cached
   table is invalidated when `service_status` observes a different service pid or version.
 
@@ -454,10 +463,10 @@ Owner approved this document at commit 79ea151 as the basis for the panel review
 
 ## Stand-downs (durable record of the panel review)
 
-- UNVERIFIED-ACCEPTED (owner ruling pending): prompt text and request bodies travel on the CLI's argv (`-d`), so they
+- UNVERIFIED-ACCEPTED (owner, 2026-10-18): prompt text and request bodies travel on the CLI's argv (`-d`), so they
   are visible to other local users in `ps` and bounded by the command-line limit. The plugin guards the length
   (`BODY_TOO_LARGE`) and the OpenCode CLI itself exposes prompts the same way (`opencode run "<text>"`).
-- UNVERIFIED-ACCEPTED (owner ruling pending): a controller may widen a worker's permissions per call
+- UNVERIFIED-ACCEPTED (owner, 2026-10-18): a controller may widen a worker's permissions per call
   (`session_create.permissions`, `permission_policy: allow`); the controller acts with the user's authority.
   `permissions_locked` exists for users who want that door shut.
 - DISCARDED-BELOW-FLOOR: pair-id collision between two launches in the same second; the id is 48 bits of a uuid v4
@@ -465,8 +474,14 @@ Owner approved this document at commit 79ea151 as the basis for the panel review
 
 ## Panel review ledger
 
-Round 1 (2026-10-18, solo panel of two reviewers with nine seats, plus the agy escalation): 55 findings raised,
-disposed as follows. FOLDED: idle `outcome` read (failed / interrupted states); forms as a second stall channel
+Round 1 (2026-10-18, solo panel of two reviewers with nine seats, plus the agy escalation that reviewed the
+pre-fold text and returned 13 findings, 10 of them duplicates of the solo panel's): 68 findings raised, disposed as
+follows. From agy specifically FOLDED: TUI liveness from the wrapper's own pid (terminal client exits at once);
+`fs.*` on the deny-list plus the non-JSON response refusal; `location[directory]` deep-object encoding;
+display-only controller-exit notice via `session.synthetic resume:false`. From agy REJECTED: "the raw-CLI fallback
+names `session.delete`" (the document never contains that string; the tool is `session_delete` and the route id
+`session.remove` is what the engine calls). Owner rulings 2026-10-18: argv exposure ACCEPTED for v1; per-call
+permission widening KEPT with `permissions_locked` available. Those two move from pending to UNVERIFIED-ACCEPTED. FOLDED: idle `outcome` read (failed / interrupted states); forms as a second stall channel
 (`awaiting_input`, `form_reply`); concurrent permission/form polling every `poll_s` (the earlier text polled only
 at the 30 s deadline); server-derived wait anchor (newest input message) instead of process memory; `queue`
 delivery when a turn is running; `stalled` terminal state; CLI stdout to a temp file (256 KiB pipe truncation);
@@ -483,7 +498,7 @@ descriptions; `emit-skill <name>` for both skills with a pinning test; file logg
 `stall_slices` added to the contract; `body_max_bytes`; always-valid JSON truncation; experimental wait route
 fallback and doctor check; subcommand list completed. REJECTED: none. DEFERRED-TO-ANOMALIES: the CLI's 256 KiB pipe
 truncation is an upstream OpenCode defect, recorded in `.clavity/local-anomalies.md` (2026-10-18) for reporting
-upstream; the plugin works around it. Two UNVERIFIED-ACCEPTED items above await the owner.
+upstream; the plugin works around it. The two UNVERIFIED-ACCEPTED items above carry the owner's ruling.
 
 ## Parked work (do not lose)
 
