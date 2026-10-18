@@ -686,14 +686,14 @@ Owner approved this document at commit 79ea151 as the basis for the panel review
 - UNVERIFIED-ACCEPTED (owner, 2026-10-18): a controller may widen a worker's permissions per call
   (`session_create.permissions`, `permission_policy: allow`); the controller acts with the user's authority.
   `permissions_locked` exists for users who want that door shut.
-- UNVERIFIED-ACCEPTED (owner ruling pending): the worker runs as the same OS user as the plugin, so a
+- UNVERIFIED-ACCEPTED (owner, 2026-10-18, accepted for v1): the worker runs as the same OS user as the plugin, so a
   prompt-injected worker could rewrite `~/.opencode-ctl/settings.local.md` (including `opencode_bin`) or the pair
   sentinels; the same user can also edit `~/.claude` itself, so this is the OS trust boundary, not a plugin one.
   Mitigation offered: `doctor` prints the settings file's hash and mtime; nothing else.
 - DISCARDED-BELOW-FLOOR: a session driven by a `--standalone` TUI is absent from `session.active` and could read
   as stalled; unreachable because pairing goes only through the shared background service (Decisions, L3) and a
   standalone instance has no discoverable endpoint for the plugin to bind to.
-- UNVERIFIED-ACCEPTED (owner ruling pending): the driver skill's verification rule is prose the engine cannot
+- UNVERIFIED-ACCEPTED (owner, 2026-10-18, prose-only accepted): the driver skill's verification rule is prose the engine cannot
   enforce; a controller that never calls `session_changes` passes nothing the engine can see. `verify_hint` on
   every `idle` result is the nudge offered.
 - DISCARDED-BELOW-FLOOR: name dispatch under an invoker that resolves the `opencode-pair` symlink before exec;
@@ -768,7 +768,7 @@ validated in the engine; the HTTP-transport trigger restated as a CPU share (the
 turn); a named test per ledger defect class, the allow-list pinned, a 300 KB stdout fixture, argv recording in the
 mock; stale ledger wording marked superseded. REJECTED: "`type=user limit=1` can return the synthetic notice" (the
 message type enum lists `synthetic` as its own type, so the filter excludes it). DISCARDED-BELOW-FLOOR: the
-standalone-TUI stall case (above). UNVERIFIED-ACCEPTED pending the owner: same-user worker can rewrite the plugin's
+standalone-TUI stall case (above). UNVERIFIED-ACCEPTED (owner ruled 2026-10-18): same-user worker can rewrite the plugin's
 own files (above).
 
 Round 4 (2026-10-18, solo panel: Fold Auditor over round-3 edits, Procedure Walker re-walk, Protocol Pedant;
@@ -813,7 +813,7 @@ invocation form in the emitted copy, loop lines for `starting` and `none`; docto
 sanity, env-vs-file, `.source` and `.old`, ignored and clamped settings. REJECTED: "a forked session escapes
 `permissions_locked`" as stated (the fork body cannot carry permissions, measured) while the id was dropped on the
 unverified-inheritance ground. DISCARDED-BELOW-FLOOR: name dispatch under an invoker that resolves symlinks before
-exec (the explicit `<binary> pair` form always works). UNVERIFIED-ACCEPTED (owner, pending): the verification rule
+exec (the explicit `<binary> pair` form always works). UNVERIFIED-ACCEPTED (owner ruled 2026-10-18): the verification rule
 ("never trust the closing summary") is a skill rule the engine cannot enforce; `verify_hint` is the only nudge.
 
 ## Parked work (do not lose)
