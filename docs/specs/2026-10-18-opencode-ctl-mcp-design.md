@@ -3,8 +3,8 @@
 Design document. Written 2026-10-18 on branch `feat/opencode-ctl-mcp` (from `feat/antigravity-parity` @4aeeb54).
 Status: APPROVED by the owner on 2026-10-18 (at 79ea151); eight adversarial panel rounds folded (ledger at the end);
 every statement about OpenCode behaviour is cited to the OpenCode v2.0.32 source as `packages/<path>:<line>`
-(repository github.com/anomalyco/opencode, tag v2.0.32 = commit 843a6c5), read in round 8; the published-name fork
-awaits the owner; then the plan.
+(repository github.com/anomalyco/opencode, tag v2.0.32 = commit 843a6c5), read in round 8; the published name was
+ruled by the owner on 2026-10-18 (registry keys, round 9 below); the plan is next.
 
 ## Intent and why
 
@@ -148,7 +148,9 @@ human can watch (and type into) the worker while Claude drives it. Each Claude g
 - Vehicle: build the binary now; the driver skill is written first and documents the raw-CLI fallback.
 - Transport: CLI wrapper for everything, behind a `Transport` trait.
 - Tool surface: curated typed tools plus one gated generic `opencode_api` tool.
-- Name: `opencode-ctl-mcp`.
+- Name: `opencode-ctl-mcp` as the plugin's name in prose and crate (`shared/opencode-ctl`); PUBLISHED under the per-host
+  REGISTRY KEYS `opencode-ctl-mcp-cc|qwen|agy|opencode` like every binary sibling (owner ruling 2026-10-18, round 9; no
+  `publishedNames` entry).
 - Policy when the worker skips something: send it back to finish (re-prompt the same session with the specific
   finding), do not take over. Measured: 37 s fix on the spike.
 - Process: full ceremony (brainstorm, builder check, adversarial panel review, plan, subagent-driven development,
@@ -211,7 +213,9 @@ opencode/plugins/opencode-ctl-mcp-opencode/  plugin.ts (a hook plugin with `id: 
 
 Binary names follow the siblings: `opencode-ctl-cc-mcp`, `opencode-ctl-qwen-mcp`, `opencode-ctl-agy-mcp`; the
 OpenCode front stages `opencode-ctl-cc-mcp` (as rtk does). Registry keys: `opencode-ctl-mcp-cc`, `-qwen`, `-agy`,
-`-opencode`; published name `opencode-ctl-mcp` via `agents.json` `publishedNames`.
+`-opencode`; each front is PUBLISHED under its registry key (no `publishedNames` entry): install
+`opencode-ctl-mcp-cc@aiplugins`, slash form `/opencode-ctl-mcp-cc:opencode-ctl-doctor`, matching `rtk-mcp-cc` and
+`re-ghidra-mcp-cc` exactly (owner ruling 2026-10-18).
 
 ### Transport
 
@@ -828,8 +832,9 @@ doctor copy is argument-free and runs `install` when invoked with no argument an
 
 ### Release and registry wiring
 
-- `agents.json`: add the four keys to each agent's `plugins`. PUBLISHED NAME, OPEN FORK (owner decision pending,
-  round 7): the co-signed name decision publishes all four fronts as `opencode-ctl-mcp` through `publishedNames`,
+- `agents.json`: add the four keys to each agent's `plugins`. PUBLISHED NAME, DECIDED by the owner on
+  2026-10-18 (option A, registry keys; agy and the author both recommended it): the co-signed name decision had
+  published all four fronts as `opencode-ctl-mcp` through `publishedNames`,
   which `scripts/lib/registry.sh` implements and the marketplace checks enforce (the manifest `name` must then equal
   the published name). But every binary plugin today is published under its REGISTRY KEY, and the four bundle
   workflows (`agy-bundles.yml`, `qwen-extension-bundles.yml`, `plugin-bundles.yml`, `opencode-bundles.yml`) resolve
@@ -838,8 +843,10 @@ doctor copy is argument-free and runs `install` when invoked with no argument an
   release job of the four fronts dies; only `skills-bundles.yml` resolves through the registry. Options: (A) drop
   `publishedNames`, publish under the registry keys like every binary sibling (install
   `opencode-ctl-mcp-cc@aiplugins`, slash form `/opencode-ctl-mcp-cc:opencode-ctl-doctor`); (B) keep the published
-  name and change the four workflow lookups to `registry_plugin_for_published` plus a manifest-name check. The plan
-  waits for the ruling; the Install section below is written for (B) and marked.
+  name and change the four workflow lookups to `registry_plugin_for_published` plus a manifest-name check. RULING: (A). No
+  `publishedNames` entry; manifest `name` = registry key per front; the four workflows need no edit; a user installs
+  `opencode-ctl-mcp-cc@aiplugins` and types `/opencode-ctl-mcp-cc:opencode-ctl-doctor` (the stated cost: the host
+  suffix). The Install section below is written for (A).
 - Justfile: `build-opencode-ctl-mcp-cc|agy|opencode` recipes cloning the rtk ones, and `build-opencode-ctl-mcp-qwen`
   as the FIRST qwen build recipe (none exists: the Justfile builds cc, opencode and agy fronts only, and the
   footprint loops, `scripts/check-footprint-budgets.sh` and `docs/footprints/budgets.json` know no qwen front, so the
@@ -981,9 +988,8 @@ doctor copy is argument-free and runs `install` when invoked with no argument an
 ### Install and verification
 
 Claude Code: `claude plugin marketplace add ckir/aiplugins` once (as the siblings' READMEs), then
-`claude plugin install opencode-ctl-mcp@aiplugins` (registry key `opencode-ctl-mcp-cc`; under option (A) of the
-published-name fork this reads `opencode-ctl-mcp-cc@aiplugins` and the slash form gains the `-cc` suffix); verify with
-`/opencode-ctl-mcp:opencode-ctl-doctor`. Other hosts follow their siblings' INSTALL.md / README patterns. First-use path: run
+`claude plugin install opencode-ctl-mcp-cc@aiplugins` (the registry key is the published name, owner ruling
+2026-10-18); verify with `/opencode-ctl-mcp-cc:opencode-ctl-doctor`. Other hosts follow their siblings' INSTALL.md / README patterns. First-use path: run
 `service_status`, then the driver skill's loop on a throwaway directory.
 
 ## To confirm while building (resolved in the plan, not here)
@@ -1021,7 +1027,7 @@ binary that dispatches on its own name; the full rules live in the Launcher sect
 first `install-launcher` runs from inside the host, where the plugin root is known: the `opencode-ctl-doctor` skill
 accepts the argument `install` and runs `<plugin root>/bin/<host binary> install-launcher` (`${CLAUDE_PLUGIN_ROOT}`
 on Claude Code; each front's README gives its own path form); the human never types the plugin's `bin/` path.
-Owner approved this document at commit 79ea151 as the basis for the panel review and the plan. Per host, the skill names the binary as: Claude Code `${CLAUDE_PLUGIN_ROOT}/bin/opencode-ctl-cc-mcp`; Qwen `~/.qwen/extensions/<extension name>/bin/opencode-ctl-qwen-mcp` (the directory `scripts/install-qwen-extension.sh:35` extracts to; the name follows the published-name fork) (`${extensionPath}` expands only inside the manifest, never in a skill); Antigravity the bare `opencode-ctl-agy-mcp` from `mcp_config.json`, which is already on PATH (agy gives skills no plugin-root variable); OpenCode has no `install` step.
+Owner approved this document at commit 79ea151 as the basis for the panel review and the plan. Per host, the skill names the binary as: Claude Code `${CLAUDE_PLUGIN_ROOT}/bin/opencode-ctl-cc-mcp`; Qwen `~/.qwen/extensions/<extension name>/bin/opencode-ctl-qwen-mcp` (the directory `scripts/install-qwen-extension.sh:35` extracts to; the extension name IS the registry key `opencode-ctl-mcp-qwen` under ruling A) (`${extensionPath}` expands only inside the manifest, never in a skill); Antigravity the bare `opencode-ctl-agy-mcp` from `mcp_config.json`, which is already on PATH (agy gives skills no plugin-root variable); OpenCode has no `install` step.
 
 ## Stand-downs (durable record of the panel review)
 
@@ -1046,10 +1052,9 @@ Owner approved this document at commit 79ea151 as the basis for the panel review
 - DISCARDED-BELOW-FLOOR: pair-id collision between two launches in the same second; the id is 48 bits of a uuid v4
   and the launcher refuses an existing id (Pairing contract), so a collision cannot produce two pairs.
 
-- OPEN (owner decision pending, round 7): the published name. `publishedNames` = `opencode-ctl-mcp` makes every
-  bundle workflow's tag lookup fail (Release and registry wiring); option (A) publish under the registry keys like
-  every binary sibling, option (B) keep the name and change the four workflow lookups. Neither is folded until the
-  owner rules; the ruling is recorded here.
+- DECIDED (owner, 2026-10-18, round 9): the published name is the per-host REGISTRY KEY (option A); the
+  `publishedNames` route would have made every bundle workflow's tag lookup fail. Recorded in Release and registry
+  wiring, Install, Layout and the Decisions list.
 
 ## Panel review ledger
 
@@ -1271,9 +1276,9 @@ names, engine bin with `dist = false`, `Engine::new(Settings, Clock, Transport)`
 lookup, `create_new` counters, platform pipe detection, env presence+length+hash, failpoint attach race); error
 mapping gains `FormInvalidAnswerError`, `MessageNotFoundError`, `SyntheticConflictError`; the status line; 20 named
 tests. REJECTED: "`GetTickCount64` excludes sleep time" as the mechanism (unmeasured either way; the derivation was
-replaced, so the finding's consequence is gone whichever way it falls). OPEN: the published-name fork, agy's call is
-(A) publish under the registry keys like every binary sibling (its stated failure mode: users must type the host
-suffix); the owner decides.
+replaced, so the finding's consequence is gone whichever way it falls). The published-name fork: agy's call was (A) publish under
+the registry keys like every binary sibling (its stated failure mode: users must type the host suffix), the author's
+too; the OWNER RULED (A) on 2026-10-18 and the ruling is folded in round 9.
 
 ## Parked work (do not lose)
 
