@@ -266,7 +266,7 @@ is closed: a builder adding a code adds it here.
 | `session_create` | `title?`, `directory?`, `agent?`, `model?` (`provider/model[#variant]`, split on the first `/` and `#` into `Model.Ref`), `permissions?: Rule[]`, `parent_id?` | `{session_id, directory, agent, model}` | no | directory default as above; model default = settings `default_model`; permissions default per `permission_policy`; a per-call `permissions` is refused with `PERMISSIONS_LOCKED` when settings `permissions_locked: true` |
 | `session_get` | `session_id?` | `{id, title, directory, outcome, agent?, model?, tokens, cost, time, pending_permissions, pending_forms}` | no | |
 | `session_prompt` | `session_id?`, `text`, `delivery?='steer'`, `files?: [path]` | `{message_id, delivery}` and the hint "call session_wait with after=<message_id>" | YES | `message_id` is the stored user message id (verified for steer); steering into a busy turn joins that turn (route description), so `steer` is the default in every state and `queue` is opt-in |
-| `session_wait` | `session_id?`, `after?: message_id`, `timeout_s?=25`, `poll_s?=5`, `hard?: bool=false` | `{state: idle\|failed\|interrupted\|running\|awaiting_permission\|awaiting_input\|stalled\|timeout, outcome?, inbox_pending: bool, elapsed_s, pending_permissions: [{id, action, resources, save, message}], pending_forms: [{id, title, fields: [{key, type, label?, options?}]}], last_assistant_text, tokens}` | no | ONE SLICE per call: `timeout_s` capped at settings `wait_max_s` (default 300); `running` means "call again"; `timeout` only with `hard: true` |
+| `session_wait` | `session_id?`, `after?: message_id`, `timeout_s?=25`, `poll_s?=10`, `hard?: bool=false` | `{state: idle\|failed\|interrupted\|running\|awaiting_permission\|awaiting_input\|stalled\|timeout, outcome?, inbox_pending: bool, elapsed_s, pending_permissions: [{id, action, resources, save, message}], pending_forms: [{id, title, fields: [{key, type, label?, options?}]}], last_assistant_text, tokens}` | no | ONE SLICE per call: `timeout_s` capped at settings `wait_max_s` (default 300); `running` means "call again"; `timeout` only with `hard: true` |
 | `session_messages` | `session_id?`, `limit?=20`, `cursor?`, `order?='desc'`, `type?` (one of the route's enum values), `reasoning?=false`, `tools?='summary'` (`none\|summary\|full`) | `{messages: [{id, type, outcome?, text, tools: [{name, status}]}], next_cursor, truncated}` | no | compaction (below) |
 | `session_changes` | `session_id?`, `from?: message_id`, `to?: message_id`, `paths?: [path]`, `patches?: bool=true` | `{directory, from, to, files: [{file, status, additions, deletions, patch?, patch_truncated?}], omitted_patches: n}` from `session.diff`; DEFAULT RANGE = the whole session (`from` = the session's first `user` message, `to` = its newest message), so a re-prompt loop's every turn is included; pass `from` = a prompt's `message_id` for that turn only | no | with `paths` only those files' patches are returned, so a controller can fetch every patch it needs under the cap; `omitted_patches > 0` is a signal the driver skill must act on, never a pass |
 | `workspace_status` | `directory?` | `{directory, status: [{path, kind}]}` from `vcs.status` with `location[directory]` | no | directory-wide view; a non-git directory returns `{vcs: null}` |
@@ -294,21 +294,26 @@ call is a SLICE, never the whole wait: it returns `running` when its slice ends 
 The OpenCode front's `opencode.jsonc` sets `timeout.execution` to `wait_max_s + 30` seconds (330000 ms).
 
 1. Resolve `session_id`; `timeout_s` from arg, else settings `wait_timeout_s`, else 25, capped at `wait_max_s`;
-   `poll_s` likewise, else 5. Resolve the ANCHOR, all from the server (nothing is remembered in the process, so it
+   `poll_s` likewise, else 10. Resolve the ANCHOR, all from the server (nothing is remembered in the process, so it
    survives MCP restarts and holds for a second controller): the `after` arg if given, else the newest `user` message
    (`session.message.list order=desc type=user limit=1`; `synthetic` messages never anchor, so the controller-exit
-   notice cannot make an idle session look busy). A model-supplied `after` older than that newest user message is
-   replaced by it. Comparisons use `time.created`. A session with NO user message is `idle` by definition. If the
+   notice cannot make an idle session look busy). An EXPLICIT `after` is never replaced: a human typing into the paired TUI
+   creates a newer user message, and the controller must keep waiting on ITS turn, not the human's. Comparisons use
+   `time.created`. A session with NO user message is `idle` by definition. If the
    inbox (`session.inbox.list`) still holds the anchor's input (a `queue`d prompt, or a prompt not yet admitted),
    the state is `running` with `inbox_pending: true`, whatever the message list says.
 2. Run two tasks concurrently until the slice deadline (`tokio::select`): (a) the wait child, `wait_idle` with
-   `min(remaining, 30 s)`, restarted while the slice lasts; (b) a poll every `poll_s`: `session.permission.list`,
-   `session.form.list`, and the newest message. Return the first terminal state reached:
+   `min(remaining, 30 s)`, restarted while the slice lasts; (b) a poll every `poll_s` (default 10) of the two stall
+   channels only, `session.permission.list` and `session.form.list` (two CLI spawns, about 1 s of CPU per cycle,
+   measured 0.53 s each). The message, inbox and `session.active` reads happen once whenever the wait child returns
+   and once at the slice end, never per poll. Return the first terminal state reached:
    - newest message is `idle`, created after the anchor: `idle` / `failed` / `interrupted` from its `outcome`;
    - a pending permission: `awaiting_permission`; a pending form: `awaiting_input`;
-   - STATELESS stall rule: inbox empty, no message newer than the anchor, and server time minus the anchor's
-     `time.created` greater than `stall_s` (default 90): `stalled` (the prompt produced nothing; the skill re-reads
-     `session_get` and re-prompts or gives up). An input parked in the inbox longer than `stall_s` is reported as
+   - STATELESS stall rule: inbox empty, no message newer than the anchor, the session ABSENT from `session.active`
+     (the server's own list of sessions with a running loop), and server time minus the anchor's `time.created`
+     greater than `stall_s` (default 90): `stalled` (the prompt produced nothing; the skill re-reads `session_get`
+     and re-prompts or gives up). A session the server lists as active is `running` regardless of the message list,
+     so a slow-starting provider or a long tool call can never read as stalled. An input parked in the inbox longer than `stall_s` is reported as
      `running` with `inbox_pending: true` and `parked_s`; the skill decides whether to interrupt.
    `wait_idle` returning idle while the newest message is older than the anchor means the loop has not started;
    keep polling.
@@ -354,9 +359,10 @@ Measured on the spike: 5 to 7 wait children of 30 s per 2 to 3 minute turn, 0.5 
   `experimental.*` writes, `credential.*`, `integration.*`, `plugin.*`, `shell.*`, `pty.*`, `permission.saved.*`,
   `vcs.init`, `location.reload`, `debug.*`. Ids are matched whole and case-sensitively; a `*` in these lists is a
   glob over the rest of the id. The protocol test enumerates every mutating operation id from the snapshot table
-  and asserts each is either on the allow-list or refused. An operation whose declared 200
-  response is not `application/json` is refused as `NON_JSON_RESPONSE` before execution; stdout that fails to parse
-  as JSON is never returned to the model. `event.subscribe`, the pty connect routes and any `text/event-stream` response
+  and asserts each is either on the allow-list or refused. An operation is runnable only when it
+  declares a 204 success (result `{ok: true}`, 46 operations) or a 200 with `application/json`; anything else
+  (`application/octet-stream`, `text/event-stream`) is refused as `NON_JSON_RESPONSE` before execution; stdout that
+  fails to parse as JSON is never returned to the model. `event.subscribe`, the pty connect routes and any `text/event-stream` response
   are `STREAMING_REFUSED`. Unknown ids are `UNKNOWN_OPERATION` with the three nearest ids as a hint. The cached
   table is invalidated when `service_status` observes a different service pid or version.
 
@@ -458,8 +464,9 @@ re-ghidra siblings (measured: three `skills/doctor/SKILL.md` in the tree).
   tested `2.0.x` range, since `session.diff` turn semantics and the experimental wait route are version behaviours); service registration file present
   and pid alive; `opencode api server.info` answers; the operation table contains `experimental.session.wait`;
   pairing (if any) resolves to a live session; `opencode-pair` link resolves to the running binary; `server_url`
-  without `OPENCODE_SERVER_PASSWORD`; newest log file and its last error; prints the resolved settings when invoked
-  with `verbose`.
+  without `OPENCODE_SERVER_PASSWORD`; newest log file and its last error; pairs whose Claude side is dead while the TUI side is alive (the
+  orphaned-worker case an abnormal controller death leaves behind); prints the resolved settings when invoked with
+  `verbose`.
 
 ### Release and registry wiring
 
@@ -562,7 +569,11 @@ pair record; `pwsh` else `powershell.exe`; Windows shim `.cmd` with marker heade
 `AUTH_FAILED` from the password stderr lines and `[cause]:` extraction; `type` singular and engine-side
 `order=desc,limit=1`; `pending_forms` with compacted `fields`; `saved` inference and `project_id` filter;
 `session_interrupt.resume`; host narrowing from any constant; four launcher variables; doctor version-range warning;
-`meta` envelope keys kept. REJECTED: none. The grandchildren-kill question moved to "to confirm".
+`meta` envelope keys kept. From the agy escalation (reviewing the pre-fold text, 7 findings, 3 already folded) FOLDED:
+204-only operations runnable through the hatch (`{ok: true}`); an explicit `after` is never overwritten by a newer
+human message; `stalled` requires absence from `session.active`; poll task limited to the two stall channels with
+`poll_s` 10; doctor lists orphaned workers after an abnormal controller death. REJECTED: none. The grandchildren-kill
+question moved to "to confirm".
 
 ## Parked work (do not lose)
 
