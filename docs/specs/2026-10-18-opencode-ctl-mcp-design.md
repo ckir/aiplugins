@@ -1,7 +1,7 @@
 # opencode-ctl-mcp: drive an OpenCode worker from Claude Code (and three other hosts) as a subagent
 
 Design document. Written 2026-10-18 on branch `feat/opencode-ctl-mcp` (from `feat/antigravity-parity` @4aeeb54).
-Status: DRAFT, awaiting owner approval. Nothing is built until it is approved.
+Status: APPROVED by the owner on 2026-10-18 (at 79ea151); panel review next, then the plan.
 
 ## Intent and why
 
@@ -293,8 +293,8 @@ Measured on the spike: 5 to 7 wait children of 30 s per 2 to 3 minute turn, 0.5 
    record `claude.exited_at` and print "worker session <id> is still running; attach with `opencode <dir> -s <id>`".
 `attach <session-id | pair-id>` opens step 4 for an existing session (lazy binding made visible).
 `pair` and `attach` live in `cli::dispatch`, so the cc, qwen and agy binaries all have them; the OpenCode front does
-not offer them. How a human reaches the one command from a terminal is the owner's decision (PENDING, see
-"Decisions still open"); the provisional default is an `install-launcher` subcommand that links the staged binary as
+not offer them. How a human reaches the one command from a terminal: the owner chose (see "Decision: how the human invokes
+the one command") the `install-launcher` subcommand that links the staged binary as
 `opencode-pair` into `~/.local/bin` (Windows: `%LOCALAPPDATA%\opencode-ctl\opencode-pair.cmd`) and prints the PATH
 hint, so the plugin's `bin/` location never has to be typed.
 `--dry-run` prints every command it would run and writes nothing; the launcher's tests use it.
@@ -355,10 +355,12 @@ Claude Code: `claude plugin install opencode-ctl-mcp@aiplugins` (registry key `o
 - Windows: `wt` argument quoting and whether `opencode.exe` is on PATH after the official installer.
 - Antigravity's `mcp_config.json` environment key for `OPENCODE_CTL_HOST`.
 
-## Decisions still open (owner)
+## Decision: how the human invokes the one command (owner, 2026-10-18)
 
-- How the human invokes the one command: `install-launcher` symlink (provisional), the release binary installed on
-  PATH by the user, or a clavity verb. The plan's install docs and the launcher tests depend on it.
+`install-launcher` it is: the subcommand links the staged binary as `opencode-pair` into `~/.local/bin` (Windows:
+`%LOCALAPPDATA%\opencode-ctl\opencode-pair.cmd`), prints a PATH hint when that directory is not on PATH, and the
+`doctor` skill checks the link resolves to the currently staged binary. The human types `opencode-pair [dir]`.
+Owner approved this document at commit 79ea151 as the basis for the panel review and the plan.
 
 ## Parked work (do not lose)
 
