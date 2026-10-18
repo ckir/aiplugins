@@ -203,8 +203,9 @@ file instead. Error mapping, in order: spawn failure = `OPENCODE_NOT_FOUND`; exi
 `UNKNOWN_OPERATION` (for any `UnknownError` the `[cause]:` line is the message, not the first line); stderr containing `ECONNREFUSED` or a reachability probe (`opencode service status`) failing
 -> `SERVICE_DOWN`; anything else -> `CLI_ERROR` with the first stderr line only (never a stack trace). Empty stdout with
 exit 0 on an operation whose declared success status is 204 is SUCCESS (`{ok: true}`); on a 200 operation it is
-retried once for GET operations only (never a mutation), then `CLI_ERROR` (`"reason": "unparseable stdout"`, and for
-a mutation `"outcome": "unknown"` with the hint to check the inbox and messages before repeating it). Every tool
+retried once for GET operations only (never a mutation), then `CLI_ERROR` with `details.reason = "unparseable
+stdout"` and, for a mutation, `details.outcome = "unknown"` with the hint to check the inbox and messages before
+repeating it. `InvalidRequestError` maps to `INVALID_REQUEST`. Every tool
 validates a session id against `^ses_[A-Za-z0-9]{26}$` before spawning (`SESSION_NOT_FOUND` with the hint).
 Envelope keys beside `data` and `cursor` (for example `location` on `vcs.status`) are kept under `meta`.
 When `server_url` is set, the CLI needs credentials for that server: `OPENCODE_SERVER_PASSWORD` is passed through
@@ -212,9 +213,9 @@ from the environment, and `doctor` reports when `server_url` is set without it. 
 experimental.session.wait --param sessionID=<id>` with the deadline; exit 0 = idle, killed by deadline =
 `DeadlineHit`, anything else = error. Binary resolution: settings `opencode_bin`, else `opencode` on PATH, else
 `~/.opencode/bin/opencode` (Windows: `opencode.exe` and `%USERPROFILE%\.opencode\bin`). HTTP is a second impl
-only when a tool needs streaming or the polling task's CPU time exceeds 10 % of a turn's wall time measured over
-ten real turns (the co-signed trigger, restated: the original "2 s cumulative per turn" would fire on every normal
-turn at two 0.53 s spawns per 10 s poll).
+only when a tool needs streaming or the polling task's measured CPU time (not wall time) exceeds 25 % of a
+turn's wall time over ten real turns; at the shipped defaults two spawns per 10 s cost about 1 s of WALL time and
+less CPU, so the trigger is not self-satisfying (the earlier "2 s cumulative per turn" wording was).
 
 The CLI's JSON output is `{"data": ..., "cursor"?: {...}}` for list/get operations and a raw object or array for
 some (`server.info`, `location.get`, `config.get`). The engine unwraps `data` and KEEPS `cursor` as the tool's
@@ -222,53 +223,67 @@ some (`server.info`, `location.get`, `config.get`). The engine unwraps `data` an
 
 ### Pairing contract (owned by this plugin)
 
-Environment, read by the MCP server (inherited from Claude) and set by the launcher:
+Environment, read ONCE by the MCP server at spawn (inherited from Claude) and set by the launcher:
 
 | Variable | Meaning |
 |---|---|
 | `OPENCODE_CTL_SESSION` | the paired session id; tools with an optional `session_id` default to it |
-| `OPENCODE_CTL_DIR` | the paired workspace directory; `session_create`/`session_list` default to it, else host cwd |
-| `OPENCODE_CTL_SERVER` | optional server URL passed as `--server`; empty = background service |
-| `OPENCODE_CTL_PAIR` | pair id; names the fallback file below |
-| `OPENCODE_CTL_HOST` | `opencode` only, set by the OpenCode front's `opencode.jsonc` (it reuses the cc binary); the cc, qwen and agy binaries carry their host as a compile-time constant passed to `cli::dispatch`. Lifecycle tools fail CLOSED: unknown host = refused |
+| `OPENCODE_CTL_DIR` | the paired workspace directory; `session_create` / `session_list` default to it, else host cwd |
+| `OPENCODE_CTL_SERVER` | optional server URL passed as `--server` to every CLI call AND to the TUI wrapper; empty = background service. This is also the env form of the settings key `server_url` (second documented naming exception) |
+| `OPENCODE_CTL_PAIR` | pair id (`^[0-9a-f]{12}$`); names the pair record below; invalid = `INVALID_ARGUMENT` at startup, logged, unpaired |
+| `OPENCODE_CTL_HOST` | `opencode` only, set by the OpenCode front (see Host-specific behaviour) |
 
-Fallback file `~/.opencode-ctl/pair.<pair-id>.json` (directory mode 0700, files 0600, written to a temp name and
-renamed): `{"pair_id", "session_id", "directory", "server_url", "created"}` (pids live in their own sentinels, see below). The
-pair id is 12 hex characters from a uuid v4, validated as `^[0-9a-f]{12}$` everywhere, and the launcher refuses an
-id that already exists. Exit signals are SEPARATE
-sentinel files, each written once by one writer: `pair.<pair-id>.tui-pid` by the tab wrapper at start (its own
-`$$` plus the process start time, `pid:starttime`; the terminal CLIENT the launcher spawns hands the tab to a daemon
-and exits in 0.22 s, measured, so the launcher's child pid is worthless for liveness), `pair.<pair-id>.claude-pid`
-by the launcher right after it spawns Claude (same `pid:starttime` form), `pair.<pair-id>.tui-exited` by the
-wrapper's exit trap, and `pair.<pair-id>.claude-exited` by the launcher when Claude returns. A pid is "alive" only
-when it exists AND the sentinel's `pid:boot_id:starttime` matches (Linux: `/proc/sys/kernel/random/boot_id` plus
-`/proc/<pid>/stat` field 22 parsed after the last `)`; Windows: process creation time, absolute), so a recycled pid
-after a reboot never reads as alive. Sentinels are same-user files and are not a security boundary (see
-Stand-downs). When Claude returns the launcher also posts a
-display-only notice into the worker session (`session.synthetic` with `resume: false`, which admits the message
-without scheduling a model turn) so the human in the TUI tab sees "controller exited"; a 409 (session busy) is
-retried once with `delivery: queue`, and a failure is logged, never fatal. Liveness is computed, not stored: `tui_alive` =
-no tui-exited sentinel AND `tui_pid` alive; `claude_alive` likewise; an abnormal death (SIGKILL, terminal closed,
-power loss) therefore reads as dead within one pid check even though no sentinel was written. Identity comes from
-env (read once at spawn) and the file is re-read on every `pair_status` / `service_status` call for liveness only;
-`attach` never changes an existing pair's session. `opencode-pair gc` deletes every `pair.<pair-id>.*` file (sentinels and wrapper included) of a pair whose both
-sides are dead, whose session is NOT in `session.active`, and whose newest file mtime is older than 24 h (a
-still-running worker keeps its record); `pair` runs `gc` first on every start, and `gc` can be run by hand.
-`attach <session-id | pair-id>` ALWAYS creates a NEW pair record (fresh pair id, no claude side; a pair id
-argument only resolves the session id), because sentinels are write-once and a re-opened tab needs fresh ones; the
-old record is left for `gc`.
+Pair directory `~/.opencode-ctl/` (mode 0700; every file 0600, wrappers 0700; every write goes to a temp name then
+`rename`). Files of one pair, all named `pair.<pair-id>.*`:
+
+| File | Writer (once) | Content |
+|---|---|---|
+| `pair.<id>.json` | launcher | `{"pair_id", "session_id", "directory", "server_url", "created": <epoch ms>, "controller": "claude" \| "qwen" \| "agy" \| null, "generation": <n>}` (`generation` is rewritten by `attach`, the only field ever updated) |
+| `pair.<id>.g<n>.wrapper.sh` / `.ps1` | launcher or `attach` | the tab script for generation `n` |
+| `pair.<id>.g<n>.tui-pid` | the wrapper, at its start | one line `<pid>:<boot_id>:<starttime>` |
+| `pair.<id>.g<n>.tui-exited` | the wrapper's exit trap | `<epoch ms>` |
+| `pair.<id>.claude-pid` | launcher, right after spawning the controller | one line `<pid>:<boot_id>:<starttime>` |
+| `pair.<id>.claude-exited` | launcher, when the controller returns | `<epoch ms>` |
+
+Liveness line format on every platform: `<pid>:<boot_id>:<starttime>`. POSIX wrapper (bash): pid `$$`; `boot_id` =
+`/proc/sys/kernel/random/boot_id` (macOS: `sysctl -n kern.boottime` epoch); `starttime` = field 22 of
+`/proc/$$/stat` parsed after the last `)` (macOS: `ps -o lstart= -p $$` as epoch). Windows (`.ps1`): `$PID`,
+`(Get-CimInstance Win32_OperatingSystem).LastBootUpTime` as epoch, `(Get-Process -Id $PID).StartTime` as FILETIME.
+The launcher writes the controller line the same way from its child handle. A side is `alive` only when the pid
+exists AND its boot id and start time equal the sentinel; a recycled pid after a reboot therefore reads `dead`.
+
+Liveness VALUE for each side is one of `alive | dead | starting | unknown | none`:
+- `none`: the pair has no such side (`--no-tab`, or an `attach` record, whose `controller` is null);
+- `starting`: the pid sentinel is not yet written and the record is younger than 30 s;
+- `unknown`: no pid sentinel after 30 s (the tab never opened), or the sentinel is unparsable;
+- `dead`: an exited sentinel exists, or the pid check fails;
+- `alive`: otherwise.
+`tui_*` reads the HIGHEST generation `n` present, so a tab re-opened with `attach` (which bumps `generation` and
+writes `g<n+1>` sentinels) is seen by the controller that still holds the same `OPENCODE_CTL_PAIR`. The file is
+re-read on every `pair_status`, `service_status` and `session_wait` call; identity (session, directory, server)
+comes from env only. `created` is the fallback age for `gc` when no sentinel exists; `server_url` is read by the
+wrapper writer and by `doctor`.
+
+`gc` (also run by `pair` right after the service is confirmed up, never before): deletes every `pair.<id>.*` file
+of a pair whose sides are all `dead` or `none`, whose session is absent from `session.active`, and whose newest file
+mtime (or `created`) is older than 24 h. When the service is down, `gc` cannot read `session.active` and deletes
+nothing. Sentinel files without a `pair.<id>.json` are deleted when older than 24 h.
 
 ### Tools (all return JSON text; every description states "spends model tokens: yes/no")
 
-Common error shape: `{"error": {"code": CODE, "message": "...", "hint": "..."}}` with codes `OPENCODE_NOT_FOUND`,
-`SERVICE_DOWN`, `AUTH_FAILED`, `SESSION_NOT_FOUND`, `NO_SESSION` (no `session_id` and no pairing), `REFUSED_ON_HOST`,
-`CONFIRM_REQUIRED`, `PERMISSIONS_LOCKED`, `MUTATION_BLOCKED`, `BLOCKED_OPERATION`, `STREAMING_REFUSED`,
-`NON_JSON_RESPONSE`, `UNKNOWN_OPERATION`, `BODY_TOO_LARGE`, `LAUNCHER_CONFLICT`, `TIMEOUT`, `CLI_ERROR`. This list
-is closed: a builder adding a code adds it here.
+Common error shape: `{"error": {"code": CODE, "message": "...", "hint": "...", "details"?: {...}}}` (`details` carries
+structured extras such as `reason` or `outcome: "unknown"`). Codes, closed list (a builder adding one adds it here):
+`OPENCODE_NOT_FOUND`, `SERVICE_DOWN`, `AUTH_FAILED`, `SESSION_NOT_FOUND`, `NO_SESSION` (no `session_id` and no
+pairing), `PAIR_NOT_FOUND`, `INVALID_ARGUMENT` (a tool argument, id, `--param` name or value, or launcher value fails
+validation), `INVALID_REQUEST` (the server answered 400, e.g. a rejected diff range), `REFUSED_ON_HOST`,
+`CONFIRM_REQUIRED`, `PERMISSIONS_LOCKED`, `MUTATION_BLOCKED` (allow-listed id without the flag), `BLOCKED_OPERATION`,
+`STREAMING_REFUSED`, `NON_JSON_RESPONSE`, `UNKNOWN_OPERATION`, `BODY_TOO_LARGE`, `DEADLINE` (a non-wait CLI call hit
+its deadline), `IO_ERROR` (a settings, log or pair file could not be written), `LAUNCHER_CONFLICT`, `CLI_ERROR`.
+`timeout` is a `session_wait` STATE, not an error.
 
 | Tool | Arguments | Returns | Tokens | Guards |
 |---|---|---|---|---|
-| `service_status` | none | `{running, urls: [..], pid, version, reachable, paired: {session_id, directory, tui_alive, claude_alive} \| null}` | no | |
+| `service_status` | none | `{running, urls: [..], pid, version, reachable, paired: {pair_id, session_id, directory, server_url, tui, claude} \| null}` (liveness values per the pairing contract) | no | |
 | `service_start` | none | same as status after `opencode service start` (idempotent) | no | |
 | `service_stop` | `confirm: bool` | `{stopped: true}` | no | `confirm` required; refused when host is opencode or unknown; description: "stops the daemon for EVERY session on this machine; to stop one turn use session_interrupt" |
 | `service_restart` | `confirm: bool` | status | no | same |
@@ -276,9 +291,9 @@ is closed: a builder adding a code adds it here.
 | `session_create` | `title?`, `directory?`, `agent?`, `model?` (`provider/model[#variant]`, split on the first `/` and `#` into `Model.Ref`), `permissions?: Rule[]`, `parent_id?` | `{session_id, directory, agent, model}` | no | directory default as above; model default = settings `default_model`; permissions default per `permission_policy`; a per-call `permissions` is refused with `PERMISSIONS_LOCKED` when settings `permissions_locked: true` |
 | `session_get` | `session_id?` | `{id, title, directory, outcome, agent?, model?, tokens, cost, time, pending_permissions, pending_forms}` | no | |
 | `session_prompt` | `session_id?`, `text`, `delivery?='steer'`, `files?: [path]` | `{message_id, delivery}` and the hint "call session_wait with after=<message_id> on EVERY slice" | YES | `message_id` is the stored user message id (verified for steer; for `queue` it is the inbox item's id and resolution rule (i) handles it, to confirm); steering into a busy turn joins that turn (route description), so `steer` is the default in every state and `queue` is opt-in |
-| `session_wait` | `session_id?`, `after?: message_id`, `timeout_s?=25`, `poll_s?=10`, `hard?: bool=false` | `{state: idle\|failed\|interrupted\|running\|awaiting_permission\|awaiting_input\|stalled\|budget_exceeded\|timeout, outcome?, inbox_pending: bool, elapsed_s, turn_s, pair?: {tui_alive, claude_alive}, pending_permissions: [{id, action, resources, save, message}], pending_forms: [{id, title, fields: [{key, type, label?, options?}]}], last_assistant_text, tokens}` | no | ONE SLICE per call: `timeout_s` capped at settings `wait_max_s` (default 300); `running` means "call again"; `timeout` only with `hard: true` |
+| `session_wait` | `session_id?`, `after?: message_id`, `timeout_s?=25`, `poll_s?=10`, `hard?: bool=false` | the result object defined under "session_wait mechanics": `state` is one of `idle \| failed \| interrupted \| running \| awaiting_permission \| awaiting_input \| stalled \| budget_exceeded \| timeout` | no | ONE SLICE per call; `running` means "call again with the same `after`"; `timeout` only with `hard: true` |
 | `session_messages` | `session_id?`, `limit?=20`, `cursor?`, `order?='desc'`, `type?` (one of the route's enum values), `reasoning?=false`, `tools?='summary'` (`none\|summary\|full`) | `{messages: [{id, type, outcome?, text, tools: [{name, status}]}], next_cursor, truncated}` | no | compaction (below) |
-| `session_changes` | `session_id?`, `from?: message_id`, `to?: message_id`, `paths?: [path]`, `patches?: bool=true` | `{directory, from, to, files: [{file, status, additions, deletions, patch?, patch_truncated?}], omitted_patches: n}` from `session.diff`; DEFAULT RANGE = the whole session (`from` = the session's first `user` message, `to` = its newest `user` message, both found with one `session.message.list type=user` read each; the route requires `to` to be a user message, per its parameter description), so a re-prompt loop's every turn is included; pass `from` = a prompt's `message_id` for that turn only | no | the cap drops PATCHES first (`omitted_patches`), never files; a single patch larger than the cap comes back cut with `patch_truncated: true`; only if even the file list exceeds the cap does `files_truncated: true` appear and the skill pages with `paths`; `omitted_patches > 0`, any `patch_truncated` or `files_truncated` is a signal the driver skill must act on (fetch by `paths`, or read the file itself with the host's own file tools: it is in the workspace), never a pass |
+| `session_changes` | `session_id?`, `from?: message_id`, `to?: message_id`, `paths?: [workspace-relative exact paths]`, `patches?: bool=true`, `context?: int` | `{directory, from, to, files: [{file, status: added\|modified\|deleted\|renamed, additions, deletions, patch?, patch_truncated?}], omitted_patches: n, omitted_files: [file names]}` from `session.diff` (`from`/`to` are user message ids; DEFAULT = the whole session: `from` = the first `user` message, `to` = the newest `user` message, each found with one `session.message.list type=user` read; the route requires `to` to be a user message; in a paired session that range includes the human's turns, so the skill passes `from=<its prompt id>` for its own turn) | no | `paths` is an ENGINE-SIDE filter applied after the fetch (the route has no such parameter); the cap drops patches first (`omitted_patches`), then, if the file list alone exceeds it, lists the omitted FILE NAMES in `omitted_files` so the skill can page with `paths`; a single patch larger than the cap is cut with `patch_truncated: true`; `patches: false` fetches names and counts only and sets `omitted_patches` to the file count; any of `omitted_patches > 0`, `patch_truncated`, non-empty `omitted_files` is a signal the skill must act on (page by `paths`, or read the file itself with the host's own file tools), never a pass; a range the route rejects (location change, non-user `to`) is `INVALID_REQUEST` |
 | `workspace_status` | `directory?` | `{directory, status: [{path, kind}]}` from `vcs.status` with `location[directory]` | no | directory-wide view; a non-git directory returns `{vcs: null}` |
 | `session_interrupt` | `session_id?`, `resume?: bool=false` | `{interrupted: bool}` (false = the idle no-op) | no | `resume: true` lets pending steering input continue; queued prompts stay parked either way |
 | `session_delete` | `session_id`, `confirm: bool` | `{deleted: true}` | no | `confirm` required; never defaults to the paired session |
@@ -287,7 +302,7 @@ is closed: a builder adding a code adds it here.
 | `saved_permissions` | `project_id?`, `remove_id?`, `confirm?: bool` | `{rules: [...]}`; with `remove_id` + `confirm` removes one | no | inspect and revoke what `always` created; `project_id` is the route's filter |
 | `opencode_operations` | `filter?` | `{operations: [{id, method, path, summary, mutating}]}` from the cached OpenAPI document | no | |
 | `opencode_api` | `operation`, `params?`, `body?`, `allow_mutation?=false` | compacted response | depends | gating (below) |
-| `pair_status` | none | the pairing file contents plus liveness | no | |
+| `pair_status` | none | the pair record plus `{tui, claude}` liveness and `generation` | no | |
 
 Twenty tools. `pair_status`, `session_changes`, `workspace_status`, `form_reply` and `saved_permissions` are
 additions to the co-signed list (the owner can cut them): the first because the launcher's lifecycle sentinels
@@ -301,45 +316,45 @@ escape-hatch deny-list, `permissions_locked`, and the driver skill never recomme
 Hosts bound a single MCP tool call (the OpenCode front's sibling manifests set `timeout.execution: 30000` ms; the
 other hosts have their own defaults), and a worker turn took 133 to 202 s on the spike. So one `session_wait`
 call is a SLICE, never the whole wait: it returns `running` when its slice ends and the driver skill calls it again.
-The OpenCode front's `opencode.jsonc` sets `timeout.execution` to `wait_max_s + 30` seconds (330000 ms).
+The OpenCode front's `opencode.jsonc` sets `timeout.execution` to `wait_max_s + 30` seconds (330000 ms), which is why
+`wait_max_s` is not workspace-settable.
 
-1. Resolve `session_id`; `timeout_s` from arg, else settings `wait_timeout_s`, else 25, capped at `wait_max_s`;
-   `poll_s` likewise, else 10. Resolve the ANCHOR, all from the server (nothing is remembered in the process, so it
-   survives MCP restarts and holds for a second controller): the `after` arg if given, else the newest `user` message
-   (`session.message.list order=desc type=user limit=1`; `synthetic` messages never anchor, so the controller-exit
-   notice cannot make an idle session look busy). An EXPLICIT `after` is never replaced: a human typing into the paired TUI
-   creates a newer user message, and the controller must keep waiting on ITS turn, not the human's. Resolution
-   order for an explicit `after`: (i) the inbox (`session.inbox.list`) still holds it: `running` with
-   `inbox_pending: true`, whatever the message list says; (ii) it is in the message list: compare by `time.created`
-   (server-stamped epoch milliseconds; the service is local, so the engine's clock is the same clock); (iii) found in
-   neither: `running` (not yet admitted) until `stall_s`, then `stalled`. Only when no `after` is given does "a session
-   with NO user message" mean `idle`.
+Result object. Always present: `state`, `elapsed_s` (this slice), `turn_s` (server time since the anchor's
+timestamp; `null` when the anchor has none), `inbox_pending` (bool), `tokens` (`{input, output, reasoning,
+cache_read}` from `session.get`), `last_assistant_text` (newest `text` part, or `null`). Present only in their
+state: `outcome` (`idle | failed | interrupted`), `pending_permissions` (`awaiting_permission`), `pending_forms`
+(`awaiting_input`; each entry `{id, title, fields}` where every field is the route's `Form.Field` object reduced to
+`key, type, title, description, required, hidden, when` plus its per-type extras; the skill answers visible, required
+fields only), `parked_s` (when `inbox_pending`). Present whenever the server is paired: `pair: {tui, claude}`
+with the liveness values above. "Server time" is the engine's clock: every timestamp compared is server-stamped
+epoch milliseconds and the service runs on the same machine.
+
+1. Resolve `session_id` (validated); `timeout_s` from arg, else settings `wait_timeout_s`, else 25, capped at
+   `wait_max_s`; `poll_s` likewise, else 10. Resolve the ANCHOR from the server (nothing is remembered in the
+   process): the `after` arg if given, else the newest `user` message (`session.message.list order=desc type=user
+   limit=1`; `synthetic` is its own type and never anchors). An explicit `after` is never replaced: a human typing
+   into the paired TUI creates a newer user message, and the controller must keep waiting on ITS turn. Its
+   timestamp: (i) if the inbox (`session.inbox.list`) holds it, the item's `time` and the state is `running` with
+   `inbox_pending: true` and `parked_s`, whatever the message list says; (ii) if the message list holds it, its
+   `time.created`; (iii) if neither, the session's `time.updated` (so the stall clock still runs) and the state is
+   `running` until `stall_s`, then `stalled`. Without `after`, a session with no user message is `idle`.
 2. Run two tasks concurrently until the slice deadline (`tokio::select`): (a) the wait child, `wait_idle` with
-   `min(remaining, 30 s)`, restarted while the slice lasts; (b) a poll every `poll_s` (default 10) of the two stall
-   channels only, `session.permission.list` and `session.form.list` (two CLI spawns, about 1 s of CPU per cycle,
-   measured 0.53 s each). The message, inbox and `session.active` reads happen once whenever the wait child returns
-   and once at the slice end, never per poll. Return the first terminal state reached:
-   - newest message is `idle`, created after the anchor: `idle` / `failed` / `interrupted` from its `outcome`;
-   - a pending permission: `awaiting_permission`; a pending form: `awaiting_input`;
-   - STATELESS stall rule: inbox empty, no message newer than the anchor, the session ABSENT from `session.active`
-     (the server's own list of sessions with a running loop), and server time minus the anchor's `time.created`
-     greater than `stall_s` (default 90): `stalled` (the prompt produced nothing; the skill re-reads `session_get`
-     and re-prompts or gives up). A session the server lists as active is `running` regardless of the message list,
-     so a slow-starting provider or a long tool call can never read as stalled. An input parked in the inbox longer than `stall_s` is reported as
-     `running` with `inbox_pending: true` and `parked_s`; the skill decides whether to interrupt.
-   `wait_idle` returning idle while the newest message is older than the anchor means the loop has not started:
-   sleep `poll_s` before restarting the wait child (no back-to-back spawns), keep polling.
-   - TURN BUDGET: when server time minus the anchor's `time.created` exceeds settings `max_turn_s` (default 1800) the
-     slice returns `budget_exceeded` even if the session is still in `session.active`; the driver skill then calls
-     `session_interrupt` and reports, so a hung provider or a tool waiting on stdin cannot hold the controller
-     forever.
-3. At the slice deadline return `running` (or `timeout` when `hard: true`). Every return carries `outcome` when
-   known, `last_assistant_text` (newest `text` part), `tokens`, `elapsed_s`, `turn_s` (since the anchor) and, when
-   paired, `pair: {tui_alive, claude_alive}` so the controller learns in the same call that the human's tab is gone. A `SERVICE_DOWN` or
-   `SESSION_NOT_FOUND` from either task ends the slice with that error.
-4. If the operation table has no `experimental.session.wait` (route removed upstream), task (a) is skipped and
-   the poll alone drives the state machine; `doctor` reports the missing route.
-Measured on the spike: 5 to 7 wait children of 30 s per 2 to 3 minute turn, 0.5 s CLI overhead per poll call.
+   `min(remaining, 30 s)`; when it returns before the turn is done (an idle marker older than the anchor), sleep
+   `poll_s` before restarting it; (b) a poll every `poll_s` of the two stall channels only, `session.permission.list`
+   and `session.form.list` (two CLI spawns, 0.53 s wall each, measured). The message, inbox and `session.active`
+   reads happen whenever the wait child returns and once at the slice end, never per poll.
+3. Terminal-state evaluation, in this ORDER, first match wins:
+   1. the FIRST `idle` message created after the anchor exists: `idle | failed | interrupted` from its `outcome`
+      (the first marker after the anchor is the controller's own turn even if the human ran a later one);
+   2. a pending permission: `awaiting_permission`; a pending form: `awaiting_input`;
+   3. `turn_s > max_turn_s` (default 1800): `budget_exceeded`, even if the session is in `session.active`;
+   4. inbox empty, no message newer than the anchor, session absent from `session.active`, `turn_s > stall_s`
+      (default 90): `stalled`;
+   5. otherwise `running`; at the slice deadline `running` (or `timeout` when `hard: true`).
+4. If the operation table has no `experimental.session.wait` (route removed upstream), task (a) is skipped and the
+   poll alone drives the state machine; `doctor` reports the missing route. `SERVICE_DOWN` or `SESSION_NOT_FOUND`
+   from either task ends the slice with that error.
+Measured on the spike: 5 to 7 wait children of 30 s per 2 to 3 minute turn; each CLI spawn 0.53 s wall.
 
 ### Compaction (`compact.rs`)
 
@@ -355,38 +370,35 @@ Measured on the spike: 5 to 7 wait children of 30 s per 2 to 3 minute turn, 0.5 
 ### Escape hatch gating (`openapi.rs`)
 
 - The OpenAPI document (280 KB live) is fetched once per process via `opencode api GET /openapi.json` and reduced
-  to the operation table `operationId -> (method, path, summary)` (14 KB). A built-in copy of that TABLE only
-  (`openapi.table.json`, generated from v2.0.32 and committed with the version it came from) is the fallback when the
-  live fetch fails, so `opencode_operations` still answers. Live always wins; every `opencode_operations` and
-  `opencode_api` result carries `source: live | snapshot(v2.0.32)`, and when the snapshot is used while
-  `server.info.version` differs from it the result adds a `warning`. A mutating operation is never run from the
-  snapshot when the live document could not be fetched (`SERVICE_DOWN` first).
-- `operation` accepts an operation id ONLY (the `METHOD /path` form is rejected, so no raw path ever reaches the
-  CLI). Method resolution happens BEFORE execution. GET operations run unless on the GET DENY-LIST (`BLOCKED_OPERATION`):
-  `server.connect` (redeems a pairing code into a server credential), the whole `fs.*` group (`fs.read` returns raw
-  file bytes as `application/octet-stream` from anywhere on the host; `fs.list` / `fs.find` enumerate it),
-  `session.log` (`text/event-stream`), `event.subscribe`, and everything that returns terminal buffers or secrets:
-  `shell.*`, `pty.*`, `server.experimental.persistentPty.*` (measured: `shell.output`, `persistentPty.read` and
-  `.snapshot` return buffers as JSON), `credential.*`, `config.*`. Non-GET operations require
-  `allow_mutation: true` (`MUTATION_BLOCKED` otherwise) AND must be on the MUTATION ALLOW-LIST, which is closed and
-  enumerated here (eight ids): `session.compact`, `session.switchAgent`, `session.switchModel`, `session.view`,
-  `session.inbox.cancel`, `session.inbox.update`, `session.form.cancel`, `session.fork`. Dropped after review:
-  `session.update` (its body carries `permissions`, measured, which would bypass `permissions_locked`) and
-  `session.background` (lets a turn end while a tool keeps editing, which defeats verification by diff).
-  `session.switchModel` / `session.switchAgent` stay allowed and are NOT covered by `permissions_locked`; that is a
-  cost exposure, not an authority one, and is accepted. Every other mutating operation is `BLOCKED_OPERATION` even with `allow_mutation`, which covers
-  `server.pair`, `rpc.call`, `session.shell`, `session.command`, `session.environment`, `session.generate`,
-  `session.permission.reply` (only `permission_reply` may answer, so `always` cannot skip `confirm`),
-  `session.revert.*`, `session.move`, `project.update`, `worktree.*`, `experimental.session.instructions.*`,
-  `experimental.*` writes, `credential.*`, `integration.*`, `plugin.*`, `shell.*`, `pty.*`, `permission.saved.*`,
-  `vcs.init`, `location.reload`, `debug.*`. Ids are matched whole and case-sensitively; a `*` in these lists is a
-  glob over the rest of the id. The protocol test enumerates every mutating operation id from the snapshot table
-  and asserts each is either on the allow-list or refused. An operation is runnable only when it
-  declares a 204 success (result `{ok: true}`, 46 operations) or a 200 with `application/json`; anything else
-  (`application/octet-stream`, `text/event-stream`) is refused as `NON_JSON_RESPONSE` before execution; stdout that
-  fails to parse as JSON is never returned to the model. `event.subscribe`, the pty connect routes and any `text/event-stream` response
-  are `STREAMING_REFUSED`. Unknown ids are `UNKNOWN_OPERATION` with the three nearest ids as a hint. The cached
-  table is invalidated when `service_status` observes a different service pid or version.
+  to the operation table `operationId -> (method, path, declared parameters, success status, response media type,
+  summary)` (14 KB). A built-in copy of that TABLE only (`openapi.table.json`, generated from v2.0.32 and committed
+  with the version it came from) is the fallback when the live fetch fails. Live always wins; the cache is
+  invalidated when `service_status` observes a different service pid or version; every `opencode_operations` and
+  `opencode_api` result carries `source: live | snapshot(v2.0.32)` and, when the snapshot is used while
+  `server.info.version` differs, a `warning`. A mutating operation is never run from the snapshot when the live
+  document could not be fetched (`SERVICE_DOWN` first).
+- `operation` accepts an operation id ONLY (the `METHOD /path` form is `INVALID_ARGUMENT`). An operation is runnable
+  only when it declares a 204 success (result `{ok: true}`, 46 operations) or a 200 with `application/json`;
+  anything else is `NON_JSON_RESPONSE`.
+- GET DENY-LIST (`BLOCKED_OPERATION`): `server.connect` (redeems a pairing code into a credential), `fs.*` (raw
+  file bytes from anywhere on the host, listings), `session.log` (`text/event-stream`), `event.subscribe`,
+  `shell.*`, `pty.*`, `server.experimental.persistentPty.*` (terminal buffers), `credential.*`, `config.*`,
+  `integration.*` (auth-attempt status and output), `experimental.session.export` (full transcripts).
+- MUTATION ALLOW-LIST, closed, eight ids: `session.compact`, `session.switchAgent`, `session.switchModel`,
+  `session.view`, `session.inbox.cancel`, `session.inbox.update`, `session.form.cancel`, `session.fork`. An
+  allow-listed id without `allow_mutation: true` is `MUTATION_BLOCKED`; every other non-GET id is
+  `BLOCKED_OPERATION` whatever the flag (that covers `server.pair`, `rpc.call`, `session.shell`, `session.command`,
+  `session.environment`, `session.generate`, `session.permission.reply`, `session.update` (its body carries
+  `permissions`), `session.background` (lets a turn end while a tool keeps editing), `session.revert.*`,
+  `session.move`, `project.update`, `worktree.*`, `experimental.*` writes, `credential.*`, `integration.*`,
+  `plugin.*`, `shell.*`, `pty.*`, `permission.saved.*`, `vcs.init`, `location.reload`, `debug.*`).
+  `session.switchModel` / `session.switchAgent` are a cost exposure, not an authority one, and are accepted. Ids are
+  matched whole and case-sensitively; `*` is a glob over the rest of the id.
+- RESPONSE REDACTION, applied to every hatch result and to `session_get` / `session_list`: any JSON key named
+  `headers`, `apiKey`, `api_key`, `token`, `secret` or `password` (case-insensitive) has its value replaced by
+  `"<redacted>"`. Provider, model and agent records carry `headers` fields at schema level.
+- Unknown ids are `UNKNOWN_OPERATION` with the three nearest ids as a hint. Hatch results are `{source, warning?,
+  meta?, data}` and pass the common cap.
 
 ### Permission handling
 
@@ -399,73 +411,84 @@ Measured on the spike: 5 to 7 wait children of 30 s per 2 to 3 minute turn, 0.5 
   per-call `permissions` on `session_create` and `permission_policy` other than the file's value, for users who
   want the controller unable to widen the worker's authority.
 
-### Host-specific behaviour
+### Host-specific behaviour and settings
 
 - Host identity: each per-host binary passes a `Host` constant (`Claude`, `Qwen`, `Agy`) into `cli::dispatch`. The
   OpenCode front stages the cc binary and runs it as `serve --host opencode` (an ARGUMENT in `opencode.jsonc`'s
   command array, which survives any environment handling; `OPENCODE_CTL_HOST=opencode` is set as well). Either
-  signal alone is enough: `Opencode` wins whenever the argument OR the variable says so, from ANY constant
-  (`Claude`, `Qwen`, `Agy`), and nothing can widen a constant. `Unknown` exists only for test builds. On `Opencode` or `Unknown`,
-  `service_stop` and `service_restart` return `REFUSED_ON_HOST` (fail closed) and the mutation allow-list contains no service- or instance-level operation, so the refusal cannot be bypassed
-  through the hatch. On
-  `Opencode` the `pair` and `attach` subcommands are not offered (the TUI is already open).
-- The Claude Code and OpenCode fronts read `.claude/opencode-ctl-mcp-cc.local.md` and
-  `.opencode/opencode-ctl-mcp-opencode.local.md` (YAML front matter: `key: value` lines between `---` fences, the
-  keys above, env overrides win), the re-ghidra precedent. BUT a workspace file is part of a checkout a stranger may
-  have written, so it may set ONLY the tuning keys: `wait_timeout_s`, `wait_max_s`, `poll_s`, `stall_s`,
-  `max_turn_s`, `output_max_bytes`, `body_max_bytes`. The keys that choose what runs, where data goes (a provider
-  receives the code), or how much authority the worker gets (`opencode_bin`, `server_url`, `default_model`,
-  `permission_policy`, `permissions_locked`) are read
-  ONLY from the environment or from the USER-LEVEL file `~/.opencode-ctl/settings.local.md` (same format, written
-  by the user, mode 0600), env winning; a workspace file that names them is ignored for those keys with a logged
-  warning. Qwen and Antigravity fronts read the user-level file and env only in v1. Env names: `OPENCODE_CTL_` + the key upper-cased
-  (`OPENCODE_CTL_WAIT_TIMEOUT_S`, ...), with one documented exception: `opencode_bin` is `OPENCODE_CTL_BIN`.
+  signal alone is enough: `Opencode` wins whenever the argument OR the variable says so, from ANY constant, and
+  nothing can widen a constant. `Unknown` exists only for test builds. On `Opencode` or `Unknown`, `service_stop`
+  and `service_restart` return `REFUSED_ON_HOST` (fail closed), and the mutation allow-list contains no service- or
+  instance-level operation, so the refusal cannot be bypassed through the hatch. On `Opencode` the `pair`, `attach`
+  and `install-launcher` subcommands are not offered (the TUI is already open). A Claude launched from inside an
+  OpenCode terminal inherits the variable and is refused too: accepted, fail-closed.
+- Settings sources, in precedence order (first wins): environment; user-level file
+  `~/.opencode-ctl/settings.local.md` (written by the user, mode 0600); workspace file
+  `.claude/opencode-ctl-mcp-cc.local.md` on Claude Code or `.opencode/opencode-ctl-mcp-opencode.local.md` on
+  OpenCode (the re-ghidra precedent; Qwen and Antigravity fronts read env and the user-level file only in v1);
+  defaults. Grammar of both files: YAML front matter between `---` fences, one `key: value` per line; integers for
+  seconds and bytes, `true`/`false` for booleans, unquoted strings otherwise; an unknown key or an invalid value is
+  ignored with a logged warning and the default stands. `default_model` is `provider/model[#variant]`.
+- Key table. TUNING keys, settable anywhere: `wait_timeout_s` (25), `poll_s` (10), `stall_s` (90), `max_turn_s`
+  (1800), `output_max_bytes` (16384, workspace value capped at 65536), `body_max_bytes` (100000; 24000 on Windows).
+  PROTECTED keys, read ONLY from environment or the user-level file (a workspace file is part of a checkout a
+  stranger may have written; a workspace value for these is ignored with a logged warning): `opencode_bin`
+  (`OPENCODE_CTL_BIN`), `server_url` (`OPENCODE_CTL_SERVER`), `default_model`, `permission_policy` (`inherit`),
+  `permissions_locked` (`false`), `wait_max_s` (300; must stay below the OpenCode manifest's static timeout).
+  Env names are `OPENCODE_CTL_` + the key upper-cased except the two noted. When `permissions_locked` is true, the
+  lock and `permission_policy` are read from the SAME source as the lock (env if the lock came from env, else the
+  user-level file) and per-call `permissions` on `session_create` is `PERMISSIONS_LOCKED`.
 - Logging: `serve` writes a per-instance file log (`tracing-appender`, like the siblings) under
   `~/.opencode-ctl/logs/`; stdout is the protocol channel and never receives a log line; `doctor` prints the path
   of the newest log and its last error.
 
-### Launcher (`opencode-ctl-cc-mcp pair`, shipped in the same binary)
+### Launcher (`pair`, `attach`, `gc`, `install-launcher`; in `cli::dispatch`, so the cc, qwen and agy binaries all have them)
 
-`pair [directory] [--model <provider/model>] [--title <t>] [--no-tab] [--dry-run] [-- <claude args>]`:
-1. Ensure the service runs (`opencode service start`, idempotent).
-2. Create the session in `directory` (default cwd) with `default_model` or `--model`; title default
-   `pair <basename> <HH:MM>`.
-3. Write `~/.opencode-ctl/pair.<pair-id>.json` (pair id = 12 hex chars of a uuid v4).
-4. Unless `--no-tab`: write a wrapper script under `~/.opencode-ctl/` (mode 0700) that runs `opencode <directory>
-   -s <id>` and writes the `tui-exited` sentinel on exit; the wrapper is `~/.opencode-ctl/pair.<pair-id>.wrapper.sh`
-   (Windows: `.wrapper.ps1`, single-quoted values with `''` escaping; no `.cmd`, whose `%` and `^` expansion cannot be
-   quoted away). Open it in a new tab of the terminal the user is in: FIRST the terminal found by walking the parent
-   process names (clavity's measured approach: mate-terminal, gnome-terminal, xfce4-terminal), and ONLY when no
-   parent matches, the first of those three found on PATH, in that order; forms `mate-terminal --tab -e <script>`,
-   `gnome-terminal --tab -- <script>`, `xfce4-terminal --tab -e <script>`. On Windows: `wt -w 0 nt -d <directory>
-   <pwsh|powershell.exe> -NoProfile -ExecutionPolicy Bypass -File <script.ps1>` (`pwsh` when on PATH, else the stock
-   `powershell.exe`; `doctor` reports which; `Bypass` because the stock client policy refuses `.ps1` files). When no
-   terminal is found at all, print the attach command and continue without a tab. Until the wrapper has written
-   `tui-pid` (expected within seconds) `tui_alive` reports `starting`; after 30 s without it, `unknown`.
-5. Spawn `claude <claude args>` as a CHILD with inherited stdio in the current terminal, with the four
-   `OPENCODE_CTL_*` variables set (`SESSION`, `DIR`, `SERVER`, `PAIR`; `HOST` is the binary's constant); write the
-   `claude-pid` sentinel from the child's pid and start time; then block on the child. When it exits write the
-   `claude-exited` sentinel and print "worker session <id> is still running; attach with `opencode <dir> -s <id>`".
-`attach <session-id | pair-id>` opens step 4 for an existing session (lazy binding made visible).
-`pair`, `attach`, `gc` and `install-launcher` live in `cli::dispatch`, so the cc, qwen and agy binaries all have
-them; the OpenCode front does not offer them. `install-launcher` is idempotent: on POSIX it creates `~/.local/bin/opencode-pair`
-as a symlink to the running binary; an existing symlink is replaced when its target's file name matches
-`opencode-ctl-*-mcp` (host-agnostic, no cache-path patterns), and a regular file or a symlink elsewhere is never
-touched (`LAUNCHER_CONFLICT` with the path). On Windows it COPIES the running exe to `%LOCALAPPDATA%\opencode-ctl\opencode-pair.exe` and writes
-`opencode-pair.exe.source` beside it (the staged path and the plugin version); an existing copy is replaced only
-when that source file exists. No `.cmd` shim exists, so cmd's `%`, `^` and `&` expansion never touches user input.
-`doctor` compares the symlink target (POSIX) or the copy's hash against the running binary and says "re-run
-install-launcher" after a plugin update. The link target
-goes stale when the plugin updates, so `doctor` compares the link target with the running binary and the README
-says to re-run `install-launcher` after an update. How a human reaches the one command from a terminal: the owner chose (see "Decision: how the human invokes
-the one command") the `install-launcher` subcommand that links the staged binary as
-`opencode-pair` into `~/.local/bin` (Windows: `%LOCALAPPDATA%\opencode-ctl\opencode-pair.cmd`) and prints the PATH
-hint, so the plugin's `bin/` location never has to be typed.
+Name-based dispatch: when the binary is invoked as `opencode-pair` (symlink or copy) and `argv[1]` is one of
+`attach`, `gc`, `install-launcher`, `doctor-json`, `--version`, that subcommand runs; any other `argv[1]` (a
+directory, a flag, or nothing) runs `pair`. The long binary name always takes an explicit subcommand.
+
+`pair [directory] [--model <provider/model[#variant]>] [--title <t>] [--no-tab] [--dry-run] [-- <controller args>]`:
+1. Ensure the service runs (`opencode service start`, idempotent), then run `gc`.
+2. Create the session in `directory` (default cwd, canonicalised, must exist) with `default_model` or `--model`;
+   title default `pair <basename> <HH:MM>`; `server_url` from settings becomes the record's `server_url`.
+3. Write `pair.<pair-id>.json` (pair id = 12 hex chars of a uuid v4; an existing id is refused, `INVALID_ARGUMENT`),
+   `generation: 1`, `controller` = the binary's host constant (`claude`, `qwen` or `agy`).
+4. Unless `--no-tab`: write `pair.<id>.g1.wrapper.sh` (Windows: `.wrapper.ps1`) that writes `g1.tui-pid`, runs
+   `opencode <directory> -s <session-id> [--server <server_url>]` (with `OPENCODE_SERVER_PASSWORD` passed through
+   when a server URL is set), and writes `g1.tui-exited` from its exit trap. Open it in a new tab of the terminal
+   the user is in: FIRST the terminal found by walking the parent process names (mate-terminal, gnome-terminal,
+   xfce4-terminal), and ONLY when no parent matches, the first of those three on PATH, in that order; forms
+   `mate-terminal --tab -e <script>`, `gnome-terminal --tab -- <script>`, `xfce4-terminal --tab -e <script>`. On
+   Windows: `wt -w 0 nt -d <directory> <pwsh|powershell.exe> -NoProfile -ExecutionPolicy Bypass -File <script.ps1>`
+   (`pwsh` when on PATH, else the stock `powershell.exe`; `doctor` reports which; `Bypass` because the stock client
+   policy refuses `.ps1` files). When no terminal is found at all, print the attach command and continue without a
+   tab (`tui: none`).
+5. Spawn the host's controller CLI (`claude`, `qwen` or `agy`, by the host constant) as a CHILD with inherited
+   stdio in the current terminal, with `OPENCODE_CTL_SESSION`, `OPENCODE_CTL_DIR`, `OPENCODE_CTL_SERVER` and
+   `OPENCODE_CTL_PAIR` set; write `claude-pid` from the child's pid, boot id and start time; block on the child.
+   When it exits: write `claude-exited`; post a display-only notice into the worker session (`session.synthetic`
+   with `resume: false`, no model turn; a 409 is retried once with `delivery: queue`; failure logged, never fatal);
+   print "worker session <id> is still running; attach with `opencode-pair attach <pair-id>`".
 `--dry-run` prints every command it would run and writes nothing; the launcher's tests use it.
+
+`attach <session-id | pair-id>`: with a pair id, reads the record, bumps `generation` (the only field ever
+rewritten) and runs step 4 for the new generation, so a controller still holding that pair id sees the re-opened
+tab; with a session id, resolves the directory via `session.get`, writes a NEW record with `controller: null` and
+runs step 4. A pair id whose record is gone is `PAIR_NOT_FOUND`.
+
+`install-launcher`: POSIX creates `~/.local/bin/opencode-pair` as a symlink to the running binary; an existing
+symlink is replaced when its target's file name matches `opencode-ctl-*-mcp`; a regular file or a symlink elsewhere
+is never touched (`LAUNCHER_CONFLICT`). Windows copies the running exe to `%LOCALAPPDATA%\opencode-ctl\
+opencode-pair.exe` (an in-use copy is first renamed to `opencode-pair.exe.old`, which `gc` deletes) and writes
+`opencode-pair.exe.source` with two lines, `path=<staged path>` and `version=<plugin semver>`; an existing copy is
+replaced only when that file exists. Both print a PATH hint when the directory is not on PATH. `doctor` compares the
+symlink target or the copy's hash with the running binary and says "re-run install-launcher" after a plugin update.
+
 Values that reach a shell: the session id must match `^ses_[A-Za-z0-9]{26}$`, the pair id `^[0-9a-f]{12}$`, the
-directory is canonicalised and must exist; the wrapper script single-quotes every value (`'\''` escaping) on POSIX
-and `''` escaping in the `.ps1` on Windows; a value that fails validation aborts the launcher before any file is
-written. A unit test feeds a directory containing a quote, a space, a `$`, a `%`, a `^` and an `&`.
+directory is canonicalised and must exist; the wrapper single-quotes every value (`'\''` escaping on POSIX, `''` in
+the `.ps1`); a value that fails validation aborts the launcher before any file is written (`INVALID_ARGUMENT`). A
+unit test feeds a directory containing a quote, a space, a `$`, a `%`, a `^` and an `&`.
 
 ### Skills
 
@@ -482,22 +505,24 @@ re-ghidra siblings (measured: three `skills/doctor/SKILL.md` in the tree).
   when to delegate; the loop: `service_status` first, and if `paired` USE THAT SESSION (never create a second one
   beside the human's tab unless a parallel worker is wanted on purpose), else `session_create`; then
   `session_prompt -> session_wait with after=<message_id> on EVERY slice until a terminal state -> handle
-  awaiting_permission / awaiting_input / failed / interrupted / stalled / budget_exceeded (interrupt and report) /
-  tui_alive=false (tell the user the tab is gone, keep driving) -> session_changes + session_messages -> verify by
-  files and diff -> on a gap re-prompt the SAME session with the specific finding`;
-  which tools spend tokens; how to answer permissions and forms; `omitted_patches > 0` or `stalled` are never a
+  awaiting_permission / awaiting_input / failed / interrupted / stalled / budget_exceeded (interrupt, report, ask
+  the user before re-prompting) / pair.tui = dead or unknown (tell the user the tab is gone, keep driving) ->
+  session_changes (from = the prompt id for this turn) + session_messages -> verify by files and diff; any of
+  omitted_patches, patch_truncated, omitted_files is never a pass: page by paths or read the file -> on a gap
+  re-prompt the SAME session with the specific finding`;
+  which tools spend tokens; how to answer permissions and forms; `omitted_patches > 0`, `patch_truncated`, `omitted_files`, `stalled` and `budget_exceeded` are never a
   pass; the raw-CLI fallback (`opencode service start`,
   `opencode api session.create -d ...`, `opencode api session.prompt ...`, `opencode api
   experimental.session.wait ...`) for a host without the binary; never trust the worker's closing summary.
 - `opencode-ctl-doctor` (description: "Diagnoses why opencode-ctl-mcp tools fail or do not appear. Use when the user
   runs /opencode-ctl-mcp:opencode-ctl-doctor, when a tool returns OPENCODE_NOT_FOUND, SERVICE_DOWN, AUTH_FAILED,
-  UNKNOWN_OPERATION or REFUSED_ON_HOST, when opencode-pair is missing or stale, or when the user asks why the worker
-  does not respond"): checks in order: `opencode` binary found and version >= 2.0 (warns when `server.info.version` is outside the
+  UNKNOWN_OPERATION, REFUSED_ON_HOST or budget_exceeded, when opencode-pair is missing or stale, when the user wants
+  opencode-pair installed (argument `install`), or when the user asks why the worker does not respond"): checks in order: `opencode` binary found and version >= 2.0 (warns when `server.info.version` is outside the
   tested `2.0.x` range, since `session.diff` turn semantics and the experimental wait route are version behaviours); service registration file present
   and pid alive; `opencode api server.info` answers; the operation table contains `experimental.session.wait`;
   pairing (if any) resolves to a live session; `opencode-pair` link resolves to the running binary; `server_url`
-  without `OPENCODE_SERVER_PASSWORD`; newest log file and its last error; pairs whose Claude side is dead while the TUI side is alive (the
-  orphaned-worker case an abnormal controller death leaves behind); prints the resolved settings when invoked with
+  without `OPENCODE_SERVER_PASSWORD`; newest log file and its last error; pairs whose controller side is `dead` (not `none`) while the TUI side is `alive`, and sessions in
+  `session.active` whose pair has no living side (orphaned workers); prints the resolved settings when invoked with
   `verbose`.
 
 ### Release and registry wiring
@@ -512,42 +537,54 @@ re-ghidra siblings (measured: three `skills/doctor/SKILL.md` in the tree).
 ### Testing
 
 - `tests/bin/mock_opencode.rs`: a stand-in `opencode` selected by `OPENCODE_CTL_BIN`. It answers `api <op>` from a
-  fixture directory (`MOCK_OPENCODE_FIXTURES`), `service status|start|stop` from `MOCK_OPENCODE_SERVICE`, and forces
-  failure modes via `MOCK_OPENCODE_MODE`: `fail`, `garbage`, `silent`, `slow` (wait never returns), `permission`
-  (permission list non-empty after N polls).
-- The mock records every argv it receives into `MOCK_OPENCODE_ARGV_LOG`, so tests assert the exact parameters sent
-  (deep-object `location[directory]`, `type=user`, `order=desc`), and it can emit a 300 000-byte stdout to prove the
-  temp-file read (a pipe-based transport would see 262144 bytes and fail `transport_reads_large_stdout_whole`).
+  fixture directory (`MOCK_OPENCODE_FIXTURES/<operationId>.json`, or `<operationId>.<n>.json` consumed in order for
+  call sequences), `service status|start|stop` from `MOCK_OPENCODE_SERVICE`, records every argv it receives into
+  `MOCK_OPENCODE_ARGV_LOG` (one JSON line per call, so tests assert exact parameters: deep-object
+  `location[directory]`, `type=user`, `order=desc`, `--server`), and forces failure modes via `MOCK_OPENCODE_MODE`:
+  `fail`, `garbage`, `silent`, `slow` (wait never returns; it spawns a grandchild that records its own pid so the
+  kill test can check it died), `permission` (permission list non-empty after N polls), `form`, `big` (a
+  300 000-byte stdout; a pipe-based transport sees 262144 and fails `transport_reads_large_stdout_whole`).
 - Engine protocol test (rmcp in-process client), named tests, each tied to a ledger defect class:
   `tools_declare_token_cost`; `hatch_get_runs`, `hatch_mutation_needs_flag`, `hatch_allowlist_is_exactly_these_eight`
-  (pins the ids; any addition or removal goes red), `hatch_get_denylist_blocks_buffers_and_secrets` (every id listed),
+  (pins the ids; any addition or removal goes red), `hatch_get_denylist_blocks_every_listed_id`,
   `hatch_204_is_ok_true`, `hatch_non_json_refused`, `hatch_unknown_id`, `hatch_method_path_form_rejected`,
-  `hatch_param_name_prefix_and_value_rules`, `hatch_never_forwards_header`; `wait_idle_after_anchor`,
-  `wait_stale_idle_before_anchor_is_running`, `wait_explicit_after_not_replaced_by_human_message`,
-  `wait_synthetic_never_anchors`, `wait_inbox_pending`, `wait_after_unknown_then_stalled`, `wait_failed_outcome`,
-  `wait_awaiting_permission_shape`, `wait_awaiting_input_fields`, `wait_active_session_never_stalled`,
-  `wait_budget_exceeded`, `wait_no_spin_on_early_idle`; `transport_204_no_retry_of_mutation`,
-  `transport_error_mapping_table` (one case per code), `transport_kills_grandchild`; `compact_valid_json_under_cap`,
-  `changes_drop_patches_before_files`, `changes_default_range_ends_at_user_message`; `pairing_env_then_file_then_none`,
-  `pairing_ids_validated`, `liveness_boot_id_and_starttime`, `gc_keeps_active_session`;
-  `host_narrowing_from_each_constant`, `host_unknown_refuses_lifecycle`, `settings_workspace_cannot_set_policy_keys`,
-  `settings_env_beats_user_file`.
+  `hatch_param_name_prefix_and_value_rules`, `hatch_never_forwards_header`, `hatch_redacts_secret_keys`;
+  `wait_idle_after_anchor`, `wait_first_idle_after_anchor_not_newest`, `wait_stale_idle_before_anchor_is_running`,
+  `wait_explicit_after_not_replaced_by_human_message`, `wait_synthetic_never_anchors`, `wait_inbox_pending`,
+  `wait_after_unknown_then_stalled`, `wait_failed_outcome`, `wait_awaiting_permission_shape`,
+  `wait_awaiting_input_fields`, `wait_active_session_never_stalled`, `wait_budget_exceeded`,
+  `wait_idle_beats_budget`, `wait_no_spin_on_early_idle`, `wait_result_field_matrix` (per state);
+  `transport_204_no_retry_of_mutation`, `transport_error_mapping_table` (one case per code),
+  `transport_kills_grandchild`, `transport_reads_large_stdout_whole`, `transport_session_id_validated`;
+  `compact_valid_json_under_cap`, `changes_drop_patches_before_files`, `changes_files_truncated_lists_names`,
+  `changes_default_range_ends_at_user_message`, `changes_paths_filter_engine_side`;
+  `pairing_env_then_file_then_none`, `pairing_ids_validated`, `pairing_bin_env_exception`,
+  `liveness_boot_id_and_starttime`, `liveness_values_per_side` (alive, dead, starting, unknown, none),
+  `liveness_reads_highest_generation`, `gc_keeps_active_session`, `gc_skips_when_service_down`;
+  `host_narrowing_from_each_constant`, `host_unknown_refuses_lifecycle`,
+  `settings_workspace_cannot_set_protected_keys`, `settings_workspace_caps`, `settings_env_beats_user_file`,
+  `settings_lock_source_rule`.
+- Launcher tests (`--dry-run`): `pair_commands_per_terminal` (fake parent chain per terminal and the PATH
+  fallback), `pair_passes_server_url_to_wrapper`, `pair_argv0_dispatch_table` (every subcommand name and a
+  directory), `attach_bumps_generation`, `attach_session_id_new_record`, `install_launcher_conflict_rules`,
+  `install_launcher_source_file`, `exit_notice_409_retry`, the sentinel writer, and the quoting test.
 - Per-host e2e (child-process rmcp client against the staged binary): handshake, `service_status`, one refusal.
-- Launcher: `--dry-run` snapshot tests for each terminal candidate with a fake parent chain; the sentinel writer.
 - OpenCode front: `bun test` for the plugin's own hooks (pattern from rtk-mcp-opencode).
 - A reproduction of the spike through the MCP tools, run by hand before the capstone, is the acceptance test.
 
 ### Install and verification
 
 Claude Code: `claude plugin install opencode-ctl-mcp@aiplugins` (registry key `opencode-ctl-mcp-cc`); verify with
-`/opencode-ctl-mcp:doctor`. Other hosts follow their siblings' INSTALL.md / README patterns. First-use path: run
+`/opencode-ctl-mcp:opencode-ctl-doctor`. Other hosts follow their siblings' INSTALL.md / README patterns. First-use path: run
 `service_status`, then the driver skill's loop on a throwaway directory.
 
 ## To confirm while building (resolved in the plan, not here)
 
 - Whether killing the CLI child's process group also reaches bun's grandchildren (measured: the binary is a native
   ELF; the kill behaviour is not yet measured); the mock's `slow` mode has a grandchild to prove it.
-- The `Form.Answer` shape for `form_reply` and what `session.form.list` rows contain.
+- The `Form.Answer` shape for `form_reply`, the per-type extras of `Form.Field` (`external` has `url`; `multiselect`
+  has options), and what `session.form.list` rows contain.
+- `session.inbox.list` item `time` field shape (object or epoch) for the parked clock.
 - `session.inbox.list` row shape for the `stalled` check.
 - `files` attachments on `session.prompt` (`PromptInput.FileAttachment` shape) for `session_prompt.files`.
 - Windows: `wt` argument quoting and whether `opencode.exe` is on PATH after the official installer.
@@ -555,15 +592,11 @@ Claude Code: `claude plugin install opencode-ctl-mcp@aiplugins` (registry key `o
 
 ## Decision: how the human invokes the one command (owner, 2026-10-18)
 
-`install-launcher` it is: the subcommand links the staged binary as `opencode-pair` into `~/.local/bin` (Windows:
-a COPY of the exe as `%LOCALAPPDATA%\opencode-ctl\opencode-pair.exe`, no shim script at all), prints a PATH hint when
-that directory is not on PATH, and the `doctor` skill checks the link (or copy) matches the currently staged binary.
-The binary dispatches on its own name: invoked as `opencode-pair` it behaves as `<binary> pair`, so no wrapper and no
-command-line quoting layer exists on either platform. The human types `opencode-pair [dir]`. FRESH-MACHINE
-BOOTSTRAP: the first `install-launcher` is run from inside the host, where the plugin root is known: the
-`opencode-ctl-doctor` skill accepts the argument `install` and runs `${CLAUDE_PLUGIN_ROOT}/bin/opencode-ctl-cc-mcp
-install-launcher` (per-host path in each front's README); the README's one-liner uses the same variable. The human
-never types the plugin's `bin/` path.
+`install-launcher` it is: the human types `opencode-pair [dir]`, a symlink (POSIX) or copy (Windows) of the plugin
+binary that dispatches on its own name; the full rules live in the Launcher section. FRESH-MACHINE BOOTSTRAP: the
+first `install-launcher` runs from inside the host, where the plugin root is known: the `opencode-ctl-doctor` skill
+accepts the argument `install` and runs `<plugin root>/bin/<host binary> install-launcher` (`${CLAUDE_PLUGIN_ROOT}`
+on Claude Code; each front's README gives its own path form); the human never types the plugin's `bin/` path.
 Owner approved this document at commit 79ea151 as the basis for the panel review and the plan.
 
 ## Stand-downs (durable record of the panel review)
@@ -653,6 +686,27 @@ mock; stale ledger wording marked superseded. REJECTED: "`type=user limit=1` can
 message type enum lists `synthetic` as its own type, so the filter excludes it). DISCARDED-BELOW-FLOOR: the
 standalone-TUI stall case (above). UNVERIFIED-ACCEPTED pending the owner: same-user worker can rewrite the plugin's
 own files (above).
+
+Round 4 (2026-10-18, solo panel: Fold Auditor over round-3 edits, Procedure Walker re-walk, Protocol Pedant;
+plus the agy escalation): 28 solo findings, most of them contradictions introduced by rounds 1 to 3's incremental
+patches. Disposition: CONSOLIDATION REWRITE of the Pairing contract, session_wait mechanics, Escape hatch, Host and
+settings, Launcher and Testing sections as single texts, which FOLDS: name-based dispatch that still reaches `attach`,
+`gc`, `install-launcher`; the last `.cmd` shim mention removed, the in-use Windows copy renamed before replacing,
+`.source` file format; one sentinel format `<pid>:<boot_id>:<starttime>` with the wrapper's way of computing it per
+platform; the wrapper passes `--server`; pair GENERATIONS so `attach` reuses the controller's pair id; liveness values
+`alive | dead | starting | unknown | none` for both sides and a loop branch for each; doctor orphan rule on `dead`,
+not `none`; the unknown-anchor stall clock from the inbox item's time or the session's `time.updated`; terminal-state
+ORDER (first idle marker after the anchor wins over budget and stall); `paths` named as an engine-side filter and
+`omitted_files` names so `files_truncated` is no dead end; the whole-session range documented as including the
+human's turns, with `from=<prompt id>` for one turn; GET deny-list extended to `integration.*` and
+`experimental.session.export` plus RESPONSE REDACTION of secret-named keys; workspace caps on `output_max_bytes`,
+`wait_max_s` made protected, `server_url` env name as the second exception, lock-source rule; HTTP trigger restated
+on measured CPU at 25 %; `pair` runs `gc` after the service is up, `gc` deletes nothing when the service is down;
+the controller spawned by host constant (`claude`, `qwen`, `agy`); `session_wait` result field matrix; `Form.Field`
+reduction; `session_changes` request and response fully typed; file-content grammars; settings grammar; error list
+closed with `INVALID_ARGUMENT`, `INVALID_REQUEST`, `DEADLINE`, `IO_ERROR`, `PAIR_NOT_FOUND` and `details`,
+`TIMEOUT` removed as an error; `source`/`warning`/`meta` in the hatch rows; stale doctor command name; the test list
+extended to every round-3 and round-4 fold. REJECTED: none. The pre-rewrite text is in git history (395e3df).
 
 ## Parked work (do not lose)
 
