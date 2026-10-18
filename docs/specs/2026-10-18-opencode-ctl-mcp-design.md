@@ -444,7 +444,8 @@ Measured on the spike: 5 to 7 wait children of 30 s per 2 to 3 minute turn; each
 
 ### Launcher (`pair`, `attach`, `gc`, `install-launcher`; in `cli::dispatch`, so the cc, qwen and agy binaries all have them)
 
-Name-based dispatch: when the binary is invoked as `opencode-pair` (symlink or copy) and `argv[1]` is one of
+Name-based dispatch: the binary compares the file stem of `argv[0]` (directory and `.exe` stripped) with
+`opencode-pair`; when it matches and `argv[1]` is one of
 `attach`, `gc`, `install-launcher`, `doctor-json`, `--version`, that subcommand runs; any other `argv[1]` (a
 directory, a flag, or nothing) runs `pair`. The long binary name always takes an explicit subcommand.
 
@@ -477,7 +478,8 @@ rewritten) and runs step 4 for the new generation, so a controller still holding
 tab; with a session id, resolves the directory via `session.get`, writes a NEW record with `controller: null` and
 runs step 4. A pair id whose record is gone is `PAIR_NOT_FOUND`.
 
-`install-launcher`: POSIX creates `~/.local/bin/opencode-pair` as a symlink to the running binary; an existing
+`install-launcher`: creates the target directory when missing (0700 on POSIX); POSIX creates
+`~/.local/bin/opencode-pair` as a symlink to the running binary; an existing
 symlink is replaced when its target's file name matches `opencode-ctl-*-mcp`; a regular file or a symlink elsewhere
 is never touched (`LAUNCHER_CONFLICT`). Windows copies the running exe to `%LOCALAPPDATA%\opencode-ctl\
 opencode-pair.exe` (an in-use copy is first renamed to `opencode-pair.exe.old`, which `gc` deletes) and writes
@@ -706,7 +708,9 @@ the controller spawned by host constant (`claude`, `qwen`, `agy`); `session_wait
 reduction; `session_changes` request and response fully typed; file-content grammars; settings grammar; error list
 closed with `INVALID_ARGUMENT`, `INVALID_REQUEST`, `DEADLINE`, `IO_ERROR`, `PAIR_NOT_FOUND` and `details`,
 `TIMEOUT` removed as an error; `source`/`warning`/`meta` in the hatch rows; stale doctor command name; the test list
-extended to every round-3 and round-4 fold. REJECTED: none. The pre-rewrite text is in git history (395e3df).
+extended to every round-3 and round-4 fold. From the agy escalation (6 findings on the pre-rewrite text): all six
+already resolved by the consolidation; two walker guesses folded (installer creates its directory; name dispatch
+strips directory and `.exe`). REJECTED: none. The pre-rewrite text is in git history (395e3df).
 
 ## Parked work (do not lose)
 
