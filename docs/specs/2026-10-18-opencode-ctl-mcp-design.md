@@ -59,11 +59,15 @@ human can watch (and type into) the worker while Claude drives it. Each Claude g
   = `{id, version, url, pid, password}`. The CLI client `opencode api <operationId | METHOD path> [--param k=v]
   [-d body] [--server url]` authenticates by itself. Lifecycle: `opencode service start|restart|status|stop|get|set|unset`.
 - `session.prompt` ENQUEUES (returns `Session.Inbox.User` at once); `experimental.session.wait` (POST, no body)
-  blocks until the agent loop is idle (204). `Session.Inbox.Delivery` = `steer | queue`; the TUI sends every prompt
+  blocks until the agent loop is idle (204) and returns at once when the session is already idle. When a turn
+  ends the server appends a message of type `idle` to the session's message list (measured: the spike sessions end
+  `user, assistant..., idle`), so "newest message is `idle` and newer than the prompt" is the end-of-turn signal. `Session.Inbox.Delivery` = `steer | queue`; the TUI sends every prompt
   with `steer`; `queue` items are held until the current turn ends. The wait route does not report permissions;
   pending ones are read from `session.permission.list` (per session) or `permission.request.list` (per location).
-- `session.create` without `location` lands in the SERVER default directory (`/home/user` here), not the host
-  workspace. Sessions carry `agent`, `model {providerID, id, variant}`, `permissions: Permission.Rule[] | null`
+- `session.create` (POST /api/session, JSON body `{title?, parentID?, agent?, model?, location?: {directory}, permissions?}`)
+  without `location` lands in the SERVER default directory (`/home/user` here), not the host workspace. `session.list`
+  (GET /api/session) filters SERVER-side by query params `directory`, `project`, `search`, `parentID`, `subpath`,
+  with `limit`, `order`, `cursor` paging. Session ids look like `ses_` + 26 alphanumerics. Sessions carry `agent`, `model {providerID, id, variant}`, `permissions: Permission.Rule[] | null`
   (`{action, resource, effect: allow|deny|ask}`), `time {created, updated, idle, viewed}`, `tokens`, `cost`.
   Reply decisions: `once | always | reject`. The owner's global config is allow-all.
 - `opencode api` costs 0.48 to 0.62 s per call (bun startup); curl 0.1 s. `opencode api event.subscribe` emits
@@ -72,9 +76,12 @@ human can watch (and type into) the worker while Claude drives it. Each Claude g
   tracing-subscriber, thiserror, uuid, sha2, lru, tracing-appender. No HTTP client crate; adding one would ratchet
   `docs/footprints/budgets.json` and pass `deny.toml`.
 - Repo pattern for multi-host MCP plugins: engine lib crate in `shared/<x>` (rmcp `#[tool_router]` server,
-  `cli::dispatch`), thin per-host crates `claude-code/plugins/<x>-cc`, `qwen/plugins/<x>-qwen`,
+  `cli::dispatch`, an `emit-skill` subcommand that prints the crate-embedded driver skill; the Justfile
+  `emit-ghidra-skill` recipe writes the four committed `skills/<name>/SKILL.md` copies from it, and the cc front's
+  `tests/skill_emit.rs` pins the committed copy to the emitted text), thin per-host crates `claude-code/plugins/<x>-cc`, `qwen/plugins/<x>-qwen`,
   `antigravity/plugins/<x>-agy` with `src/bin/*.rs`, host manifests (`.claude-plugin/plugin.json` + `.mcp.json`;
-  `qwen-extension.json` with `mcpServers`; `plugin.json` + `mcp_config.json` + `hooks.json`), and an OpenCode front
+  `qwen-extension.json` with `mcpServers`; `plugin.json` + `mcp_config.json` (`{command, args}` only, the binary is
+  found by NAME on PATH, no environment block) + `hooks.json`), and an OpenCode front
   `opencode/plugins/<x>-opencode` (`plugin.ts`, `opencode.jsonc` with `mcp.servers.<x>`, `package.json`,
   `README.md`, `INSTALL.md`; bundler requires all five). `/bin/` holds built binaries and is gitignored; Justfile
   `build-<plugin>` recipes stage them. `agents.json` is the registry; `scripts/check-package-versions.sh` lists
@@ -107,7 +114,8 @@ human can watch (and type into) the worker while Claude drives it. Each Claude g
   mutations unless `allow_mutation: true`; streaming routes are refused outright.
 - `session_create` defaults `directory` to the host working directory.
 - Preflight: `doctor` skill only. Settings keys: `opencode_bin`, `wait_timeout_s`, `poll_s`, `permission_policy`,
-  `output_max_bytes`, `server_url`, `default_model`.
+  `output_max_bytes`, `server_url`, `default_model`; author added `wait_max_s` (slice cap, default 300) after the
+  builder check.
 - Launcher: the plugin owns the pairing contract and ships a minimal launcher; clavity may implement the same
   contract later. Pairing travels as environment variables with a file fallback. Shared background service.
   Linux terminals (mate, gnome, xfce `--tab -e`) and Windows Terminal (`wt`) in v1. Lifecycle desync between the
@@ -169,7 +177,7 @@ Environment, read by the MCP server (inherited from Claude) and set by the launc
 | `OPENCODE_CTL_DIR` | the paired workspace directory; `session_create`/`session_list` default to it, else host cwd |
 | `OPENCODE_CTL_SERVER` | optional server URL passed as `--server`; empty = background service |
 | `OPENCODE_CTL_PAIR` | pair id; names the fallback file below |
-| `OPENCODE_CTL_HOST` | `claude` / `qwen` / `agy` / `opencode`; set by each front's manifest, drives refusals |
+| `OPENCODE_CTL_HOST` | `opencode` only, set by the OpenCode front's `opencode.jsonc` (it reuses the cc binary); the cc, qwen and agy binaries carry their host as a compile-time constant passed to `cli::dispatch`. Lifecycle tools fail CLOSED: unknown host = refused |
 
 Fallback file `~/.opencode-ctl/pair.<pair-id>.json`:
 `{"pair_id", "session_id", "directory", "server_url", "created", "tui": {"pid", "exited_at"}, "claude": {"pid",
@@ -193,8 +201,8 @@ Common error shape: `{"error": {"code": CODE, "message": "...", "hint": "..."}}`
 | `session_list` | `directory?`, `all?: bool`, `search?`, `limit?=20` | `{sessions: [{id, title, directory, agent, model, updated, idle}]}` | no | default directory = paired dir or cwd; `all` drops the filter |
 | `session_create` | `title?`, `directory?`, `agent?`, `model?`, `permissions?: Rule[]`, `parent_id?` | `{session_id, directory, agent, model}` | no | directory default as above; model default = settings `default_model`; permissions default per `permission_policy` |
 | `session_get` | `session_id?` | `{id, title, directory, agent, model, tokens, cost, time, pending_permissions}` | no | |
-| `session_prompt` | `session_id?`, `text`, `delivery?='steer'`, `files?: [path]` | `{message_id, delivery}` and the hint "call session_wait" | YES | |
-| `session_wait` | `session_id?`, `timeout_s?`, `poll_s?` | `{state: idle\|running\|awaiting_permission\|timeout, elapsed_s, pending_permissions: [{id, action, resource}], last_assistant_text, tokens}` | no | timeout capped at 3600 |
+| `session_prompt` | `session_id?`, `text`, `delivery?='steer'`, `files?: [path]` | `{message_id, delivery}` and the hint "call session_wait with after=<message_id>" | YES | the server remembers `message_id` per session for `session_wait.after` |
+| `session_wait` | `session_id?`, `after?: message_id`, `timeout_s?=25`, `poll_s?=2` | `{state: idle\|running\|awaiting_permission\|timeout, elapsed_s, pending_permissions: [{id, action, resource}], last_assistant_text, tokens}` | no | ONE SLICE per call: `timeout_s` capped at settings `wait_max_s` (default 300); `state: running` means "call again" |
 | `session_messages` | `session_id?`, `limit?=20`, `cursor?`, `reasoning?=false`, `tools?='summary'` (`none\|summary\|full`) | `{messages: [{id, type, text, tools: [{name, status}]}], next_cursor, truncated}` | no | compaction (below) |
 | `session_changes` | `session_id?` | `{directory, status: [{path, kind}], diff_stat, diff?}` from the vcs routes for the session's directory | no | diff included only under the byte cap |
 | `session_interrupt` | `session_id?` | `{interrupted: true}` | no | |
@@ -208,14 +216,23 @@ Seventeen tools. `pair_status` and `session_changes` are the author's additions 
 can cut them): the first because the launcher's lifecycle sentinels need a reader, the second because the spike
 proved verification by diff is the whole point.
 
-### session_wait mechanics
+### session_wait mechanics (slice protocol)
 
-1. Resolve `session_id`; `timeout_s` from arg, else settings, else 120; `poll_s` likewise, else 2.
-2. Loop until the deadline: run `wait_idle` with `min(remaining, 30 s)`; on `Idle`, read the newest message; if its
-   type is `idle` return `idle`, otherwise (the loop had not started yet) sleep `poll_s` and continue. On
-   `DeadlineHit`, read `session.permission.list`; if non-empty return `awaiting_permission` with the requests.
-3. On the overall deadline return `timeout` with whatever is known. Each return carries `last_assistant_text`
-   (newest `text` part), `tokens` and `elapsed_s`.
+Hosts bound a single MCP tool call (the OpenCode front's sibling manifests set `timeout.execution: 30000` ms; the
+other hosts have their own defaults), and a worker turn took 133 to 202 s on the spike. So one `session_wait`
+call is a SLICE, never the whole wait: it returns `running` when its slice ends and the driver skill calls it again.
+The OpenCode front's `opencode.jsonc` sets `timeout.execution` to `wait_max_s + 30` seconds (330000 ms).
+
+1. Resolve `session_id`; `timeout_s` from arg, else settings `wait_timeout_s`, else 25, capped at `wait_max_s`;
+   `poll_s` likewise, else 2. Resolve `after`: the arg, else the id of the last prompt this server process sent to
+   that session, else none.
+2. Loop until the slice deadline: run `wait_idle` with `min(remaining, 30 s)`; on `Idle`, read the newest message
+   (`order=desc`, `limit=1`); if its type is `idle` AND (no `after`, or it was created after the `after` message)
+   return `idle`, otherwise (the loop has not started yet, or the idle marker is stale) sleep `poll_s` and continue.
+   On `DeadlineHit`, read `session.permission.list`; if non-empty return `awaiting_permission` with the requests.
+3. At the slice deadline return `running` (or `timeout` when the caller's own `timeout_s` was the binding limit and
+   the skill asked for a hard stop via `hard: true`). Each return carries `last_assistant_text` (newest `text` part),
+   `tokens` and `elapsed_s`.
 Measured on the spike: 5 to 7 wait children of 30 s per 2 to 3 minute turn, 0.5 s CLI overhead per poll.
 
 ### Compaction (`compact.rs`)
@@ -229,9 +246,13 @@ Measured on the spike: 5 to 7 wait children of 30 s per 2 to 3 minute turn, 0.5 
 
 ### Escape hatch gating (`openapi.rs`)
 
-- The OpenAPI document is fetched once per process via `opencode api GET /openapi.json` and cached; a built-in copy
-  (`openapi.snapshot.json`, taken at build time from v2.0.32) is the fallback when the service is down so
-  `opencode_operations` still answers. The table maps `operationId -> (method, path, summary)`.
+- The OpenAPI document (280 KB live) is fetched once per process via `opencode api GET /openapi.json` and reduced
+  to the operation table `operationId -> (method, path, summary)` (14 KB). A built-in copy of that TABLE only
+  (`openapi.table.json`, generated from v2.0.32 and committed with the version it came from) is the fallback when the
+  live fetch fails, so `opencode_operations` still answers. Live always wins; every `opencode_operations` and
+  `opencode_api` result carries `source: live | snapshot(v2.0.32)`, and when the snapshot is used while
+  `server.info.version` differs from it the result adds a `warning`. A mutating operation is never run from the
+  snapshot when the live document could not be fetched (`SERVICE_DOWN` first).
 - `operation` accepts an operation id or `METHOD /path`. Method resolution happens BEFORE execution; anything but
   GET requires `allow_mutation: true` else `MUTATION_BLOCKED`. `event.subscribe`, the pty connect routes and any
   `text/event-stream` response are `STREAMING_REFUSED`. Unknown ids are `UNKNOWN_OPERATION` with the three nearest
@@ -248,8 +269,10 @@ Measured on the spike: 5 to 7 wait children of 30 s per 2 to 3 minute turn, 0.5 
 
 ### Host-specific behaviour
 
-- `OPENCODE_CTL_HOST=opencode`: `service_stop` and `service_restart` return `REFUSED_ON_HOST`; the `pair` and
-  `attach` subcommands are not offered (the TUI is already open).
+- Host identity: each per-host binary passes a `Host` constant (`Claude`, `Qwen`, `Agy`) into `cli::dispatch`; the
+  cc binary alone also honours `OPENCODE_CTL_HOST=opencode` because the OpenCode front stages that binary. On
+  `Opencode` or `Unknown`, `service_stop` and `service_restart` return `REFUSED_ON_HOST` (fail closed; the hint names
+  the variable). On `Opencode` the `pair` and `attach` subcommands are not offered (the TUI is already open).
 - The Claude Code and OpenCode fronts read `.claude/opencode-ctl-mcp-cc.local.md` and
   `.opencode/opencode-ctl-mcp-opencode.local.md` (YAML front matter, keys above, env overrides win), the re-ghidra
   precedent. Qwen and Antigravity fronts are env-only in v1 (builder may add files following the same code path).
@@ -269,7 +292,16 @@ Measured on the spike: 5 to 7 wait children of 30 s per 2 to 3 minute turn, 0.5 
 5. Run `claude <claude args>` in the current terminal with the five `OPENCODE_CTL_*` variables set; when it exits,
    record `claude.exited_at` and print "worker session <id> is still running; attach with `opencode <dir> -s <id>`".
 `attach <session-id | pair-id>` opens step 4 for an existing session (lazy binding made visible).
+`pair` and `attach` live in `cli::dispatch`, so the cc, qwen and agy binaries all have them; the OpenCode front does
+not offer them. How a human reaches the one command from a terminal is the owner's decision (PENDING, see
+"Decisions still open"); the provisional default is an `install-launcher` subcommand that links the staged binary as
+`opencode-pair` into `~/.local/bin` (Windows: `%LOCALAPPDATA%\opencode-ctl\opencode-pair.cmd`) and prints the PATH
+hint, so the plugin's `bin/` location never has to be typed.
 `--dry-run` prints every command it would run and writes nothing; the launcher's tests use it.
+Values that reach a shell: the session id must match `^ses_[A-Za-z0-9]{26}$`, the pair id `^[0-9a-f]{8}$`, the
+directory is canonicalised and must exist; the wrapper script single-quotes every value (`'\''` escaping) on POSIX
+and uses `""` quoting in the `.cmd` on Windows; a value that fails validation aborts the launcher before any file is
+written. A unit test feeds a directory containing a quote, a space and a `$`.
 
 ### Skills
 
@@ -323,6 +355,11 @@ Claude Code: `claude plugin install opencode-ctl-mcp@aiplugins` (registry key `o
 - Windows: `wt` argument quoting and whether `opencode.exe` is on PATH after the official installer.
 - Antigravity's `mcp_config.json` environment key for `OPENCODE_CTL_HOST`.
 
+## Decisions still open (owner)
+
+- How the human invokes the one command: `install-launcher` symlink (provisional), the release binary installed on
+  PATH by the user, or a clavity verb. The plan's install docs and the launcher tests depend on it.
+
 ## Parked work (do not lose)
 
 - HTTP transport with SSE event tailing (`event_tail` tool) when the co-signed trigger fires.
@@ -330,6 +367,14 @@ Claude Code: `claude plugin install opencode-ctl-mcp@aiplugins` (registry key `o
 - clavity: an opencode tab option writing this pairing contract.
 - A composite `delegate` tool (create + prompt + wait + changes in one call) once the primitives are measured.
 - Per-pair private servers if OpenCode ever publishes the standalone endpoint.
+
+## Builder check (2026-10-18, fresh reviewer, read-only)
+
+Seven questions, one broken reference. Folded as the author's calls: slice protocol for `session_wait` with
+`after` and `wait_max_s`; request shapes and server-side `directory` filtering stated; `idle` marker semantics;
+host identity as a binary constant with fail-closed refusals; launcher input validation and quoting; OpenAPI
+snapshot reduced to the operation table with live-wins policy; skill emission cited as `emit-skill` + Justfile
+recipe + pinning test. Left to the owner: how the human invokes `pair`.
 
 ## Self-audit of this document (exhaustiveness)
 
