@@ -4,12 +4,15 @@ use std::sync::Arc;
 
 use rmcp::ServiceExt;
 
-use crate::clock::SystemClock;
+use crate::clock::{Clock, SystemClock};
 use crate::engine::{Engine, EnvSnapshot};
 use crate::host::{self, Host};
-use crate::liveness::SystemProbe;
+use crate::liveness::{ProcessProbe, SystemProbe};
+use crate::logging::LogScope;
+use crate::pairing;
 use crate::server::OpencodeCtlServer;
 use crate::settings;
+use crate::startup::startup;
 use crate::transport::{build_transport, home_required};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -100,6 +103,34 @@ pub async fn dispatch(
     }
 }
 
+/// What `serve` resolves before it starts logging: settings loaded with the RAW environment (an
+/// empty `OPENCODE_CTL_SERVER` must stay visible as the background-service override), the
+/// pairing identity resolved and applied (`pairing.rs`), and the warnings for the log.
+pub struct ServePrep {
+    pub settings: settings::Settings,
+    pub notes: Vec<settings::Note>,
+    pub env: EnvSnapshot,
+    pub identity_warnings: Vec<crate::error::ToolError>,
+}
+
+pub fn prepare_serve(
+    host: Host,
+    ctl_home: &std::path::Path,
+    cwd: std::path::PathBuf,
+    get: &dyn Fn(&str) -> Option<String>,
+) -> ServePrep {
+    let mut env = EnvSnapshot::from_lookup(get, cwd, ctl_home.to_path_buf());
+    let (mut settings, notes) = settings::load_from_fs(host, ctl_home, &env.cwd, get);
+    let (identity, identity_warnings) = pairing::resolve_identity(&env, ctl_home);
+    pairing::apply_identity(&mut env, &mut settings, &identity);
+    ServePrep {
+        settings,
+        notes,
+        env,
+        identity_warnings,
+    }
+}
+
 async fn serve(host: Host, user_home: &std::path::Path, rest: &[String]) -> Result<(), String> {
     let host_arg = match rest {
         [] => None,
@@ -109,23 +140,41 @@ async fn serve(host: Host, user_home: &std::path::Path, rest: &[String]) -> Resu
     let env_host = env_nonempty("OPENCODE_CTL_HOST");
     let host = host::resolve(host, host_arg, env_host.as_deref()).map_err(|e| e.message)?;
     let ctl_home = settings::ctl_home(&|k| env_nonempty(k));
-    let env = EnvSnapshot::from_env(ctl_home.clone());
-    let (loaded, notes) =
-        settings::load_from_fs(host, &ctl_home, &env.cwd, &|k| std::env::var(k).ok());
-    let transport = build_transport(&loaded, &ctl_home, user_home);
-    let engine = Arc::new(Engine::new(
-        loaded,
-        notes,
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let prep = prepare_serve(host, &ctl_home, cwd, &|k| std::env::var(k).ok());
+    let probe: Arc<dyn ProcessProbe> = Arc::new(SystemProbe);
+    let debug = env_nonempty("OPENCODE_CTL_LOG").is_some_and(|v| v.eq_ignore_ascii_case("debug"));
+    let report = startup(
+        &ctl_home,
         host,
-        env,
+        &prep.env,
+        probe.as_ref(),
+        SystemClock.now_ms(),
+        debug,
+        LogScope::Global,
+        &prep.identity_warnings,
+    );
+    if let Some(w) = &report.log_warning {
+        eprintln!("{w}");
+    }
+    for line in &report.identity_stderr {
+        eprintln!("opencode-ctl: {line}");
+    }
+    let transport = build_transport(&prep.settings, &ctl_home, user_home);
+    let engine = Arc::new(Engine::new(
+        prep.settings,
+        prep.notes,
+        host,
+        prep.env,
         transport,
         SystemClock,
-        Arc::new(SystemProbe),
+        probe,
     ));
     let running = OpencodeCtlServer::new(engine)
         .serve(rmcp::transport::stdio())
         .await
         .map_err(|e| e.to_string())?;
     running.waiting().await.map_err(|e| e.to_string())?;
+    drop(report);
     Ok(())
 }
