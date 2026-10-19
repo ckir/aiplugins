@@ -554,6 +554,22 @@ fn binary_check<T: Transport, C: Clock>(engine: &Engine<T, C>, ctx: &DoctorCtx) 
 
 fn registration_check<T: Transport, C: Clock>(engine: &Engine<T, C>, ctx: &DoctorCtx) -> Check {
     const ID: &str = "registration";
+    // A disabled service config selects a private standalone server for every call (server-connection.ts:41),
+    // so it outranks an absent, dead or live registration.
+    let disabled = ctx
+        .config_file
+        .and_then(|f| std::fs::read_to_string(f).ok())
+        .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+        .is_some_and(|v| v.get("disabled") == Some(&Value::Bool(true)));
+    if disabled {
+        let cfg = ctx.config_file.map(|f| f.display().to_string());
+        return Check::new(
+            ID,
+            Status::Warn,
+            "disabled",
+            &[("config_file", cfg.as_deref().unwrap_or(""))],
+        );
+    }
     let Some(file) = ctx.registration_file else {
         return Check::new(ID, Status::Skip, "no_path", &[]);
     };
@@ -578,20 +594,6 @@ fn registration_check<T: Transport, C: Clock>(engine: &Engine<T, C>, ctx: &Docto
     if !alive {
         return Check::new(ID, Status::Fail, "", &[("pid", &pid_s)])
             .details(json!({"url": redact_text(&url)}));
-    }
-    let disabled = ctx
-        .config_file
-        .and_then(|f| std::fs::read_to_string(f).ok())
-        .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
-        .is_some_and(|v| v.get("disabled") == Some(&Value::Bool(true)));
-    if disabled {
-        let cfg = ctx.config_file.map(|f| f.display().to_string());
-        return Check::new(
-            ID,
-            Status::Warn,
-            "disabled",
-            &[("config_file", cfg.as_deref().unwrap_or(""))],
-        );
     }
     Check::new(ID, Status::Ok, "", &[("pid", &pid_s)])
 }

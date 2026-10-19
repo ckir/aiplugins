@@ -1689,3 +1689,37 @@ fn launcher_link_status_table() {
     symlink(exe, &link).unwrap();
     assert_eq!(st(Host::Claude), LinkStatus::Fresh);
 }
+
+fn disabled_msg(rig: &Rig) -> String {
+    format!(
+        "service disabled in {}: every CLI call runs a private standalone server",
+        rig.cfg().display()
+    )
+}
+
+#[tokio::test]
+async fn registration_disabled_wins_over_absent_file() {
+    let rig = Rig::new();
+    fs::write(rig.cfg(), json!({"disabled": true}).to_string()).unwrap();
+    let missing = rig.home.path().join("state").join("absent.json");
+    let v = rig.run_with(&[], Some(&missing), false).await;
+    expect(&v, "registration", "warn", &disabled_msg(&rig));
+}
+
+#[tokio::test]
+async fn registration_disabled_wins_over_dead_pid() {
+    let rig = Rig::new();
+    fs::write(rig.cfg(), json!({"disabled": true}).to_string()).unwrap();
+    rig.probe.set_dead(4242);
+    let v = rig.run().await;
+    expect(&v, "registration", "warn", &disabled_msg(&rig));
+}
+
+#[tokio::test]
+async fn registration_disabled_with_live_pid() {
+    let rig = Rig::new();
+    fs::write(rig.cfg(), json!({"disabled": true}).to_string()).unwrap();
+    let v = rig.run().await;
+    expect(&v, "registration", "warn", &disabled_msg(&rig));
+    assert!(!check(&v, "registration").to_string().contains("password"));
+}
