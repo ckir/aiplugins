@@ -1,10 +1,12 @@
 //! Argv routing and the dispatch skeleton.
 
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use rmcp::ServiceExt;
 
 use crate::clock::{Clock, SystemClock};
+use crate::doctor::{default_config_file, default_registration_file, doctor_json, DoctorCtx};
 use crate::engine::{Engine, EnvSnapshot};
 use crate::error::{ErrorCode, ToolError};
 use crate::host::{self, Host};
@@ -80,6 +82,7 @@ pub async fn dispatch(
             return 1;
         }
     };
+    let probe: Arc<dyn ProcessProbe> = Arc::new(SystemProbe);
     match r {
         Route::Version => {
             println!("{}", version_line(product, version));
@@ -90,7 +93,7 @@ pub async fn dispatch(
             2
         }
         Route::Sub { name, rest } if name == "serve" => {
-            match serve(host, &user_home, &rest).await {
+            match serve(host, &user_home, &rest, probe).await {
                 Ok(()) => 0,
                 Err(msg) => {
                     eprintln!("{msg}");
@@ -115,6 +118,18 @@ pub async fn dispatch(
                 2
             }
         },
+        Route::Sub { name, rest } if name == "doctor-json" => {
+            match doctor_main(host, version, &user_home, &rest, probe).await {
+                Ok(report) => {
+                    println!("{report}");
+                    0
+                }
+                Err(e) => {
+                    eprintln!("{}", e.to_json());
+                    2
+                }
+            }
+        }
         Route::Sub { .. } | Route::Pair(_) => {
             eprintln!("not implemented ({host:?}, argv0={argv0:?})");
             2
@@ -150,7 +165,12 @@ pub fn prepare_serve(
     }
 }
 
-async fn serve(host: Host, user_home: &std::path::Path, rest: &[String]) -> Result<(), String> {
+async fn serve(
+    host: Host,
+    user_home: &std::path::Path,
+    rest: &[String],
+    probe: Arc<dyn ProcessProbe>,
+) -> Result<(), String> {
     let host_arg = match rest {
         [] => None,
         [flag, value] if flag == "--host" => Some(value.as_str()),
@@ -161,7 +181,6 @@ async fn serve(host: Host, user_home: &std::path::Path, rest: &[String]) -> Resu
     let ctl_home = settings::ctl_home(&|k| env_nonempty(k));
     let cwd = std::env::current_dir().unwrap_or_default();
     let prep = prepare_serve(host, &ctl_home, cwd, &|k| std::env::var(k).ok());
-    let probe: Arc<dyn ProcessProbe> = Arc::new(SystemProbe);
     let debug = env_nonempty("OPENCODE_CTL_LOG").is_some_and(|v| v.eq_ignore_ascii_case("debug"));
     let report = startup(
         &ctl_home,
@@ -241,4 +260,94 @@ pub fn emit_skill(rest: &[String]) -> Result<String, ToolError> {
         None => return Err(bad("--host <cc|qwen|agy|opencode> is required".into())),
     };
     render(skill, host)
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct DoctorArgs {
+    pub verbose: bool,
+    pub host_arg: Option<String>,
+}
+
+/// `doctor-json [verbose] [--host <h>]`, the two in either order; any other word is `INVALID_ARGUMENT`.
+pub fn parse_doctor_args(rest: &[String]) -> Result<DoctorArgs, ToolError> {
+    let bad = |msg: String| ToolError::new(ErrorCode::InvalidArgument, msg);
+    let mut args = DoctorArgs {
+        verbose: false,
+        host_arg: None,
+    };
+    let mut it = rest.iter().map(String::as_str);
+    while let Some(w) = it.next() {
+        match w {
+            "verbose" => args.verbose = true,
+            "--host" => {
+                let v = it
+                    .next()
+                    .ok_or_else(|| bad("--host needs a value (opencode)".into()))?;
+                if args.host_arg.replace(v.to_string()).is_some() {
+                    return Err(bad("--host given twice".into()));
+                }
+            }
+            other => {
+                return Err(bad(format!(
+                    "unexpected argument '{other}' (doctor-json [verbose] [--host h])"
+                )))
+            }
+        }
+    }
+    Ok(args)
+}
+
+/// The launcher install dir (spec Launcher, install-launcher): `~/.local/bin` on POSIX,
+/// `%LOCALAPPDATA%\opencode-ctl` on Windows. `get` is the raw environment lookup.
+pub fn launcher_bin_dir(user_home: &Path, get: &dyn Fn(&str) -> Option<String>) -> PathBuf {
+    if cfg!(windows) {
+        blank_is_unset(get("LOCALAPPDATA"))
+            .map(PathBuf::from)
+            .unwrap_or_else(|| user_home.join("AppData").join("Local"))
+            .join("opencode-ctl")
+    } else {
+        user_home.join(".local").join("bin")
+    }
+}
+
+/// `doctor-json`: the report for the real environment, as the value to print on stdout.
+async fn doctor_main(
+    host: Host,
+    version: &str,
+    user_home: &Path,
+    rest: &[String],
+    probe: Arc<dyn ProcessProbe>,
+) -> Result<serde_json::Value, ToolError> {
+    let args = parse_doctor_args(rest)?;
+    let env_host = env_nonempty("OPENCODE_CTL_HOST");
+    let host = host::resolve(host, args.host_arg.as_deref(), env_host.as_deref())?;
+    let raw = |k: &str| std::env::var(k).ok();
+    let ctl_home = settings::ctl_home(&|k| env_nonempty(k));
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let prep = prepare_serve(host, &ctl_home, cwd, &raw);
+    let transport = build_transport(&prep.settings, &ctl_home, user_home);
+    let engine = Engine::new(
+        prep.settings,
+        prep.notes,
+        host,
+        prep.env,
+        transport,
+        SystemClock,
+        probe,
+    );
+    let bin_dir = launcher_bin_dir(user_home, &raw);
+    let running_exe = std::env::current_exe().unwrap_or_default();
+    let registration = default_registration_file(&raw, user_home);
+    let config = default_config_file(&raw, user_home);
+    let ctx = DoctorCtx {
+        bin_dir: &bin_dir,
+        running_exe: &running_exe,
+        version,
+        user_home,
+        path: env_nonempty("PATH"),
+        registration_file: Some(&registration),
+        config_file: Some(&config),
+        env: &raw,
+    };
+    Ok(doctor_json(&engine, &ctx, args.verbose).await)
 }
