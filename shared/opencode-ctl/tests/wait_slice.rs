@@ -1009,6 +1009,10 @@ async fn wait_search_cut_result_has_running_key_set() {
         assert_eq!(out["state"], want, "{out}");
         assert_eq!(keys(&out), with(&[]), "same keys as a plain {want}: {out}");
         assert!(out["elapsed_s"].as_i64().unwrap() >= 25, "{out}");
+        // The stretch started at the anchor (600 s before NOW) and runs to now, not to the page-1 marker (595).
+        let elapsed = out["elapsed_s"].as_i64().unwrap();
+        assert_eq!(out["turn_s"], 600 + elapsed, "turn_s runs to now: {out}");
+        assert_ne!(out["turn_s"], 595, "not the marker-ended value: {out}");
         assert_eq!(calls_of_fake(&fake, "session.permission.list"), 0);
         assert_eq!(calls_of_fake(&fake, "session.form.list"), 0);
         assert!(calls_of_fake(&fake, "session.message.list") < 4);

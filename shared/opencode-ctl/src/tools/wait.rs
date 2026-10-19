@@ -876,6 +876,8 @@ impl<T: Transport, C: Clock> Engine<T, C> {
             ev.outcome = None;
             ev.error = None;
             ev.concurrent_turn = None;
+            // As a running result: the stretch runs to now, never to a marker in the partial snapshot.
+            ev.turn_s = turn_start(&anchor, &snap, snap.now_ms).map(|s| seconds(snap.now_ms - s));
         }
         if ev.state == WaitState::Running && a.hard == Some(true) {
             ev.state = WaitState::Timeout;
