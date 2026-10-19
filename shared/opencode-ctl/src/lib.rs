@@ -13,6 +13,7 @@ pub mod openapi;
 pub mod pairing;
 pub mod server;
 pub mod settings;
+pub mod skill_asset;
 pub mod startup;
 pub mod sweep;
 pub mod testing;

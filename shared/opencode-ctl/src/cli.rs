@@ -6,12 +6,14 @@ use rmcp::ServiceExt;
 
 use crate::clock::{Clock, SystemClock};
 use crate::engine::{Engine, EnvSnapshot};
+use crate::error::{ErrorCode, ToolError};
 use crate::host::{self, Host};
 use crate::liveness::{ProcessProbe, SystemProbe};
 use crate::logging::LogScope;
 use crate::pairing;
 use crate::server::OpencodeCtlServer;
 use crate::settings;
+use crate::skill_asset::{render, SkillName};
 use crate::startup::startup;
 use crate::transport::{build_transport, home_required};
 
@@ -96,6 +98,23 @@ pub async fn dispatch(
                 }
             }
         }
+        Route::Sub { name, rest } if name == "emit-skill" => match emit_skill(&rest) {
+            Ok(text) => {
+                use std::io::Write;
+                let mut out = std::io::stdout().lock();
+                match out.write_all(text.as_bytes()).and_then(|()| out.flush()) {
+                    Ok(()) => 0,
+                    Err(e) => {
+                        eprintln!("{}", ToolError::from(e).to_json());
+                        1
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("{}", e.to_json());
+                2
+            }
+        },
         Route::Sub { .. } | Route::Pair(_) => {
             eprintln!("not implemented ({host:?}, argv0={argv0:?})");
             2
@@ -177,4 +196,49 @@ async fn serve(host: Host, user_home: &std::path::Path, rest: &[String]) -> Resu
     running.waiting().await.map_err(|e| e.to_string())?;
     drop(report);
     Ok(())
+}
+
+/// `emit-skill <name> --host <cc|qwen|agy|opencode>` (the two words in either order): the rendered skill, byte
+/// for byte what goes to stdout. Any other argument shape, name or host is `INVALID_ARGUMENT`.
+pub fn emit_skill(rest: &[String]) -> Result<String, ToolError> {
+    let bad = |msg: String| ToolError::new(ErrorCode::InvalidArgument, msg);
+    let mut name: Option<&str> = None;
+    let mut host_arg: Option<&str> = None;
+    let mut it = rest.iter().map(String::as_str);
+    while let Some(w) = it.next() {
+        if w == "--host" {
+            let v = it
+                .next()
+                .ok_or_else(|| bad("--host needs a value (cc|qwen|agy|opencode)".into()))?;
+            if host_arg.replace(v).is_some() {
+                return Err(bad("--host given twice".into()));
+            }
+        } else if name.replace(w).is_some() {
+            return Err(bad(format!("unexpected argument '{w}'")));
+        }
+    }
+    let name = name.ok_or_else(|| {
+        bad(
+            "emit-skill <opencode-ctl-driver|opencode-ctl-doctor> --host <cc|qwen|agy|opencode>"
+                .into(),
+        )
+    })?;
+    let skill = SkillName::parse(name).ok_or_else(|| {
+        bad(format!(
+            "unknown skill '{name}' (opencode-ctl-driver or opencode-ctl-doctor)"
+        ))
+    })?;
+    let host = match host_arg {
+        Some("cc") => Host::Claude,
+        Some("qwen") => Host::Qwen,
+        Some("agy") => Host::Agy,
+        Some("opencode") => Host::Opencode,
+        Some(other) => {
+            return Err(bad(format!(
+                "unknown --host value '{other}' (cc, qwen, agy or opencode)"
+            )))
+        }
+        None => return Err(bad("--host <cc|qwen|agy|opencode> is required".into())),
+    };
+    render(skill, host)
 }
