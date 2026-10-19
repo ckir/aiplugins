@@ -9,6 +9,7 @@ pub mod engine;
 pub mod error;
 pub mod gc;
 pub mod host;
+pub mod launcher;
 pub mod liveness;
 pub mod logging;
 pub mod openapi;

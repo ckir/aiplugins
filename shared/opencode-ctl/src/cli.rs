@@ -47,7 +47,31 @@ pub fn env_nonempty(name: &str) -> Option<String> {
     blank_is_unset(std::env::var(name).ok())
 }
 
-pub fn route(_argv0: Option<&str>, args: &[String]) -> Route {
+/// The file stem of `argv0` with the directory and a `.exe` suffix stripped (either separator).
+fn argv0_stem(argv0: &str) -> &str {
+    let name = argv0.rsplit(['/', '\\']).next().unwrap_or(argv0);
+    match name.len().checked_sub(4) {
+        Some(i) if name.is_char_boundary(i) && name[i..].eq_ignore_ascii_case(".exe") => &name[..i],
+        _ => name,
+    }
+}
+
+/// Under the name `opencode-pair` (the launcher link) a leading `resume`, `attach`, `gc`,
+/// `install-launcher`, `doctor-json` or `--version` is that subcommand and anything else, no
+/// arguments included, is `pair`. Under the long binary names the subcommand is always explicit.
+pub fn route(argv0: Option<&str>, args: &[String]) -> Route {
+    if argv0.map(argv0_stem) == Some("opencode-pair") {
+        return match args.first().map(String::as_str) {
+            Some("--version") => Route::Version,
+            Some(w @ ("resume" | "attach" | "gc" | "install-launcher" | "doctor-json")) => {
+                Route::Sub {
+                    name: w.to_string(),
+                    rest: args[1..].to_vec(),
+                }
+            }
+            _ => Route::Pair(args.to_vec()),
+        };
+    }
     match args.first().map(String::as_str) {
         Some("--version") | Some("-V") => Route::Version,
         Some(w) if SUBCOMMANDS.contains(&w) => Route::Sub {
@@ -142,7 +166,24 @@ pub async fn dispatch(
                 }
             }
         }
-        Route::Sub { .. } | Route::Pair(_) => {
+        Route::Pair(_) if launcher_withheld(host) => {
+            eprintln!("pair: {}", crate::launcher::NOT_OFFERED);
+            2
+        }
+        Route::Pair(rest) => launcher_main(host, version, &user_home, "pair", &rest, probe).await,
+        Route::Sub { name, .. }
+            if matches!(
+                name.as_str(),
+                "pair" | "install-launcher" | "resume" | "attach"
+            ) && launcher_withheld(host) =>
+        {
+            eprintln!("{name}: {}", crate::launcher::NOT_OFFERED);
+            2
+        }
+        Route::Sub { name, rest } if name == "pair" || name == "install-launcher" => {
+            launcher_main(host, version, &user_home, &name, &rest, probe).await
+        }
+        Route::Sub { .. } => {
             eprintln!("not implemented ({host:?}, argv0={argv0:?})");
             2
         }
@@ -424,4 +465,100 @@ async fn gc_main(
     let debug = env_nonempty("OPENCODE_CTL_LOG").is_some_and(|v| v.eq_ignore_ascii_case("debug"));
     log_gc_report(&ctl_home, &report, debug);
     serde_json::to_value(&report).map_err(|e| ToolError::new(ErrorCode::IoError, e.to_string()))
+}
+
+/// The OpenCode host (the compiled constant or `OPENCODE_CTL_HOST=opencode`) is never offered the launcher.
+fn launcher_withheld(host: Host) -> bool {
+    let env_host = env_nonempty("OPENCODE_CTL_HOST");
+    host::resolve(host, None, env_host.as_deref()).is_ok_and(|h| !h.offers_launcher())
+}
+
+/// `pair` and `install-launcher` for the real environment; returns the exit code.
+async fn launcher_main(
+    host: Host,
+    version: &str,
+    user_home: &Path,
+    name: &str,
+    rest: &[String],
+    probe: Arc<dyn ProcessProbe>,
+) -> i32 {
+    match launcher_run(host, version, user_home, name, rest, probe).await {
+        Ok(code) => code,
+        Err(e) => {
+            eprintln!("{}", e.to_json());
+            2
+        }
+    }
+}
+
+async fn launcher_run(
+    host: Host,
+    version: &str,
+    user_home: &Path,
+    name: &str,
+    rest: &[String],
+    probe: Arc<dyn ProcessProbe>,
+) -> Result<i32, ToolError> {
+    use crate::launcher::{self, LauncherCtx};
+    let raw = |k: &str| std::env::var(k).ok();
+    let ctl_home = settings::ctl_home(&|k| env_nonempty(k));
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let prep = prepare_serve(host, &ctl_home, cwd, &raw);
+    let opencode_bin = crate::transport::cli::resolve_binary(
+        prep.settings.opencode_bin.as_deref(),
+        env_nonempty("PATH").as_deref(),
+        user_home,
+    )
+    .ok();
+    let transport = build_transport(&prep.settings, &ctl_home, user_home);
+    let engine = Engine::new(
+        prep.settings,
+        prep.notes,
+        host,
+        prep.env,
+        transport,
+        SystemClock,
+        probe.clone(),
+    );
+    let bin_dir = launcher_bin_dir(user_home, &raw);
+    let running_exe = std::env::current_exe().unwrap_or_default();
+    let password = env_nonempty("OPENCODE_SERVER_PASSWORD");
+    let now = || SystemClock.now_ms();
+    let mut stdout = std::io::stdout();
+    let mut ctx = LauncherCtx {
+        home: &ctl_home,
+        bin_dir: &bin_dir,
+        running_exe: &running_exe,
+        host,
+        probe: probe.as_ref(),
+        now_ms: &now,
+        path_has: &launcher::system_path_has,
+        opencode_bin: opencode_bin.as_deref(),
+        version,
+        parent_chain: &launcher::system_parent_chain,
+        server_password: password.as_deref(),
+        spawn_detached: &launcher::system_spawn_detached,
+        spawn_and_wait: &launcher::system_spawn_and_wait,
+        before_claim: None,
+        out: &mut stdout,
+    };
+    match name {
+        "install-launcher" => {
+            let force = match rest {
+                [] => false,
+                [f] if f == "--force" => true,
+                [other, ..] => {
+                    return Err(ToolError::new(
+                        ErrorCode::InvalidArgument,
+                        format!("unexpected argument '{other}' (install-launcher [--force])"),
+                    ))
+                }
+            };
+            launcher::install_launcher(&mut ctx, force).map(|()| 0)
+        }
+        _ => {
+            let args = launcher::parse_pair_args(rest)?;
+            launcher::pair(args, &mut ctx, &engine).await
+        }
+    }
 }
