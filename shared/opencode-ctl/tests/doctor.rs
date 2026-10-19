@@ -29,6 +29,8 @@ use serde_json::{json, Value};
 const PAIR: &str = "0123456789ab";
 const OTHER_PAIR: &str = "ba9876543210";
 const URL: &str = "http://127.0.0.1:49374";
+/// The registration file's `password` (Service.Info, packages/client/src/effect/service.ts:146).
+const SECRET: &str = "hunter2-fixture-secret";
 
 const IDS: [&str; 18] = [
     "ctl_home_override",
@@ -153,7 +155,7 @@ impl Rig {
         };
         fs::write(
             rig.reg(),
-            json!({"url": URL, "pid": 4242, "version": "2.0.32"}).to_string(),
+            json!({"url": URL, "pid": 4242, "version": "2.0.32", "password": SECRET}).to_string(),
         )
         .unwrap();
         rig
@@ -192,6 +194,15 @@ impl Rig {
             .filter(|c| c.op == "server.info")
             .count()
     }
+}
+
+/// The distinctive password VALUE appears nowhere in the whole report.
+#[track_caller]
+fn no_secret(v: &Value) {
+    assert!(
+        !v.to_string().contains(SECRET),
+        "registration password leaked: {v}"
+    );
 }
 
 fn check<'a>(v: &'a Value, id: &str) -> &'a Value {
@@ -311,6 +322,7 @@ async fn doctor_json_baseline_all_checks() {
         "CLI 2.0.32 and server 2.0.32 are within the tested 2.0.x range",
     );
     expect(&v, "registration", "ok", "registered pid 4242 is alive");
+    no_secret(&v);
     expect(
         &v,
         "server_info",
@@ -516,7 +528,11 @@ async fn doctor_json_reports_registration() {
         ),
     );
     // disabled in the service config
-    fs::write(rig.reg(), json!({"url": URL, "pid": 4242}).to_string()).unwrap();
+    fs::write(
+        rig.reg(),
+        json!({"url": URL, "pid": 4242, "password": SECRET}).to_string(),
+    )
+    .unwrap();
     fs::write(rig.cfg(), json!({"disabled": true}).to_string()).unwrap();
     expect(
         &rig.run().await,
@@ -528,15 +544,13 @@ async fn doctor_json_reports_registration() {
         ),
     );
     fs::write(rig.cfg(), json!({"disabled": false}).to_string()).unwrap();
-    expect(
-        &rig.run().await,
-        "registration",
-        "ok",
-        "registered pid 4242 is alive",
-    );
+    let v = rig.run().await;
+    expect(&v, "registration", "ok", "registered pid 4242 is alive");
+    no_secret(&v);
     // a dead pid fails and carries the url from the file
     rig.probe.set_dead(4242);
     let v = rig.run().await;
+    no_secret(&v);
     expect(&v, "registration", "fail", "registered pid 4242 is dead");
     assert_eq!(check(&v, "registration")["details"]["url"], URL);
     // plain server_info: ok next to the stale registration (another server answers)
@@ -1704,6 +1718,7 @@ async fn registration_disabled_wins_over_absent_file() {
     let missing = rig.home.path().join("state").join("absent.json");
     let v = rig.run_with(&[], Some(&missing), false).await;
     expect(&v, "registration", "warn", &disabled_msg(&rig));
+    no_secret(&v);
 }
 
 #[tokio::test]
@@ -1713,6 +1728,7 @@ async fn registration_disabled_wins_over_dead_pid() {
     rig.probe.set_dead(4242);
     let v = rig.run().await;
     expect(&v, "registration", "warn", &disabled_msg(&rig));
+    no_secret(&v);
 }
 
 #[tokio::test]
@@ -1721,5 +1737,6 @@ async fn registration_disabled_with_live_pid() {
     fs::write(rig.cfg(), json!({"disabled": true}).to_string()).unwrap();
     let v = rig.run().await;
     expect(&v, "registration", "warn", &disabled_msg(&rig));
-    assert!(!check(&v, "registration").to_string().contains("password"));
+    no_secret(&v);
+    assert!(check(&v, "registration").get("details").is_none());
 }
