@@ -192,6 +192,11 @@ impl<T: Transport, C: Clock> Engine<T, C> {
         cache.version = version;
     }
 
+    /// The `server.info` version last observed by `invalidate_if_changed`.
+    pub async fn observed_server_version(&self) -> Option<String> {
+        self.openapi.lock().await.version.clone()
+    }
+
     pub async fn op(&self, id: &str) -> Result<Operation, ToolError> {
         let (table, _, _) = self.operation_table().await;
         table.get(id).cloned().ok_or_else(|| {

@@ -10,6 +10,7 @@ use crate::error::{ErrorCode, ToolError, ToolResult};
 use crate::transport::Transport;
 
 pub mod changes;
+pub mod hatch;
 pub mod messages;
 pub mod permissions;
 pub mod service;
@@ -172,12 +173,6 @@ fn not_implemented(tool: &str) -> ToolResult {
 impl<T: Transport, C: Clock> Engine<T, C> {
     pub async fn session_wait(&self, _a: SessionWaitArgs) -> ToolResult {
         not_implemented("session_wait")
-    }
-    pub async fn opencode_operations(&self, _a: OpencodeOperationsArgs) -> ToolResult {
-        not_implemented("opencode_operations")
-    }
-    pub async fn opencode_api(&self, _a: OpencodeApiArgs) -> ToolResult {
-        not_implemented("opencode_api")
     }
     pub async fn pair_status(&self, _a: PairStatusArgs) -> ToolResult {
         not_implemented("pair_status")
