@@ -1,0 +1,47 @@
+[package]
+name = "opencode-ctl"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish = false
+
+[lib]
+name = "opencode_ctl"
+
+[[bin]]
+name = "mock-opencode-ctl"
+path = "tests/bin/mock_opencode.rs"
+
+[package.metadata.dist]
+dist = false
+
+[dependencies]
+anyhow = { workspace = true }
+lru = { workspace = true }
+rmcp = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-appender = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
+proc-guard = { path = "../proc-guard" }
+
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+nix = { workspace = true }
+
+[dev-dependencies]
+rmcp = { workspace = true, features = ["client", "transport-child-process"] }
+insta = { workspace = true }
+proptest = { workspace = true }

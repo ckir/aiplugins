@@ -13,7 +13,6 @@ members = [
 # Skills-only sources: markdown, no crate.
 exclude = [
     "shared/devtools",
-    "shared/opencode-ctl",
     "claude-code/plugins/aiplugins-devtools-cc",
     "claude-code/plugins/repo-user-guide-cc",
     "qwen/plugins/aiplugins-devtools-qwen",
