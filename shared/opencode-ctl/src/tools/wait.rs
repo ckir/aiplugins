@@ -228,9 +228,15 @@ pub fn evaluate(anchor: &Anchor, snap: &Snapshot, settings: &Settings) -> Evalua
         let newest = snap.messages.iter().max_by_key(|m| m.created);
         let newest_is_marker_after_anchor =
             newest.is_some_and(|m| is_idle(m) && m.created > anchor.created_ms);
-        if let Some(newest) = newest {
+        // An empty message list has no newest message: the anchor's own clock (the call start, see `locate`) stands in.
+        let clock = match (newest, &anchor.source) {
+            (Some(m), _) => Some(m.created),
+            (None, AnchorSource::Neither { .. }) => Some(anchor.created_ms),
+            (None, _) => None,
+        };
+        if let Some(clock) = clock {
             if !newest_is_marker_after_anchor
-                && snap.now_ms - newest.created >= settings.stall_s as i64 * 1000
+                && snap.now_ms - clock >= settings.stall_s as i64 * 1000
             {
                 return verdict(WaitState::Stalled);
             }
@@ -308,6 +314,14 @@ enum Stop<'a> {
 }
 
 impl Stop<'_> {
+    /// The anchor timestamp this stop establishes once `hit` matched `m`.
+    fn ts(&self, m: &Message) -> i64 {
+        match self {
+            Stop::Find(_) => m.created,
+            Stop::Anchor(a) => a.created_ms,
+        }
+    }
+
     fn hit(&self, m: &Message) -> bool {
         match self {
             Stop::Find(id) => m.id == *id,
@@ -348,6 +362,7 @@ impl<T: Transport, C: Clock> Engine<T, C> {
         let mut all: Vec<Message> = Vec::new();
         let mut cursor: Option<String> = None;
         let mut first = true;
+        let mut hit_ts: Option<i64> = None;
         let found = loop {
             let mut params = vec![
                 ("sessionID".to_string(), session.to_string()),
@@ -365,11 +380,16 @@ impl<T: Transport, C: Clock> Engine<T, C> {
             }
             let page: Vec<Message> = rows(&data).iter().map(message_from_raw).collect();
             let empty = page.is_empty();
-            let found = page.iter().any(|m| stop.hit(m));
+            if hit_ts.is_none() {
+                hit_ts = page.iter().find(|m| stop.hit(m)).map(|m| stop.ts(m));
+            }
             all.extend(page);
+            // After the stop hits, keep paging until an idle marker older than the anchor has been read, so the
+            // whole current non-idle stretch (`turn_s`) is in the snapshot even when the turn spans pages.
+            let done = hit_ts.is_some_and(|ts| all.iter().any(|m| is_idle(m) && m.created < ts));
             match cursor_str(&cur, "next") {
-                Some(next) if !found && !empty => cursor = Some(next),
-                _ => break found,
+                Some(next) if !done && !empty => cursor = Some(next),
+                _ => break hit_ts.is_some(),
             }
         };
         all.reverse();
@@ -424,6 +444,7 @@ impl<T: Transport, C: Clock> Engine<T, C> {
         &self,
         session: &str,
         after: Option<&str>,
+        call_start: i64,
         state: &mut PageState,
     ) -> Result<Option<Located>, ToolError> {
         let Some(after) = after else {
@@ -486,7 +507,9 @@ impl<T: Transport, C: Clock> Engine<T, C> {
                     .iter()
                     .map(|m| m.created)
                     .max()
-                    .unwrap_or_else(|| self.clock().now_ms());
+                    // RULING: an unknown `after` on an EMPTY message list uses the call-start time as its stall
+                    // clock, so the wait reaches `stalled` after `stall_s` instead of staying `running` forever.
+                    .unwrap_or(call_start);
                 Anchor {
                     id: after.to_string(),
                     created_ms: newest_ms,
@@ -509,7 +532,7 @@ impl<T: Transport, C: Clock> Engine<T, C> {
         after: Option<&str>,
     ) -> Result<Anchor, ToolError> {
         let mut state = PageState::default();
-        self.locate(session, after, &mut state)
+        self.locate(session, after, self.clock().now_ms(), &mut state)
             .await?
             .map(|l| l.anchor)
             .ok_or_else(|| {
@@ -536,7 +559,7 @@ impl<T: Transport, C: Clock> Engine<T, C> {
             .then(|| json!({"tui": "unknown", "claude": "unknown"}));
 
         let Some(located) = self
-            .locate(&session, a.after.as_deref(), &mut state)
+            .locate(&session, a.after.as_deref(), started, &mut state)
             .await?
         else {
             let tokens = self.tokens_of(&session).await;

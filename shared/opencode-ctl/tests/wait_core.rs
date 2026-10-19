@@ -10,7 +10,7 @@ use opencode_ctl::host::Host;
 use opencode_ctl::settings::Settings;
 use opencode_ctl::testing::fake::{FakeTransport, RecordedCall};
 use opencode_ctl::testing::temp_home;
-use opencode_ctl::tools::wait::{Anchor, AnchorSource, PageState};
+use opencode_ctl::tools::wait::{evaluate, Anchor, AnchorSource, PageState, Snapshot, WaitState};
 use opencode_ctl::transport::TransportError;
 use serde_json::{json, Value};
 
@@ -897,7 +897,11 @@ async fn wait_idle_search_pages_to_anchor_timestamp() {
             "session.message.list",
             &[("cursor", "c3")],
             vec![paged(
-                json!([asst("msg_p3", ago(40), json!([])), user("msg_a", ago(60))]),
+                json!([
+                    asst("msg_p3", ago(40), json!([])),
+                    user("msg_a", ago(60)),
+                    idle("msg_i0", ago(70), "succeeded")
+                ]),
                 Some("c4"),
                 Some("x3"),
             )],
@@ -1056,4 +1060,97 @@ async fn wait_always_present_fields_are_null_not_absent() {
     let r = rig(|f| base(f, vec![asst("msg_x", ago(5), json!([]))])).await;
     let out = wait(&r, Some("msg_vanished")).await;
     assert_eq!(out["turn_s"], Value::Null, "{out}");
+}
+
+#[tokio::test]
+async fn wait_budget_survives_reprompt_across_pages() {
+    let r = rig(|f| {
+        base(f, vec![]);
+        active(f);
+        f.on_matching(
+            "session.message.list",
+            &[("order", "desc")],
+            vec![paged(
+                json!([asst("msg_p1", ago(20), json!([])), user("msg_a", ago(50))]),
+                Some("c2"),
+                Some("prev1"),
+            )],
+        );
+        f.on_matching(
+            "session.message.list",
+            &[("cursor", "c2")],
+            vec![paged(
+                json!([asst("msg_p2", ago(900), json!([]))]),
+                Some("c3"),
+                Some("x2"),
+            )],
+        );
+        f.on_matching(
+            "session.message.list",
+            &[("cursor", "c3")],
+            vec![paged(
+                json!([user("msg_u1", ago(1900))]),
+                Some("c4"),
+                Some("x3"),
+            )],
+        );
+        f.on_matching(
+            "session.message.list",
+            &[("cursor", "c4")],
+            vec![paged(
+                json!([idle("msg_i0", ago(2500), "succeeded")]),
+                Some("c5"),
+                Some("x4"),
+            )],
+        );
+    })
+    .await;
+    let out = wait(&r, Some("msg_a")).await;
+    assert_eq!(out["state"], "budget_exceeded", "{out}");
+    assert_eq!(
+        out["turn_s"], 1900,
+        "measured from the original open user message"
+    );
+    let list = calls_of(&r, "session.message.list");
+    assert_eq!(
+        list.len(),
+        4,
+        "stops at the page holding the idle marker older than the anchor: {list:?}"
+    );
+    for c in &list[1..] {
+        assert!(param(c, "order").is_none() && param(c, "type").is_none());
+    }
+}
+
+#[tokio::test]
+async fn wait_after_unknown_empty_list_stalls_after_stall_s() {
+    let settings = Settings::default();
+    let anchor = Anchor {
+        id: "msg_nowhere".into(),
+        created_ms: NOW,
+        source: AnchorSource::Neither { newest_ms: NOW },
+    };
+    let snap = |now_ms| Snapshot {
+        messages: vec![],
+        inbox: vec![],
+        active: false,
+        permissions: vec![],
+        forms: vec![],
+        now_ms,
+    };
+    let stall_ms = settings.stall_s as i64 * 1000;
+    assert_eq!(
+        evaluate(&anchor, &snap(NOW + stall_ms - 1), &settings).state,
+        WaitState::Running
+    );
+    assert_eq!(
+        evaluate(&anchor, &snap(NOW + stall_ms), &settings).state,
+        WaitState::Stalled
+    );
+
+    // Through the tool: the stall clock is the call start, so a single call returns running.
+    let r = rig(|f| base(f, vec![])).await;
+    let out = wait(&r, Some("msg_nowhere")).await;
+    assert_eq!(out["state"], "running", "{out}");
+    assert_eq!(out["turn_s"], Value::Null);
 }
