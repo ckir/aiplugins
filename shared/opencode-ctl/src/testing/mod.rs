@@ -6,6 +6,7 @@ use std::sync::Mutex;
 
 use crate::liveness::ProcessProbe;
 
+pub mod fake;
 pub mod mock;
 
 pub struct TempHome {
