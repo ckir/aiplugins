@@ -664,6 +664,11 @@ async fn service_status_unpaired_shape() {
     assert_eq!(out["running"], json!(false));
     assert_eq!(out["reachable"], json!(false));
     assert!(r.fake.calls().iter().all(|c| c.op != "server.info"));
+    assert_eq!(
+        r.fake.openapi_fetches(),
+        0,
+        "a stopped service must not be touched"
+    );
 
     let r = plain(|f| {
         f.on(
