@@ -275,21 +275,19 @@ pub fn depth_cap(value: Value, max_depth: usize) -> Value {
 
 fn sensitive_key(key: &str) -> bool {
     let k = key.to_lowercase().replace('-', "_");
-    if k.contains("tokens") {
-        return false;
-    }
-    [
-        "header",
-        "apikey",
-        "api_key",
-        "token",
-        "secret",
-        "password",
-        "auth",
-        "credential",
-    ]
-    .iter()
-    .any(|n| k.contains(n))
+    // The `tokens` exemption applies to the `token` term only (token counts are not secrets).
+    k.replace("tokens", "").contains("token")
+        || [
+            "header",
+            "apikey",
+            "api_key",
+            "secret",
+            "password",
+            "auth",
+            "credential",
+        ]
+        .iter()
+        .any(|n| k.contains(n))
 }
 
 /// Redact secret-bearing keys and strip URL userinfo from every string.

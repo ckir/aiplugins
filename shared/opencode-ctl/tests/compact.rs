@@ -40,6 +40,15 @@ proptest! {
         prop_assert!(serde_json::from_str::<Value>(&s).is_ok());
         prop_assert!(s.len() <= c.max_bytes + 40960, "len {} max {}", s.len(), max);
     }
+
+    // The generator never emits `pending_*` keys, so no exempt allowance applies: the real bound is `max_bytes`
+    // itself (the truncation markers are budgeted inside it by MARKER_RESERVE).
+    #[test]
+    fn compact_exempt_free_input_fits_max_bytes(v in arb_json(), max in 1024usize..4096) {
+        let c = cap(max);
+        let s = serde_json::to_string(&cap_json(v, &c)).unwrap();
+        prop_assert!(s.len() <= c.max_bytes, "len {} max {}", s.len(), max);
+    }
 }
 
 #[test]
@@ -143,6 +152,17 @@ fn redaction_substring_and_url_userinfo() {
         redact_text("see http://h/p@x and ftp://me@h2:21/z"),
         "see http://h/p@x and ftp://h2:21/z"
     );
+}
+
+#[test]
+fn redaction_tokens_exemption_is_only_for_the_token_term() {
+    let mut v = json!({"authTokens": 1, "secret_tokens": 2, "tokens": 3, "Tokens": 4, "token": 5, "Token": 6, "x-token": 7});
+    redact(&mut v);
+    for k in ["authTokens", "secret_tokens", "token", "Token", "x-token"] {
+        assert_eq!(v[k], json!("<redacted>"), "{k}");
+    }
+    assert_eq!(v["tokens"], json!(3));
+    assert_eq!(v["Tokens"], json!(4));
 }
 
 #[test]
