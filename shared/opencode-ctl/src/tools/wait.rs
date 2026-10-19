@@ -742,14 +742,10 @@ impl<T: Transport, C: Clock> Engine<T, C> {
     }
 
     fn pair_of(&self) -> Option<Value> {
+        // As `service_status.paired.{tui,claude}`, re-read from the pair files on every call.
         self.env.session.as_ref().map(|_| {
-            // As `service_status.paired.{tui,claude}`: "none" when the server has no pair id.
-            let liveness = if self.env.pair.is_some() {
-                "unknown"
-            } else {
-                "none"
-            };
-            json!({"tui": liveness, "claude": liveness})
+            let (tui, claude) = self.pair_liveness();
+            json!({"tui": tui.as_str(), "claude": claude.as_str()})
         })
     }
 

@@ -68,18 +68,14 @@ impl<T: Transport, C: Clock> Engine<T, C> {
         }
         let paired = match &self.env.session {
             Some(session) => {
-                let liveness = if self.env.pair.is_some() {
-                    "unknown"
-                } else {
-                    "none"
-                };
+                let (tui, claude) = self.pair_liveness();
                 json!({
                     "pair_id": self.env.pair,
                     "session_id": session,
                     "directory": self.env.directory.as_ref().map(|d| d.to_string_lossy().to_string()),
                     "server_url": self.env.server,
-                    "tui": liveness,
-                    "claude": liveness,
+                    "tui": tui.as_str(),
+                    "claude": claude.as_str(),
                 })
             }
             None => Value::Null,

@@ -4,14 +4,10 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::clock::Clock;
-use crate::engine::Engine;
-use crate::error::{ErrorCode, ToolError, ToolResult};
-use crate::transport::Transport;
-
 pub mod changes;
 pub mod hatch;
 pub mod messages;
+pub mod pair;
 pub mod permissions;
 pub mod service;
 pub mod session;
@@ -162,17 +158,3 @@ pub struct OpencodeApiArgs {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct PairStatusArgs {}
-
-fn not_implemented(tool: &str) -> ToolResult {
-    Err(ToolError::new(
-        ErrorCode::CliError,
-        format!("{tool}: not implemented"),
-    ))
-}
-
-/// Tools whose bodies land in later tasks; each moves out of here when its task lands.
-impl<T: Transport, C: Clock> Engine<T, C> {
-    pub async fn pair_status(&self, _a: PairStatusArgs) -> ToolResult {
-        not_implemented("pair_status")
-    }
-}

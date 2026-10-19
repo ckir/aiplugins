@@ -42,7 +42,7 @@ const TWENTY: [&str; 20] = [
 
 /// Ruling 1: the tools whose bodies land in later tasks, with a minimal valid argument object each.
 /// A later task deletes its line(s) here and nowhere else.
-const NOT_YET_IMPLEMENTED: [(&str, &str); 1] = [("pair_status", r#"{}"#)];
+const NOT_YET_IMPLEMENTED: [(&str, &str); 0] = [];
 
 fn code(v: &Value) -> &str {
     v["error"]["code"].as_str().unwrap_or("")
