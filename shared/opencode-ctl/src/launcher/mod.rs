@@ -955,6 +955,14 @@ fn remove_if_present(path: &Path) -> Result<(), ToolError> {
     }
 }
 
+fn live_controller(pair_id: &str) -> ToolError {
+    ToolError::new(
+        ErrorCode::LauncherConflict,
+        format!("pair {pair_id} already has a live controller"),
+    )
+    .hint("two controllers on one worker is not supported; end the running one first")
+}
+
 /// `--controller`, else the record's, else the host constant (an `attach` record has `None`).
 fn pick_controller(
     flag: Option<&str>,
@@ -1023,11 +1031,7 @@ async fn resume_run<T: Transport, C: Clock>(
 
     let pid_file = pair_file(home, pair_id, "claude-pid");
     if pairing::read_sentinel(&pid_file).is_some_and(|s| sentinel_alive(&s, ctx.probe)) {
-        return Err(ToolError::new(
-            ErrorCode::LauncherConflict,
-            format!("pair {pair_id} already has a live controller"),
-        )
-        .hint("two controllers on one worker is not supported; end the running one first"));
+        return Err(live_controller(pair_id));
     }
     // Nothing changes when the controller cannot be started at all.
     if controller_command(
@@ -1047,8 +1051,17 @@ async fn resume_run<T: Transport, C: Clock>(
     // here too, so it never wedges the pair. An empty or unparsable lock may be mid-creation.
     if let Some(owner) = pairing::read_sentinel(&lock_path) {
         if !sentinel_alive(&owner, ctx.probe) {
-            tracing::info!("resume {pair_id}: removing the dead lock of {owner}");
-            remove_if_present(&lock_path)?;
+            if let Some(f) = ctx.before_claim {
+                f(); // test failpoint: between the dead-lock read and the unlink
+            }
+            // Re-read right before the unlink: delete only the exact owner judged dead. A lock that
+            // now names someone else is a fresh winner; it stays and the create below loses. The
+            // residual window between this re-read and the unlink is inherent to the spec's
+            // delete-then-create and is covered by the claude-pid re-check after the claim.
+            if pairing::read_sentinel(&lock_path).as_ref() == Some(&owner) {
+                tracing::info!("resume {pair_id}: removing the dead lock of {owner}");
+                remove_if_present(&lock_path)?;
+            }
         }
     }
     let me = std::process::id();
@@ -1062,6 +1075,9 @@ async fn resume_run<T: Transport, C: Clock>(
             )
         })?,
     };
+    if let Some(f) = ctx.before_claim {
+        f(); // test failpoint: after the first claude-pid check, before the lock claim
+    }
     if !claim_file(&lock_path, own.to_string().as_bytes(), 0o600)? {
         return Err(ToolError::new(
             ErrorCode::LauncherConflict,
@@ -1070,6 +1086,11 @@ async fn resume_run<T: Transport, C: Clock>(
         .hint("wait for it, or remove pair.<id>.resume-lock when its owner is gone"));
     }
     let _lock = LockGuard(lock_path.clone());
+    // Re-check under the lock: another resume may have started a controller and dropped its lock
+    // between the first check and our claim. Nothing is touched before this.
+    if pairing::read_sentinel(&pid_file).is_some_and(|s| sentinel_alive(&s, ctx.probe)) {
+        return Err(live_controller(pair_id));
+    }
     remove_if_present(&pair_file(home, pair_id, "claude-exited"))?;
     remove_if_present(&pair_file(home, pair_id, "dead-seen"))?;
     step5(

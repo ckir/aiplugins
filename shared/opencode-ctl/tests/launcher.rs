@@ -61,6 +61,8 @@ struct Rig {
     record_at_spawn: RefCell<Option<Vec<u8>>>,
     /// (name, contents) of every file in the home at the moment a controller is spawned.
     at_spawn: RefCell<Vec<(String, String)>>,
+    /// Whether a resume-lock still exists right after the `cb(pid)` callback.
+    lock_after_cb: RefCell<bool>,
 }
 
 /// What `Rig::drive` runs.
@@ -125,6 +127,7 @@ impl Rig {
             ctrl_err: Cell::new(None),
             record_at_spawn: RefCell::default(),
             at_spawn: RefCell::default(),
+            lock_after_cb: RefCell::new(true),
         }
     }
 
@@ -206,6 +209,12 @@ impl Rig {
                         fs::read(home_path.join(format!("pair.{id}.json"))).ok();
                 }
                 cb(4242);
+                *self.lock_after_cb.borrow_mut() = fs::read_dir(&home_path)
+                    .map(|rd| {
+                        rd.flatten()
+                            .any(|e| e.file_name().to_string_lossy().ends_with(".resume-lock"))
+                    })
+                    .unwrap_or(true);
                 Ok(exit_status(0))
             };
         let exe = PathBuf::from("/usr/bin/opencode-ctl-cc-mcp");
@@ -2296,6 +2305,10 @@ async fn resume_execs_controller_from_record() {
         // claude-pid is bound, the lock is gone, claude-exited is written on return, the tab is
         // untouched and the notice is posted.
         assert!(has(&rig, &format!("pair.{id}.claude-pid")));
+        assert!(
+            !*rig.lock_after_cb.borrow(),
+            "the lock is gone as soon as claude-pid is written, not on drop"
+        );
         assert!(!has(&rig, &format!("pair.{id}.resume-lock")));
         assert!(has(&rig, &format!("pair.{id}.claude-exited")));
         assert!(rig.tabs.borrow().is_empty());
@@ -2517,4 +2530,49 @@ async fn resume_and_attach_refused_on_the_opencode_host() {
     let (r, _) = rig.resume("0123456789ab", &[]).await;
     assert_eq!(r.unwrap_err().code, ErrorCode::RefusedOnHost);
     assert!(rig.fake.calls().is_empty());
+}
+
+#[tokio::test]
+async fn resume_rechecks_claude_pid_after_claim() {
+    let rig = Rig::new();
+    script_session_get(&rig);
+    let id = seed(&rig, 1, true, None, None);
+    put(&rig, &format!("pair.{id}.claude-exited"), "1");
+    put(&rig, &format!("pair.{id}.dead-seen"), "1");
+    // Another resume's controller (pid 4242, alive) is bound after our first check passed.
+    let home = rig.home.path().to_path_buf();
+    let pid_file = home.join(format!("pair.{id}.claude-pid"));
+    let hook = move || fs::write(&pid_file, "4242:boot:777").unwrap();
+    let (r, _) = rig
+        .drive(Op::Resume(id.clone(), None, Vec::new()), Some(&hook))
+        .await;
+    assert_eq!(r.unwrap_err().code, ErrorCode::LauncherConflict);
+    assert!(rig.ctrl.borrow().is_empty());
+    assert!(has(&rig, &format!("pair.{id}.claude-exited")));
+    assert!(has(&rig, &format!("pair.{id}.dead-seen")));
+    assert!(
+        !has(&rig, &format!("pair.{id}.resume-lock")),
+        "lock released"
+    );
+}
+
+#[tokio::test]
+async fn resume_dead_lock_replaced_by_fresh_lock_is_not_deleted() {
+    let rig = Rig::new();
+    script_session_get(&rig);
+    let id = seed(&rig, 1, true, None, None);
+    put(&rig, &format!("pair.{id}.resume-lock"), "9999:boot:1");
+    // Between the dead-lock read and the unlink another resumer replaces it with a live lock.
+    let lock = rig.home.path().join(format!("pair.{id}.resume-lock"));
+    let hook = move || fs::write(&lock, "4242:boot:777").unwrap();
+    let (r, _) = rig
+        .drive(Op::Resume(id.clone(), None, Vec::new()), Some(&hook))
+        .await;
+    assert_eq!(r.unwrap_err().code, ErrorCode::LauncherConflict);
+    assert_eq!(
+        fs::read_to_string(rig.home.path().join(format!("pair.{id}.resume-lock"))).unwrap(),
+        "4242:boot:777",
+        "the fresh lock survives"
+    );
+    assert!(rig.ctrl.borrow().is_empty());
 }
