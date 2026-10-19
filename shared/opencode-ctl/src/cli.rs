@@ -180,7 +180,12 @@ pub async fn dispatch(
             eprintln!("{name}: {}", crate::launcher::NOT_OFFERED);
             2
         }
-        Route::Sub { name, rest } if name == "pair" || name == "install-launcher" => {
+        Route::Sub { name, rest }
+            if matches!(
+                name.as_str(),
+                "pair" | "install-launcher" | "resume" | "attach"
+            ) =>
+        {
             launcher_main(host, version, &user_home, &name, &rest, probe).await
         }
         Route::Sub { .. } => {
@@ -555,6 +560,14 @@ async fn launcher_run(
                 }
             };
             launcher::install_launcher(&mut ctx, force).map(|()| 0)
+        }
+        "resume" => {
+            let (id, controller, args) = launcher::parse_resume_args(rest)?;
+            launcher::resume_with(&id, controller.as_deref(), &args, &mut ctx, &engine).await
+        }
+        "attach" => {
+            let target = launcher::parse_attach_args(rest)?;
+            launcher::attach(&target, &mut ctx, &engine).await
         }
         _ => {
             let args = launcher::parse_pair_args(rest)?;

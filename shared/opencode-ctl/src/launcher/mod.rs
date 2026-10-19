@@ -1,6 +1,6 @@
 //! The launcher: `pair`, the tab wrappers, the terminal walk, `install-launcher` and the pure
-//! Windows resolvers (spec "Launcher"). `resume` and `attach` (Task 19) reuse `claim_file`,
-//! `write_wrapper`, `controller_env` and `LauncherCtx::before_claim` from here.
+//! Windows resolvers (spec "Launcher"), and `resume` and `attach` (Task 19), which reuse
+//! `claim_file`, `write_wrapper`, `controller_env` and `LauncherCtx::before_claim`.
 
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -18,8 +18,8 @@ use crate::doctor::{
 use crate::engine::{valid_session_id, Engine};
 use crate::error::{ErrorCode, ToolError};
 use crate::host::Host;
-use crate::liveness::{ProcessProbe, Sentinel};
-use crate::logging::{init_file_logging, LogScope};
+use crate::liveness::{sentinel_alive, ProcessProbe, Sentinel};
+use crate::logging::{init_file_logging, LogHandle, LogScope};
 use crate::openapi::Operation;
 use crate::pairing::{self, claim_file, valid_pair_id, write_record_new, Record};
 use crate::tools::SessionCreateArgs;
@@ -120,7 +120,7 @@ pub struct LauncherCtx<'a> {
     pub spawn_detached: &'a dyn Fn(&mut Command) -> io::Result<u32>,
     /// The controller: calls the callback with the pid right after spawn, then waits.
     pub spawn_and_wait: &'a SpawnAndWaitFn<'a>,
-    /// Test failpoint for `attach` (Task 19).
+    /// Test failpoint for `attach`: called after the record is read, before the first claim.
     pub before_claim: Option<&'a dyn Fn()>,
     pub out: &'a mut dyn Write,
 }
@@ -414,16 +414,7 @@ pub async fn pair<T: Transport, C: Clock>(
     if args.dry_run {
         return dry_run(&args, ctx, engine, &directory, &controller, &title).await;
     }
-    let debug = crate::cli::env_nonempty("OPENCODE_CTL_LOG")
-        .is_some_and(|v| v.eq_ignore_ascii_case("debug"));
-    let log_path = ctx.home.join("logs").join(format!("pair-{pair_id}.log"));
-    let _log = match init_file_logging(&log_path, debug, LogScope::Scoped) {
-        Ok(h) => Some(h),
-        Err(e) => {
-            eprintln!("opencode-ctl: cannot open {}: {e}", log_path.display());
-            None
-        }
-    };
+    let _log = open_pair_log(ctx.home, &pair_id);
     run(
         &args,
         ctx,
@@ -436,6 +427,21 @@ pub async fn pair<T: Transport, C: Clock>(
     )
     .with_current_subscriber()
     .await
+}
+
+/// `<home>/logs/pair-<id>.log`, scoped to this thread; a failed open is a stderr warning (plan
+/// decision 10) and the run continues.
+fn open_pair_log(home: &Path, pair_id: &str) -> Option<LogHandle> {
+    let debug = crate::cli::env_nonempty("OPENCODE_CTL_LOG")
+        .is_some_and(|v| v.eq_ignore_ascii_case("debug"));
+    let log_path = home.join("logs").join(format!("pair-{pair_id}.log"));
+    match init_file_logging(&log_path, debug, LogScope::Scoped) {
+        Ok(h) => Some(h),
+        Err(e) => {
+            eprintln!("opencode-ctl: cannot open {}: {e}", log_path.display());
+            None
+        }
+    }
 }
 
 fn tab_plan(ctx: &LauncherCtx, args: &PairArgs) -> Option<Terminal> {
@@ -523,7 +529,6 @@ async fn run<T: Transport, C: Clock>(
     title: &str,
     opencode_bin: &Path,
 ) -> Result<i32, ToolError> {
-    let windows = cfg!(windows);
     let home = ctx.home;
     tracing::info!("pair {pair_id}: directory {}", directory.display());
     if engine.settings.server_url.is_none() {
@@ -588,10 +593,39 @@ async fn run<T: Transport, C: Clock>(
         }
     }
 
-    // Step 5: the controller, as a child with inherited stdio.
-    let argv = controller_command(
+    step5(
+        ctx,
+        engine,
+        pair_id,
+        &session_id,
+        directory,
         controller,
         &args.controller_args,
+        server_url,
+        None,
+    )
+    .await
+}
+
+/// Step 5: the controller, as a child with inherited stdio. Shared with `resume`, which passes the
+/// `resume-lock` it holds: deleted once `claude-pid` is written.
+#[allow(clippy::too_many_arguments)]
+async fn step5<T: Transport, C: Clock>(
+    ctx: &mut LauncherCtx<'_>,
+    engine: &Engine<T, C>,
+    pair_id: &str,
+    session_id: &str,
+    directory: &Path,
+    controller: &str,
+    controller_args: &[String],
+    server_url: Option<&str>,
+    lock: Option<&Path>,
+) -> Result<i32, ToolError> {
+    let windows = cfg!(windows);
+    let home = ctx.home;
+    let argv = controller_command(
+        controller,
+        controller_args,
         windows,
         crate::cli::env_nonempty("PATH").as_deref(),
         crate::cli::env_nonempty("PATHEXT").as_deref(),
@@ -601,10 +635,16 @@ async fn run<T: Transport, C: Clock>(
     };
     let mut cmd = Command::new(&argv[0]);
     cmd.args(&argv[1..])
-        .envs(controller_env(&session_id, directory, server_url, pair_id));
+        .envs(controller_env(session_id, directory, server_url, pair_id));
     tracing::info!("pair {pair_id}: starting controller {controller}");
     let probe = ctx.probe;
-    let mut bind = |pid: u32| bind_controller(home, pair_id, probe, pid);
+    let mut bind = |pid: u32| {
+        if bind_controller(home, pair_id, probe, pid) {
+            if let Some(l) = lock {
+                let _ = std::fs::remove_file(l);
+            }
+        }
+    };
     let status = match (ctx.spawn_and_wait)(&mut cmd, &mut bind) {
         Ok(s) => s,
         Err(e) => return Err(controller_unavailable(ctx, pair_id, controller, Some(e))),
@@ -619,8 +659,8 @@ async fn run<T: Transport, C: Clock>(
         Ok(_) => {}
         Err(e) => tracing::warn!("pair {pair_id}: claude-exited not written: {e}"),
     }
-    post_exit_notice(engine, pair_id, &session_id).await;
-    print_closing(ctx, pair_id, &session_id, directory, server_url);
+    post_exit_notice(engine, pair_id, session_id).await;
+    print_closing(ctx, pair_id, session_id, directory, server_url);
     Ok(status.code().unwrap_or(1))
 }
 
@@ -702,11 +742,7 @@ fn stage(
         server_password: ctx.server_password,
         boot_id_expr: true,
     };
-    let (script, kind) = if windows {
-        (wrapper_script_ps1(&input), WrapperKind::Ps1)
-    } else {
-        (wrapper_script_posix(&input), WrapperKind::Sh)
-    };
+    let (script, kind) = wrapper_text(&input, windows);
     let path = wrapper_path(home, pair_id, 1, windows);
     if !write_wrapper(&path, &script, kind)? {
         return Err(ToolError::new(
@@ -715,24 +751,42 @@ fn stage(
         ));
     }
     tracing::info!("pair {pair_id}: wrapper written {}", path.display());
-    let shell = select_windows_shell(ctx.path_has);
-    let argv = tab_command(t, &path, directory, shell);
-    let mut cmd = tab_argv_command(&argv);
-    let pid = (ctx.spawn_detached)(&mut cmd).map_err(|e| {
-        ToolError::new(
-            ErrorCode::IoError,
-            format!("cannot open a {} tab: {e}", t.program()),
-        )
-    })?;
+    let pid = open_tab(ctx, t, &path, directory)?;
     tracing::info!("pair {pair_id}: tab spawned ({}, pid {pid})", t.program());
     Ok(Staged { terminal })
 }
 
+fn wrapper_text(input: &WrapperInput, windows: bool) -> (String, WrapperKind) {
+    if windows {
+        (wrapper_script_ps1(input), WrapperKind::Ps1)
+    } else {
+        (wrapper_script_posix(input), WrapperKind::Sh)
+    }
+}
+
+/// Spec step 4's last action: the wrapper in a new tab of `t`; returns the tab process's pid.
+fn open_tab(
+    ctx: &LauncherCtx,
+    t: Terminal,
+    script: &Path,
+    directory: &Path,
+) -> Result<u32, ToolError> {
+    let shell = select_windows_shell(ctx.path_has);
+    let argv = tab_command(t, script, directory, shell);
+    let mut cmd = tab_argv_command(&argv);
+    (ctx.spawn_detached)(&mut cmd).map_err(|e| {
+        ToolError::new(
+            ErrorCode::IoError,
+            format!("cannot open a {} tab: {e}", t.program()),
+        )
+    })
+}
+
 /// `claude-pid` from the child's pid, boot id and start time.
-fn bind_controller(home: &Path, pair_id: &str, probe: &dyn ProcessProbe, pid: u32) {
+fn bind_controller(home: &Path, pair_id: &str, probe: &dyn ProcessProbe, pid: u32) -> bool {
     let Some(starttime) = probe.starttime(pid) else {
         tracing::warn!("pair {pair_id}: cannot read the start time of controller pid {pid}");
-        return;
+        return false;
     };
     let sentinel = Sentinel {
         pid,
@@ -740,8 +794,14 @@ fn bind_controller(home: &Path, pair_id: &str, probe: &dyn ProcessProbe, pid: u3
         starttime,
     };
     match pairing::write_sentinel(&pair_file(home, pair_id, "claude-pid"), &sentinel) {
-        Ok(()) => tracing::info!("pair {pair_id}: controller started, claude-pid {sentinel}"),
-        Err(e) => tracing::warn!("pair {pair_id}: claude-pid not written: {e}"),
+        Ok(()) => {
+            tracing::info!("pair {pair_id}: controller started, claude-pid {sentinel}");
+            true
+        }
+        Err(e) => {
+            tracing::warn!("pair {pair_id}: claude-pid not written: {e}");
+            false
+        }
     }
 }
 
@@ -799,6 +859,488 @@ fn print_closing(
         };
         say(ctx, &line);
     }
+}
+
+// ------------------------------------------------------------------ resume and attach
+
+fn launcher_guard<T: Transport, C: Clock>(
+    ctx: &LauncherCtx,
+    engine: &Engine<T, C>,
+) -> Result<(), ToolError> {
+    if !ctx.host.offers_launcher() {
+        return Err(ToolError::new(ErrorCode::RefusedOnHost, NOT_OFFERED));
+    }
+    if ctx.home != engine.env.home.as_path() {
+        return Err(ToolError::new(
+            ErrorCode::IoError,
+            "launcher home differs from the engine's home",
+        ));
+    }
+    Ok(())
+}
+
+fn check_pair_id(id: &str) -> Result<(), ToolError> {
+    if valid_pair_id(id) {
+        Ok(())
+    } else {
+        Err(invalid(format!(
+            "'{}' is not a pair id",
+            crate::compact::redact_text(id)
+        ))
+        .hint("pair ids match ^[0-9a-f]{12}$"))
+    }
+}
+
+/// `resume <pair-id> [--controller c] [-- <controller args>]` -> (pair id, controller, args).
+pub fn parse_resume_args(
+    rest: &[String],
+) -> Result<(String, Option<String>, Vec<String>), ToolError> {
+    let usage = "resume <pair-id> [--controller claude|qwen|agy] [-- <controller args>]";
+    let (mut id, mut controller) = (None::<String>, None::<String>);
+    let mut it = rest.iter();
+    let mut args = Vec::new();
+    while let Some(w) = it.next() {
+        match w.as_str() {
+            "--" => {
+                args = it.by_ref().cloned().collect();
+                break;
+            }
+            "--controller" => {
+                controller = Some(
+                    it.next()
+                        .cloned()
+                        .ok_or_else(|| invalid("--controller needs a value".into()).hint(usage))?,
+                );
+            }
+            f if f.starts_with("--controller=") => {
+                controller = Some(f["--controller=".len()..].to_string());
+            }
+            f if f.starts_with('-') && f.len() > 1 => {
+                return Err(invalid(format!("unknown option '{f}'")).hint(usage));
+            }
+            other => {
+                if id.replace(other.to_string()).is_some() {
+                    return Err(invalid(format!("unexpected argument '{other}'")).hint(usage));
+                }
+            }
+        }
+    }
+    let id = id.ok_or_else(|| invalid("resume needs a pair id".into()).hint(usage))?;
+    Ok((id, controller, args))
+}
+
+/// `attach <session-id | pair-id>` -> the target.
+pub fn parse_attach_args(rest: &[String]) -> Result<String, ToolError> {
+    match rest {
+        [t] => Ok(t.clone()),
+        _ => Err(invalid("attach takes one session id or pair id".into())
+            .hint("attach <ses_... | pair-id>")),
+    }
+}
+
+/// Deletes the `resume-lock` it was handed on drop, whatever way `resume` ends.
+struct LockGuard(PathBuf);
+
+impl Drop for LockGuard {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+fn remove_if_present(path: &Path) -> Result<(), ToolError> {
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// `--controller`, else the record's, else the host constant (an `attach` record has `None`).
+fn pick_controller(
+    flag: Option<&str>,
+    record: Option<&str>,
+    host: Host,
+) -> Result<String, ToolError> {
+    let args = PairArgs {
+        controller: flag.or(record).map(str::to_string),
+        ..PairArgs::default()
+    };
+    resolve_controller(&args, host)
+}
+
+/// `resume <pair-id>` with the record's (else the host's) controller.
+pub async fn resume<T: Transport, C: Clock>(
+    pair_id: &str,
+    controller_args: &[String],
+    ctx: &mut LauncherCtx<'_>,
+    engine: &Engine<T, C>,
+) -> Result<i32, ToolError> {
+    resume_with(pair_id, None, controller_args, ctx, engine).await
+}
+
+/// `resume` with an explicit `--controller` (which wins over the record and the host constant).
+pub async fn resume_with<T: Transport, C: Clock>(
+    pair_id: &str,
+    controller_flag: Option<&str>,
+    controller_args: &[String],
+    ctx: &mut LauncherCtx<'_>,
+    engine: &Engine<T, C>,
+) -> Result<i32, ToolError> {
+    launcher_guard(ctx, engine)?;
+    check_pair_id(pair_id)?;
+    let record = pairing::read_record(ctx.home, pair_id)?.ok_or_else(|| {
+        ToolError::new(
+            ErrorCode::PairNotFound,
+            format!("no pair record for {pair_id}"),
+        )
+    })?;
+    let controller = pick_controller(controller_flag, record.controller.as_deref(), ctx.host)?;
+    validate_launch_values(
+        &record.directory,
+        Some(&record.session_id),
+        pair_id,
+        controller_args,
+        cfg!(windows),
+    )?;
+    let _log = open_pair_log(ctx.home, pair_id);
+    resume_run(pair_id, &record, &controller, controller_args, ctx, engine)
+        .with_current_subscriber()
+        .await
+}
+
+async fn resume_run<T: Transport, C: Clock>(
+    pair_id: &str,
+    record: &Record,
+    controller: &str,
+    controller_args: &[String],
+    ctx: &mut LauncherCtx<'_>,
+    engine: &Engine<T, C>,
+) -> Result<i32, ToolError> {
+    let home = ctx.home;
+    tracing::info!("resume {pair_id}: controller {controller}");
+    let params = vec![("sessionID".to_string(), record.session_id.clone())];
+    engine.call_json("session.get", params, None).await?;
+
+    let pid_file = pair_file(home, pair_id, "claude-pid");
+    if pairing::read_sentinel(&pid_file).is_some_and(|s| sentinel_alive(&s, ctx.probe)) {
+        return Err(ToolError::new(
+            ErrorCode::LauncherConflict,
+            format!("pair {pair_id} already has a live controller"),
+        )
+        .hint("two controllers on one worker is not supported; end the running one first"));
+    }
+    // Nothing changes when the controller cannot be started at all.
+    if controller_command(
+        controller,
+        controller_args,
+        cfg!(windows),
+        crate::cli::env_nonempty("PATH").as_deref(),
+        crate::cli::env_nonempty("PATHEXT").as_deref(),
+    )
+    .is_none()
+    {
+        return Err(controller_unavailable(ctx, pair_id, controller, None));
+    }
+
+    let lock_path = pair_file(home, pair_id, "resume-lock");
+    // A lock whose owner is dead (a crash between its create and the claude-pid write) is swept
+    // here too, so it never wedges the pair. An empty or unparsable lock may be mid-creation.
+    if let Some(owner) = pairing::read_sentinel(&lock_path) {
+        if !sentinel_alive(&owner, ctx.probe) {
+            tracing::info!("resume {pair_id}: removing the dead lock of {owner}");
+            remove_if_present(&lock_path)?;
+        }
+    }
+    let me = std::process::id();
+    let own = Sentinel {
+        pid: me,
+        boot_id: ctx.probe.boot_id(),
+        starttime: ctx.probe.starttime(me).ok_or_else(|| {
+            ToolError::new(
+                ErrorCode::IoError,
+                format!("cannot read the start time of process {me}"),
+            )
+        })?,
+    };
+    if !claim_file(&lock_path, own.to_string().as_bytes(), 0o600)? {
+        return Err(ToolError::new(
+            ErrorCode::LauncherConflict,
+            format!("another resume of pair {pair_id} is in progress"),
+        )
+        .hint("wait for it, or remove pair.<id>.resume-lock when its owner is gone"));
+    }
+    let _lock = LockGuard(lock_path.clone());
+    remove_if_present(&pair_file(home, pair_id, "claude-exited"))?;
+    remove_if_present(&pair_file(home, pair_id, "dead-seen"))?;
+    step5(
+        ctx,
+        engine,
+        pair_id,
+        &record.session_id,
+        &record.directory,
+        controller,
+        controller_args,
+        record.server_url.as_deref(),
+        Some(&lock_path),
+    )
+    .await
+}
+
+/// `pair.<id>.g<k>.*` for every `k < n`: the tabs of older generations.
+fn delete_older_generations(home: &Path, pair_id: &str, n: u32) {
+    let prefix = format!("pair.{pair_id}.g");
+    let Ok(entries) = std::fs::read_dir(home) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(rest) = name.to_str().and_then(|n| n.strip_prefix(&prefix)) else {
+            continue;
+        };
+        let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+        if rest[digits.len()..].starts_with('.') && digits.parse::<u32>().is_ok_and(|k| k < n) {
+            if let Err(e) = remove_if_present(&entry.path()) {
+                tracing::warn!(
+                    "attach {pair_id}: cannot remove {}: {e}",
+                    entry.path().display()
+                );
+            }
+        }
+    }
+}
+
+fn announce_tab(ctx: &mut LauncherCtx, terminal: Option<Terminal>, pair_id: &str, wrapper: &Path) {
+    match terminal {
+        Some(t) => say(ctx, &format!("tui: {}", t.program())),
+        None => say(
+            ctx,
+            &format!(
+                "tui: none (no terminal found); run {} by hand to open the worker for pair {pair_id}",
+                wrapper.display()
+            ),
+        ),
+    }
+}
+
+/// `attach <session-id | pair-id>`.
+pub async fn attach<T: Transport, C: Clock>(
+    target: &str,
+    ctx: &mut LauncherCtx<'_>,
+    engine: &Engine<T, C>,
+) -> Result<i32, ToolError> {
+    launcher_guard(ctx, engine)?;
+    if valid_pair_id(target) {
+        attach_pair(target, ctx).await
+    } else if target.starts_with("ses_") {
+        if !valid_session_id(target) {
+            return Err(
+                invalid("not a session id".into()).hint("session ids match ^ses_[A-Za-z0-9]{26}$")
+            );
+        }
+        attach_session(target, ctx, engine).await
+    } else {
+        Err(invalid(format!(
+            "'{}' is neither a pair id nor a session id",
+            crate::compact::redact_text(target)
+        ))
+        .hint("attach <ses_... | 12-hex pair id>"))
+    }
+}
+
+async fn attach_pair(pair_id: &str, ctx: &mut LauncherCtx<'_>) -> Result<i32, ToolError> {
+    let record = pairing::read_record(ctx.home, pair_id)?.ok_or_else(|| {
+        ToolError::new(
+            ErrorCode::PairNotFound,
+            format!("no pair record for {pair_id}"),
+        )
+    })?;
+    let windows = cfg!(windows);
+    validate_launch_values(
+        &record.directory,
+        Some(&record.session_id),
+        pair_id,
+        &[],
+        windows,
+    )?;
+    let opencode_bin = ctx.opencode_bin.ok_or_else(opencode_missing)?.to_path_buf();
+    let _log = open_pair_log(ctx.home, pair_id);
+    attach_pair_run(pair_id, &record, &opencode_bin, ctx)
+        .with_current_subscriber()
+        .await
+}
+
+async fn attach_pair_run(
+    pair_id: &str,
+    record: &Record,
+    opencode_bin: &Path,
+    ctx: &mut LauncherCtx<'_>,
+) -> Result<i32, ToolError> {
+    let windows = cfg!(windows);
+    let home = ctx.home;
+    let n = record.generation;
+    let terminal = tab_plan(ctx, &PairArgs::default());
+    tracing::info!("attach {pair_id}: generation {n}, terminal {terminal:?}");
+    if let Some(f) = ctx.before_claim {
+        f();
+    }
+    // The exclusive create of the wrapper is the claim token; orphans of a crashed attach are
+    // skipped.
+    let mut claimed = None;
+    for g in (1..=5).map(|k| n.saturating_add(k)) {
+        let input = WrapperInput {
+            home,
+            opencode_bin,
+            pair_id,
+            generation: g,
+            directory: &record.directory,
+            session_id: &record.session_id,
+            server_url: record.server_url.as_deref(),
+            server_password: ctx.server_password,
+            boot_id_expr: true,
+        };
+        let (script, kind) = wrapper_text(&input, windows);
+        let path = wrapper_path(home, pair_id, g, windows);
+        if write_wrapper(&path, &script, kind)? {
+            claimed = Some((g, path));
+            break;
+        }
+        tracing::info!("attach {pair_id}: generation {g} is taken");
+    }
+    let Some((g, wrapper)) = claimed else {
+        return Err(ToolError::new(
+            ErrorCode::LauncherConflict,
+            format!(
+                "generations {}..{} of pair {pair_id} are all taken",
+                n + 1,
+                n + 5
+            ),
+        )
+        .hint("another attach is running; retry in a moment"));
+    };
+    tracing::info!("attach {pair_id}: claimed generation {g}");
+    if let Err(e) = pairing::rewrite_record(home, pair_id, g, terminal.is_some(), None) {
+        tracing::warn!("attach {pair_id}: record not rewritten: {e}");
+        let _ = std::fs::remove_file(&wrapper);
+        return Err(e);
+    }
+    if let Err(e) = remove_if_present(&pair_file(home, pair_id, "dead-seen")) {
+        tracing::warn!("attach {pair_id}: dead-seen not removed: {e}");
+    }
+    delete_older_generations(home, pair_id, n);
+    if let Some(t) = terminal {
+        let pid = open_tab(ctx, t, &wrapper, &record.directory)?;
+        tracing::info!("attach {pair_id}: tab spawned ({}, pid {pid})", t.program());
+    }
+    announce_tab(ctx, terminal, pair_id, &wrapper);
+    say(ctx, &format!("pair {pair_id}: generation {g}"));
+    Ok(0)
+}
+
+async fn attach_session<T: Transport, C: Clock>(
+    session_id: &str,
+    ctx: &mut LauncherCtx<'_>,
+    engine: &Engine<T, C>,
+) -> Result<i32, ToolError> {
+    let windows = cfg!(windows);
+    let params = vec![("sessionID".to_string(), session_id.to_string())];
+    let (data, _, _) = engine.call_json("session.get", params, None).await?;
+    let directory = data
+        .pointer("/location/directory")
+        .and_then(Value::as_str)
+        .filter(|d| !d.is_empty())
+        .map(PathBuf::from)
+        .ok_or_else(|| {
+            ToolError::new(
+                ErrorCode::IoError,
+                format!("session {session_id} reports no directory"),
+            )
+        })?;
+    let pair_id = mint_pair_id();
+    validate_launch_values(&directory, Some(session_id), &pair_id, &[], windows)?;
+    let opencode_bin = ctx.opencode_bin.ok_or_else(opencode_missing)?.to_path_buf();
+    let _log = open_pair_log(ctx.home, &pair_id);
+    let _scope = tracing::info_span!("attach").entered();
+    tracing::info!("attach {pair_id}: new record for session {session_id}");
+    let staged = stage_attached(
+        ctx,
+        &pair_id,
+        session_id,
+        &directory,
+        &opencode_bin,
+        engine.settings.server_url.as_deref(),
+    );
+    match staged {
+        Ok((terminal, wrapper)) => {
+            announce_tab(ctx, terminal, &pair_id, &wrapper);
+            say(
+                ctx,
+                &format!(
+                    "pair {pair_id}: new record for session {session_id}; start a controller with `opencode-pair resume {pair_id}`"
+                ),
+            );
+            Ok(0)
+        }
+        Err(e) => {
+            tracing::warn!("attach {pair_id}: {e}");
+            // Neither a session (attach created none) nor anything else to remove.
+            if let Err(d) = pairing::delete_pair_files(ctx.home, &pair_id) {
+                tracing::warn!("attach {pair_id}: removing the pair files failed: {d}");
+            }
+            Err(e)
+        }
+    }
+}
+
+/// The new record (`controller: null`, generation 1, `tab` from the terminal walk), then the
+/// wrapper, then the tab.
+fn stage_attached(
+    ctx: &mut LauncherCtx<'_>,
+    pair_id: &str,
+    session_id: &str,
+    directory: &Path,
+    opencode_bin: &Path,
+    server_url: Option<&str>,
+) -> Result<(Option<Terminal>, PathBuf), ToolError> {
+    let windows = cfg!(windows);
+    let home = ctx.home;
+    let terminal = tab_plan(ctx, &PairArgs::default());
+    write_record_new(
+        home,
+        &Record {
+            pair_id: pair_id.to_string(),
+            session_id: session_id.to_string(),
+            directory: directory.to_path_buf(),
+            server_url: server_url.map(str::to_string),
+            created: (ctx.now_ms)(),
+            controller: None,
+            generation: 1,
+            tab: terminal.is_some(),
+        },
+    )?;
+    let input = WrapperInput {
+        home,
+        opencode_bin,
+        pair_id,
+        generation: 1,
+        directory,
+        session_id,
+        server_url,
+        server_password: ctx.server_password,
+        boot_id_expr: true,
+    };
+    let (script, kind) = wrapper_text(&input, windows);
+    let path = wrapper_path(home, pair_id, 1, windows);
+    if !write_wrapper(&path, &script, kind)? {
+        return Err(ToolError::new(
+            ErrorCode::IoError,
+            format!("{} already exists", path.display()),
+        ));
+    }
+    if let Some(t) = terminal {
+        let pid = open_tab(ctx, t, &path, directory)?;
+        tracing::info!("attach {pair_id}: tab spawned ({}, pid {pid})", t.program());
+    }
+    Ok((terminal, path))
 }
 
 // ------------------------------------------------------------------ install-launcher

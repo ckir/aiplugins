@@ -17,11 +17,11 @@ use opencode_ctl::engine::Engine;
 use opencode_ctl::error::{ErrorCode, ToolError};
 use opencode_ctl::host::Host;
 use opencode_ctl::launcher::{
-    cmd_wrap, controller_command, controller_env, install_launcher_as, pair, resolve_executable,
-    select_terminal, select_windows_shell, strip_verbatim, tab_command, validate_launch_values,
-    wrapper_script_posix, wrapper_script_ps1, write_wrapper, wt_directory_arg, LauncherCtx,
-    PairArgs, Terminal, WindowsShell, WrapperInput, WrapperKind, BOOT_ID_EXPR_POSIX,
-    STARTTIME_EXPR_POSIX,
+    attach, cmd_wrap, controller_command, controller_env, install_launcher_as, pair,
+    resolve_executable, resume, resume_with, select_terminal, select_windows_shell, strip_verbatim,
+    tab_command, validate_launch_values, wrapper_path, wrapper_script_posix, wrapper_script_ps1,
+    write_wrapper, wt_directory_arg, LauncherCtx, PairArgs, Terminal, WindowsShell, WrapperInput,
+    WrapperKind, BOOT_ID_EXPR_POSIX, STARTTIME_EXPR_POSIX,
 };
 use opencode_ctl::liveness::ProcessProbe;
 use opencode_ctl::settings::{PermissionPolicy, Settings};
@@ -59,6 +59,15 @@ struct Rig {
     ctrl: RefCell<Vec<Spawned>>,
     ctrl_err: Cell<Option<io::ErrorKind>>,
     record_at_spawn: RefCell<Option<Vec<u8>>>,
+    /// (name, contents) of every file in the home at the moment a controller is spawned.
+    at_spawn: RefCell<Vec<(String, String)>>,
+}
+
+/// What `Rig::drive` runs.
+enum Op {
+    Pair(PairArgs),
+    Attach(String),
+    Resume(String, Option<String>, Vec<String>),
 }
 
 impl Rig {
@@ -72,6 +81,8 @@ impl Rig {
         let bin = temp_home();
         let probe = Arc::new(FakeProbe::new("boot"));
         probe.set_alive(4242, "777");
+        // `resume` writes its own pid into the lock, so the probe must know it.
+        probe.set_alive(std::process::id(), "own-start");
         let fake = FakeTransport::new();
         fake.on("session.active", vec![Ok(json!({"data": {}}))]);
         fake.on(
@@ -113,6 +124,7 @@ impl Rig {
             ctrl: RefCell::default(),
             ctrl_err: Cell::new(None),
             record_at_spawn: RefCell::default(),
+            at_spawn: RefCell::default(),
         }
     }
 
@@ -128,6 +140,23 @@ impl Rig {
     }
 
     async fn pair(&self, args: PairArgs) -> (Result<i32, ToolError>, String) {
+        self.drive(Op::Pair(args), None).await
+    }
+
+    async fn attach(&self, target: &str) -> (Result<i32, ToolError>, String) {
+        self.drive(Op::Attach(target.to_string()), None).await
+    }
+
+    async fn resume(&self, id: &str, args: &[&str]) -> (Result<i32, ToolError>, String) {
+        self.drive(Op::Resume(id.to_string(), None, s(args)), None)
+            .await
+    }
+
+    async fn drive(
+        &self,
+        op: Op,
+        before_claim: Option<&dyn Fn()>,
+    ) -> (Result<i32, ToolError>, String) {
         let mut out: Vec<u8> = Vec::new();
         let now = || NOW;
         let path_has = |n: &str| self.on_path.iter().any(|p| p == n);
@@ -159,6 +188,19 @@ impl Rig {
                     })
                     .collect();
                 self.ctrl.borrow_mut().push((argv, envs));
+                *self.at_spawn.borrow_mut() = fs::read_dir(&home_path)
+                    .map(|rd| {
+                        rd.flatten()
+                            .filter(|e| e.path().is_file())
+                            .map(|e| {
+                                (
+                                    e.file_name().to_string_lossy().into_owned(),
+                                    fs::read_to_string(e.path()).unwrap_or_default(),
+                                )
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
                 if let Some(id) = pair_ids(&home_path).first() {
                     *self.record_at_spawn.borrow_mut() =
                         fs::read(home_path.join(format!("pair.{id}.json"))).ok();
@@ -182,10 +224,17 @@ impl Rig {
                 server_password: self.password.as_deref(),
                 spawn_detached: &spawn_detached,
                 spawn_and_wait: &spawn_and_wait,
-                before_claim: None,
+                before_claim,
                 out: &mut out,
             };
-            pair(args, &mut ctx, &self.engine).await
+            match op {
+                Op::Pair(args) => pair(args, &mut ctx, &self.engine).await,
+                Op::Attach(t) => attach(&t, &mut ctx, &self.engine).await,
+                Op::Resume(id, None, a) => resume(&id, &a, &mut ctx, &self.engine).await,
+                Op::Resume(id, c, a) => {
+                    resume_with(&id, c.as_deref(), &a, &mut ctx, &self.engine).await
+                }
+            }
         };
         (result, String::from_utf8(out).unwrap())
     }
@@ -1297,6 +1346,22 @@ async fn launcher_opencode_missing_writes_nothing() {
     // Also for a dry run.
     let (r, _) = rig.pair(dry(&rig)).await;
     assert_eq!(r.unwrap_err().code, ErrorCode::OpencodeNotFound);
+    // `attach <pair-id>` on an existing record (Task 19): the record holds the values it validates.
+    let mut rig = Rig::new();
+    let id = seed(&rig, 1, false, Some("claude"), None);
+    rig.opencode = None;
+    let record = fs::read(rig.home.path().join(format!("pair.{id}.json"))).unwrap();
+    let before = entries(rig.home.path());
+    let (r, out) = rig.attach(&id).await;
+    assert_eq!(r.unwrap_err().code, ErrorCode::OpencodeNotFound);
+    assert!(out.is_empty());
+    assert_eq!(
+        fs::read(rig.home.path().join(format!("pair.{id}.json"))).unwrap(),
+        record,
+        "record bytes unchanged"
+    );
+    assert_eq!(entries(rig.home.path()), before, "no new wrapper, no logs/");
+    assert!(rig.tabs.borrow().is_empty());
 }
 
 #[tokio::test]
@@ -1764,4 +1829,692 @@ fn doctor_conflict_hint_names_force() {
         assert!(hint.contains("install-launcher --force"), "{hint}");
         assert!(e.message.contains("opencode-pair"), "{}", e.message);
     }
+}
+
+// ------------------------------------------------------------------ Task 19: resume and attach
+
+use opencode_ctl::pairing::{write_record_new, Record};
+use std::sync::Barrier;
+
+const SID_OTHER: &str = "ses_ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+/// A record in the rig's home for the rig's workspace; returns the pair id.
+fn seed(
+    rig: &Rig,
+    generation: u32,
+    tab: bool,
+    controller: Option<&str>,
+    server_url: Option<&str>,
+) -> String {
+    let id = "0123456789ab".to_string();
+    write_record_new(
+        rig.home.path(),
+        &Record {
+            pair_id: id.clone(),
+            session_id: SID.to_string(),
+            directory: rig.ws.path().to_path_buf(),
+            server_url: server_url.map(str::to_string),
+            created: 1,
+            controller: controller.map(str::to_string),
+            generation,
+            tab,
+        },
+    )
+    .unwrap();
+    id
+}
+
+fn put(rig: &Rig, name: &str, content: &str) {
+    fs::write(rig.home.path().join(name), content).unwrap();
+}
+
+fn has(rig: &Rig, name: &str) -> bool {
+    rig.home.path().join(name).exists()
+}
+
+fn read_json(rig: &Rig, id: &str) -> Value {
+    serde_json::from_slice(&fs::read(rig.home.path().join(format!("pair.{id}.json"))).unwrap())
+        .unwrap()
+}
+
+fn not_found() -> TransportError {
+    TransportError {
+        code: ErrorCode::SessionNotFound,
+        message: "session not found".into(),
+        hint: None,
+        details: None,
+    }
+}
+
+/// `session.get` answers with the rig's workspace as the session's directory.
+fn script_session_get(rig: &Rig) {
+    rig.fake.on(
+        "session.get",
+        vec![Ok(json!({"data": {
+            "id": SID,
+            "location": {"directory": rig.ws.path().to_string_lossy()}
+        }}))],
+    );
+}
+
+fn pair_files(home: &Path) -> Vec<String> {
+    entries(home)
+        .into_iter()
+        .filter(|n| n.starts_with("pair."))
+        .collect()
+}
+
+#[tokio::test]
+async fn attach_bumps_generation() {
+    let rig = Rig::new();
+    let id = seed(&rig, 1, false, Some("qwen"), Some(URL));
+    let before = read_json(&rig, &id);
+    let (r, out) = rig.attach(&id).await;
+    assert_eq!(r.unwrap(), 0, "{out}");
+    let after = read_json(&rig, &id);
+    assert_eq!(after["generation"], 2);
+    assert_eq!(after["tab"], true);
+    for k in [
+        "pair_id",
+        "session_id",
+        "directory",
+        "server_url",
+        "created",
+        "controller",
+    ] {
+        assert_eq!(after[k], before[k], "{k} is not rewritten");
+    }
+    let w = wrapper_path(rig.home.path(), &id, 2, false);
+    assert!(w.is_file(), "the g2 wrapper is the claim token");
+    assert!(!has(&rig, &format!("pair.{id}.g1.wrapper.sh")));
+    let script = fs::read_to_string(&w).unwrap();
+    assert!(
+        script.contains(&format!("pair.{id}.g2.tui-pid")),
+        "{script}"
+    );
+    assert!(
+        script.contains("--server"),
+        "the record's server_url: {script}"
+    );
+    let tabs = rig.tabs.borrow();
+    assert_eq!(tabs.len(), 1);
+    assert!(tabs[0].iter().any(|a| a == w.to_string_lossy().as_ref()));
+    assert!(rig.fake.calls().is_empty(), "a pair id needs no API call");
+    assert!(rig
+        .home
+        .path()
+        .join("logs")
+        .join(format!("pair-{id}.log"))
+        .is_file());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn attach_wrapper_mode_is_0700() {
+    use std::os::unix::fs::PermissionsExt;
+    let rig = Rig::new();
+    let id = seed(&rig, 1, true, None, None);
+    rig.attach(&id).await.0.unwrap();
+    let mode = fs::metadata(wrapper_path(rig.home.path(), &id, 2, false))
+        .unwrap()
+        .permissions()
+        .mode()
+        & 0o777;
+    assert_eq!(mode, 0o700);
+}
+
+#[tokio::test]
+async fn attach_deletes_generations_older_than_n() {
+    let rig = Rig::new();
+    let id = seed(&rig, 3, true, None, None);
+    for g in 1..=3 {
+        for f in ["wrapper.sh", "tui-pid", "tui-exited"] {
+            put(&rig, &format!("pair.{id}.g{g}.{f}"), "x");
+        }
+    }
+    rig.attach(&id).await.0.unwrap();
+    for g in 1..=2 {
+        for f in ["wrapper.sh", "tui-pid", "tui-exited"] {
+            assert!(!has(&rig, &format!("pair.{id}.g{g}.{f}")), "g{g} {f}");
+        }
+    }
+    assert!(has(&rig, &format!("pair.{id}.g3.tui-pid")), "g<n> is kept");
+    assert!(has(&rig, &format!("pair.{id}.g4.wrapper.sh")));
+    assert_eq!(read_json(&rig, &id)["generation"], 4);
+}
+
+/// The standalone driver for the threaded tests: its own fakes, the shared home.
+fn attach_alone(
+    home: &Path,
+    ws: &Path,
+    bin: &Path,
+    id: &str,
+    before: Option<&dyn Fn()>,
+) -> (Result<i32, ToolError>, Vec<Vec<String>>) {
+    let probe = FakeProbe::new("boot");
+    let fake = FakeTransport::new();
+    let engine = Engine::new(
+        Settings::default(),
+        Vec::new(),
+        Host::Claude,
+        opencode_ctl::engine::EnvSnapshot::for_tests(ws.to_path_buf(), home.to_path_buf()),
+        fake,
+        TestClock::new(NOW),
+        Arc::new(FakeProbe::new("boot")) as Arc<dyn ProcessProbe>,
+    );
+    let tabs = RefCell::new(Vec::new());
+    let now = || NOW;
+    let path_has = |_: &str| false;
+    let chain = || vec!["gnome-terminal-server".to_string()];
+    let spawn_detached = |c: &mut Command| -> io::Result<u32> {
+        let mut argv = vec![c.get_program().to_string_lossy().into_owned()];
+        argv.extend(c.get_args().map(|a| a.to_string_lossy().into_owned()));
+        tabs.borrow_mut().push(argv);
+        Ok(1)
+    };
+    let spawn_and_wait =
+        |_: &mut Command, _: &mut dyn FnMut(u32)| -> io::Result<_> { Ok(exit_status(0)) };
+    let exe = PathBuf::from("/usr/bin/opencode-ctl-cc-mcp");
+    let opencode = bin.join("opencode");
+    let mut out: Vec<u8> = Vec::new();
+    let mut ctx = LauncherCtx {
+        home,
+        bin_dir: bin,
+        running_exe: &exe,
+        host: Host::Claude,
+        probe: &probe,
+        now_ms: &now,
+        path_has: &path_has,
+        opencode_bin: Some(&opencode),
+        version: "0.1.0",
+        parent_chain: &chain,
+        server_password: None,
+        spawn_detached: &spawn_detached,
+        spawn_and_wait: &spawn_and_wait,
+        before_claim: before,
+        out: &mut out,
+    };
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap();
+    let r = rt.block_on(attach(id, &mut ctx, &engine));
+    (r, tabs.into_inner())
+}
+
+#[test]
+fn attach_exclusive_create() {
+    let rig = Rig::new();
+    let id = seed(&rig, 1, false, None, None);
+    let barrier = Barrier::new(2);
+    let (home, ws, bin) = (
+        rig.home.path().to_path_buf(),
+        rig.ws.path().to_path_buf(),
+        rig.bin.path().to_path_buf(),
+    );
+    let run = || {
+        // Both threads have read generation 1 before either claims.
+        let before = || {
+            barrier.wait();
+        };
+        attach_alone(&home, &ws, &bin, &id, Some(&before))
+    };
+    let (a, b) = std::thread::scope(|sc| {
+        let ta = sc.spawn(run);
+        let tb = sc.spawn(run);
+        (ta.join().unwrap(), tb.join().unwrap())
+    });
+    assert_eq!(a.0.unwrap(), 0);
+    assert_eq!(b.0.unwrap(), 0);
+    let claimed: Vec<String> = entries(&home)
+        .into_iter()
+        .filter(|n| n.ends_with(".wrapper.sh"))
+        .collect();
+    assert_eq!(
+        claimed,
+        vec![
+            format!("pair.{id}.g2.wrapper.sh"),
+            format!("pair.{id}.g3.wrapper.sh")
+        ],
+        "winner n+1 and loser n+2"
+    );
+    assert_eq!(
+        read_json(&rig, &id)["generation"],
+        3,
+        "final generation n+2"
+    );
+    let mut tabs = a.1;
+    tabs.extend(b.1);
+    assert_eq!(tabs.len(), 2);
+}
+
+#[tokio::test]
+async fn attach_loser_retries_then_conflict() {
+    // A racing winner takes n+1 between the read and the claim: the loser takes n+2.
+    let rig = Rig::new();
+    let id = seed(&rig, 1, false, None, None);
+    let home = rig.home.path().to_path_buf();
+    let wid = id.clone();
+    let winner = move || {
+        let w = wrapper_path(&home, &wid, 2, false);
+        assert!(write_wrapper(&w, "#!/bin/sh\n", WrapperKind::Sh).unwrap());
+    };
+    let (r, _) = rig.drive(Op::Attach(id.clone()), Some(&winner)).await;
+    r.unwrap();
+    assert_eq!(read_json(&rig, &id)["generation"], 3);
+
+    // n+1 .. n+5 all taken: LAUNCHER_CONFLICT, nothing rewritten, no tab.
+    let rig = Rig::new();
+    let id = seed(&rig, 1, false, None, None);
+    for g in 2..=6 {
+        put(&rig, &format!("pair.{id}.g{g}.wrapper.sh"), "claimed");
+    }
+    let record = fs::read(rig.home.path().join(format!("pair.{id}.json"))).unwrap();
+    let (r, _) = rig.attach(&id).await;
+    assert_eq!(r.unwrap_err().code, ErrorCode::LauncherConflict);
+    assert_eq!(
+        fs::read(rig.home.path().join(format!("pair.{id}.json"))).unwrap(),
+        record
+    );
+    assert!(rig.tabs.borrow().is_empty());
+    assert!(
+        !has(&rig, &format!("pair.{id}.g7.wrapper.sh")),
+        "five tries only"
+    );
+
+    // The fifth try still wins.
+    let rig = Rig::new();
+    let id = seed(&rig, 1, false, None, None);
+    for g in 2..=5 {
+        put(&rig, &format!("pair.{id}.g{g}.wrapper.sh"), "claimed");
+    }
+    rig.attach(&id).await.0.unwrap();
+    assert_eq!(read_json(&rig, &id)["generation"], 6);
+}
+
+#[tokio::test]
+async fn attach_skips_orphaned_claims() {
+    let rig = Rig::new();
+    let id = seed(&rig, 1, false, None, None);
+    // A crashed attach claimed g2 and never rewrote the record.
+    put(&rig, &format!("pair.{id}.g2.wrapper.sh"), "orphan");
+    rig.attach(&id).await.0.unwrap();
+    assert_eq!(read_json(&rig, &id)["generation"], 3);
+    assert_eq!(
+        fs::read_to_string(wrapper_path(rig.home.path(), &id, 2, false)).unwrap(),
+        "orphan",
+        "the orphan is not overwritten"
+    );
+}
+
+#[tokio::test]
+async fn attach_clears_dead_seen() {
+    let rig = Rig::new();
+    let id = seed(&rig, 1, true, None, None);
+    put(&rig, &format!("pair.{id}.dead-seen"), "1700000000000");
+    rig.attach(&id).await.0.unwrap();
+    assert!(!has(&rig, &format!("pair.{id}.dead-seen")));
+}
+
+#[tokio::test]
+async fn attach_session_id_new_record() {
+    let rig = Rig::new();
+    script_session_get(&rig);
+    let (r, out) = rig.attach(SID).await;
+    assert_eq!(r.unwrap(), 0, "{out}");
+    let ids = pair_ids(rig.home.path());
+    assert_eq!(ids.len(), 1);
+    let id = &ids[0];
+    assert!(opencode_ctl::pairing::valid_pair_id(id));
+    let rec = read_json(&rig, id);
+    assert_eq!(rec["session_id"], SID);
+    assert_eq!(rec["pair_id"], id.as_str());
+    assert_eq!(rec["controller"], Value::Null);
+    assert_eq!(rec["generation"], 1);
+    assert_eq!(rec["tab"], true);
+    assert_eq!(rec["directory"], rig.ws.path().to_string_lossy().as_ref());
+    assert!(wrapper_path(rig.home.path(), id, 1, false).is_file());
+    assert_eq!(rig.tabs.borrow().len(), 1);
+    assert_eq!(rig.fake_calls("session.get").len(), 1);
+    assert!(rig.fake_calls("session.remove").is_empty());
+    assert!(rig
+        .home
+        .path()
+        .join("logs")
+        .join(format!("pair-{id}.log"))
+        .is_file());
+}
+
+#[tokio::test]
+async fn attach_sets_tab_true() {
+    let rig = Rig::new();
+    let id = seed(&rig, 1, false, None, None);
+    rig.attach(&id).await.0.unwrap();
+    assert_eq!(read_json(&rig, &id)["tab"], true);
+
+    // Derived from the rule text ("true only when a terminal was found"): no terminal -> false,
+    // and the generation is still claimed and bumped.
+    let mut rig = Rig::new();
+    rig.chain = Vec::new();
+    let id = seed(&rig, 1, true, None, None);
+    let (r, out) = rig.attach(&id).await;
+    r.unwrap();
+    let rec = read_json(&rig, &id);
+    assert_eq!(rec["tab"], false);
+    assert_eq!(rec["generation"], 2);
+    assert!(rig.tabs.borrow().is_empty());
+    assert!(out.contains("tui: none"), "{out}");
+}
+
+#[tokio::test]
+async fn attach_rejects_bad_target() {
+    for bad in [
+        "",
+        "zzz",
+        "ses_short",
+        "0123456789AB",
+        "0123456789a",
+        "0123456789abc",
+        "ses_abcdefghijklmnopqrstuvwxy!",
+        "../x",
+    ] {
+        let rig = Rig::new();
+        let before = entries(rig.home.path());
+        let (r, _) = rig.attach(bad).await;
+        assert_eq!(r.unwrap_err().code, ErrorCode::InvalidArgument, "{bad:?}");
+        assert_eq!(entries(rig.home.path()), before, "{bad:?}");
+        assert!(rig.fake.calls().is_empty(), "{bad:?}");
+    }
+    // A pair-id target that has no record.
+    let rig = Rig::new();
+    let (r, _) = rig.attach("0123456789ab").await;
+    assert_eq!(r.unwrap_err().code, ErrorCode::PairNotFound);
+}
+
+#[tokio::test]
+async fn attach_session_id_checks_binary_before_record() {
+    let mut rig = Rig::new();
+    rig.opencode = None;
+    script_session_get(&rig);
+    let before = entries(rig.home.path());
+    let (r, out) = rig.attach(SID).await;
+    assert_eq!(r.unwrap_err().code, ErrorCode::OpencodeNotFound);
+    assert!(out.is_empty());
+    assert_eq!(entries(rig.home.path()), before, "home untouched");
+    assert!(!rig.home.path().join("logs").exists(), "no logs/ entry");
+    assert!(rig.tabs.borrow().is_empty());
+}
+
+#[tokio::test]
+async fn attach_session_id_rolls_back_on_tab_failure() {
+    let rig = Rig::new();
+    script_session_get(&rig);
+    rig.tab_fails.set(true);
+    let (r, _) = rig.attach(SID).await;
+    assert_eq!(r.unwrap_err().code, ErrorCode::IoError);
+    assert_eq!(pair_files(rig.home.path()), Vec::<String>::new());
+    assert!(
+        rig.fake_calls("session.remove").is_empty(),
+        "attach created no session"
+    );
+}
+
+#[tokio::test]
+async fn attach_session_id_missing_session_writes_nothing() {
+    let rig = Rig::new();
+    rig.fake.on("session.get", vec![Err(not_found())]);
+    let before = entries(rig.home.path());
+    let (r, _) = rig.attach(SID_OTHER).await;
+    assert_eq!(r.unwrap_err().code, ErrorCode::SessionNotFound);
+    assert_eq!(entries(rig.home.path()), before);
+}
+
+#[tokio::test]
+async fn resume_execs_controller_from_record() {
+    for (url, want) in [(None, ""), (Some(URL), URL)] {
+        let rig = Rig::new();
+        script_session_get(&rig);
+        let id = seed(&rig, 1, true, Some("qwen"), url);
+        let (r, out) = rig.resume(&id, &["--continue", "x y"]).await;
+        assert_eq!(r.unwrap(), 0, "{out}");
+        let ctrl = rig.ctrl.borrow();
+        assert_eq!(ctrl.len(), 1);
+        assert_eq!(ctrl[0].0, s(&["qwen", "--continue", "x y"]));
+        let env = |k: &str| {
+            ctrl[0]
+                .1
+                .iter()
+                .find(|(n, _)| n == k)
+                .map(|(_, v)| v.clone())
+        };
+        assert_eq!(env("OPENCODE_CTL_SERVER"), Some(Some(want.to_string())));
+        assert_eq!(env("OPENCODE_CTL_SESSION"), Some(Some(SID.to_string())));
+        assert_eq!(
+            env("OPENCODE_CTL_DIR"),
+            Some(Some(rig.ws.path().to_string_lossy().into_owned()))
+        );
+        assert_eq!(env("OPENCODE_CTL_PAIR"), Some(Some(id.clone())));
+        // claude-pid is bound, the lock is gone, claude-exited is written on return, the tab is
+        // untouched and the notice is posted.
+        assert!(has(&rig, &format!("pair.{id}.claude-pid")));
+        assert!(!has(&rig, &format!("pair.{id}.resume-lock")));
+        assert!(has(&rig, &format!("pair.{id}.claude-exited")));
+        assert!(rig.tabs.borrow().is_empty());
+        assert_eq!(rig.fake_calls("session.synthetic").len(), 1);
+        assert_eq!(rig.fake_calls("session.get").len(), 1);
+        let rec = read_json(&rig, &id);
+        assert_eq!(rec["generation"], 1, "the record is not rewritten");
+        assert!(out.contains(&format!("opencode-pair resume {id}")), "{out}");
+    }
+}
+
+#[tokio::test]
+async fn resume_controller_precedence() {
+    // --controller, else the record, else the host constant (an attach record has null).
+    for (host, record, flag, want) in [
+        (Host::Claude, Some("qwen"), Some("agy"), "agy"),
+        (Host::Claude, Some("qwen"), None, "qwen"),
+        (Host::Qwen, None, None, "qwen"),
+        (Host::Agy, None, Some("claude"), "claude"),
+    ] {
+        let rig = Rig::with(host, Settings::default());
+        script_session_get(&rig);
+        let id = seed(&rig, 1, true, record, None);
+        let (r, _) = rig
+            .drive(Op::Resume(id, flag.map(str::to_string), Vec::new()), None)
+            .await;
+        r.unwrap();
+        assert_eq!(
+            rig.ctrl.borrow()[0].0,
+            s(&[want]),
+            "{host:?} {record:?} {flag:?}"
+        );
+    }
+    // An unknown --controller is refused before any state changes.
+    let rig = Rig::new();
+    script_session_get(&rig);
+    let id = seed(&rig, 1, true, None, None);
+    put(&rig, &format!("pair.{id}.claude-exited"), "1");
+    let (r, _) = rig
+        .drive(
+            Op::Resume(id.clone(), Some("bash".into()), Vec::new()),
+            None,
+        )
+        .await;
+    assert_eq!(r.unwrap_err().code, ErrorCode::InvalidArgument);
+    assert!(has(&rig, &format!("pair.{id}.claude-exited")));
+    assert!(rig.ctrl.borrow().is_empty());
+}
+
+#[tokio::test]
+async fn resume_refuses_alive_controller() {
+    let rig = Rig::new();
+    script_session_get(&rig);
+    let id = seed(&rig, 1, true, None, None);
+    // 4242 is alive in the rig with start time 777.
+    put(&rig, &format!("pair.{id}.claude-pid"), "4242:boot:777");
+    put(&rig, &format!("pair.{id}.claude-exited"), "1");
+    let (r, _) = rig.resume(&id, &[]).await;
+    assert_eq!(r.unwrap_err().code, ErrorCode::LauncherConflict);
+    assert!(rig.ctrl.borrow().is_empty());
+    assert!(!has(&rig, &format!("pair.{id}.resume-lock")));
+    assert!(
+        has(&rig, &format!("pair.{id}.claude-exited")),
+        "nothing was changed"
+    );
+    // A claude-pid naming a dead process does not refuse.
+    put(&rig, &format!("pair.{id}.claude-pid"), "9999:boot:1");
+    rig.resume(&id, &[]).await.0.unwrap();
+    assert_eq!(rig.ctrl.borrow().len(), 1);
+}
+
+#[tokio::test]
+async fn resume_lock_exclusive() {
+    let rig = Rig::new();
+    script_session_get(&rig);
+    let id = seed(&rig, 1, true, None, None);
+    // Another resume holds the lock and its owner is alive.
+    put(&rig, &format!("pair.{id}.resume-lock"), "4242:boot:777");
+    let (r, _) = rig.resume(&id, &[]).await;
+    assert_eq!(r.unwrap_err().code, ErrorCode::LauncherConflict);
+    assert!(rig.ctrl.borrow().is_empty());
+    assert_eq!(
+        fs::read_to_string(rig.home.path().join(format!("pair.{id}.resume-lock"))).unwrap(),
+        "4242:boot:777",
+        "the winner's lock is untouched"
+    );
+    // An empty lock may be mid-creation: left alone, so the resume loses.
+    put(&rig, &format!("pair.{id}.resume-lock"), "");
+    let (r, _) = rig.resume(&id, &[]).await;
+    assert_eq!(r.unwrap_err().code, ErrorCode::LauncherConflict);
+    assert!(rig.ctrl.borrow().is_empty());
+}
+
+#[tokio::test]
+async fn resume_holds_its_own_lock_until_claude_pid_is_written() {
+    let rig = Rig::new();
+    script_session_get(&rig);
+    rig.probe.set_alive(std::process::id(), "own-start");
+    let id = seed(&rig, 1, true, None, None);
+    rig.resume(&id, &[]).await.0.unwrap();
+    let at = rig.at_spawn.borrow();
+    let lock = at
+        .iter()
+        .find(|(n, _)| n == &format!("pair.{id}.resume-lock"))
+        .expect("the lock exists while the controller is being spawned");
+    assert_eq!(lock.1, format!("{}:boot:own-start", std::process::id()));
+    assert!(!has(&rig, &format!("pair.{id}.resume-lock")));
+}
+
+#[tokio::test]
+async fn resume_clears_exited_and_dead_seen() {
+    let rig = Rig::new();
+    script_session_get(&rig);
+    let id = seed(&rig, 1, true, None, None);
+    put(&rig, &format!("pair.{id}.claude-exited"), "1");
+    put(&rig, &format!("pair.{id}.dead-seen"), "1");
+    rig.resume(&id, &[]).await.0.unwrap();
+    let at = rig.at_spawn.borrow();
+    assert!(
+        !at.iter().any(|(n, _)| n.ends_with(".dead-seen")),
+        "dead-seen is gone before the spawn"
+    );
+    assert!(
+        !at.iter().any(|(n, _)| n.ends_with(".claude-exited")),
+        "claude-exited is gone before the spawn"
+    );
+    assert!(!has(&rig, &format!("pair.{id}.dead-seen")));
+}
+
+#[tokio::test]
+async fn resume_sweeps_dead_lock_first() {
+    let rig = Rig::new();
+    script_session_get(&rig);
+    rig.probe.set_alive(std::process::id(), "own-start");
+    let id = seed(&rig, 1, true, None, None);
+    // A crash between the lock's create and the claude-pid write left this (pid 9999 is dead).
+    put(&rig, &format!("pair.{id}.resume-lock"), "9999:boot:1");
+    let (r, out) = rig.resume(&id, &[]).await;
+    assert_eq!(r.unwrap(), 0, "{out}");
+    assert_eq!(rig.ctrl.borrow().len(), 1);
+    let at = rig.at_spawn.borrow();
+    let lock = at
+        .iter()
+        .find(|(n, _)| n.ends_with(".resume-lock"))
+        .unwrap();
+    assert!(
+        lock.1.starts_with(&format!("{}:", std::process::id())),
+        "our own line replaced it"
+    );
+}
+
+#[tokio::test]
+async fn resume_missing_session_not_found() {
+    let rig = Rig::new();
+    rig.fake.on("session.get", vec![Err(not_found())]);
+    let id = seed(&rig, 1, true, None, None);
+    put(&rig, &format!("pair.{id}.claude-exited"), "1");
+    let (r, _) = rig.resume(&id, &[]).await;
+    assert_eq!(r.unwrap_err().code, ErrorCode::SessionNotFound);
+    assert!(rig.ctrl.borrow().is_empty());
+    assert!(!has(&rig, &format!("pair.{id}.resume-lock")));
+    assert!(has(&rig, &format!("pair.{id}.claude-exited")));
+}
+
+#[tokio::test]
+async fn resume_missing_record_is_pair_not_found() {
+    let rig = Rig::new();
+    let (r, _) = rig.resume("0123456789ab", &[]).await;
+    assert_eq!(r.unwrap_err().code, ErrorCode::PairNotFound);
+    assert!(rig.fake.calls().is_empty());
+}
+
+#[tokio::test]
+async fn resume_rejects_bad_pair_id_before_fs() {
+    for bad in [
+        "",
+        "../etc/passwd",
+        "0123456789AB",
+        "0123456789a",
+        "zzzzzzzzzzzz",
+    ] {
+        let rig = Rig::new();
+        let before = entries(rig.home.path());
+        let (r, _) = rig.resume(bad, &[]).await;
+        assert_eq!(r.unwrap_err().code, ErrorCode::InvalidArgument, "{bad:?}");
+        assert_eq!(
+            entries(rig.home.path()),
+            before,
+            "{bad:?}: no file, no logs/"
+        );
+        assert!(rig.fake.calls().is_empty(), "{bad:?}");
+    }
+}
+
+#[tokio::test]
+async fn resume_controller_not_found_keeps_state_and_drops_the_lock() {
+    for kind in [io::ErrorKind::NotFound, io::ErrorKind::PermissionDenied] {
+        let rig = Rig::new();
+        script_session_get(&rig);
+        rig.ctrl_err.set(Some(kind));
+        let id = seed(&rig, 1, true, None, None);
+        let (r, out) = rig.resume(&id, &[]).await;
+        assert_eq!(
+            r.unwrap_err().code,
+            ErrorCode::ControllerNotFound,
+            "{kind:?}"
+        );
+        assert!(!has(&rig, &format!("pair.{id}.resume-lock")), "{kind:?}");
+        assert!(has(&rig, &format!("pair.{id}.json")));
+        assert!(out.contains(&format!("opencode-pair resume {id}")), "{out}");
+    }
+}
+
+#[tokio::test]
+async fn resume_and_attach_refused_on_the_opencode_host() {
+    let rig = Rig::with(Host::Opencode, Settings::default());
+    let (r, _) = rig.attach(SID).await;
+    assert_eq!(r.unwrap_err().code, ErrorCode::RefusedOnHost);
+    let (r, _) = rig.resume("0123456789ab", &[]).await;
+    assert_eq!(r.unwrap_err().code, ErrorCode::RefusedOnHost);
+    assert!(rig.fake.calls().is_empty());
 }
