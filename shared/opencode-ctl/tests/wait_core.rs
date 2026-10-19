@@ -11,7 +11,7 @@ use opencode_ctl::settings::Settings;
 use opencode_ctl::testing::fake::{FakeTransport, RecordedCall};
 use opencode_ctl::testing::temp_home;
 use opencode_ctl::tools::wait::{evaluate, Anchor, AnchorSource, PageState, Snapshot, WaitState};
-use opencode_ctl::transport::TransportError;
+use opencode_ctl::transport::{TransportError, WaitOutcome};
 use serde_json::{json, Value};
 
 const NOW: i64 = 10_000_000;
@@ -80,6 +80,8 @@ fn base(fake: &FakeTransport, messages: Vec<Value>) {
         "session.get",
         vec![data(json!({"id": SID, "tokens": {"input": 1, "output": 2, "reasoning": 3, "cache_read": 4}}))],
     );
+    // Task 11: the slice loop starts a wait child; one that answers at once makes the first evaluation the answer.
+    fake.on_wait(vec![(Ok(WaitOutcome::Idle), 0)]);
 }
 
 async fn rig_with(settings: Settings, paired: bool, setup: impl FnOnce(&FakeTransport)) -> Rig {
@@ -108,11 +110,16 @@ async fn rig(setup: impl FnOnce(&FakeTransport)) -> Rig {
 }
 
 async fn wait(r: &Rig, after: Option<&str>) -> Value {
-    let mut args = json!({"session_id": SID});
+    // Task 11: a one-second slice keeps a `running` answer cheap on virtual time (it adds 1 s to every clock figure).
+    let mut args = json!({"session_id": SID, "timeout_s": 1});
     if let Some(a) = after {
         args["after"] = json!(a);
     }
-    call(&r.client, "session_wait", args).await
+    // Task 11: the slice loop runs on virtual time.
+    tokio::select! {
+        out = call(&r.client, "session_wait", args) => out,
+        () = r.clock.run_until_idle() => unreachable!("run_until_idle never returns"),
+    }
 }
 
 fn calls_of(r: &Rig, op: &str) -> Vec<RecordedCall> {
@@ -148,10 +155,11 @@ async fn wait_idle_after_anchor() {
     assert_eq!(out["state"], "idle", "{out}");
     assert_eq!(out["outcome"], "idle");
     assert_eq!(out["concurrent_turn"], Value::Null);
-    assert!(out["verify_hint"]
-        .as_str()
-        .unwrap()
-        .contains("session_changes"));
+    assert_eq!(
+        out["verify_hint"],
+        json!({"tool": "session_changes", "args": {"session_id": SID, "from": "msg_a"}}),
+        "Task 11 shape"
+    );
     assert_eq!(out["turn_s"], 50);
     assert!(out.get("error").is_none());
 }
@@ -228,7 +236,7 @@ async fn wait_synthetic_never_anchors() {
     .await;
     let out = wait(&r, None).await;
     assert_eq!(out["state"], "running", "{out}");
-    assert_eq!(out["turn_s"], 60);
+    assert_eq!(out["turn_s"], 61, "60 s + the 1 s slice");
     let anchor_read = calls_of(&r, "session.message.list")
         .into_iter()
         .find(|c| param(c, "type") == Some("user"))
@@ -254,7 +262,10 @@ async fn wait_inbox_pending() {
     .await;
     let out = wait(&r, Some("msg_a")).await;
     assert_eq!(out["inbox_pending"], true, "{out}");
-    assert_eq!(out["parked_s"], 120, "parked_s comes from the OLDER item");
+    assert_eq!(
+        out["parked_s"], 121,
+        "parked_s comes from the OLDER item (+1 s slice)"
+    );
 
     let r2 = rig(|f| base(f, vec![user("msg_a", ago(30))])).await;
     let out = wait(&r2, Some("msg_a")).await;
@@ -282,8 +293,8 @@ async fn wait_parked_s_from_anchor_parked_since() {
     assert_eq!(out["state"], "running", "{out}");
     assert_eq!(out["inbox_pending"], true);
     assert_eq!(
-        out["parked_s"], 30,
-        "from the anchor's parked_since, not the older item"
+        out["parked_s"], 31,
+        "(+1 s slice) from the anchor's parked_since, not the older item"
     );
 }
 
@@ -379,8 +390,8 @@ async fn wait_queued_prompt_does_not_borrow_previous_idle() {
     let out = wait(&r, Some("ibx_q")).await;
     assert_eq!(out["state"], "running", "{out}");
     assert_eq!(
-        out["turn_s"], 100,
-        "the finished turn's user message is not part of this stretch"
+        out["turn_s"], 101,
+        "(+1 s slice) the finished turn's user message is not part of this stretch"
     );
 
     // Promoted: the anchor is now a message created after the previous marker.
@@ -519,14 +530,14 @@ async fn wait_after_unknown_then_stalled() {
     assert_eq!(out["state"], "running", "{out}");
     assert_eq!(
         calls_of(&r, "session.message.list").len(),
-        1,
-        "one message read per slice"
+        3,
+        "the first read, one incremental read for the child return and one at the slice end"
     );
 
     r.clock.advance(100_000);
     let out = wait(&r, Some("msg_nowhere")).await;
     assert_eq!(out["state"], "stalled", "{out}");
-    assert_eq!(calls_of(&r, "session.message.list").len(), 2);
+    assert_eq!(calls_of(&r, "session.message.list").len(), 5);
 }
 
 #[tokio::test]
@@ -916,11 +927,17 @@ async fn wait_idle_search_pages_to_anchor_timestamp() {
     let out = wait(&r, Some("msg_a")).await;
     assert_eq!(out["state"], "idle", "{out}");
     let list = calls_of(&r, "session.message.list");
-    assert_eq!(list.len(), 3, "exactly three reads: {list:?}");
+    // Three first-read pages (not every page) plus the one incremental read of the child return.
+    assert_eq!(
+        list.len(),
+        4,
+        "exactly three page reads + one incremental: {list:?}"
+    );
+    assert_eq!(param(&list[3], "cursor"), Some("prev1"));
     assert_eq!(param(&list[0], "order"), Some("desc"));
     assert_eq!(param(&list[0], "limit"), Some("200"));
     assert!(param(&list[0], "cursor").is_none());
-    for c in &list[1..] {
+    for c in &list[1..3] {
         assert!(
             param(c, "order").is_none(),
             "order is never sent with a cursor"
@@ -1040,7 +1057,7 @@ async fn wait_always_present_fields_are_null_not_absent() {
     }
     assert_eq!(out["tokens"], Value::Null);
     assert_eq!(out["last_assistant_text"], Value::Null);
-    assert_eq!(out["elapsed_s"], 0);
+    assert_eq!(out["elapsed_s"], 1, "the 1 s slice");
     for k in [
         "outcome",
         "verify_hint",
@@ -1114,8 +1131,8 @@ async fn wait_budget_survives_reprompt_across_pages() {
     let list = calls_of(&r, "session.message.list");
     assert_eq!(
         list.len(),
-        4,
-        "stops at the page holding the idle marker older than the anchor: {list:?}"
+        5,
+        "four pages (stops at the page holding the idle marker older than the anchor) + one incremental: {list:?}"
     );
     for c in &list[1..] {
         assert!(param(c, "order").is_none() && param(c, "type").is_none());

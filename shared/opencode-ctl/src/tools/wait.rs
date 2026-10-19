@@ -1,5 +1,7 @@
 //! `session_wait`: one evaluation of the anchor, the paged marker search and the terminal-state order.
 
+use std::time::Duration;
+
 use serde::Serialize;
 use serde_json::{json, Map, Value};
 
@@ -8,7 +10,7 @@ use crate::compact::{compact_form_field, compact_message, compact_permission, Me
 use crate::engine::Engine;
 use crate::error::{ErrorCode, ToolError, ToolResult};
 use crate::settings::Settings;
-use crate::transport::Transport;
+use crate::transport::{Transport, WaitOutcome};
 
 use super::SessionWaitArgs;
 
@@ -16,6 +18,8 @@ use super::SessionWaitArgs;
 const PAGE_LIMIT: usize = 200;
 /// Hard ceiling of `pending_permissions` / `pending_forms` entries.
 const PENDING_CEILING: usize = 20;
+/// A wait child never blocks longer than this, so the slice deadline and the poll are never starved.
+const CHILD_SLICE_MS: i64 = 30_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -110,7 +114,7 @@ pub struct WaitResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub outcome: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub verify_hint: Option<String>,
+    pub verify_hint: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub concurrent_turn: Option<Option<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -268,6 +272,14 @@ fn message_from_raw(raw: &Value) -> Message {
     m
 }
 
+fn push_new(out: &mut Vec<Message>, page: Vec<Message>) {
+    for m in page {
+        if !out.iter().any(|k| k.id == m.id) {
+            out.push(m);
+        }
+    }
+}
+
 fn rows(v: &Value) -> Vec<Value> {
     v.as_array().cloned().unwrap_or_default()
 }
@@ -335,6 +347,40 @@ struct Located {
     anchor: Anchor,
     messages: Vec<Message>,
     inbox: Vec<Value>,
+    /// The slice deadline cut the first read short: the slice reports `running`.
+    cut: bool,
+}
+
+/// The two lists one poll tick reads.
+struct Lists {
+    permissions: Vec<Value>,
+    forms: Vec<Value>,
+}
+
+enum PollEnd {
+    /// A tick found a pending permission or form (the slice ends at once).
+    Found(Lists),
+    /// The tick at the deadline; empty lists when that tick failed after a good one.
+    Deadline(Lists),
+    /// Two consecutive failed ticks.
+    Failed(ToolError),
+}
+
+/// What the wait-child task accumulates; it lives outside the task so the slice end can use it.
+struct ChildState {
+    messages: Vec<Message>,
+    pages: PageState,
+}
+
+/// The reads a child return already made, when its evaluation ended the slice.
+struct ChildDone {
+    inbox: Vec<Value>,
+    active: bool,
+}
+
+enum SliceEnd {
+    Child(ChildDone),
+    Poll(Lists),
 }
 
 impl<T: Transport, C: Clock> Engine<T, C> {
@@ -352,17 +398,20 @@ impl<T: Transport, C: Clock> Engine<T, C> {
     }
 
     /// The first read of a slice: `order=desc limit=200`, following `cursor.next` until `stop` hits or
-    /// the list ends. Returns the messages OLDEST FIRST and whether `stop` hit.
+    /// the list ends or the clock reaches `cut_at`. Returns the messages OLDEST FIRST, whether `stop` hit and
+    /// whether the deadline cut the search.
     async fn read_pages(
         &self,
         session: &str,
         stop: Stop<'_>,
         state: &mut PageState,
-    ) -> Result<(Vec<Message>, bool), ToolError> {
+        cut_at: i64,
+    ) -> Result<(Vec<Message>, bool, bool), ToolError> {
         let mut all: Vec<Message> = Vec::new();
         let mut cursor: Option<String> = None;
         let mut first = true;
         let mut hit_ts: Option<i64> = None;
+        let mut cut = false;
         let found = loop {
             let mut params = vec![
                 ("sessionID".to_string(), session.to_string()),
@@ -388,12 +437,18 @@ impl<T: Transport, C: Clock> Engine<T, C> {
             // whole current non-idle stretch (`turn_s`) is in the snapshot even when the turn spans pages.
             let done = hit_ts.is_some_and(|ts| all.iter().any(|m| is_idle(m) && m.created < ts));
             match cursor_str(&cur, "next") {
+                // The slice deadline cuts a search that still has pages to read: the slice reports `running`
+                // and the next one reads again (spec step 2: "a read cut off by the deadline reports `running`").
+                Some(_) if !done && !empty && self.clock().now_ms() >= cut_at => {
+                    cut = true;
+                    break hit_ts.is_some();
+                }
                 Some(next) if !done && !empty => cursor = Some(next),
                 _ => break hit_ts.is_some(),
             }
         };
         all.reverse();
-        Ok((all, found))
+        Ok((all, found, cut))
     }
 
     /// Messages not read yet, OLDEST FIRST. The first read of a slice (`state` empty) pages back to the
@@ -404,13 +459,28 @@ impl<T: Transport, C: Clock> Engine<T, C> {
         anchor: &Anchor,
         state: &mut PageState,
     ) -> Result<Vec<Message>, ToolError> {
+        let mut out = Vec::new();
+        self.read_incremental(session, anchor, state, &mut out)
+            .await?;
+        Ok(out)
+    }
+
+    /// `read_messages_since` appending into `out` page by page, so a read dropped mid-way (the poll ended the
+    /// slice) never loses a page the cursor has already moved past. A message already in `out` is not added twice.
+    async fn read_incremental(
+        &self,
+        session: &str,
+        anchor: &Anchor,
+        state: &mut PageState,
+        out: &mut Vec<Message>,
+    ) -> Result<(), ToolError> {
         let Some(mut cursor) = state.newest_cursor_previous.clone() else {
-            return Ok(self
-                .read_pages(session, Stop::Anchor(anchor), state)
-                .await?
-                .0);
+            let (page, _, _) = self
+                .read_pages(session, Stop::Anchor(anchor), state, i64::MAX)
+                .await?;
+            push_new(out, page);
+            return Ok(());
         };
-        let mut out: Vec<Message> = Vec::new();
         loop {
             let params = vec![
                 ("sessionID".to_string(), session.to_string()),
@@ -424,7 +494,7 @@ impl<T: Transport, C: Clock> Engine<T, C> {
                 break;
             }
             page.reverse();
-            out.extend(page);
+            push_new(out, page);
             match cursor_str(&cur, "previous") {
                 Some(prev) => {
                     state.newest_cursor_previous = Some(prev.clone());
@@ -436,15 +506,17 @@ impl<T: Transport, C: Clock> Engine<T, C> {
                 None => break,
             }
         }
-        Ok(out)
+        Ok(())
     }
 
     /// The anchor of this slice, or `None` when the session has no user message and no `after` was given.
+    /// `cut_at` is the slice deadline: a first read still paging at that time stops and sets `cut`.
     async fn locate(
         &self,
         session: &str,
         after: Option<&str>,
         call_start: i64,
+        cut_at: i64,
         state: &mut PageState,
     ) -> Result<Option<Located>, ToolError> {
         let Some(after) = after else {
@@ -463,12 +535,15 @@ impl<T: Transport, C: Clock> Engine<T, C> {
                 created_ms: newest_user.created,
                 source: AnchorSource::Message,
             };
-            let messages = self.read_messages_since(session, &anchor, state).await?;
-            let (inbox, _, _) = self.list_op("session.inbox.list", session).await?;
+            let (messages, _, cut) = self
+                .read_pages(session, Stop::Anchor(&anchor), state, cut_at)
+                .await?;
+            // A stored message is never parked: the inbox is read on every child return and at the slice end.
             return Ok(Some(Located {
                 anchor,
                 messages,
-                inbox: rows(&inbox),
+                inbox: Vec::new(),
+                cut,
             }));
         };
 
@@ -486,16 +561,21 @@ impl<T: Transport, C: Clock> Engine<T, C> {
                     parked_since: created,
                 },
             };
-            let messages = self.read_messages_since(session, &anchor, state).await?;
+            let (messages, _, cut) = self
+                .read_pages(session, Stop::Anchor(&anchor), state, cut_at)
+                .await?;
             return Ok(Some(Located {
                 anchor,
                 messages,
                 inbox,
+                cut,
             }));
         }
 
         // Not parked: it is a stored message, or it is nowhere and the newest message's clock stands in.
-        let (messages, found) = self.read_pages(session, Stop::Find(after), state).await?;
+        let (messages, found, cut) = self
+            .read_pages(session, Stop::Find(after), state, cut_at)
+            .await?;
         let anchor = match messages.iter().find(|m| m.id == after) {
             Some(m) if found => Anchor {
                 id: after.to_string(),
@@ -521,18 +601,20 @@ impl<T: Transport, C: Clock> Engine<T, C> {
             anchor,
             messages,
             inbox,
+            cut,
         }))
     }
 
     /// Explicit `after` never replaced; else the newest `user` message. A session with no user message and
     /// no `after` has no anchor: `session_wait` answers `idle` before this point, so here it is `INVALID_REQUEST`.
+    /// Delegates to `locate`, the one anchor path `session_wait` itself uses.
     pub async fn resolve_anchor(
         &self,
         session: &str,
         after: Option<&str>,
     ) -> Result<Anchor, ToolError> {
         let mut state = PageState::default();
-        self.locate(session, after, self.clock().now_ms(), &mut state)
+        self.locate(session, after, self.clock().now_ms(), i64::MAX, &mut state)
             .await?
             .map(|l| l.anchor)
             .ok_or_else(|| {
@@ -548,18 +630,155 @@ impl<T: Transport, C: Clock> Engine<T, C> {
         Some(s.get("tokens").cloned().unwrap_or(Value::Null))
     }
 
+    /// One poll tick: both stall channels. Either failing is a failed tick.
+    async fn poll_once(&self, session: &str) -> Result<Lists, ToolError> {
+        let (permissions, _, _) = self.list_op("session.permission.list", session).await?;
+        let (forms, _, _) = self.list_op("session.form.list", session).await?;
+        Ok(Lists {
+            permissions: rows(&permissions),
+            forms: rows(&forms),
+        })
+    }
+
+    /// Task (b): ticks at the slice start, at every multiple of `poll_ms` strictly before the deadline, and at
+    /// the deadline. A failed tick is retried at the next one; two in a row end the slice with the last error.
+    async fn poll_loop(
+        &self,
+        session: &str,
+        started: i64,
+        timeout_ms: i64,
+        poll_ms: i64,
+    ) -> PollEnd {
+        let mut failed = 0u8;
+        loop {
+            let at_deadline = self.clock().now_ms() - started >= timeout_ms;
+            match self.poll_once(session).await {
+                Ok(lists) => {
+                    failed = 0;
+                    if !lists.permissions.is_empty() || !lists.forms.is_empty() {
+                        return PollEnd::Found(lists);
+                    }
+                    if at_deadline {
+                        return PollEnd::Deadline(lists);
+                    }
+                }
+                Err(e) => {
+                    failed += 1;
+                    if failed >= 2 {
+                        return PollEnd::Failed(e);
+                    }
+                    if at_deadline {
+                        return PollEnd::Deadline(Lists {
+                            permissions: Vec::new(),
+                            forms: Vec::new(),
+                        });
+                    }
+                }
+            }
+            let elapsed = self.clock().now_ms() - started;
+            let next = (elapsed / poll_ms + 1) * poll_ms;
+            let target = next.min(timeout_ms);
+            self.clock()
+                .sleep(Duration::from_millis((target - elapsed).max(0) as u64))
+                .await;
+        }
+    }
+
+    /// Task (a): the wait child, restarted until a return whose evaluation is not `Running`. Each return costs the
+    /// inbox, `session.active` and one incremental message read besides the child itself.
+    async fn child_loop(
+        &self,
+        session: &str,
+        anchor: &Anchor,
+        deadline_ms: i64,
+        poll_ms: i64,
+        cs: &mut ChildState,
+    ) -> Result<ChildDone, ToolError> {
+        loop {
+            let remaining = deadline_ms - self.clock().now_ms();
+            if remaining <= 0 {
+                // The poll's deadline tick ends the slice.
+                return std::future::pending().await;
+            }
+            let outcome = self
+                .wait_idle(
+                    session,
+                    Duration::from_millis(remaining.min(CHILD_SLICE_MS) as u64),
+                )
+                .await?;
+            let (inbox, _, _) = self.list_op("session.inbox.list", session).await?;
+            let (active, _, _) = self.list_op("session.active", session).await?;
+            self.read_incremental(session, anchor, &mut cs.pages, &mut cs.messages)
+                .await?;
+            let snap = Snapshot {
+                messages: cs.messages.clone(),
+                inbox: rows(&inbox),
+                active: active.get(session).is_some(),
+                // A pending permission or form has already ended the slice from the poll.
+                permissions: Vec::new(),
+                forms: Vec::new(),
+                now_ms: self.clock().now_ms(),
+            };
+            if evaluate(anchor, &snap, &self.settings).state != WaitState::Running {
+                return Ok(ChildDone {
+                    inbox: snap.inbox,
+                    active: snap.active,
+                });
+            }
+            if outcome == WaitOutcome::Idle {
+                // The route answers at once when the coordinator holds no execution: do not spin.
+                self.clock()
+                    .sleep(Duration::from_millis(poll_ms as u64))
+                    .await;
+            }
+        }
+    }
+
+    fn pair_of(&self) -> Option<Value> {
+        self.env.session.as_ref().map(|_| {
+            // As `service_status.paired.{tui,claude}`: "none" when the server has no pair id.
+            let liveness = if self.env.pair.is_some() {
+                "unknown"
+            } else {
+                "none"
+            };
+            json!({"tui": liveness, "claude": liveness})
+        })
+    }
+
     pub async fn session_wait(&self, a: SessionWaitArgs) -> ToolResult {
         let session = self.resolve_session(a.session_id.as_deref())?;
+        for (name, v) in [("timeout_s", a.timeout_s), ("poll_s", a.poll_s)] {
+            if v == Some(0) {
+                return Err(ToolError::new(
+                    ErrorCode::InvalidArgument,
+                    format!("{name} must be at least 1"),
+                ));
+            }
+        }
+        let timeout_s = a
+            .timeout_s
+            .unwrap_or(self.settings.wait_timeout_s)
+            .min(self.settings.wait_max_s);
+        let poll_s = a.poll_s.unwrap_or(self.settings.poll_s).max(1);
+        let timeout_ms = timeout_s as i64 * 1000;
+        let poll_ms = poll_s as i64 * 1000;
         let started = self.clock().now_ms();
-        let mut state = PageState::default();
-        let pair = self
-            .env
-            .pair
-            .is_some()
-            .then(|| json!({"tui": "unknown", "claude": "unknown"}));
+        let deadline_ms = started + timeout_ms;
+        let pair = self.pair_of();
 
+        let mut cs = ChildState {
+            messages: Vec::new(),
+            pages: PageState::default(),
+        };
         let Some(located) = self
-            .locate(&session, a.after.as_deref(), started, &mut state)
+            .locate(
+                &session,
+                a.after.as_deref(),
+                started,
+                deadline_ms,
+                &mut cs.pages,
+            )
             .await?
         else {
             let tokens = self.tokens_of(&session).await;
@@ -587,22 +806,76 @@ impl<T: Transport, C: Clock> Engine<T, C> {
             anchor,
             messages,
             inbox,
+            cut,
         } = located;
+        cs.messages = messages;
 
-        let (permissions, _, _) = self.list_op("session.permission.list", &session).await?;
-        let (forms, _, _) = self.list_op("session.form.list", &session).await?;
-        let (active, _, _) = self.list_op("session.active", &session).await?;
+        let (inbox, active, lists) = if cut {
+            // The search used the whole slice: report `running`; the next slice reads again.
+            let none = Lists {
+                permissions: Vec::new(),
+                forms: Vec::new(),
+            };
+            (inbox, true, none)
+        } else {
+            let has_wait_route = self.op("experimental.session.wait").await.is_ok();
+            let end = {
+                let poll = self.poll_loop(&session, started, timeout_ms, poll_ms);
+                let child = async {
+                    if has_wait_route {
+                        self.child_loop(&session, &anchor, deadline_ms, poll_ms, &mut cs)
+                            .await
+                    } else {
+                        std::future::pending().await
+                    }
+                };
+                tokio::select! {
+                    biased;
+                    p = poll => match p {
+                        PollEnd::Failed(e) => return Err(e),
+                        PollEnd::Found(l) | PollEnd::Deadline(l) => SliceEnd::Poll(l),
+                    },
+                    c = child => SliceEnd::Child(c?),
+                }
+            };
+            match end {
+                SliceEnd::Child(done) => (
+                    done.inbox,
+                    done.active,
+                    Lists {
+                        permissions: Vec::new(),
+                        forms: Vec::new(),
+                    },
+                ),
+                SliceEnd::Poll(lists) => {
+                    // Slice-end reads: each propagates its mapped error (a failed `session.active` is an error,
+                    // never `active = false`), and the error wins even over a permission the poll found.
+                    self.read_incremental(&session, &anchor, &mut cs.pages, &mut cs.messages)
+                        .await?;
+                    let (inbox, _, _) = self.list_op("session.inbox.list", &session).await?;
+                    let (active, _, _) = self.list_op("session.active", &session).await?;
+                    (rows(&inbox), active.get(&session).is_some(), lists)
+                }
+            }
+        };
+        // The only slice-end read that degrades.
         let tokens = self.tokens_of(&session).await;
 
         let snap = Snapshot {
-            messages,
+            messages: std::mem::take(&mut cs.messages),
             inbox,
-            active: active.get(&session).is_some(),
-            permissions: rows(&permissions),
-            forms: rows(&forms),
+            active,
+            permissions: lists.permissions,
+            forms: lists.forms,
             now_ms: self.clock().now_ms(),
         };
-        let ev = evaluate(&anchor, &snap, &self.settings);
+        let mut ev = evaluate(&anchor, &snap, &self.settings);
+        if cut {
+            ev.state = WaitState::Running;
+        }
+        if ev.state == WaitState::Running && a.hard == Some(true) {
+            ev.state = WaitState::Timeout;
+        }
 
         let parked_s = if snap.inbox.is_empty() {
             None
@@ -630,10 +903,10 @@ impl<T: Transport, C: Clock> Engine<T, C> {
             more_permissions,
             more_forms,
             verify_hint: (ev.state == WaitState::Idle).then(|| {
-                format!(
-                    "call session_changes with from={} to see what this turn changed",
-                    anchor.id
-                )
+                json!({
+                    "tool": "session_changes",
+                    "args": {"session_id": session, "from": anchor.id},
+                })
             }),
             outcome: ev.outcome,
             concurrent_turn: ev.concurrent_turn,
