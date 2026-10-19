@@ -372,6 +372,10 @@ pub fn load(input: Input) -> (Settings, Vec<Note>) {
         }
     }
 
+    if s.sources["wait_timeout_s"] == Source::Default && s.wait_timeout_s > s.wait_max_s {
+        s.wait_timeout_s = s.wait_max_s;
+    }
+
     resolve_permissions(&mut s, &mut notes, &cands);
     (s, notes)
 }

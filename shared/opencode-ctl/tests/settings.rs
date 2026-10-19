@@ -421,3 +421,32 @@ fn settings_server_url_userinfo_ignored() {
     assert_eq!(n[0].reason, NoteReason::UserinfoInUrl);
     assert!(!n[0].value.contains("pass"), "secret leaked: {:?}", n[0]);
 }
+
+#[test]
+fn settings_default_wait_timeout_follows_lowered_wait_max() {
+    let (s, notes) = run(
+        Host::Claude,
+        &[("OPENCODE_CTL_WAIT_MAX_S", "60")],
+        None,
+        None,
+    );
+    assert_eq!(s.wait_timeout_s, 60);
+    assert_eq!(s.sources["wait_timeout_s"], Source::Default);
+    assert!(notes.is_empty(), "{notes:?}");
+    let (s, notes) = run(Host::Claude, &[], None, None);
+    assert_eq!(s.wait_timeout_s, 120);
+    assert!(notes.is_empty(), "{notes:?}");
+    let (s, notes) = run(
+        Host::Claude,
+        &[
+            ("OPENCODE_CTL_WAIT_MAX_S", "60"),
+            ("OPENCODE_CTL_WAIT_TIMEOUT_S", "200"),
+        ],
+        None,
+        None,
+    );
+    assert_eq!(s.wait_timeout_s, 60);
+    let n = notes_for(&notes, "wait_timeout_s");
+    assert_eq!(n.len(), 1, "{notes:?}");
+    assert_eq!(n[0].reason, NoteReason::Clamped { min: 5, max: 60 });
+}
