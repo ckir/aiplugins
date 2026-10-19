@@ -17,6 +17,7 @@ fn invalid(msg: String) -> ToolError {
 impl<T: Transport, C: Clock> Engine<T, C> {
     pub async fn session_prompt(&self, a: SessionPromptArgs) -> ToolResult {
         let id = self.resolve_session(a.session_id.as_deref())?;
+        self.guard_created(&id)?;
         let delivery = a.delivery.as_deref().unwrap_or("steer");
         if delivery != "steer" && delivery != "queue" {
             return Err(invalid(format!(

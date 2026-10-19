@@ -755,6 +755,7 @@ impl<T: Transport, C: Clock> Engine<T, C> {
 
     pub async fn session_wait(&self, a: SessionWaitArgs) -> ToolResult {
         let session = self.resolve_session(a.session_id.as_deref())?;
+        self.guard_created(&session)?;
         for (name, v) in [("timeout_s", a.timeout_s), ("poll_s", a.poll_s)] {
             if v == Some(0) {
                 return Err(ToolError::new(

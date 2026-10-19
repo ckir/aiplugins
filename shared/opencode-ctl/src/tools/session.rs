@@ -8,6 +8,7 @@ use crate::clock::Clock;
 use crate::compact::{compact_form_field, compact_permission};
 use crate::engine::Engine;
 use crate::error::{ErrorCode, ToolError, ToolResult};
+use crate::host::Host;
 use crate::settings::PermissionPolicy;
 use crate::transport::Transport;
 
@@ -161,6 +162,11 @@ impl<T: Transport, C: Clock> Engine<T, C> {
                 .or_else(|| sent.pointer(fallback).cloned())
                 .unwrap_or(Value::Null)
         };
+        if self.host == Host::Opencode {
+            if let Some(new_id) = data.get("id").and_then(Value::as_str) {
+                self.record_created(&directory, new_id).await?;
+            }
+        }
         Ok(json!({
             "session_id": field(&data, "/id"),
             "directory": pick("/location/directory", "/location/directory"),
@@ -202,6 +208,7 @@ impl<T: Transport, C: Clock> Engine<T, C> {
 
     pub async fn session_interrupt(&self, a: SessionInterruptArgs) -> ToolResult {
         let id = self.resolve_session(a.session_id.as_deref())?;
+        self.guard_created(&id)?;
         let params = vec![
             ("sessionID".to_string(), id),
             ("resume".to_string(), a.resume.unwrap_or(false).to_string()),
@@ -220,6 +227,7 @@ impl<T: Transport, C: Clock> Engine<T, C> {
             ));
         }
         let id = self.resolve_session(Some(&a.session_id))?;
+        self.guard_created(&id)?;
         self.call_json("session.remove", vec![("sessionID".to_string(), id)], None)
             .await?;
         Ok(json!({"deleted": true}))

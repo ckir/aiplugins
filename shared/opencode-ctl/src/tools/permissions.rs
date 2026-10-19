@@ -20,6 +20,7 @@ fn non_empty(v: Option<&Value>) -> bool {
 impl<T: Transport, C: Clock> Engine<T, C> {
     pub async fn permission_reply(&self, a: PermissionReplyArgs) -> ToolResult {
         let id = self.resolve_session(a.session_id.as_deref())?;
+        self.guard_created(&id)?;
         let decision = a.decision.as_str();
         if !matches!(decision, "once" | "always" | "reject") {
             return Err(ToolError::new(
@@ -81,6 +82,7 @@ impl<T: Transport, C: Clock> Engine<T, C> {
 
     pub async fn form_reply(&self, a: FormReplyArgs) -> ToolResult {
         let id = self.resolve_session(a.session_id.as_deref())?;
+        self.guard_created(&id)?;
         self.call_json(
             "session.form.reply",
             vec![

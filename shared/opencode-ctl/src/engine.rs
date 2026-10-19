@@ -10,6 +10,7 @@ use serde_json::Value;
 use crate::cli::env_nonempty;
 use crate::clock::Clock;
 use crate::compact::{cap_json, redact, redact_text, unwrap_envelope, Cap};
+use crate::created_set::CreatedSet;
 use crate::error::{ErrorCode, ToolError, ToolResult};
 use crate::host::Host;
 use crate::liveness::ProcessProbe;
@@ -265,6 +266,72 @@ impl<T: Transport, C: Clock> Engine<T, C> {
             )
             .hint("session ids match ^ses_[A-Za-z0-9]{26}$; list them with session_list"))
         }
+    }
+
+    /// The created-session set kept in the ctl home.
+    pub fn created_set(&self) -> CreatedSet {
+        CreatedSet::new(self.env.home.clone())
+    }
+
+    /// On `Host::Opencode` a session-scoped tool accepts only a session this controller created.
+    /// The set is re-read from disk on every call, so a refusal never rests on stale memory.
+    pub fn guard_created(&self, id: &str) -> Result<(), ToolError> {
+        if self.host != Host::Opencode {
+            return Ok(());
+        }
+        match self.created_set().contains(id) {
+            Ok(Some(_)) => Ok(()),
+            Ok(None) => Err(ToolError::new(
+                ErrorCode::RefusedOnHost,
+                format!(
+                    "{} was not created by this controller: on the OpenCode host only sessions made with session_create are accepted",
+                    redact_text(id)
+                ),
+            )
+            .hint("create the worker session first")),
+            Err(e) => Err(ToolError::new(
+                ErrorCode::IoError,
+                format!("cannot read the created-session set: {e}"),
+            )),
+        }
+    }
+
+    /// Append a new session to the set, then probe at most five OTHER ids of that file and prune
+    /// those the service reports as `SESSION_NOT_FOUND` (any other error leaves the entry).
+    pub async fn record_created(
+        &self,
+        directory: &std::path::Path,
+        id: &str,
+    ) -> Result<(), ToolError> {
+        let set = self.created_set();
+        set.append(directory, id).map_err(|e| {
+            ToolError::new(
+                ErrorCode::IoError,
+                format!("session {id} was created but could not be recorded: {e}"),
+            )
+            .hint("the session exists; recording it failed, so this host will refuse it")
+        })?;
+        let others: Vec<String> = set
+            .ids_for(directory)
+            .into_iter()
+            .filter(|o| o != id)
+            .take(crate::created_set::PROBE_LIMIT)
+            .collect();
+        for other in others {
+            let probe = self
+                .call_json(
+                    "session.get",
+                    vec![("sessionID".to_string(), other.clone())],
+                    None,
+                )
+                .await;
+            if let Err(e) = probe {
+                if e.code == ErrorCode::SessionNotFound {
+                    let _ = set.prune(&other);
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn resolve_directory(&self, arg: Option<&std::path::Path>) -> PathBuf {

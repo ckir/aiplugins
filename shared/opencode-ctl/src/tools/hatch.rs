@@ -6,6 +6,7 @@ use crate::clock::Clock;
 use crate::compact::depth_cap;
 use crate::engine::Engine;
 use crate::error::{ErrorCode, ToolError, ToolResult};
+use crate::host::Host;
 use crate::openapi::{
     gate, validate_params, validate_session_id, GateInput, OperationTable, TableSource,
     SNAPSHOT_VERSION,
@@ -132,6 +133,13 @@ impl<T: Transport, C: Clock> Engine<T, C> {
         for (name, value) in &params {
             if name == "sessionID" {
                 validate_session_id(value)?;
+            }
+        }
+        if self.host == Host::Opencode && op.mutating() {
+            for (name, value) in &params {
+                if name == "sessionID" {
+                    self.guard_created(value)?;
+                }
             }
         }
 
