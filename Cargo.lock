@@ -483,12 +483,11 @@ name = "ghidra-worker-ctl"
 version = "0.7.2"
 dependencies = [
  "ghidra-ipc",
- "nix",
+ "proc-guard",
  "serde_json",
  "thiserror",
  "tokio",
  "uuid",
- "windows",
 ]
 
 [[package]]
@@ -742,6 +741,14 @@ name = "powerfmt"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
+
+[[package]]
+name = "proc-guard"
+version = "0.7.2"
+dependencies = [
+ "nix",
+ "windows",
+]
 
 [[package]]
 name = "proc-macro-crate"
