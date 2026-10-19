@@ -69,6 +69,8 @@ jobs:
           just build-re-ghidra-mcp-cc
           just build-rtk-mcp-opencode
           just build-re-ghidra-mcp-opencode
+          just build-rtk-mcp-agy
+          just build-re-ghidra-mcp-agy
 
       - name: Regenerate derived files
         run: |

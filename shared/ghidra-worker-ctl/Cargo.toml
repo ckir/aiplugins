@@ -17,8 +17,8 @@ tokio = { workspace = true }
 uuid = { workspace = true }
 
 # The worker JVM is held in a Windows Job Object so it dies with its parent.
-# `job_object.rs` carries a `#[cfg(not(windows))]` stub, so the crate compiles
-# everywhere; only the lifecycle guarantee is Windows-only.
+# `job_object.rs` has a Unix process-group guard and a no-op fallback for other
+# targets, so the crate compiles everywhere; the Job Object itself is Windows-only.
 [target.'cfg(windows)'.dependencies]
 windows = { workspace = true }
 

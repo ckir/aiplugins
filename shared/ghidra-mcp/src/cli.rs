@@ -58,7 +58,7 @@ pub async fn dispatch(
         }
         _ => {
             usage(product, version);
-            0
+            2
         }
     }
 }
@@ -273,6 +273,15 @@ fn mk(id: i64, method: &str, params: serde_json::Value) -> ghidra_ipc::rpc::RpcR
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Bad usage is exit 2, as the `dispatch` contract says.
+    #[tokio::test]
+    async fn unknown_command_exits_2() {
+        let code = dispatch("p", "0", vec!["bogus".into()], crate::config::RawConfig::default()).await;
+        assert_eq!(code, 2);
+        let code = dispatch("p", "0", vec![], crate::config::RawConfig::default()).await;
+        assert_eq!(code, 2);
+    }
 
     #[test]
     fn parses_both_flag_spellings() {

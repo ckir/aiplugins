@@ -37,6 +37,8 @@ jobs:
           just build-re-ghidra-mcp-cc
           just build-rtk-mcp-opencode
           just build-re-ghidra-mcp-opencode
+          just build-rtk-mcp-agy
+          just build-re-ghidra-mcp-agy
           just footprint-regen
           if git diff --quiet -- docs/footprints/ README.md claude-code/plugins/*/README.md opencode/plugins/*/README.md; then
             echo "Fresh. Nothing to do."

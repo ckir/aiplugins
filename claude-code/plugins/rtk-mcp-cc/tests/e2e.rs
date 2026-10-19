@@ -5,7 +5,7 @@
 //! Those are exactly the parts that compile fine and still break in production,
 //! so they get exercised through a real process rather than a function call.
 //!
-//! `RTK_BIN` points at the `mock-rtk` fixture rather than the real rtk, so the
+//! `RTK_BIN` points at the `mock-rtk-cc` fixture rather than the real rtk, so the
 //! suite runs identically on a machine that has never heard of rtk — and so the
 //! failure modes (missing binary, non-zero exit, prose on stdout) can be forced
 //! on demand instead of waited for.
