@@ -349,6 +349,20 @@ build-re-ghidra-mcp-cc:
     done
     @echo "Plugin binaries staged in claude-code/plugins/re-ghidra-mcp-cc/bin/"
 
+# Build the opencode-ctl-mcp-cc Claude Code plugin's binary into its bin/ directory.
+# Windows developers run this locally; CI produces the other platforms.
+build-opencode-ctl-mcp-cc:
+    cargo build -p opencode-ctl-mcp-cc --release --bin opencode-ctl-cc-mcp
+    mkdir -p claude-code/plugins/opencode-ctl-mcp-cc/bin
+    for b in opencode-ctl-cc-mcp; do \
+        if [ -f "target/release/$b.exe" ]; then \
+            cp "target/release/$b.exe" claude-code/plugins/opencode-ctl-mcp-cc/bin/; \
+        else \
+            cp "target/release/$b" claude-code/plugins/opencode-ctl-mcp-cc/bin/; \
+        fi; \
+    done
+    @echo "Plugin binaries staged in claude-code/plugins/opencode-ctl-mcp-cc/bin/"
+
 # Stage rtk-mcp-opencode's MCP binary into its bin/ directory.
 build-rtk-mcp-opencode:
     cargo build -p rtk-mcp-cc --release --bin rtk-cc-mcp
@@ -568,7 +582,7 @@ clean-stale:
 # full rebuild.
 clean:
     cargo clean
-    rm -rf claude-code/plugins/example/bin claude-code/plugins/rtk-mcp-cc/bin claude-code/plugins/re-ghidra-mcp-cc/bin opencode/plugins/rtk-mcp-opencode/bin opencode/plugins/re-ghidra-mcp-opencode/bin qwen/plugins/*/bin antigravity/plugins/*/bin
+    rm -rf claude-code/plugins/example/bin claude-code/plugins/rtk-mcp-cc/bin claude-code/plugins/re-ghidra-mcp-cc/bin claude-code/plugins/opencode-ctl-mcp-cc/bin opencode/plugins/rtk-mcp-opencode/bin opencode/plugins/re-ghidra-mcp-opencode/bin qwen/plugins/*/bin antigravity/plugins/*/bin
     @echo "Removed target/ and staged plugin binaries."
 
 

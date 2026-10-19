@@ -29,6 +29,7 @@ for spec in \
     "re-ghidra-mcp-cc|claude-code/plugins/re-ghidra-mcp-cc/Cargo.toml|claude-code/plugins/re-ghidra-mcp-cc/.claude-plugin/plugin.json|.version" \
     "aiplugins-devtools-cc|claude-code/plugins/aiplugins-devtools-cc/.claude-plugin/plugin.json|claude-code/plugins/aiplugins-devtools-cc/.claude-plugin/plugin.json|.version" \
     "repo-user-guide-cc|claude-code/plugins/repo-user-guide-cc/.claude-plugin/plugin.json|claude-code/plugins/repo-user-guide-cc/.claude-plugin/plugin.json|.version" \
+    "opencode-ctl-mcp-cc|claude-code/plugins/opencode-ctl-mcp-cc/Cargo.toml|claude-code/plugins/opencode-ctl-mcp-cc/.claude-plugin/plugin.json|.version" \
     "rtk-mcp-qwen|qwen/plugins/rtk-mcp-qwen/Cargo.toml|qwen/plugins/rtk-mcp-qwen/qwen-extension.json|.version" \
     "re-ghidra-mcp-qwen|qwen/plugins/re-ghidra-mcp-qwen/Cargo.toml|qwen/plugins/re-ghidra-mcp-qwen/qwen-extension.json|.version" \
     "aiplugins-devtools-qwen|qwen/plugins/aiplugins-devtools-qwen/qwen-extension.json|qwen/plugins/aiplugins-devtools-qwen/qwen-extension.json|.version" \
@@ -47,6 +48,7 @@ for spec in \
 done
 # Shippable crates must NOT inherit the workspace version anymore.
 for crate in claude-code/plugins/rtk-mcp-cc/Cargo.toml claude-code/plugins/re-ghidra-mcp-cc/Cargo.toml \
+    claude-code/plugins/opencode-ctl-mcp-cc/Cargo.toml \
     qwen/plugins/rtk-mcp-qwen/Cargo.toml qwen/plugins/re-ghidra-mcp-qwen/Cargo.toml \
     antigravity/plugins/rtk-mcp-agy/Cargo.toml antigravity/plugins/re-ghidra-mcp-agy/Cargo.toml; do
     if grep -q '^version\.workspace' "$crate"; then

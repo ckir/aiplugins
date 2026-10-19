@@ -30,6 +30,13 @@
         ".claude-plugin/plugin.json"
       ]
     },
+    "claude-code/plugins/opencode-ctl-mcp-cc": {
+      "release-type": "rust",
+      "component": "opencode-ctl-mcp-cc",
+      "extra-files": [
+        ".claude-plugin/plugin.json"
+      ]
+    },
     "qwen/plugins/rtk-mcp-qwen": {
       "release-type": "rust",
       "component": "rtk-mcp-qwen",

@@ -188,6 +188,7 @@ jobs:
         run: |
           just build-rtk-mcp-cc
           just build-re-ghidra-mcp-cc
+          just build-opencode-ctl-mcp-cc
           just build-rtk-mcp-opencode
           just build-re-ghidra-mcp-opencode
           just build-rtk-mcp-agy
