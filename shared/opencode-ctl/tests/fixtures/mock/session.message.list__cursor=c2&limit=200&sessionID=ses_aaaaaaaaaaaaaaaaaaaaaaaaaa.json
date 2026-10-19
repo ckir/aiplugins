@@ -1,0 +1,1 @@
+{"data":[{"id":"msg_u1","type":"user","time":{"created":"{{now-60000}}"},"text":"hi"}],"cursor":{"previous":null,"next":null}}

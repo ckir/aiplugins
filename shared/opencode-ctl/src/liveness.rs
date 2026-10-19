@@ -217,3 +217,33 @@ impl ProcessProbe for SystemProbe {
         }
     }
 }
+
+/// Delete `<home>/stdout/<pid>-<starttime>` directories whose process is dead or whose start time
+/// differs from the live process's (a reused pid). Names of any other shape are left alone.
+/// Returns the directories removed.
+pub fn sweep_stdout_dirs(
+    home: &std::path::Path,
+    probe: &dyn ProcessProbe,
+) -> Vec<std::path::PathBuf> {
+    let Ok(entries) = std::fs::read_dir(home.join("stdout")) else {
+        return Vec::new();
+    };
+    let mut removed = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = entry.file_name();
+        let Some((pid, start)) = name.to_str().and_then(|n| n.split_once('-')) else {
+            continue;
+        };
+        let Ok(pid) = pid.parse::<u32>() else {
+            continue;
+        };
+        // The transport names an unreadable start time "0".
+        let live =
+            probe.is_alive(pid) && probe.starttime(pid).unwrap_or_else(|| "0".to_string()) == start;
+        if !live && path.is_dir() && std::fs::remove_dir_all(&path).is_ok() {
+            removed.push(path);
+        }
+    }
+    removed
+}

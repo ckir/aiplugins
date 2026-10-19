@@ -6,7 +6,10 @@ use std::time::Duration;
 
 use serde_json::Value;
 
-use crate::cli::{blank_is_unset, Route};
+pub mod cli;
+pub use cli::CliTransport;
+
+use crate::cli::{blank_is_unset, env_nonempty, Route};
 use crate::compact::redact_text;
 use crate::error::{ErrorCode, ToolError};
 use crate::openapi::Operation;
@@ -106,7 +109,7 @@ pub fn home_required(
     }
 }
 
-/// Every call fails `OPENCODE_NOT_FOUND`; Task 13 replaces the body with the CLI transport.
+/// Every call fails `OPENCODE_NOT_FOUND` (kept for the server tests that need a transport with no CLI).
 pub struct NotFoundTransport;
 
 fn not_found() -> TransportError {
@@ -147,6 +150,6 @@ impl Transport for NotFoundTransport {
 }
 
 /// `home` is the ctl home, `user_home` the OS home.
-pub fn build_transport(_settings: &Settings, _home: &Path, _user_home: &Path) -> impl Transport {
-    NotFoundTransport
+pub fn build_transport(settings: &Settings, home: &Path, user_home: &Path) -> impl Transport {
+    CliTransport::new(settings, home, user_home).with_path(env_nonempty("PATH"))
 }
