@@ -341,3 +341,50 @@ fn regenerate_snapshot_table() {
     )
     .unwrap();
 }
+
+#[test]
+fn hatch_denylist_is_exactly_these_thirteen() {
+    assert_eq!(
+        GET_DENY_LIST,
+        [
+            "server.connect",
+            "fs.*",
+            "session.log",
+            "event.subscribe",
+            "shell.*",
+            "pty.*",
+            "persistentPty.*",
+            "server.experimental.persistentPty.*",
+            "credential.*",
+            "config.*",
+            "mcp.*",
+            "integration.*",
+            "experimental.session.export"
+        ]
+    );
+}
+
+#[test]
+fn hatch_known_sensitive_gets_are_blocked() {
+    let s = snap();
+    for id in [
+        "mcp.list",
+        "mcp.resource.catalog",
+        "config.get",
+        "credential.list",
+        "fs.read",
+        "shell.output",
+        "pty.connect",
+        "integration.get",
+    ] {
+        let op = s
+            .get(id)
+            .unwrap_or_else(|| panic!("{id} missing from snapshot"));
+        assert_eq!(op.method, Method::Get, "{id}");
+        assert_eq!(
+            code(run(None, &s, id, true, false)),
+            ErrorCode::BlockedOperation,
+            "{id}"
+        );
+    }
+}
