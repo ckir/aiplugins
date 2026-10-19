@@ -7,6 +7,7 @@ pub mod created_set;
 pub mod doctor;
 pub mod engine;
 pub mod error;
+pub mod gc;
 pub mod host;
 pub mod liveness;
 pub mod logging;

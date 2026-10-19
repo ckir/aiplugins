@@ -130,6 +130,18 @@ pub async fn dispatch(
                 }
             }
         }
+        Route::Sub { name, rest } if name == "gc" => {
+            match gc_main(host, &user_home, &rest, probe).await {
+                Ok(report) => {
+                    println!("{report}");
+                    0
+                }
+                Err(e) => {
+                    eprintln!("{}", e.to_json());
+                    2
+                }
+            }
+        }
         Route::Sub { .. } | Route::Pair(_) => {
             eprintln!("not implemented ({host:?}, argv0={argv0:?})");
             2
@@ -350,4 +362,66 @@ async fn doctor_main(
         env: &raw,
     };
     Ok(doctor_json(&engine, &ctx, args.verbose).await)
+}
+
+/// One line per pair `gc` touched, appended to that pair's `pair-<id>.log` (the `gc` subcommand
+/// opens each log `Scoped`; `pair` writes to its own already-open log instead and never calls this).
+fn log_gc_report(home: &Path, report: &crate::gc::GcReport, debug: bool) {
+    let touched = report
+        .pairs_deleted
+        .iter()
+        .map(|id| (id, "deleted"))
+        .chain(
+            report
+                .dead_seen_written
+                .iter()
+                .map(|id| (id, "dead-seen written")),
+        )
+        .chain(
+            report
+                .dead_seen_cleared
+                .iter()
+                .map(|id| (id, "dead-seen cleared")),
+        );
+    for (id, what) in touched {
+        let path = home.join("logs").join(format!("pair-{id}.log"));
+        if let Ok(handle) = crate::logging::init_file_logging(&path, debug, LogScope::Scoped) {
+            tracing::info!("gc: pair {id} {what}");
+            drop(handle);
+        }
+    }
+}
+
+/// `gc` (no arguments): the report for the real environment as the JSON to print on stdout.
+async fn gc_main(
+    host: Host,
+    user_home: &Path,
+    rest: &[String],
+    probe: Arc<dyn ProcessProbe>,
+) -> Result<serde_json::Value, ToolError> {
+    if !rest.is_empty() {
+        return Err(ToolError::new(
+            ErrorCode::InvalidArgument,
+            format!("unexpected argument '{}' (gc takes none)", rest[0]),
+        ));
+    }
+    let raw = |k: &str| std::env::var(k).ok();
+    let ctl_home = settings::ctl_home(&|k| env_nonempty(k));
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let prep = prepare_serve(host, &ctl_home, cwd, &raw);
+    let transport = build_transport(&prep.settings, &ctl_home, user_home);
+    let engine = Engine::new(
+        prep.settings,
+        prep.notes,
+        host,
+        prep.env,
+        transport,
+        SystemClock,
+        probe.clone(),
+    );
+    let now = SystemClock.now_ms();
+    let report = crate::gc::gc(&engine, probe.as_ref(), now, None).await;
+    let debug = env_nonempty("OPENCODE_CTL_LOG").is_some_and(|v| v.eq_ignore_ascii_case("debug"));
+    log_gc_report(&ctl_home, &report, debug);
+    serde_json::to_value(&report).map_err(|e| ToolError::new(ErrorCode::IoError, e.to_string()))
 }

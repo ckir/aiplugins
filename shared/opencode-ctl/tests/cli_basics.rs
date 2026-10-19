@@ -37,7 +37,7 @@ async fn usage_exit_code_is_2() {
         2
     );
     assert_eq!(
-        dispatch(Host::Qwen, "p", "1", Some("x"), s(&["gc"])).await,
+        dispatch(Host::Qwen, "p", "1", Some("x"), s(&["attach"])).await,
         2
     );
 }
