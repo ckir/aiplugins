@@ -2,6 +2,7 @@
 
 pub mod cli;
 pub mod clock;
+pub mod compact;
 pub mod error;
 pub mod host;
 pub mod liveness;
