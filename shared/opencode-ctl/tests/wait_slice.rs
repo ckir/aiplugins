@@ -936,3 +936,81 @@ async fn wait_search_cut_by_deadline_is_running() {
 fn calls_of_fake(fake: &FakeTransport, op: &str) -> usize {
     fake.calls().iter().filter(|c| c.op == op).count()
 }
+
+#[tokio::test]
+async fn wait_search_cut_result_has_running_key_set() {
+    for hard in [false, true] {
+        let home = temp_home();
+        let clock = TestClock::new(NOW);
+        let fake = FakeTransport::new().with_clock(clock.clone());
+        active(&fake);
+        fake.on("session.inbox.list", vec![data(json!([]))]);
+        fake.on("session.permission.list", vec![data(json!([]))]);
+        fake.on("session.form.list", vec![data(json!([]))]);
+        fake.on(
+            "session.get",
+            vec![data(json!({"id": SID, "tokens": {"input": 1}}))],
+        );
+        child_idle_at_once(&fake);
+        // Page 1 already holds a FAILED marker after the (known) anchor; the anchor's own page comes later.
+        let mut marker = idle("msg_i", ago(5), "failed");
+        marker["error"] = json!({"name": "ProviderError", "message": "boom"});
+        fake.on_matching(
+            "session.message.list",
+            &[("type", "user"), ("order", "desc")],
+            vec![paged(json!([user("msg_a", ago(600))]), None, None)],
+        );
+        fake.on_matching(
+            "session.message.list",
+            &[("order", "desc")],
+            vec![paged(
+                json!([user("msg_later", ago(2)), marker]),
+                Some("c2"),
+                Some("prev1"),
+            )],
+        );
+        fake.on_matching(
+            "session.message.list",
+            &[("cursor", "c2")],
+            vec![paged(json!([asst("msg_p2", ago(10))]), Some("c3"), None)],
+        );
+        fake.on_matching(
+            "session.message.list",
+            &[("cursor", "c3")],
+            vec![paged(json!([user("msg_a", ago(600))]), None, None)],
+        );
+        let slow = Slow {
+            inner: fake.clone(),
+            clock: clock.clone(),
+            per_call_ms: 10_000,
+        };
+        let engine = Arc::new(Engine::new(
+            Settings::default(),
+            Vec::new(),
+            Host::Claude,
+            env_unpaired(&home),
+            slow,
+            clock.clone(),
+            Arc::new(FakeProbe::new("boot")),
+        ));
+        let out = driven(
+            &clock,
+            engine.session_wait(SessionWaitArgs {
+                session_id: Some(SID.into()),
+                after: None,
+                timeout_s: Some(25),
+                poll_s: None,
+                hard: Some(hard),
+            }),
+        )
+        .await
+        .expect("a cut search is a result, not an error");
+        let want = if hard { "timeout" } else { "running" };
+        assert_eq!(out["state"], want, "{out}");
+        assert_eq!(keys(&out), with(&[]), "same keys as a plain {want}: {out}");
+        assert!(out["elapsed_s"].as_i64().unwrap() >= 25, "{out}");
+        assert_eq!(calls_of_fake(&fake, "session.permission.list"), 0);
+        assert_eq!(calls_of_fake(&fake, "session.form.list"), 0);
+        assert!(calls_of_fake(&fake, "session.message.list") < 4);
+    }
+}

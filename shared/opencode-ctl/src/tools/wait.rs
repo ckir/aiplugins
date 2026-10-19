@@ -871,7 +871,11 @@ impl<T: Transport, C: Clock> Engine<T, C> {
         };
         let mut ev = evaluate(&anchor, &snap, &self.settings);
         if cut {
+            // A partial snapshot decides nothing: the result has exactly a running result's keys.
             ev.state = WaitState::Running;
+            ev.outcome = None;
+            ev.error = None;
+            ev.concurrent_turn = None;
         }
         if ev.state == WaitState::Running && a.hard == Some(true) {
             ev.state = WaitState::Timeout;
