@@ -15,6 +15,7 @@ pub mod messages;
 pub mod permissions;
 pub mod service;
 pub mod session;
+pub mod wait;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct ServiceStatusArgs {}
@@ -171,9 +172,6 @@ fn not_implemented(tool: &str) -> ToolResult {
 
 /// Tools whose bodies land in later tasks; each moves out of here when its task lands.
 impl<T: Transport, C: Clock> Engine<T, C> {
-    pub async fn session_wait(&self, _a: SessionWaitArgs) -> ToolResult {
-        not_implemented("session_wait")
-    }
     pub async fn pair_status(&self, _a: PairStatusArgs) -> ToolResult {
         not_implemented("pair_status")
     }
