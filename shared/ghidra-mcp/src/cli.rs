@@ -277,7 +277,13 @@ mod tests {
     /// Bad usage is exit 2, as the `dispatch` contract says.
     #[tokio::test]
     async fn unknown_command_exits_2() {
-        let code = dispatch("p", "0", vec!["bogus".into()], crate::config::RawConfig::default()).await;
+        let code = dispatch(
+            "p",
+            "0",
+            vec!["bogus".into()],
+            crate::config::RawConfig::default(),
+        )
+        .await;
         assert_eq!(code, 2);
         let code = dispatch("p", "0", vec![], crate::config::RawConfig::default()).await;
         assert_eq!(code, 2);
