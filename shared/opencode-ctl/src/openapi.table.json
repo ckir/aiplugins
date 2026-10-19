@@ -1,1 +1,2480 @@
-{"version":"2.0.32","operations":[]}
+{
+  "operations": [
+    {
+      "body_required": [],
+      "id": "agent.get",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "agentID"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/agent/{agentID}",
+      "success": 200,
+      "summary": "Get agent"
+    },
+    {
+      "body_required": [],
+      "id": "agent.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/agent",
+      "success": 200,
+      "summary": "List agents"
+    },
+    {
+      "body_required": [],
+      "id": "command.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/command",
+      "success": 200,
+      "summary": "List commands"
+    },
+    {
+      "body_required": [],
+      "id": "config.get",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/config",
+      "success": 200,
+      "summary": "Get configuration"
+    },
+    {
+      "body_required": [],
+      "id": "config.shells",
+      "json": true,
+      "method": "GET",
+      "params": [],
+      "path": "/api/config/shell",
+      "success": 200,
+      "summary": "List available shells"
+    },
+    {
+      "body_required": [],
+      "id": "credential.activate",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "credentialID"
+        }
+      ],
+      "path": "/api/credential/{credentialID}/activate",
+      "success": 204,
+      "summary": "Activate credential"
+    },
+    {
+      "body_required": [
+        "integrationID",
+        "value"
+      ],
+      "id": "credential.create",
+      "json": true,
+      "method": "POST",
+      "params": [],
+      "path": "/api/credential",
+      "success": 200,
+      "summary": "Create credential"
+    },
+    {
+      "body_required": [],
+      "id": "credential.list",
+      "json": true,
+      "method": "GET",
+      "params": [],
+      "path": "/api/credential",
+      "success": 200,
+      "summary": "List credentials"
+    },
+    {
+      "body_required": [],
+      "id": "credential.remove",
+      "json": false,
+      "method": "DELETE",
+      "params": [
+        {
+          "in": "path",
+          "name": "credentialID"
+        }
+      ],
+      "path": "/api/credential/{credentialID}",
+      "success": 204,
+      "summary": "Remove credential"
+    },
+    {
+      "body_required": [
+        "label"
+      ],
+      "id": "credential.update",
+      "json": false,
+      "method": "PATCH",
+      "params": [
+        {
+          "in": "path",
+          "name": "credentialID"
+        }
+      ],
+      "path": "/api/credential/{credentialID}",
+      "success": 204,
+      "summary": "Update credential"
+    },
+    {
+      "body_required": [],
+      "id": "debug.location.evict",
+      "json": false,
+      "method": "DELETE",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/debug/location",
+      "success": 204,
+      "summary": "Evict a loaded location"
+    },
+    {
+      "body_required": [],
+      "id": "debug.location.list",
+      "json": true,
+      "method": "GET",
+      "params": [],
+      "path": "/api/debug/location",
+      "success": 200,
+      "summary": "List loaded locations"
+    },
+    {
+      "body_required": [],
+      "id": "event.subscribe",
+      "json": false,
+      "method": "GET",
+      "params": [],
+      "path": "/api/event",
+      "success": 200,
+      "summary": "Subscribe to events"
+    },
+    {
+      "body_required": [
+        "shell"
+      ],
+      "id": "experimental.config.update",
+      "json": false,
+      "method": "PATCH",
+      "params": [],
+      "path": "/api/experimental/config",
+      "success": 204,
+      "summary": "Update global configuration"
+    },
+    {
+      "body_required": [],
+      "id": "experimental.fs.write",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        },
+        {
+          "in": "query",
+          "name": "path"
+        }
+      ],
+      "path": "/api/experimental/fs/write",
+      "success": 200,
+      "summary": "Write file"
+    },
+    {
+      "body_required": [
+        "prompt"
+      ],
+      "id": "experimental.generate.text",
+      "json": true,
+      "method": "POST",
+      "params": [],
+      "path": "/api/experimental/generate",
+      "success": 200,
+      "summary": "Generate text"
+    },
+    {
+      "body_required": [
+        "url"
+      ],
+      "id": "experimental.integration.wellknown.add",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/experimental/integration/wellknown",
+      "success": 204,
+      "summary": "Add wellknown integration"
+    },
+    {
+      "body_required": [
+        "config"
+      ],
+      "id": "experimental.mcp.add",
+      "json": false,
+      "method": "PUT",
+      "params": [
+        {
+          "in": "path",
+          "name": "server"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/experimental/mcp/{server}",
+      "success": 204,
+      "summary": "Add MCP server"
+    },
+    {
+      "body_required": [],
+      "id": "experimental.mcp.connect",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "server"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/experimental/mcp/{server}/connect",
+      "success": 204,
+      "summary": "Connect MCP server"
+    },
+    {
+      "body_required": [],
+      "id": "experimental.mcp.disconnect",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "server"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/experimental/mcp/{server}/disconnect",
+      "success": 204,
+      "summary": "Disconnect MCP server"
+    },
+    {
+      "body_required": [],
+      "id": "experimental.mcp.remove",
+      "json": false,
+      "method": "DELETE",
+      "params": [
+        {
+          "in": "path",
+          "name": "server"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/experimental/mcp/{server}",
+      "success": 204,
+      "summary": "Remove MCP server"
+    },
+    {
+      "body_required": [],
+      "id": "experimental.migration.v1.status",
+      "json": true,
+      "method": "GET",
+      "params": [],
+      "path": "/api/experimental/migration/v1",
+      "success": 200,
+      "summary": "Get V1 migration status"
+    },
+    {
+      "body_required": [],
+      "id": "experimental.session.export",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        },
+        {
+          "in": "query",
+          "name": "sanitize"
+        }
+      ],
+      "path": "/api/experimental/session/{sessionID}/export",
+      "success": 200,
+      "summary": "Export session"
+    },
+    {
+      "body_required": [
+        "info",
+        "messages"
+      ],
+      "id": "experimental.session.import",
+      "json": true,
+      "method": "POST",
+      "params": [],
+      "path": "/api/experimental/session/import",
+      "success": 200,
+      "summary": "Import session"
+    },
+    {
+      "body_required": [],
+      "id": "experimental.session.instructions.entry.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/experimental/session/{sessionID}/instructions/entries",
+      "success": 200,
+      "summary": "List instruction entries"
+    },
+    {
+      "body_required": [
+        "value"
+      ],
+      "id": "experimental.session.instructions.entry.put",
+      "json": false,
+      "method": "PUT",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        },
+        {
+          "in": "path",
+          "name": "key"
+        }
+      ],
+      "path": "/api/experimental/session/{sessionID}/instructions/entries/{key}",
+      "success": 204,
+      "summary": "Put instruction entry"
+    },
+    {
+      "body_required": [],
+      "id": "experimental.session.instructions.entry.remove",
+      "json": false,
+      "method": "DELETE",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        },
+        {
+          "in": "path",
+          "name": "key"
+        }
+      ],
+      "path": "/api/experimental/session/{sessionID}/instructions/entries/{key}",
+      "success": 204,
+      "summary": "Remove instruction entry"
+    },
+    {
+      "body_required": [
+        "id"
+      ],
+      "id": "experimental.session.skill",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/experimental/session/{sessionID}/skill",
+      "success": 204,
+      "summary": "Activate skill"
+    },
+    {
+      "body_required": [],
+      "id": "experimental.session.stats",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "from"
+        },
+        {
+          "in": "query",
+          "name": "to"
+        },
+        {
+          "in": "query",
+          "name": "project"
+        },
+        {
+          "in": "query",
+          "name": "timezone"
+        },
+        {
+          "in": "query",
+          "name": "tools"
+        }
+      ],
+      "path": "/api/experimental/session/stats",
+      "success": 200,
+      "summary": "Get session statistics"
+    },
+    {
+      "body_required": [],
+      "id": "experimental.session.wait",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/experimental/session/{sessionID}/wait",
+      "success": 204,
+      "summary": "Wait for session"
+    },
+    {
+      "body_required": [
+        "model",
+        "transport"
+      ],
+      "id": "experimental.voice.session",
+      "json": true,
+      "method": "POST",
+      "params": [],
+      "path": "/api/experimental/voice/session",
+      "success": 200,
+      "summary": "Create voice session"
+    },
+    {
+      "body_required": [],
+      "id": "form.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/form",
+      "success": 200,
+      "summary": "List pending forms"
+    },
+    {
+      "body_required": [],
+      "id": "fs.find",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        },
+        {
+          "in": "query",
+          "name": "query"
+        },
+        {
+          "in": "query",
+          "name": "type"
+        },
+        {
+          "in": "query",
+          "name": "limit"
+        }
+      ],
+      "path": "/api/fs/find",
+      "success": 200,
+      "summary": "Find files"
+    },
+    {
+      "body_required": [],
+      "id": "fs.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        },
+        {
+          "in": "query",
+          "name": "path"
+        }
+      ],
+      "path": "/api/fs/list",
+      "success": 200,
+      "summary": "List directory"
+    },
+    {
+      "body_required": [],
+      "id": "fs.read",
+      "json": false,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/fs/read/*",
+      "success": 200,
+      "summary": "Read file"
+    },
+    {
+      "body_required": [],
+      "id": "integration.command.cancel",
+      "json": false,
+      "method": "DELETE",
+      "params": [
+        {
+          "in": "path",
+          "name": "integrationID"
+        },
+        {
+          "in": "path",
+          "name": "attemptID"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/integration/{integrationID}/connect/command/{attemptID}",
+      "success": 204,
+      "summary": "Cancel command connection"
+    },
+    {
+      "body_required": [
+        "methodID"
+      ],
+      "id": "integration.command.connect",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "integrationID"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/integration/{integrationID}/connect/command",
+      "success": 200,
+      "summary": "Begin command connection"
+    },
+    {
+      "body_required": [],
+      "id": "integration.command.status",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "integrationID"
+        },
+        {
+          "in": "path",
+          "name": "attemptID"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/integration/{integrationID}/connect/command/{attemptID}",
+      "success": 200,
+      "summary": "Get command attempt status"
+    },
+    {
+      "body_required": [
+        "methodID"
+      ],
+      "id": "integration.connect.external",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "integrationID"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/integration/{integrationID}/connect/external",
+      "success": 204,
+      "summary": "Connect with external credentials"
+    },
+    {
+      "body_required": [
+        "key"
+      ],
+      "id": "integration.connect.key",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "integrationID"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/integration/{integrationID}/connect/key",
+      "success": 204,
+      "summary": "Connect with key"
+    },
+    {
+      "body_required": [],
+      "id": "integration.get",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "integrationID"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/integration/{integrationID}",
+      "success": 200,
+      "summary": "Get integration"
+    },
+    {
+      "body_required": [],
+      "id": "integration.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/integration",
+      "success": 200,
+      "summary": "List integrations"
+    },
+    {
+      "body_required": [],
+      "id": "integration.oauth.cancel",
+      "json": false,
+      "method": "DELETE",
+      "params": [
+        {
+          "in": "path",
+          "name": "integrationID"
+        },
+        {
+          "in": "path",
+          "name": "attemptID"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/integration/{integrationID}/connect/oauth/{attemptID}",
+      "success": 204,
+      "summary": "Cancel OAuth connection"
+    },
+    {
+      "body_required": [],
+      "id": "integration.oauth.complete",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "integrationID"
+        },
+        {
+          "in": "path",
+          "name": "attemptID"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/integration/{integrationID}/connect/oauth/{attemptID}/complete",
+      "success": 204,
+      "summary": "Complete OAuth connection"
+    },
+    {
+      "body_required": [
+        "methodID"
+      ],
+      "id": "integration.oauth.connect",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "integrationID"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/integration/{integrationID}/connect/oauth",
+      "success": 200,
+      "summary": "Begin OAuth connection"
+    },
+    {
+      "body_required": [],
+      "id": "integration.oauth.status",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "integrationID"
+        },
+        {
+          "in": "path",
+          "name": "attemptID"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/integration/{integrationID}/connect/oauth/{attemptID}",
+      "success": 200,
+      "summary": "Get OAuth attempt status"
+    },
+    {
+      "body_required": [],
+      "id": "location.get",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/location",
+      "success": 200,
+      "summary": "Get location"
+    },
+    {
+      "body_required": [],
+      "id": "location.reload",
+      "json": false,
+      "method": "POST",
+      "params": [],
+      "path": "/api/location/reload",
+      "success": 204,
+      "summary": "Reload configuration"
+    },
+    {
+      "body_required": [],
+      "id": "mcp.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/mcp",
+      "success": 200,
+      "summary": "List MCP servers"
+    },
+    {
+      "body_required": [],
+      "id": "mcp.resource.catalog",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/mcp/resource",
+      "success": 200,
+      "summary": "List MCP resources"
+    },
+    {
+      "body_required": [],
+      "id": "model.default",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/model/default",
+      "success": 200,
+      "summary": "Get default model"
+    },
+    {
+      "body_required": [],
+      "id": "model.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/model",
+      "success": 200,
+      "summary": "List models"
+    },
+    {
+      "body_required": [],
+      "id": "permission.request.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/permission/request",
+      "success": 200,
+      "summary": "List pending permission requests"
+    },
+    {
+      "body_required": [],
+      "id": "permission.saved.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "projectID"
+        }
+      ],
+      "path": "/api/permission/saved",
+      "success": 200,
+      "summary": "List saved permissions"
+    },
+    {
+      "body_required": [],
+      "id": "permission.saved.remove",
+      "json": false,
+      "method": "DELETE",
+      "params": [
+        {
+          "in": "path",
+          "name": "id"
+        }
+      ],
+      "path": "/api/permission/saved/{id}",
+      "success": 204,
+      "summary": "Remove saved permission"
+    },
+    {
+      "body_required": [],
+      "id": "persistentPty.connect",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "ptyID"
+        },
+        {
+          "in": "query",
+          "name": "cursor"
+        },
+        {
+          "in": "query",
+          "name": "role"
+        },
+        {
+          "in": "query",
+          "name": "attachment_id"
+        },
+        {
+          "in": "query",
+          "name": "takeover"
+        },
+        {
+          "in": "query",
+          "name": "input_protocol"
+        },
+        {
+          "in": "query",
+          "name": "ticket"
+        }
+      ],
+      "path": "/api/experimental/persistent-pty/{ptyID}/connect",
+      "success": 200,
+      "summary": "Connect to a persistent PTY"
+    },
+    {
+      "body_required": [],
+      "id": "plugin.check",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/plugin/check",
+      "success": 200,
+      "summary": "Check plugin updates"
+    },
+    {
+      "body_required": [],
+      "id": "plugin.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/plugin",
+      "success": 200,
+      "summary": "List plugins"
+    },
+    {
+      "body_required": [
+        "targets"
+      ],
+      "id": "plugin.update",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/plugin/update",
+      "success": 204,
+      "summary": "Update plugins"
+    },
+    {
+      "body_required": [],
+      "id": "project.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "archived"
+        }
+      ],
+      "path": "/api/project",
+      "success": 200,
+      "summary": "List projects"
+    },
+    {
+      "body_required": [],
+      "id": "project.update",
+      "json": true,
+      "method": "PATCH",
+      "params": [
+        {
+          "in": "path",
+          "name": "projectID"
+        }
+      ],
+      "path": "/api/project/{projectID}",
+      "success": 200,
+      "summary": "Update project"
+    },
+    {
+      "body_required": [],
+      "id": "provider.get",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "providerID"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/provider/{providerID}",
+      "success": 200,
+      "summary": "Get provider"
+    },
+    {
+      "body_required": [],
+      "id": "provider.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/provider",
+      "success": 200,
+      "summary": "List providers"
+    },
+    {
+      "body_required": [],
+      "id": "pty.connect",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "ptyID"
+        },
+        {
+          "in": "query",
+          "name": "location[directory]"
+        },
+        {
+          "in": "query",
+          "name": "cursor"
+        },
+        {
+          "in": "query",
+          "name": "ticket"
+        }
+      ],
+      "path": "/api/pty/{ptyID}/connect",
+      "success": 200,
+      "summary": "Connect to PTY session"
+    },
+    {
+      "body_required": [],
+      "id": "pty.connect.token",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "ptyID"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/pty/{ptyID}/connect-token",
+      "success": 200,
+      "summary": "Create PTY WebSocket token"
+    },
+    {
+      "body_required": [],
+      "id": "pty.create",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/pty",
+      "success": 200,
+      "summary": "Create PTY session"
+    },
+    {
+      "body_required": [],
+      "id": "pty.get",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "ptyID"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/pty/{ptyID}",
+      "success": 200,
+      "summary": "Get PTY session"
+    },
+    {
+      "body_required": [],
+      "id": "pty.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/pty",
+      "success": 200,
+      "summary": "List PTY sessions"
+    },
+    {
+      "body_required": [],
+      "id": "pty.remove",
+      "json": false,
+      "method": "DELETE",
+      "params": [
+        {
+          "in": "path",
+          "name": "ptyID"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/pty/{ptyID}",
+      "success": 204,
+      "summary": "Remove PTY session"
+    },
+    {
+      "body_required": [],
+      "id": "pty.update",
+      "json": true,
+      "method": "PUT",
+      "params": [
+        {
+          "in": "path",
+          "name": "ptyID"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/pty/{ptyID}",
+      "success": 200,
+      "summary": "Update PTY session"
+    },
+    {
+      "body_required": [],
+      "id": "reference.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/reference",
+      "success": 200,
+      "summary": "List references"
+    },
+    {
+      "body_required": [],
+      "id": "rpc.call",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "rpcID"
+        },
+        {
+          "in": "path",
+          "name": "method"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/rpc/{rpcID}/{method}",
+      "success": 200,
+      "summary": "Call a plugin RPC"
+    },
+    {
+      "body_required": [],
+      "id": "server.connect",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "code"
+        }
+      ],
+      "path": "/auth/connect/{code}",
+      "success": 200,
+      "summary": "Redeem pairing code"
+    },
+    {
+      "body_required": [],
+      "id": "server.experimental.persistentPty.connectToken",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "ptyID"
+        }
+      ],
+      "path": "/api/experimental/persistent-pty/{ptyID}/connect-token",
+      "success": 200,
+      "summary": ""
+    },
+    {
+      "body_required": [
+        "args",
+        "title",
+        "env"
+      ],
+      "id": "server.experimental.persistentPty.create",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/experimental/session/{sessionID}/terminal",
+      "success": 200,
+      "summary": ""
+    },
+    {
+      "body_required": [],
+      "id": "server.experimental.persistentPty.get",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "ptyID"
+        }
+      ],
+      "path": "/api/experimental/persistent-pty/{ptyID}",
+      "success": 200,
+      "summary": ""
+    },
+    {
+      "body_required": [],
+      "id": "server.experimental.persistentPty.handoff",
+      "json": true,
+      "method": "POST",
+      "params": [],
+      "path": "/api/experimental/persistent-pty/handoff",
+      "success": 200,
+      "summary": ""
+    },
+    {
+      "body_required": [],
+      "id": "server.experimental.persistentPty.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/experimental/session/{sessionID}/terminal",
+      "success": 200,
+      "summary": ""
+    },
+    {
+      "body_required": [],
+      "id": "server.experimental.persistentPty.read",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        },
+        {
+          "in": "query",
+          "name": "lines"
+        }
+      ],
+      "path": "/api/experimental/session/{sessionID}/terminal/read",
+      "success": 200,
+      "summary": "Read the session's most recently controlled terminal"
+    },
+    {
+      "body_required": [],
+      "id": "server.experimental.persistentPty.remove",
+      "json": false,
+      "method": "DELETE",
+      "params": [
+        {
+          "in": "path",
+          "name": "ptyID"
+        }
+      ],
+      "path": "/api/experimental/persistent-pty/{ptyID}",
+      "success": 204,
+      "summary": ""
+    },
+    {
+      "body_required": [],
+      "id": "server.experimental.persistentPty.shutdown",
+      "json": false,
+      "method": "POST",
+      "params": [],
+      "path": "/api/experimental/persistent-pty/shutdown",
+      "success": 204,
+      "summary": ""
+    },
+    {
+      "body_required": [],
+      "id": "server.experimental.persistentPty.snapshot",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "ptyID"
+        }
+      ],
+      "path": "/api/experimental/persistent-pty/{ptyID}/snapshot",
+      "success": 200,
+      "summary": ""
+    },
+    {
+      "body_required": [
+        "size"
+      ],
+      "id": "server.experimental.persistentPty.update",
+      "json": true,
+      "method": "PUT",
+      "params": [
+        {
+          "in": "path",
+          "name": "ptyID"
+        }
+      ],
+      "path": "/api/experimental/persistent-pty/{ptyID}",
+      "success": 200,
+      "summary": ""
+    },
+    {
+      "body_required": [],
+      "id": "server.info",
+      "json": true,
+      "method": "GET",
+      "params": [],
+      "path": "/api/info",
+      "success": 200,
+      "summary": "Get server info"
+    },
+    {
+      "body_required": [],
+      "id": "server.pair",
+      "json": true,
+      "method": "POST",
+      "params": [],
+      "path": "/api/pair",
+      "success": 200,
+      "summary": "Create pairing code"
+    },
+    {
+      "body_required": [],
+      "id": "session.active",
+      "json": true,
+      "method": "GET",
+      "params": [],
+      "path": "/api/session/active",
+      "success": 200,
+      "summary": "List active sessions"
+    },
+    {
+      "body_required": [],
+      "id": "session.background",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/background",
+      "success": 204,
+      "summary": "Background blocking session tools"
+    },
+    {
+      "body_required": [
+        "name",
+        "text"
+      ],
+      "id": "session.command",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/command",
+      "success": 204,
+      "summary": "Run command"
+    },
+    {
+      "body_required": [],
+      "id": "session.compact",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/compact",
+      "success": 200,
+      "summary": "Compact session"
+    },
+    {
+      "body_required": [],
+      "id": "session.context",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/context",
+      "success": 200,
+      "summary": "Get session context"
+    },
+    {
+      "body_required": [],
+      "id": "session.create",
+      "json": true,
+      "method": "POST",
+      "params": [],
+      "path": "/api/session",
+      "success": 200,
+      "summary": "Create session"
+    },
+    {
+      "body_required": [],
+      "id": "session.diff",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        },
+        {
+          "in": "query",
+          "name": "from"
+        },
+        {
+          "in": "query",
+          "name": "to"
+        },
+        {
+          "in": "query",
+          "name": "context"
+        }
+      ],
+      "path": "/api/session/{sessionID}/diff",
+      "success": 200,
+      "summary": "Diff session turns"
+    },
+    {
+      "body_required": [
+        "variables"
+      ],
+      "id": "session.environment",
+      "json": false,
+      "method": "PUT",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/environment",
+      "success": 204,
+      "summary": "Set session environment"
+    },
+    {
+      "body_required": [],
+      "id": "session.fork",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/fork",
+      "success": 200,
+      "summary": "Fork session"
+    },
+    {
+      "body_required": [],
+      "id": "session.form.cancel",
+      "json": false,
+      "method": "DELETE",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        },
+        {
+          "in": "path",
+          "name": "formID"
+        },
+        {
+          "in": "query",
+          "name": "message"
+        }
+      ],
+      "path": "/api/session/{sessionID}/form/{formID}",
+      "success": 204,
+      "summary": "Cancel form"
+    },
+    {
+      "body_required": [
+        "title",
+        "fields"
+      ],
+      "id": "session.form.create",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/form",
+      "success": 200,
+      "summary": "Create session form"
+    },
+    {
+      "body_required": [],
+      "id": "session.form.get",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        },
+        {
+          "in": "path",
+          "name": "formID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/form/{formID}",
+      "success": 200,
+      "summary": "Get session form"
+    },
+    {
+      "body_required": [],
+      "id": "session.form.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/form",
+      "success": 200,
+      "summary": "List session forms"
+    },
+    {
+      "body_required": [
+        "answer"
+      ],
+      "id": "session.form.reply",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        },
+        {
+          "in": "path",
+          "name": "formID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/form/{formID}/reply",
+      "success": 204,
+      "summary": "Reply to form"
+    },
+    {
+      "body_required": [
+        "prompt"
+      ],
+      "id": "session.generate",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/generate",
+      "success": 200,
+      "summary": "Generate text from session context"
+    },
+    {
+      "body_required": [],
+      "id": "session.get",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}",
+      "success": 200,
+      "summary": "Get session"
+    },
+    {
+      "body_required": [],
+      "id": "session.inbox.cancel",
+      "json": false,
+      "method": "DELETE",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        },
+        {
+          "in": "path",
+          "name": "inboxID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/inbox/{inboxID}",
+      "success": 204,
+      "summary": "Cancel inbox input"
+    },
+    {
+      "body_required": [],
+      "id": "session.inbox.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/inbox",
+      "success": 200,
+      "summary": "List session inbox"
+    },
+    {
+      "body_required": [
+        "delivery"
+      ],
+      "id": "session.inbox.update",
+      "json": false,
+      "method": "PATCH",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        },
+        {
+          "in": "path",
+          "name": "inboxID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/inbox/{inboxID}",
+      "success": 204,
+      "summary": "Update inbox item"
+    },
+    {
+      "body_required": [],
+      "id": "session.interrupt",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        },
+        {
+          "in": "query",
+          "name": "resume"
+        }
+      ],
+      "path": "/api/session/{sessionID}/interrupt",
+      "success": 200,
+      "summary": "Interrupt session execution"
+    },
+    {
+      "body_required": [],
+      "id": "session.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "limit"
+        },
+        {
+          "in": "query",
+          "name": "order"
+        },
+        {
+          "in": "query",
+          "name": "search"
+        },
+        {
+          "in": "query",
+          "name": "parentID"
+        },
+        {
+          "in": "query",
+          "name": "directory"
+        },
+        {
+          "in": "query",
+          "name": "project"
+        },
+        {
+          "in": "query",
+          "name": "subpath"
+        },
+        {
+          "in": "query",
+          "name": "cursor"
+        }
+      ],
+      "path": "/api/session",
+      "success": 200,
+      "summary": "List sessions"
+    },
+    {
+      "body_required": [],
+      "id": "session.log",
+      "json": false,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        },
+        {
+          "in": "query",
+          "name": "after"
+        },
+        {
+          "in": "query",
+          "name": "follow"
+        }
+      ],
+      "path": "/api/experimental/session/{sessionID}/log",
+      "success": 200,
+      "summary": "Read the session log"
+    },
+    {
+      "body_required": [],
+      "id": "session.message.get",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        },
+        {
+          "in": "path",
+          "name": "messageID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/message/{messageID}",
+      "success": 200,
+      "summary": "Get session message"
+    },
+    {
+      "body_required": [],
+      "id": "session.message.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        },
+        {
+          "in": "query",
+          "name": "limit"
+        },
+        {
+          "in": "query",
+          "name": "order"
+        },
+        {
+          "in": "query",
+          "name": "cursor"
+        },
+        {
+          "in": "query",
+          "name": "type"
+        }
+      ],
+      "path": "/api/session/{sessionID}/message",
+      "success": 200,
+      "summary": "Get session messages"
+    },
+    {
+      "body_required": [
+        "directory"
+      ],
+      "id": "session.move",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/move",
+      "success": 204,
+      "summary": "Move session"
+    },
+    {
+      "body_required": [
+        "action",
+        "resources"
+      ],
+      "id": "session.permission.create",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/permission",
+      "success": 200,
+      "summary": "Create permission request"
+    },
+    {
+      "body_required": [],
+      "id": "session.permission.get",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        },
+        {
+          "in": "path",
+          "name": "requestID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/permission/{requestID}",
+      "success": 200,
+      "summary": "Get permission request"
+    },
+    {
+      "body_required": [],
+      "id": "session.permission.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/permission",
+      "success": 200,
+      "summary": "List session permission requests"
+    },
+    {
+      "body_required": [
+        "decision"
+      ],
+      "id": "session.permission.reply",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        },
+        {
+          "in": "path",
+          "name": "requestID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/permission/{requestID}/reply",
+      "success": 204,
+      "summary": "Reply to pending permission request"
+    },
+    {
+      "body_required": [
+        "text"
+      ],
+      "id": "session.prompt",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/prompt",
+      "success": 200,
+      "summary": "Send message"
+    },
+    {
+      "body_required": [],
+      "id": "session.remove",
+      "json": false,
+      "method": "DELETE",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}",
+      "success": 204,
+      "summary": "Delete session"
+    },
+    {
+      "body_required": [],
+      "id": "session.revert.clear",
+      "json": false,
+      "method": "DELETE",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/revert",
+      "success": 204,
+      "summary": "Clear staged revert"
+    },
+    {
+      "body_required": [],
+      "id": "session.revert.commit",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/revert/commit",
+      "success": 204,
+      "summary": "Commit staged revert"
+    },
+    {
+      "body_required": [
+        "messageID"
+      ],
+      "id": "session.revert.stage",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/revert/stage",
+      "success": 200,
+      "summary": "Stage session revert"
+    },
+    {
+      "body_required": [
+        "command"
+      ],
+      "id": "session.shell",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/shell",
+      "success": 204,
+      "summary": "Run shell command"
+    },
+    {
+      "body_required": [
+        "agent"
+      ],
+      "id": "session.switchAgent",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/agent",
+      "success": 204,
+      "summary": "Switch session agent"
+    },
+    {
+      "body_required": [
+        "model"
+      ],
+      "id": "session.switchModel",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/model",
+      "success": 204,
+      "summary": "Switch session model"
+    },
+    {
+      "body_required": [
+        "text"
+      ],
+      "id": "session.synthetic",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/synthetic",
+      "success": 200,
+      "summary": "Add synthetic message"
+    },
+    {
+      "body_required": [],
+      "id": "session.update",
+      "json": false,
+      "method": "PATCH",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}",
+      "success": 204,
+      "summary": "Update session"
+    },
+    {
+      "body_required": [
+        "idle"
+      ],
+      "id": "session.view",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "path",
+          "name": "sessionID"
+        }
+      ],
+      "path": "/api/session/{sessionID}/view",
+      "success": 204,
+      "summary": "View session"
+    },
+    {
+      "body_required": [
+        "command"
+      ],
+      "id": "shell.create",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/shell",
+      "success": 200,
+      "summary": "Run shell command"
+    },
+    {
+      "body_required": [],
+      "id": "shell.get",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "id"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/shell/{id}",
+      "success": 200,
+      "summary": "Get shell command"
+    },
+    {
+      "body_required": [],
+      "id": "shell.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/shell",
+      "success": 200,
+      "summary": "List running shell commands"
+    },
+    {
+      "body_required": [],
+      "id": "shell.output",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "path",
+          "name": "id"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        },
+        {
+          "in": "query",
+          "name": "cursor"
+        },
+        {
+          "in": "query",
+          "name": "limit"
+        }
+      ],
+      "path": "/api/shell/{id}/output",
+      "success": 200,
+      "summary": "Read shell output"
+    },
+    {
+      "body_required": [],
+      "id": "shell.remove",
+      "json": false,
+      "method": "DELETE",
+      "params": [
+        {
+          "in": "path",
+          "name": "id"
+        },
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/shell/{id}",
+      "success": 204,
+      "summary": "Remove shell command"
+    },
+    {
+      "body_required": [],
+      "id": "skill.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/skill",
+      "success": 200,
+      "summary": "List skills"
+    },
+    {
+      "body_required": [],
+      "id": "vcs.base",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/vcs/base",
+      "success": 200,
+      "summary": "VCS review base"
+    },
+    {
+      "body_required": [],
+      "id": "vcs.branch.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        },
+        {
+          "in": "query",
+          "name": "search"
+        },
+        {
+          "in": "query",
+          "name": "limit"
+        }
+      ],
+      "path": "/api/vcs/branch",
+      "success": 200,
+      "summary": "VCS branches"
+    },
+    {
+      "body_required": [],
+      "id": "vcs.diff",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        },
+        {
+          "in": "query",
+          "name": "mode"
+        },
+        {
+          "in": "query",
+          "name": "base"
+        },
+        {
+          "in": "query",
+          "name": "context"
+        }
+      ],
+      "path": "/api/vcs/diff",
+      "success": 200,
+      "summary": "VCS diff"
+    },
+    {
+      "body_required": [],
+      "id": "vcs.get",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/vcs",
+      "success": 200,
+      "summary": "VCS info"
+    },
+    {
+      "body_required": [],
+      "id": "vcs.init",
+      "json": false,
+      "method": "POST",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        },
+        {
+          "in": "query",
+          "name": "provider"
+        }
+      ],
+      "path": "/api/vcs/init",
+      "success": 204,
+      "summary": "Initialize VCS repository"
+    },
+    {
+      "body_required": [],
+      "id": "vcs.status",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/vcs/status",
+      "success": 200,
+      "summary": "VCS status"
+    },
+    {
+      "body_required": [],
+      "id": "websearch.providers",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/websearch/provider",
+      "success": 200,
+      "summary": "List web search providers"
+    },
+    {
+      "body_required": [
+        "query"
+      ],
+      "id": "websearch.query",
+      "json": true,
+      "method": "POST",
+      "params": [
+        {
+          "in": "query",
+          "name": "location"
+        }
+      ],
+      "path": "/api/websearch",
+      "success": 200,
+      "summary": "Search the web"
+    },
+    {
+      "body_required": [
+        "projectID"
+      ],
+      "id": "worktree.create",
+      "json": true,
+      "method": "POST",
+      "params": [],
+      "path": "/api/worktree",
+      "success": 200,
+      "summary": "Create worktree"
+    },
+    {
+      "body_required": [],
+      "id": "worktree.list",
+      "json": true,
+      "method": "GET",
+      "params": [
+        {
+          "in": "query",
+          "name": "projectID"
+        }
+      ],
+      "path": "/api/worktree",
+      "success": 200,
+      "summary": "List worktrees"
+    },
+    {
+      "body_required": [
+        "projectID"
+      ],
+      "id": "worktree.refresh",
+      "json": false,
+      "method": "POST",
+      "params": [],
+      "path": "/api/worktree/refresh",
+      "success": 204,
+      "summary": "Refresh worktrees"
+    },
+    {
+      "body_required": [
+        "projectID",
+        "directory",
+        "force"
+      ],
+      "id": "worktree.remove",
+      "json": false,
+      "method": "DELETE",
+      "params": [],
+      "path": "/api/worktree",
+      "success": 204,
+      "summary": "Remove worktree"
+    }
+  ],
+  "version": "2.0.32"
+}
