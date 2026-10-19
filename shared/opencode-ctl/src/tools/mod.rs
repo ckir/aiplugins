@@ -9,6 +9,9 @@ use crate::engine::Engine;
 use crate::error::{ErrorCode, ToolError, ToolResult};
 use crate::transport::Transport;
 
+pub mod changes;
+pub mod messages;
+pub mod permissions;
 pub mod service;
 pub mod session;
 
@@ -167,29 +170,8 @@ fn not_implemented(tool: &str) -> ToolResult {
 
 /// Tools whose bodies land in later tasks; each moves out of here when its task lands.
 impl<T: Transport, C: Clock> Engine<T, C> {
-    pub async fn session_prompt(&self, _a: SessionPromptArgs) -> ToolResult {
-        not_implemented("session_prompt")
-    }
     pub async fn session_wait(&self, _a: SessionWaitArgs) -> ToolResult {
         not_implemented("session_wait")
-    }
-    pub async fn session_messages(&self, _a: SessionMessagesArgs) -> ToolResult {
-        not_implemented("session_messages")
-    }
-    pub async fn session_changes(&self, _a: SessionChangesArgs) -> ToolResult {
-        not_implemented("session_changes")
-    }
-    pub async fn workspace_status(&self, _a: WorkspaceStatusArgs) -> ToolResult {
-        not_implemented("workspace_status")
-    }
-    pub async fn permission_reply(&self, _a: PermissionReplyArgs) -> ToolResult {
-        not_implemented("permission_reply")
-    }
-    pub async fn form_reply(&self, _a: FormReplyArgs) -> ToolResult {
-        not_implemented("form_reply")
-    }
-    pub async fn saved_permissions(&self, _a: SavedPermissionsArgs) -> ToolResult {
-        not_implemented("saved_permissions")
     }
     pub async fn opencode_operations(&self, _a: OpencodeOperationsArgs) -> ToolResult {
         not_implemented("opencode_operations")

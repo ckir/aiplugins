@@ -42,18 +42,8 @@ const TWENTY: [&str; 20] = [
 
 /// Ruling 1: the tools whose bodies land in later tasks, with a minimal valid argument object each.
 /// A later task deletes its line(s) here and nowhere else.
-const NOT_YET_IMPLEMENTED: [(&str, &str); 11] = [
-    ("session_prompt", r#"{"text":"hi"}"#),
+const NOT_YET_IMPLEMENTED: [(&str, &str); 4] = [
     ("session_wait", r#"{}"#),
-    ("session_messages", r#"{}"#),
-    ("session_changes", r#"{}"#),
-    ("workspace_status", r#"{}"#),
-    (
-        "permission_reply",
-        r#"{"request_id":"per_1","decision":"once"}"#,
-    ),
-    ("form_reply", r#"{"form_id":"frm_1","answer":{}}"#),
-    ("saved_permissions", r#"{}"#),
     ("opencode_operations", r#"{}"#),
     ("opencode_api", r#"{"operation":"session.get"}"#),
     ("pair_status", r#"{}"#),

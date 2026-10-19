@@ -1,7 +1,8 @@
 //! The engine: settings, host, environment and the transport behind every tool.
 
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde_json::Value;
@@ -74,7 +75,15 @@ pub struct Engine<T: Transport, C: Clock> {
     transport: T,
     clock: C,
     openapi: tokio::sync::Mutex<OpenapiCache>,
+    diff_cache: Mutex<lru::LruCache<DiffKey, (Value, i64)>>,
 }
+
+/// `(session, from, to, context)` of a cached `session.diff` read.
+pub type DiffKey = (String, String, String, Option<u32>);
+
+const DIFF_CACHE_CAPACITY: usize = 2;
+const DIFF_CACHE_TTL_MS: i64 = 10_000;
+const DIFF_CACHE_ENTRY_MAX: usize = 32 * 1024 * 1024;
 
 const EXEMPT_ARRAYS: &[&str] = &["pending_permissions", "pending_forms"];
 
@@ -97,7 +106,35 @@ impl<T: Transport, C: Clock> Engine<T, C> {
             transport,
             clock,
             openapi: tokio::sync::Mutex::new(OpenapiCache::default()),
+            diff_cache: Mutex::new(lru::LruCache::new(
+                NonZeroUsize::new(DIFF_CACHE_CAPACITY).expect("nonzero"),
+            )),
         }
+    }
+
+    /// A cached diff, promoted to most recently used; an entry older than the TTL is dropped (checked on every lookup).
+    pub fn diff_cache_get(&self, key: &DiffKey) -> Option<Value> {
+        let now = self.clock.now_ms();
+        let mut cache = self.diff_cache.lock().unwrap_or_else(|e| e.into_inner());
+        let fresh = cache
+            .peek(key)
+            .map(|(_, at)| now - *at < DIFF_CACHE_TTL_MS)?;
+        if fresh {
+            cache.get(key).map(|(v, _)| v.clone())
+        } else {
+            cache.pop(key);
+            None
+        }
+    }
+
+    /// Cache `value` unless its serialised size exceeds 32 MiB.
+    pub fn diff_cache_put(&self, key: DiffKey, value: &Value) {
+        if value.to_string().len() > DIFF_CACHE_ENTRY_MAX {
+            return;
+        }
+        let now = self.clock.now_ms();
+        let mut cache = self.diff_cache.lock().unwrap_or_else(|e| e.into_inner());
+        cache.put(key, (value.clone(), now));
     }
 
     pub fn clock(&self) -> &C {

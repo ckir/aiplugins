@@ -40,7 +40,7 @@ pub fn tool_descriptions() -> Vec<(&'static str, &'static str)> {
         ("session_prompt", "Send a prompt to a session; then call session_wait with after=<message_id> on EVERY slice. Spends worker model tokens: yes."),
         ("session_wait", "Wait one slice for a session to settle after a prompt; call again with the same after while the state is running. Spends worker model tokens: no."),
         ("session_messages", "Read a session's messages, compacted. Spends worker model tokens: no."),
-        ("session_changes", "Read the file changes a session made (diff over a message range). Spends worker model tokens: no."),
+        ("session_changes", "Read the file changes a session made (diff over a message range; paths and patches are engine-side filters, patches: false still pays the full fetch). Spends worker model tokens: no."),
         ("workspace_status", "Read the version-control status of a workspace directory. Spends worker model tokens: no."),
         ("session_interrupt", "Interrupt the running turn of a session; {interrupted: false} means it was idle. Spends worker model tokens: no."),
         ("session_delete", "Delete a session; needs session_id and confirm: true and never defaults to the paired session. Spends worker model tokens: no."),
@@ -156,7 +156,7 @@ impl<T: Transport, C: Clock> OpencodeCtlServer<T, C> {
     }
 
     #[rmcp::tool(
-        description = "Read the file changes a session made (diff over a message range). Spends worker model tokens: no."
+        description = "Read the file changes a session made (diff over a message range; paths and patches are engine-side filters, patches: false still pays the full fetch). Spends worker model tokens: no."
     )]
     async fn session_changes(
         &self,
