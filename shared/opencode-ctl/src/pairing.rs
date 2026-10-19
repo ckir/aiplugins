@@ -170,21 +170,39 @@ fn has_userinfo(url: &str) -> bool {
 /// source `Env`, overriding a user-file value. `Env` and `None` identities (a missing or
 /// unparsable record yields `None`) leave the settings untouched. A record URL carrying userinfo
 /// is ignored: the settings keep their current value and source, and `env.server` is cleared.
-pub fn apply_identity(env: &mut EnvSnapshot, settings: &mut Settings, id: &Identity) {
+#[must_use = "the warnings must reach the startup log"]
+pub fn apply_identity(
+    env: &mut EnvSnapshot,
+    settings: &mut Settings,
+    id: &Identity,
+) -> Vec<ToolError> {
+    let env_server = env.server.clone();
     env.session = id.session_id.clone();
     env.directory = id.directory.clone();
     env.server = id.server_url.clone();
     env.pair = id.pair_id.clone();
     if id.source != IdentitySource::File {
-        return;
+        return Vec::new();
     }
-    if id.server_url.as_deref().is_some_and(has_userinfo) {
-        tracing::warn!("the pair record's server_url carries userinfo and is ignored");
+    if let Some(url) = id.server_url.as_deref().filter(|u| has_userinfo(u)) {
+        let origin = if env_server.as_deref() == Some(url) {
+            "OPENCODE_CTL_SERVER"
+        } else {
+            "the pair record's server_url"
+        };
         env.server = None;
-        return;
+        return vec![ToolError::new(
+            ErrorCode::InvalidArgument,
+            format!(
+                "{origin} ({}) carries userinfo and is ignored",
+                crate::compact::redact_text(url)
+            ),
+        )
+        .hint("put credentials in OPENCODE_SERVER_PASSWORD, not in the URL")];
     }
     settings.server_url = id.server_url.clone();
     settings.sources.insert("server_url", Source::Env);
+    Vec::new()
 }
 
 // ------------------------------------------------------------------ files

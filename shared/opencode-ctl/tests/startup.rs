@@ -90,7 +90,7 @@ fn apply_identity_pair_only_fills_session() {
     let (id, warns) = resolve_identity(&env, h.path());
     assert!(warns.is_empty());
     let mut settings = Settings::default();
-    apply_identity(&mut env, &mut settings, &id);
+    let _ = apply_identity(&mut env, &mut settings, &id);
     assert_eq!(env.session.as_deref(), Some(SID));
     assert_eq!(env.directory, Some(PathBuf::from("/work/dir")));
     assert_eq!(env.server.as_deref(), Some("http://s"));
@@ -105,7 +105,7 @@ fn apply_identity_null_record_overrides_user_file() {
     let mut env = env_with(h.path(), &[("OPENCODE_CTL_PAIR", PID)]);
     let (id, _) = resolve_identity(&env, h.path());
     let mut settings = user_u();
-    apply_identity(&mut env, &mut settings, &id);
+    let _ = apply_identity(&mut env, &mut settings, &id);
     assert_eq!(settings.server_url, None);
     assert_eq!(settings.sources["server_url"], Source::Env);
 }
@@ -117,7 +117,7 @@ fn apply_identity_missing_record_keeps_pair_and_settings() {
     let (id, warns) = resolve_identity(&env, h.path());
     assert_eq!(warns.len(), 1);
     let mut settings = user_u();
-    apply_identity(&mut env, &mut settings, &id);
+    let _ = apply_identity(&mut env, &mut settings, &id);
     assert_eq!(env.pair.as_deref(), Some(PID));
     assert_eq!(settings.server_url.as_deref(), Some("http://u"));
     assert_eq!(settings.sources["server_url"], Source::UserFile);
@@ -130,7 +130,7 @@ fn apply_identity_env_identity_keeps_user_file_server_url() {
     let (id, _) = resolve_identity(&env, h.path());
     assert_eq!(id.source, IdentitySource::Env);
     let mut settings = user_u();
-    apply_identity(&mut env, &mut settings, &id);
+    let _ = apply_identity(&mut env, &mut settings, &id);
     assert_eq!(settings.server_url.as_deref(), Some("http://u"));
     assert_eq!(settings.sources["server_url"], Source::UserFile);
 }
@@ -150,7 +150,7 @@ fn apply_identity_invalid_session_runs_unpaired() {
     let (id, warns) = resolve_identity(&env, h.path());
     assert_eq!(warns.len(), 1);
     let mut settings = user_u();
-    apply_identity(&mut env, &mut settings, &id);
+    let _ = apply_identity(&mut env, &mut settings, &id);
     assert_eq!(env.session, None);
     assert_eq!(env.directory, None);
     assert_eq!(env.server, None);
@@ -302,7 +302,7 @@ fn startup_rebinds_when_pair_set() {
     probe.set_alive(4242, "77");
     let mut env = env_with(h.path(), &[("OPENCODE_CTL_PAIR", PID)]);
     let (id, _) = resolve_identity(&env, h.path());
-    apply_identity(&mut env, &mut Settings::default(), &id);
+    let _ = apply_identity(&mut env, &mut Settings::default(), &id);
     let report = run_startup(h.path(), &env, &probe, &[]);
     assert_eq!(report.rebind, Some(RebindOutcome::Rebound));
     let raw = fs::read_to_string(h.path().join(format!("pair.{PID}.claude-pid"))).unwrap();
@@ -367,4 +367,57 @@ fn pair_is_dead_keys_on_the_file_name_id() {
     fs::write(h.path().join(format!("pair.{PID}.claude-pid")), "55:boot:5").unwrap();
     fs::write(h.path().join("pair.ffffffffffff.claude-exited"), "1").unwrap();
     assert!(!pair_is_dead(h.path(), PID, T0, &probe));
+}
+
+fn userinfo_prep(h: &Path, via_env: bool) -> opencode_ctl::cli::ServePrep {
+    let cwd = temp_home();
+    if via_env {
+        // env.server is the identity's URL: the record supplies the session
+        write_record_new(h, &rec(None)).unwrap();
+        let get = env_map(&[
+            ("OPENCODE_CTL_PAIR", PID),
+            ("OPENCODE_CTL_SERVER", "http://user:s3cretpw@host:1"),
+        ]);
+        prepare_serve(Host::Claude, h, cwd.path().to_path_buf(), &get)
+    } else {
+        write_record_new(h, &rec(Some("http://user:s3cretpw@host:1"))).unwrap();
+        let get = env_map(&[("OPENCODE_CTL_PAIR", PID)]);
+        prepare_serve(Host::Claude, h, cwd.path().to_path_buf(), &get)
+    }
+}
+
+#[test]
+fn userinfo_warning_reaches_the_log_not_the_void() {
+    for (via_env, origin) in [(false, "pair record"), (true, "OPENCODE_CTL_SERVER")] {
+        let h = temp_home();
+        let prep = userinfo_prep(h.path(), via_env);
+        assert_eq!(
+            prep.identity_warnings.len(),
+            1,
+            "{:?}",
+            prep.identity_warnings
+        );
+        let probe = FakeProbe::new("boot");
+        let report = run_startup(h.path(), &prep.env, &probe, &prep.identity_warnings);
+        assert!(report.identity_stderr.is_empty());
+        drop(report);
+        let text = serve_log(h.path());
+        assert!(text.contains("carries userinfo and is ignored"), "{text}");
+        assert!(text.contains(origin), "{origin}: {text}");
+        assert!(!text.contains("s3cretpw"), "{text}");
+    }
+}
+
+#[test]
+fn userinfo_warning_reaches_stderr_when_log_unwritable() {
+    let h = temp_home();
+    fs::write(h.path().join("logs"), b"a regular file").unwrap();
+    let prep = userinfo_prep(h.path(), false);
+    let probe = FakeProbe::new("boot");
+    let report = run_startup(h.path(), &prep.env, &probe, &prep.identity_warnings);
+    assert!(report.log.is_none());
+    assert_eq!(report.identity_stderr.len(), 1);
+    let line = &report.identity_stderr[0];
+    assert!(line.contains("carries userinfo and is ignored"), "{line}");
+    assert!(!line.contains("s3cretpw"), "{line}");
 }

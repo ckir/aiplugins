@@ -394,7 +394,7 @@ fn pairing_ids_validated() {
     // applying it leaves the server unpaired
     let mut env = env;
     let mut settings = Settings::default();
-    apply_identity(&mut env, &mut settings, &id);
+    let _ = apply_identity(&mut env, &mut settings, &id);
     assert_eq!(env.session, None);
     assert_eq!(env.pair, None);
 }
@@ -417,7 +417,7 @@ fn pairing_file_fallback_from_pair_id() {
     assert_eq!(id.server_url, None);
     assert_eq!(id.source, IdentitySource::None);
     let mut settings = user.clone();
-    apply_identity(&mut env, &mut settings, &id);
+    let _ = apply_identity(&mut env, &mut settings, &id);
     assert_eq!(env.pair.as_deref(), Some(PID));
     assert_eq!(env.session, None);
     assert_eq!(settings.server_url.as_deref(), Some("http://user-file:9"));
@@ -439,7 +439,7 @@ fn pairing_file_fallback_from_pair_id() {
     let (id, warns) = resolve_identity(&env, h.path());
     assert!(warns.is_empty());
     let mut settings = user.clone();
-    apply_identity(&mut env, &mut settings, &id);
+    let _ = apply_identity(&mut env, &mut settings, &id);
     assert_eq!(env.session.as_deref(), Some(SID));
     assert_eq!(env.directory, Some(PathBuf::from("/work/dir")));
     assert_eq!(env.server.as_deref(), Some("http://remote:4096"));
@@ -451,7 +451,7 @@ fn pairing_file_fallback_from_pair_id() {
     let (id, _) = resolve_identity(&env_with(h.path(), &[("OPENCODE_CTL_PAIR", PID)]), h.path());
     assert_eq!(id.source, IdentitySource::File);
     let mut settings = user_u();
-    apply_identity(&mut env, &mut settings, &id);
+    let _ = apply_identity(&mut env, &mut settings, &id);
     assert_eq!(settings.server_url, None);
     assert_eq!(settings.sources["server_url"], Source::Env);
 }
@@ -476,7 +476,7 @@ fn apply_identity_missing_or_unparsable_record_keeps_settings() {
         let (id, _) = resolve_identity(&env, h.path());
         assert_eq!(id.source, IdentitySource::None);
         let mut settings = user_u();
-        apply_identity(&mut env, &mut settings, &id);
+        let _ = apply_identity(&mut env, &mut settings, &id);
         assert_eq!(settings.server_url.as_deref(), Some("http://u"));
         assert_eq!(settings.sources["server_url"], Source::UserFile);
         assert_eq!(env.pair.as_deref(), Some(PID));
@@ -494,7 +494,7 @@ fn apply_identity_env_identity_keeps_user_file_server_url() {
     let (id, _) = resolve_identity(&env, h.path());
     assert_eq!(id.source, IdentitySource::Env);
     let mut settings = user_u();
-    apply_identity(&mut env, &mut settings, &id);
+    let _ = apply_identity(&mut env, &mut settings, &id);
     assert_eq!(settings.server_url.as_deref(), Some("http://u"));
     assert_eq!(settings.sources["server_url"], Source::UserFile);
     // SESSION and PAIR both set: the record is not consulted, settings untouched
@@ -504,7 +504,7 @@ fn apply_identity_env_identity_keeps_user_file_server_url() {
     );
     let (id, _) = resolve_identity(&env, h.path());
     let mut settings = user_u();
-    apply_identity(&mut env, &mut settings, &id);
+    let _ = apply_identity(&mut env, &mut settings, &id);
     assert_eq!(settings.server_url.as_deref(), Some("http://u"));
 }
 
@@ -514,7 +514,7 @@ fn apply_identity_pair_only_fills_session_and_env_dir_wins() {
     put(h.path(), &rec(1, true, Some("claude")));
     let mut env = env_with(h.path(), &[("OPENCODE_CTL_PAIR", PID)]);
     let (id, _) = resolve_identity(&env, h.path());
-    apply_identity(&mut env, &mut Settings::default(), &id);
+    let _ = apply_identity(&mut env, &mut Settings::default(), &id);
     assert_eq!(env.session.as_deref(), Some(SID));
     assert_eq!(env.directory, Some(PathBuf::from("/work/dir")));
     // an explicit OPENCODE_CTL_DIR wins over the record's directory (resolve_identity: env first)
@@ -524,7 +524,7 @@ fn apply_identity_pair_only_fills_session_and_env_dir_wins() {
     );
     let (id, _) = resolve_identity(&env, h.path());
     assert_eq!(id.source, IdentitySource::File);
-    apply_identity(&mut env, &mut Settings::default(), &id);
+    let _ = apply_identity(&mut env, &mut Settings::default(), &id);
     assert_eq!(env.session.as_deref(), Some(SID));
     assert_eq!(env.directory, Some(PathBuf::from("/env/dir")));
 }
@@ -540,7 +540,7 @@ fn apply_identity_userinfo_url_is_ignored() {
     let mut env = env_with(h.path(), &[("OPENCODE_CTL_PAIR", PID)]);
     let (id, _) = resolve_identity(&env, h.path());
     let mut settings = user_u();
-    apply_identity(&mut env, &mut settings, &id);
+    let _ = apply_identity(&mut env, &mut settings, &id);
     assert_eq!(settings.server_url.as_deref(), Some("http://u"));
     assert_eq!(settings.sources["server_url"], Source::UserFile);
     assert_eq!(env.server, None);

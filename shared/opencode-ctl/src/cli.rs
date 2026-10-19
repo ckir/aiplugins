@@ -121,8 +121,8 @@ pub fn prepare_serve(
 ) -> ServePrep {
     let mut env = EnvSnapshot::from_lookup(get, cwd, ctl_home.to_path_buf());
     let (mut settings, notes) = settings::load_from_fs(host, ctl_home, &env.cwd, get);
-    let (identity, identity_warnings) = pairing::resolve_identity(&env, ctl_home);
-    pairing::apply_identity(&mut env, &mut settings, &identity);
+    let (identity, mut identity_warnings) = pairing::resolve_identity(&env, ctl_home);
+    identity_warnings.extend(pairing::apply_identity(&mut env, &mut settings, &identity));
     ServePrep {
         settings,
         notes,
