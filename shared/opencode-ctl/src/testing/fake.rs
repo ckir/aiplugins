@@ -8,7 +8,7 @@ use serde_json::Value;
 
 use crate::clock::{Clock, TestClock};
 use crate::error::ErrorCode;
-use crate::openapi::Operation;
+use crate::openapi::{validate_params, validate_session_id, Operation};
 use crate::transport::{Lifecycle, Params, Transport, TransportError, WaitOutcome};
 
 #[derive(Debug, Clone)]
@@ -158,6 +158,19 @@ impl Transport for FakeTransport {
         body: Option<&Value>,
         _deadline: Duration,
     ) -> Result<Value, TransportError> {
+        // The real transport's own parameter checks (`transport/cli.rs`): an undeclared param is rejected there, so here.
+        let from_tool = |e: crate::error::ToolError| TransportError {
+            code: e.code,
+            message: e.message,
+            hint: e.hint,
+            details: e.details,
+        };
+        validate_params(op, params).map_err(from_tool)?;
+        for (name, value) in params {
+            if name == "sessionID" {
+                validate_session_id(value).map_err(from_tool)?;
+            }
+        }
         let at_ms = self.now();
         let mut st = self.state.lock().unwrap();
         st.calls.push(RecordedCall {

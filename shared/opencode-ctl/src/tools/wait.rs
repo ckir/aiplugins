@@ -625,6 +625,13 @@ impl<T: Transport, C: Clock> Engine<T, C> {
             })
     }
 
+    /// Whether the session is a key of `session.active`'s `data` map. The route lists every active session and
+    /// declares no parameter, so no `sessionID` is sent.
+    async fn is_active(&self, session: &str) -> Result<bool, ToolError> {
+        let (data, _, _) = self.call_json("session.active", Vec::new(), None).await?;
+        Ok(data.get(session).is_some())
+    }
+
     async fn tokens_of(&self, session: &str) -> Option<Value> {
         let (s, _, _) = self.list_op("session.get", session).await.ok()?;
         Some(s.get("tokens").cloned().unwrap_or(Value::Null))
@@ -707,13 +714,13 @@ impl<T: Transport, C: Clock> Engine<T, C> {
                 )
                 .await?;
             let (inbox, _, _) = self.list_op("session.inbox.list", session).await?;
-            let (active, _, _) = self.list_op("session.active", session).await?;
+            let active = self.is_active(session).await?;
             self.read_incremental(session, anchor, &mut cs.pages, &mut cs.messages)
                 .await?;
             let snap = Snapshot {
                 messages: cs.messages.clone(),
                 inbox: rows(&inbox),
-                active: active.get(session).is_some(),
+                active,
                 // A pending permission or form has already ended the slice from the poll.
                 permissions: Vec::new(),
                 forms: Vec::new(),
@@ -853,8 +860,8 @@ impl<T: Transport, C: Clock> Engine<T, C> {
                     self.read_incremental(&session, &anchor, &mut cs.pages, &mut cs.messages)
                         .await?;
                     let (inbox, _, _) = self.list_op("session.inbox.list", &session).await?;
-                    let (active, _, _) = self.list_op("session.active", &session).await?;
-                    (rows(&inbox), active.get(&session).is_some(), lists)
+                    let active = self.is_active(&session).await?;
+                    (rows(&inbox), active, lists)
                 }
             }
         };

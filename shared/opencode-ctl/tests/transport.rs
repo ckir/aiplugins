@@ -1357,10 +1357,8 @@ async fn wait_argv_order_desc_only_cursorless() {
     let rig = Rig::new();
     let rig = rig.env("MOCK_OPENCODE_NOW_MS", &chrono_free_now().to_string());
     let e = engine(&rig);
-    // The result is ignored on purpose: the engine's `session.active` read passes an undeclared
-    // `sessionID`, which this transport rejects (reported as a defect in the Task 13 report); only
-    // the argv of the message reads, made before that call, is asserted here.
-    let _ = e.session_wait(wait_args()).await;
+    let waited = e.session_wait(wait_args()).await;
+    assert!(waited.is_ok(), "session_wait must succeed: {waited:?}");
     let reads: Vec<Vec<String>> = rig
         .argvs()
         .into_iter()
@@ -1448,7 +1446,8 @@ async fn workspace_argv_deep_object_location() {
 async fn anchor_argv_type_user_limit_1() {
     let rig = Rig::new().env("MOCK_OPENCODE_NOW_MS", &chrono_free_now().to_string());
     let e = engine(&rig);
-    let _ = e.session_wait(wait_args()).await;
+    let waited = e.session_wait(wait_args()).await;
+    assert!(waited.is_ok(), "session_wait must succeed: {waited:?}");
     let anchor = rig
         .argvs()
         .into_iter()
