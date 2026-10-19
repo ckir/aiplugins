@@ -22,7 +22,7 @@ use opencode_ctl::pairing::{
     record_path, resolve_identity, rewrite_record, write_record_new, write_sentinel,
     IdentitySource, Record,
 };
-use opencode_ctl::settings::Settings;
+use opencode_ctl::settings::{Settings, Source};
 use opencode_ctl::testing::fake::FakeTransport;
 use opencode_ctl::testing::{env_map, temp_home, FakeProbe};
 use opencode_ctl::transport::WaitOutcome;
@@ -445,13 +445,106 @@ fn pairing_file_fallback_from_pair_id() {
     assert_eq!(env.server.as_deref(), Some("http://remote:4096"));
     assert_eq!(settings.server_url.as_deref(), Some("http://remote:4096"));
 
-    // a record without server_url leaves the user-file value alone
+    // a File identity whose record has a null server_url IS the background service: it overrides the user file
     fs::remove_file(record_path(h.path(), PID)).unwrap();
     put(h.path(), &rec(1, true, Some("claude")));
     let (id, _) = resolve_identity(&env_with(h.path(), &[("OPENCODE_CTL_PAIR", PID)]), h.path());
-    let mut settings = user.clone();
+    assert_eq!(id.source, IdentitySource::File);
+    let mut settings = user_u();
     apply_identity(&mut env, &mut settings, &id);
-    assert_eq!(settings.server_url.as_deref(), Some("http://user-file:9"));
+    assert_eq!(settings.server_url, None);
+    assert_eq!(settings.sources["server_url"], Source::Env);
+}
+
+fn user_u() -> Settings {
+    let mut s = Settings {
+        server_url: Some("http://u".to_string()),
+        ..Settings::default()
+    };
+    s.sources.insert("server_url", Source::UserFile);
+    s
+}
+
+#[test]
+fn apply_identity_missing_or_unparsable_record_keeps_settings() {
+    let h = temp_home();
+    for unparsable in [false, true] {
+        if unparsable {
+            touch(&record_path(h.path(), PID), "{nope");
+        }
+        let mut env = env_with(h.path(), &[("OPENCODE_CTL_PAIR", PID)]);
+        let (id, _) = resolve_identity(&env, h.path());
+        assert_eq!(id.source, IdentitySource::None);
+        let mut settings = user_u();
+        apply_identity(&mut env, &mut settings, &id);
+        assert_eq!(settings.server_url.as_deref(), Some("http://u"));
+        assert_eq!(settings.sources["server_url"], Source::UserFile);
+        assert_eq!(env.pair.as_deref(), Some(PID));
+    }
+}
+
+#[test]
+fn apply_identity_env_identity_keeps_user_file_server_url() {
+    let h = temp_home();
+    let mut r = rec(1, true, Some("claude"));
+    r.server_url = Some("http://record".to_string());
+    put(h.path(), &r);
+    // SESSION set, no PAIR
+    let mut env = env_with(h.path(), &[("OPENCODE_CTL_SESSION", SID)]);
+    let (id, _) = resolve_identity(&env, h.path());
+    assert_eq!(id.source, IdentitySource::Env);
+    let mut settings = user_u();
+    apply_identity(&mut env, &mut settings, &id);
+    assert_eq!(settings.server_url.as_deref(), Some("http://u"));
+    assert_eq!(settings.sources["server_url"], Source::UserFile);
+    // SESSION and PAIR both set: the record is not consulted, settings untouched
+    let mut env = env_with(
+        h.path(),
+        &[("OPENCODE_CTL_SESSION", SID), ("OPENCODE_CTL_PAIR", PID)],
+    );
+    let (id, _) = resolve_identity(&env, h.path());
+    let mut settings = user_u();
+    apply_identity(&mut env, &mut settings, &id);
+    assert_eq!(settings.server_url.as_deref(), Some("http://u"));
+}
+
+#[test]
+fn apply_identity_pair_only_fills_session_and_env_dir_wins() {
+    let h = temp_home();
+    put(h.path(), &rec(1, true, Some("claude")));
+    let mut env = env_with(h.path(), &[("OPENCODE_CTL_PAIR", PID)]);
+    let (id, _) = resolve_identity(&env, h.path());
+    apply_identity(&mut env, &mut Settings::default(), &id);
+    assert_eq!(env.session.as_deref(), Some(SID));
+    assert_eq!(env.directory, Some(PathBuf::from("/work/dir")));
+    // an explicit OPENCODE_CTL_DIR wins over the record's directory (resolve_identity: env first)
+    let mut env = env_with(
+        h.path(),
+        &[("OPENCODE_CTL_PAIR", PID), ("OPENCODE_CTL_DIR", "/env/dir")],
+    );
+    let (id, _) = resolve_identity(&env, h.path());
+    assert_eq!(id.source, IdentitySource::File);
+    apply_identity(&mut env, &mut Settings::default(), &id);
+    assert_eq!(env.session.as_deref(), Some(SID));
+    assert_eq!(env.directory, Some(PathBuf::from("/env/dir")));
+}
+
+#[test]
+fn apply_identity_userinfo_url_is_ignored() {
+    // A record URL with userinfo is dropped: settings keep the user-file value and its source,
+    // and env.server is cleared so the credentials are not carried anywhere.
+    let h = temp_home();
+    let mut r = rec(1, true, Some("claude"));
+    r.server_url = Some("http://user:pw@host:1".to_string());
+    put(h.path(), &r);
+    let mut env = env_with(h.path(), &[("OPENCODE_CTL_PAIR", PID)]);
+    let (id, _) = resolve_identity(&env, h.path());
+    let mut settings = user_u();
+    apply_identity(&mut env, &mut settings, &id);
+    assert_eq!(settings.server_url.as_deref(), Some("http://u"));
+    assert_eq!(settings.sources["server_url"], Source::UserFile);
+    assert_eq!(env.server, None);
+    assert_eq!(env.session.as_deref(), Some(SID));
 }
 
 // ---------------------------------------------------------------- re-bind

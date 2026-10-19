@@ -164,23 +164,27 @@ fn has_userinfo(url: &str) -> bool {
     rest.split('/').next().is_some_and(|a| a.contains('@'))
 }
 
-/// Write the resolved identity into the environment snapshot (and a record's `server_url` into the
-/// settings). An identity without a readable record leaves the settings alone.
+/// Write the resolved identity into the environment snapshot and, for a `File` identity, the
+/// record's `server_url` into the settings: `settings.server_url = identity.server_url` (a null
+/// record means the background service, exactly as an empty `OPENCODE_CTL_SERVER` does) with the
+/// source `Env`, overriding a user-file value. `Env` and `None` identities (a missing or
+/// unparsable record yields `None`) leave the settings untouched. A record URL carrying userinfo
+/// is ignored: the settings keep their current value and source, and `env.server` is cleared.
 pub fn apply_identity(env: &mut EnvSnapshot, settings: &mut Settings, id: &Identity) {
     env.session = id.session_id.clone();
     env.directory = id.directory.clone();
     env.server = id.server_url.clone();
     env.pair = id.pair_id.clone();
-    if id.source == IdentitySource::File {
-        if let Some(url) = id.server_url.as_deref() {
-            if has_userinfo(url) {
-                tracing::warn!("the pair record's server_url carries userinfo and is ignored");
-            } else {
-                settings.server_url = Some(url.to_string());
-                settings.sources.insert("server_url", Source::Env);
-            }
-        }
+    if id.source != IdentitySource::File {
+        return;
     }
+    if id.server_url.as_deref().is_some_and(has_userinfo) {
+        tracing::warn!("the pair record's server_url carries userinfo and is ignored");
+        env.server = None;
+        return;
+    }
+    settings.server_url = id.server_url.clone();
+    settings.sources.insert("server_url", Source::Env);
 }
 
 // ------------------------------------------------------------------ files
