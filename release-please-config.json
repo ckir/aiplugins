@@ -58,6 +58,13 @@
         "qwen-extension.json"
       ]
     },
+    "qwen/plugins/opencode-ctl-mcp-qwen": {
+      "release-type": "rust",
+      "component": "opencode-ctl-mcp-qwen",
+      "extra-files": [
+        "qwen-extension.json"
+      ]
+    },
     "opencode/plugins/rtk-mcp-opencode": {
       "release-type": "simple",
       "component": "rtk-mcp-opencode",

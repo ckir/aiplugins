@@ -1,0 +1,42 @@
+[package]
+name = "opencode-ctl-mcp-qwen"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+# The MCP server (and pairing launcher) Qwen Code launches via qwen-extension.json mcpServers.
+# A thin front end: argv in, `opencode_ctl::cli::dispatch` out.
+[[bin]]
+name = "opencode-ctl-qwen-mcp"
+path = "src/main.rs"
+
+# Test fixture: a fake `opencode` the e2e tests point OPENCODE_CTL_BIN at. The `-qwen`
+# suffix keeps the target name unique in the workspace (the engine ships
+# `mock-opencode-ctl`; the cc and agy fronts ship their own suffixed mocks).
+[[bin]]
+name = "mock-opencode-ctl-qwen"
+path = "../../../shared/opencode-ctl/tests/bin/mock_opencode.rs"
+
+[dependencies]
+opencode-ctl = { path = "../../../shared/opencode-ctl" }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+rmcp = { workspace = true, features = ["client", "transport-child-process"] }
+
+[package.metadata.release]
+# cargo-release bumps the version in Cargo.toml, but the extension manifest carries
+# it too. Rewrite it in the same commit so the two can never drift.
+pre-release-replacements = [
+  { file = "qwen-extension.json", search = '"version": "[0-9]+\.[0-9]+\.[0-9]+"', replace = '"version": "{{version}}"', exactly = 1 },
+]
+
+# `mock-opencode-ctl-qwen` is a test fixture; list the shipped binaries explicitly so
+# cargo-dist keeps it out of the release artifacts (a map keyed by target).
+[package.metadata.dist.binaries]
+"*" = ["opencode-ctl-qwen-mcp"]

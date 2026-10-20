@@ -4,6 +4,7 @@
   "claude-code/plugins/opencode-ctl-mcp-cc": "0.1.0",
   "qwen/plugins/rtk-mcp-qwen": "0.8.0",
   "qwen/plugins/re-ghidra-mcp-qwen": "0.8.0",
+  "qwen/plugins/opencode-ctl-mcp-qwen": "0.1.0",
   "opencode/plugins/rtk-mcp-opencode": "0.10.0",
   "opencode/plugins/re-ghidra-mcp-opencode": "0.10.0",
   "opencode/plugins/todov2-opencode": "0.6.0",

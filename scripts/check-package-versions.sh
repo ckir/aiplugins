@@ -32,6 +32,7 @@ for spec in \
     "opencode-ctl-mcp-cc|claude-code/plugins/opencode-ctl-mcp-cc/Cargo.toml|claude-code/plugins/opencode-ctl-mcp-cc/.claude-plugin/plugin.json|.version" \
     "rtk-mcp-qwen|qwen/plugins/rtk-mcp-qwen/Cargo.toml|qwen/plugins/rtk-mcp-qwen/qwen-extension.json|.version" \
     "re-ghidra-mcp-qwen|qwen/plugins/re-ghidra-mcp-qwen/Cargo.toml|qwen/plugins/re-ghidra-mcp-qwen/qwen-extension.json|.version" \
+    "opencode-ctl-mcp-qwen|qwen/plugins/opencode-ctl-mcp-qwen/Cargo.toml|qwen/plugins/opencode-ctl-mcp-qwen/qwen-extension.json|.version" \
     "aiplugins-devtools-qwen|qwen/plugins/aiplugins-devtools-qwen/qwen-extension.json|qwen/plugins/aiplugins-devtools-qwen/qwen-extension.json|.version" \
     "rtk-mcp-opencode|opencode/plugins/rtk-mcp-opencode/package.json|opencode/plugins/rtk-mcp-opencode/package.json|.version" \
     "re-ghidra-mcp-opencode|opencode/plugins/re-ghidra-mcp-opencode/package.json|opencode/plugins/re-ghidra-mcp-opencode/package.json|.version" \
@@ -50,6 +51,7 @@ done
 for crate in claude-code/plugins/rtk-mcp-cc/Cargo.toml claude-code/plugins/re-ghidra-mcp-cc/Cargo.toml \
     claude-code/plugins/opencode-ctl-mcp-cc/Cargo.toml \
     qwen/plugins/rtk-mcp-qwen/Cargo.toml qwen/plugins/re-ghidra-mcp-qwen/Cargo.toml \
+    qwen/plugins/opencode-ctl-mcp-qwen/Cargo.toml \
     antigravity/plugins/rtk-mcp-agy/Cargo.toml antigravity/plugins/re-ghidra-mcp-agy/Cargo.toml; do
     if grep -q '^version\.workspace' "$crate"; then
         echo "  FAIL  $crate still inherits the workspace version" >&2

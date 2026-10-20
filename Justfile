@@ -363,6 +363,20 @@ build-opencode-ctl-mcp-cc:
     done
     @echo "Plugin binaries staged in claude-code/plugins/opencode-ctl-mcp-cc/bin/"
 
+# Build the opencode-ctl-mcp-qwen Qwen Code extension's binary into its bin/ directory.
+# Windows developers run this locally; CI produces the other platforms.
+build-opencode-ctl-mcp-qwen:
+    cargo build -p opencode-ctl-mcp-qwen --release --bin opencode-ctl-qwen-mcp
+    mkdir -p qwen/plugins/opencode-ctl-mcp-qwen/bin
+    for b in opencode-ctl-qwen-mcp; do \
+        if [ -f "target/release/$b.exe" ]; then \
+            cp "target/release/$b.exe" qwen/plugins/opencode-ctl-mcp-qwen/bin/; \
+        else \
+            cp "target/release/$b" qwen/plugins/opencode-ctl-mcp-qwen/bin/; \
+        fi; \
+    done
+    @echo "Plugin binaries staged in qwen/plugins/opencode-ctl-mcp-qwen/bin/"
+
 # Stage rtk-mcp-opencode's MCP binary into its bin/ directory.
 build-rtk-mcp-opencode:
     cargo build -p rtk-mcp-cc --release --bin rtk-cc-mcp

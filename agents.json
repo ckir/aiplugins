@@ -33,7 +33,8 @@
       "plugins": [
         "rtk-mcp-qwen",
         "re-ghidra-mcp-qwen",
-        "aiplugins-devtools-qwen"
+        "aiplugins-devtools-qwen",
+        "opencode-ctl-mcp-qwen"
       ],
       "marketplace": ".qwen-plugin/marketplace.json",
       "manifestPattern": "qwen/plugins/{plugin}/qwen-extension.json",
