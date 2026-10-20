@@ -594,6 +594,78 @@ async fn transport_kills_grandchild() {
     }
 }
 
+#[cfg(windows)]
+fn pid_alive(pid: u32) -> bool {
+    let out = std::process::Command::new("tasklist")
+        .args(["/FI", &format!("PID eq {pid}"), "/NH"])
+        .output()
+        .unwrap();
+    String::from_utf8_lossy(&out.stdout).contains(&pid.to_string())
+}
+
+#[cfg(windows)]
+fn grandchild_pid(rig: &Rig) -> u32 {
+    fs::read_to_string(rig.state.path().join("grandchild.pid"))
+        .expect("the mock wrote the grandchild pid")
+        .trim()
+        .parse()
+        .unwrap()
+}
+
+/// Control for the test below: a call that hits its deadline still kills the whole tree on Windows.
+#[cfg(windows)]
+#[tokio::test]
+async fn transport_kills_grandchild_on_deadline_windows() {
+    let rig = Rig::new().mode("session.get:slow");
+    let e = code_of(
+        rig.transport()
+            .call(
+                &op("session.get"),
+                &session_params(),
+                None,
+                Duration::from_secs(1),
+            )
+            .await,
+    );
+    assert_eq!(e.code, ErrorCode::Deadline);
+    let pid = grandchild_pid(&rig);
+    let until = Instant::now() + Duration::from_secs(3);
+    while pid_alive(pid) {
+        assert!(
+            Instant::now() < until,
+            "grandchild {pid} must die with the job"
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+}
+
+/// MEASURED on Windows 11 (Task 25): a managed-mode call that auto-starts the service lost it when the
+/// call's job closed, and every later call failed with "Unable to connect". A call that EXITS normally
+/// must leave what it started running; only a deadline or the stdout ceiling kills the tree.
+#[cfg(windows)]
+#[tokio::test]
+async fn transport_leaves_the_service_running_after_a_clean_exit_windows() {
+    let rig = Rig::new().mode("session.get:leave");
+    let v = rig
+        .transport()
+        .call(
+            &op("session.get"),
+            &session_params(),
+            None,
+            Duration::from_secs(10),
+        )
+        .await
+        .expect("the call succeeds");
+    assert_eq!(v, json!({}));
+    let pid = grandchild_pid(&rig);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    let alive = pid_alive(pid);
+    let _ = std::process::Command::new("taskkill")
+        .args(["/F", "/PID", &pid.to_string()])
+        .output();
+    assert!(alive, "the child the call left behind ({pid}) must survive");
+}
+
 #[tokio::test]
 async fn wait_idle_outcomes() {
     let rig = Rig::new();

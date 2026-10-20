@@ -411,6 +411,11 @@ impl Ctx<'_> {
             ),
             "unreachable" => Reply::new(1, "", UNREACHABLE_STDERR),
             "slow" => return Some(Outcome::Slow),
+            // Answers normally and leaves a child running, as a CLI call that auto-started the service does.
+            "leave" => {
+                spawn_grandchild(self.state);
+                Reply::new(0, "{}", "")
+            }
             "big" => return Some(Outcome::Big),
             "permission" | "form" => {
                 // Empty until MOCK_OPENCODE_AFTER_POLLS calls have been served.

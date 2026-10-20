@@ -475,7 +475,18 @@ impl CliTransport {
             let _ = child.start_kill();
             status = child.wait().await.ok();
         }
-        // Stragglers of the process group die with it; the leader is already reaped.
+        // Stragglers of the process group die with it; the leader is already reaped. On Windows a call
+        // that exited normally keeps what it started: a managed-mode call auto-starts the service, and
+        // unlike POSIX (`detached: true` puts it in its own session) the service is inside this job, so
+        // killing the job here killed the service the call had just started (MEASURED, Task 25). A
+        // deadline or the ceiling still kills the tree above.
+        #[cfg(windows)]
+        if how == How::Exited && job.release().is_ok() {
+            // disarmed: nothing is killed
+        } else {
+            let _ = job.kill_group();
+        }
+        #[cfg(not(windows))]
         let _ = job.kill_group();
         let stderr_bytes = match tokio::time::timeout(STDERR_DRAIN, stderr_task).await {
             Ok(Ok(b)) => b,

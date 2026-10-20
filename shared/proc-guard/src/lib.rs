@@ -84,6 +84,39 @@ mod windows_imp {
             res
         }
 
+        /// Disarm the guard WITHOUT killing: clear `KILL_ON_JOB_CLOSE`, then close the handle, so every process
+        /// already in the job (a service the child started, say) outlives the guard. If the flag cannot be
+        /// cleared the handle is kept (still armed) and the error returned, so the caller can `kill_group`
+        /// instead of silently leaking an armed job.
+        pub fn release(&mut self) -> io::Result<()> {
+            let Some(handle) = self.handle.take() else {
+                return Ok(());
+            };
+            let info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+            // SAFETY: `info` outlives the call; size matches the info class; `handle` is our live job handle.
+            let cleared = unsafe {
+                SetInformationJobObject(
+                    handle,
+                    JobObjectExtendedLimitInformation,
+                    &info as *const _ as *const core::ffi::c_void,
+                    std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+                )
+            };
+            match cleared {
+                Ok(()) => {
+                    // SAFETY: `handle` was created by us and is taken, so it is not closed elsewhere.
+                    unsafe {
+                        let _ = CloseHandle(handle);
+                    }
+                    Ok(())
+                }
+                Err(e) => {
+                    self.handle = Some(handle);
+                    Err(io::Error::other(format!("SetInformationJobObject: {e}")))
+                }
+            }
+        }
+
         /// Whether a job handle is still held (i.e. the guard has something to kill/close).
         pub fn is_armed(&self) -> bool {
             self.handle.is_some()
@@ -167,6 +200,12 @@ mod unix_imp {
             res
         }
 
+        /// Disarm the guard WITHOUT killing: the group outlives the guard.
+        pub fn release(&mut self) -> io::Result<()> {
+            self.pid.take();
+            Ok(())
+        }
+
         /// Whether a pid is recorded and the guard can still act.
         pub fn is_armed(&self) -> bool {
             self.pid.is_some()
@@ -200,6 +239,10 @@ mod fallback_imp {
         pub fn assign_pid(&mut self, _pid: u32) {}
         /// No-op: there is never anything to kill.
         pub fn kill_group(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+        /// No-op: there is never anything to release.
+        pub fn release(&mut self) -> io::Result<()> {
             Ok(())
         }
         /// A no-op guard is never armed.
@@ -247,6 +290,32 @@ mod tests {
             "child pid {pid} should be killed by job close"
         );
         let _ = child.kill();
+    }
+
+    // `release` disarms the guard WITHOUT killing: the tree must outlive both the release and the drop
+    // (a service a CLI call auto-started has to survive the call's guard). The control above proves the
+    // same shape dies without it, so this cannot pass for a guard that never kills.
+    #[test]
+    fn release_lets_the_tree_outlive_the_job() {
+        let mut child = Command::new("cmd.exe")
+            .args(["/c", "ping -n 60 127.0.0.1 >NUL"])
+            .spawn()
+            .expect("spawn cmd");
+        {
+            let mut job = JobObject::new().expect("create job");
+            job.assign(&child).expect("assign child");
+            job.release().expect("release the job");
+            assert!(!job.is_armed(), "release must disarm the guard");
+            // job drops here: nothing must be killed
+        }
+        std::thread::sleep(Duration::from_millis(500));
+        let status = child.try_wait().expect("try_wait");
+        assert!(status.is_none(), "a released job must not kill the child");
+        // The tree is no longer guarded: reap it by hand (`/T` takes the ping grandchild too).
+        let _ = Command::new("taskkill")
+            .args(["/F", "/T", "/PID", &child.id().to_string()])
+            .output();
+        let _ = child.wait();
     }
 }
 
