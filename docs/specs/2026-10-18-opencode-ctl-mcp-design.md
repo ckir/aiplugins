@@ -1026,6 +1026,14 @@ Claude Code: `claude plugin marketplace add ckir/aiplugins` once (as the sibling
 - Whether Qwen Code and Antigravity pass the controller's environment to MCP children (measured only for Claude
   Code; a stub MCP server that prints its env settles it). A host that does not inherit has no pairing in v1, and
   `pair --controller` for it prints that instead of a half-pair.
+  MEASURED (Windows 11, 2026-10-20, stub launched from each host with `OPENCODE_CTL_SESSION=ses_...` and
+  `OPENCODE_CTL_SERVER` set to the EMPTY string, host started from Python because Windows `set` cannot express an
+  empty value): Qwen Code 0.22.0 and Antigravity 1.3.4 both pass the session variable AND the empty string through
+  (`''`), so no refusal branch is needed for either. Parent identity: under Antigravity the stub's parent pid is the
+  `agy.exe` process that was launched (`rebind_on_spawn` holds); under Qwen Code the stub's parent is the innermost of
+  THREE nested `node.exe` processes below the `qwen.cmd` shell, so a controller pid taken from the launched process
+  or the outermost `node.exe` is not the stub's parent (owner decision: should `rebind_on_spawn` match any ancestor
+  on Windows/Qwen?). Measured from a headless `-p` launch, not from an interactive tab.
 - `files` attachments on `session.prompt` (`PromptInput.FileAttachment` shape) for `session_prompt.files`.
 - Windows: `wt` argument quoting and whether `opencode.exe` is on PATH after the official installer.
   MEASURED (Windows 11, 2026-10-20): `wt -d` and the script path both quoted and containing spaces work
@@ -1055,6 +1063,14 @@ Claude Code: `claude plugin marketplace add ckir/aiplugins` once (as the sibling
 - The MCP tool-call ceiling of each host must exceed `wait_max_s` + 30 s: Claude Code (`MCP_TOOL_TIMEOUT`), Qwen
   Code (the extension's `timeout`), Antigravity (`mcp_config.json`); set it in each manifest where configurable,
   measure where not, and lower that host's `wait_max_s` clamp if it cannot be raised.
+  MEASURED (stub tool that answers after exactly 130 s, i.e. `wait_max_s` 100 + 30): Claude Code 2.1.304 with
+  `MCP_TOOL_TIMEOUT` unset returned the result (138 s); Qwen Code 0.22.0 with no `timeout` field returned it
+  (159 s), and the project-scope `timeout` field is accepted and honoured (60000 ms gave `MCP error -32001: Request
+  timed out`, 200000 ms returned the result), so the Qwen manifest can raise it; Antigravity 1.3.4: UNMEASURED,
+  headless `agy -p` auto-denies an MCP call without a `permissions.allow` rule (`mcp(<target>)`), and the only ways
+  past that were `--dangerously-skip-permissions` or editing the user-level `settings.json`, neither of which was
+  done. A stub whose read loop blocks during the call is dropped by Qwen as "failed to start" even for a 20 s call
+  (it never answers `ping`): the server must keep answering requests during a slow call (rmcp does).
 - The `konsole --new-tab -e` form (unmeasured; mate, gnome and xfce are the measured three).
   UNMEASURED in Task 25 (konsole not installed on the Windows host).
 - CLOSED from the source (round 8): the id `session_prompt` returns is the inbox id and the eventual message id for
@@ -1064,6 +1080,21 @@ Claude Code: `claude plugin marketplace add ckir/aiplugins` once (as the sibling
   but the item reaches the model on the next turn (citations in the sections).
 - Whether Qwen Code passes skill arguments (`$ARGUMENTS`) to a skill at all (Skills).
 - Runtime behaviour of a managed TUI tab's reconnect after `service_restart` (source: `default.ts:103-110`).
+  MEASURED (Windows 11, `wt` tab running `opencode <dir> -s <session>` against the managed service; isolated home,
+  port 45999): `service_restart {confirm: true}` took 9.1 s and changed the service pid 26256 -> 24836 (without
+  `confirm` it answers `CONFIRM_REQUIRED` and restarts nothing); the tab showed no error or banner; a
+  `session_prompt` sent afterwards appeared in the tab live (the user message, the reply, the `10.1K (5%)` token
+  counter and the tab title `OC | RECONNECTED`), so the TUI reattached on its own.
+- Step 1 spike through the tools (Claude Code 2.1.304, `--plugin-dir`, free model `opencode/deepseek-v4.1-flash-free`,
+  4-task PLAN.md, isolated home). With the service STOPPED, as the plan wrote it, the sequence does not complete on
+  Windows: run 1 `service_start` answered `running: false` and `session_create` failed with `EPERM ... rename
+  service.json.<id>.tmp`; run 2 created the session and the worker wrote all four files, then the service died
+  (`session_wait`: socket closed, then unable to connect), the job-object kill measured above. With the service
+  started outside the job object first, two runs completed: 64 s and 109 s wall (range; includes the controller
+  model's own turns; background load uncontrolled), one `session_wait` slice each (13 s and 40 s, `idle`), no
+  re-prompt needed. `session_changes` returned `files: []` both times although the worker created the files: the
+  directory was not a git repository. The serve log records no CLI spawns, so the spawn count is not recoverable
+  from it (5 tool calls per run).
 
 ## Decision: how the human invokes the one command (owner, 2026-10-18)
 
