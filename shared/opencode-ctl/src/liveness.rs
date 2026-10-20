@@ -442,7 +442,13 @@ pub fn side_liveness(
             }
         }
         Side::Controller => {
-            if record.controller.is_none() {
+            // An attach record carries no controller. Once `resume` (or a re-binding MCP server) has put
+            // controller files beside it, the side is real; a genuine attach record has none of them.
+            if record.controller.is_none()
+                && !["claude-pid", "claude-exited", "resume-lock"]
+                    .iter()
+                    .any(|f| pair_file(home, id, f).exists())
+            {
                 return Liveness::None;
             }
             if pair_file(home, id, "claude-exited").exists() {

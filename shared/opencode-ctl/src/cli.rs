@@ -508,7 +508,17 @@ async fn launcher_run(
     let raw = |k: &str| std::env::var(k).ok();
     let ctl_home = settings::ctl_home(&|k| env_nonempty(k));
     let cwd = std::env::current_dir().unwrap_or_default();
-    let prep = prepare_serve(host, &ctl_home, cwd, &raw);
+    let mut prep = prepare_serve(host, &ctl_home, cwd, &raw);
+    if name == "resume" {
+        // `resume` checks the session and posts the exit notice on the server its pair was made for.
+        if let Ok((id, _, _)) = launcher::parse_resume_args(rest) {
+            let mut scratch = prep.env.clone();
+            for w in pairing::apply_record_server(&ctl_home, &id, &mut scratch, &mut prep.settings)
+            {
+                tracing::warn!("{}", w.message);
+            }
+        }
+    }
     let opencode_bin = crate::transport::cli::resolve_binary(
         prep.settings.opencode_bin.as_deref(),
         env_nonempty("PATH").as_deref(),

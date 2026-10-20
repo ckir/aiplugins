@@ -205,6 +205,29 @@ pub fn apply_identity(
     Vec::new()
 }
 
+/// `resume` talks to the server its pair was made for: the record's `server_url` is applied to the settings
+/// exactly as `apply_identity` applies a File identity (a null value is the background service, a URL with
+/// userinfo is ignored). A missing or unreadable record changes nothing; `resume` itself reports that.
+#[must_use = "the warnings must reach the startup log"]
+pub fn apply_record_server(
+    home: &Path,
+    pair_id: &str,
+    env: &mut EnvSnapshot,
+    settings: &mut Settings,
+) -> Vec<ToolError> {
+    let Ok(Some(record)) = read_record(home, pair_id) else {
+        return Vec::new();
+    };
+    let id = Identity {
+        session_id: Some(record.session_id),
+        directory: Some(record.directory),
+        server_url: record.server_url,
+        pair_id: Some(pair_id.to_string()),
+        source: IdentitySource::File,
+    };
+    apply_identity(env, settings, &id)
+}
+
 // ------------------------------------------------------------------ files
 
 pub fn record_path(home: &Path, id: &str) -> PathBuf {

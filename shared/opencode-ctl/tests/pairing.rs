@@ -18,8 +18,8 @@ use opencode_ctl::liveness::{
     Liveness, RebindOutcome, Sentinel, Side,
 };
 use opencode_ctl::pairing::{
-    apply_identity, claim_file, delete_pair_files, list_records, read_record, read_sentinel,
-    record_path, resolve_identity, rewrite_record, write_record_new, write_sentinel,
+    apply_identity, apply_record_server, claim_file, delete_pair_files, list_records, read_record,
+    read_sentinel, record_path, resolve_identity, rewrite_record, write_record_new, write_sentinel,
     IdentitySource, Record,
 };
 use opencode_ctl::settings::{Settings, Source};
@@ -935,4 +935,74 @@ fn records_list_read_delete() {
     assert!(record_path(h.path(), other).exists());
     assert!(h.path().join("settings.local.md").exists());
     let _ = File::open(h.path());
+}
+
+#[test]
+fn resume_applies_the_record_server_url_like_a_file_identity() {
+    let h = temp_home();
+    let mut r = rec(1, true, Some("claude"));
+    r.server_url = Some("http://remote:4096".to_string());
+    put(h.path(), &r);
+    // the launcher's own settings name a different server: the record wins
+    let mut env = env_with(h.path(), &[]);
+    let mut settings = user_u();
+    let warns = apply_record_server(h.path(), PID, &mut env, &mut settings);
+    assert!(warns.is_empty());
+    assert_eq!(settings.server_url.as_deref(), Some("http://remote:4096"));
+    assert_eq!(settings.sources["server_url"], Source::Env);
+
+    // Ruling 13: a record with a null server_url IS the background service
+    fs::remove_file(record_path(h.path(), PID)).unwrap();
+    put(h.path(), &rec(1, true, Some("claude")));
+    let mut settings = user_u();
+    let _ = apply_record_server(h.path(), PID, &mut env_with(h.path(), &[]), &mut settings);
+    assert_eq!(settings.server_url, None);
+
+    // a record URL with userinfo is ignored with a warning; no record leaves the settings alone
+    fs::remove_file(record_path(h.path(), PID)).unwrap();
+    let mut r = rec(1, true, Some("claude"));
+    r.server_url = Some("http://u:pw@remote:4096".to_string());
+    put(h.path(), &r);
+    let mut settings = user_u();
+    let warns = apply_record_server(h.path(), PID, &mut env_with(h.path(), &[]), &mut settings);
+    assert_eq!(warns.len(), 1);
+    assert!(!warns[0].message.contains("pw"), "{}", warns[0].message);
+    assert_eq!(settings.server_url.as_deref(), Some("http://u"));
+    fs::remove_file(record_path(h.path(), PID)).unwrap();
+    let mut settings = user_u();
+    let warns = apply_record_server(h.path(), PID, &mut env_with(h.path(), &[]), &mut settings);
+    assert!(warns.is_empty());
+    assert_eq!(settings.server_url.as_deref(), Some("http://u"));
+}
+
+#[test]
+fn attach_record_controller_side_follows_a_resumed_controller() {
+    let h = temp_home();
+    let probe = FakeProbe::new("boot");
+    let r = rec(1, false, None);
+    // a genuine attach record with no controller files reads none
+    assert_eq!(
+        side_liveness(Side::Controller, &r, h.path(), &probe, NOW),
+        Liveness::None
+    );
+    // resume wrote a claude-pid: alive while the process lives, dead after, dead once claude-exited exists
+    probe.set_alive(7100, "st");
+    write_sentinel(
+        &pf(h.path(), "claude-pid"),
+        &Sentinel {
+            pid: 7100,
+            boot_id: "boot".into(),
+            starttime: "st".into(),
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        side_liveness(Side::Controller, &r, h.path(), &probe, NOW),
+        Liveness::Alive
+    );
+    touch(&pf(h.path(), "claude-exited"), "");
+    assert_eq!(
+        side_liveness(Side::Controller, &r, h.path(), &probe, NOW),
+        Liveness::Dead
+    );
 }

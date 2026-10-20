@@ -511,3 +511,16 @@ async fn gc_unknown_fresh_keeps_the_pair_and_the_grace_untouched() {
     assert!(r.pairs_deleted.is_empty(), "{r:?}");
     assert!(rig.pf(A, "json").exists());
 }
+
+#[tokio::test]
+async fn gc_keeps_an_attach_pair_whose_resumed_controller_lives() {
+    // attach record (controller None, no tab) resumed: a live claude-pid is a live controller side
+    let rig = Rig::new();
+    rig.none_pair(A, SID);
+    rig.sentinel(A, "claude-pid", 9500, true);
+    rig.dead_seen(A, NOW - 3 * DAY);
+    let r = rig.run(NOW).await;
+    assert!(r.pairs_deleted.is_empty(), "{r:?}");
+    assert_eq!(r.dead_seen_cleared, vec![A.to_string()]);
+    assert!(rig.pf(A, "json").exists());
+}
