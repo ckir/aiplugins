@@ -726,8 +726,9 @@ fn transport_unc_prefix() {
 }
 
 #[test]
-fn wt_directory_arg_drops_drive_root_backslash() {
-    assert_eq!(wt_directory_arg(r"C:\"), "C:");
+fn wt_directory_arg_keeps_drive_root_backslash() {
+    // MEASURED (Task 25): `wt -d C:` opens the drive's current directory, `wt -d C:\` opens the root.
+    assert_eq!(wt_directory_arg(r"C:\"), r"C:\");
     assert_eq!(wt_directory_arg(r"C:\x"), r"C:\x");
     assert_eq!(wt_directory_arg(r"\\server\share"), r"\\server\share");
     assert_eq!(wt_directory_arg(r"C:\x\"), r"C:\x\");

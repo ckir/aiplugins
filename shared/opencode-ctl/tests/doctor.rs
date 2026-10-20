@@ -11,9 +11,11 @@ use std::sync::Arc;
 use common::*;
 use opencode_ctl::cli::{parse_doctor_args, DoctorArgs};
 use opencode_ctl::clock::TestClock;
+#[cfg(unix)]
+use opencode_ctl::doctor::launcher_link_status;
 use opencode_ctl::doctor::{
-    doctor_json, launcher_link_status, parse_source_file, windows_link_status,
-    windows_source_old_check, DoctorCtx, LinkStatus, SourceFile, Status,
+    doctor_json, parse_source_file, windows_link_status, windows_source_old_check, DoctorCtx,
+    LinkStatus, SourceFile, Status,
 };
 use opencode_ctl::engine::{Engine, EnvSnapshot};
 use opencode_ctl::error::ErrorCode;

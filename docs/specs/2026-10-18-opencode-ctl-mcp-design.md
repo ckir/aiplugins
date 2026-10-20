@@ -1028,11 +1028,35 @@ Claude Code: `claude plugin marketplace add ckir/aiplugins` once (as the sibling
   `pair --controller` for it prints that instead of a half-pair.
 - `files` attachments on `session.prompt` (`PromptInput.FileAttachment` shape) for `session_prompt.files`.
 - Windows: `wt` argument quoting and whether `opencode.exe` is on PATH after the official installer.
+  MEASURED (Windows 11, 2026-10-20): `wt -d` and the script path both quoted and containing spaces work
+  (`cwd` and argument arrive intact); a quoted `"C:\"` swallows the rest of the command line, a bare `C:\` opens the
+  drive root, and `C:` opens the drive's current directory (`C:\WINDOWS\system32`), so `wt_directory_arg` no longer
+  strips the backslash. `opencode.exe` on PATH after the official installer: UNMEASURED (not installed here; this
+  host's OpenCode 2.0.32 is an npm install with `opencode.cmd`/`opencode.ps1` shims and no `.exe`, which
+  `resolve_binary` reports as `OPENCODE_NOT_FOUND`: `doctor-json` `binary` and `server_info` both fail; product gap
+  for the owner).
 - Whether `wt` honours `-d` with a path containing spaces when the script path is also quoted.
+  MEASURED: yes (see above).
+- `powershell.exe` 5.1 and the `.ps1` wrapper. MEASURED (5.1.26100, ANSI code page 1252): a BOM-less `.ps1` in a home
+  containing non-ASCII characters is decoded as ANSI and fails with a mojibake path; the same file with a UTF-8 BOM
+  runs; `tui-pid` is written without a BOM or newline (`<pid>:<boot>:<start>`), `tui-exited` likewise.
+- `cmd.exe /c` controller arguments. MEASURED: `(`, `)` and `!` as arguments pass through unchanged (delayed expansion
+  is off by default), so the refusal list needs no addition. FOUND: when the `.cmd` path contains a space AND any
+  argument is quoted, `cmd /c` strips the outer quotes and fails (`'C:\Users\x' is not recognized`), and a quoted
+  `a&echo INJECTED` argument executed the injected command; `cmd_wrap` needs the whole command line wrapped in one
+  extra pair of quotes (owner decision, not changed here).
+- Windows job object versus a service auto-started by a managed-mode call. MEASURED (isolated home, port 45999):
+  `session_list` with the service stopped succeeded and auto-started it, and `service_status` right afterwards
+  reported `running: false`; controls: a plain `opencode api session.list` outside the job object left the service
+  running, and `service_status` reported `running: true` for a live one. The job object kills the auto-started
+  service, so the transport must start it explicitly through `lifecycle(Start)` before a managed-mode `call` when
+  `service.status` reports stopped (plan amendment for the owner, not made here).
+- macOS `date -j` conversion and `wrapper_starttime_matches_probe`: UNMEASURED (no macOS host).
 - The MCP tool-call ceiling of each host must exceed `wait_max_s` + 30 s: Claude Code (`MCP_TOOL_TIMEOUT`), Qwen
   Code (the extension's `timeout`), Antigravity (`mcp_config.json`); set it in each manifest where configurable,
   measure where not, and lower that host's `wait_max_s` clamp if it cannot be raised.
 - The `konsole --new-tab -e` form (unmeasured; mate, gnome and xfce are the measured three).
+  UNMEASURED in Task 25 (konsole not installed on the Windows host).
 - CLOSED from the source (round 8): the id `session_prompt` returns is the inbox id and the eventual message id for
   both deliveries; a turn that fails before the request stores no assistant message, one that fails after it does,
   both end in `idle(failed)` with `error`; a fork copies the parent's ruleset; the message list defaults to `desc`;

@@ -18,13 +18,11 @@ pub fn strip_verbatim(p: &str) -> String {
     p.to_string()
 }
 
-/// The `-d` argument of `wt`: a drive root's trailing backslash is dropped, because a `\` before the
-/// closing `"` of the quoted argument would escape it. Every other path is unchanged.
+/// The `-d` argument of `wt`, passed through unchanged. MEASURED on Windows 11 with wt: a bare `C:\`
+/// opens the drive root, while the `C:` this once produced opens the drive's current directory
+/// (`C:\WINDOWS\system32` there). The trailing-backslash worry applies only to a hand-quoted `"C:\"`,
+/// and `Command` quotes only arguments that contain whitespace, which a drive root never does.
 pub fn wt_directory_arg(dir: &str) -> String {
-    let b = dir.as_bytes();
-    if b.len() == 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && b[2] == b'\\' {
-        return dir[..2].to_string();
-    }
     dir.to_string()
 }
 

@@ -277,6 +277,7 @@ fn mock_body_required_validated() {
     assert_eq!(out(&ok), "");
 }
 
+#[cfg(unix)]
 fn big_len(o: &Output) -> usize {
     o.stdout.len()
 }
