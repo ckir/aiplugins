@@ -33,8 +33,8 @@ pub use posix::{
     BOOT_ID_EXPR_POSIX, STARTTIME_EXPR_POSIX,
 };
 pub use windows::{
-    cmd_wrap, controller_command, quote_ps, resolve_executable, select_windows_shell,
-    strip_verbatim, wrapper_script_ps1, wt_directory_arg, WindowsShell,
+    cmd_line, cmd_wrap, controller_command, controller_process, quote_ps, resolve_executable,
+    select_windows_shell, strip_verbatim, wrapper_script_ps1, wt_directory_arg, WindowsShell,
 };
 
 /// What `pair`, `resume`, `attach` and `install-launcher` print on the OpenCode host.
@@ -633,9 +633,8 @@ async fn step5<T: Transport, C: Clock>(
     let Some(argv) = argv else {
         return Err(controller_unavailable(ctx, pair_id, controller, None));
     };
-    let mut cmd = Command::new(&argv[0]);
-    cmd.args(&argv[1..])
-        .envs(controller_env(session_id, directory, server_url, pair_id));
+    let mut cmd = controller_process(&argv);
+    cmd.envs(controller_env(session_id, directory, server_url, pair_id));
     tracing::info!("pair {pair_id}: starting controller {controller}");
     let probe = ctx.probe;
     let mut bind = |pid: u32| {

@@ -3,6 +3,7 @@
 //! `cmd.exe /c` wrap and the `.ps1` wrapper.
 
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use super::WrapperInput;
 
@@ -69,6 +70,43 @@ pub fn cmd_wrap(exe: &Path, args: &[String]) -> Vec<String> {
     ];
     v.extend(args.iter().cloned());
     v
+}
+
+/// The single command line `cmd.exe /c` receives for a `.cmd` controller. `cmd /c` strips the first and the
+/// last quote of a line that holds more than two, so a quoted executable followed by any quoted argument
+/// breaks (MEASURED, Task 25: `'C:\Users\x' is not recognized`, and a quoted `a&echo INJECTED` ran), hence the
+/// ONE outer pair. The executable is always quoted, an argument only when it is empty or has whitespace, and a
+/// backslash run at the end of a quoted argument is doubled so it cannot escape the closing quote. The
+/// launcher already refuses `" % & | < > ^` and newlines in controller arguments.
+pub fn cmd_line(exe: &Path, args: &[String]) -> String {
+    let quote = |a: &str| -> String {
+        if a.is_empty() || a.contains([' ', '\t']) {
+            let trailing = a.len() - a.trim_end_matches('\\').len();
+            format!("\"{a}{}\"", "\\".repeat(trailing))
+        } else {
+            a.to_string()
+        }
+    };
+    let mut parts = vec![format!("\"{}\"", exe.to_string_lossy())];
+    parts.extend(args.iter().map(|a| quote(a)));
+    format!("\"{}\"", parts.join(" "))
+}
+
+/// The process for an argv from `controller_command`. A `cmd.exe /c <script> <args>` argv on Windows gets the
+/// raw command line of `cmd_line` (the standard argument quoting breaks `cmd /c`); anything else is the plain
+/// program and arguments.
+pub fn controller_process(argv: &[String]) -> Command {
+    #[cfg(windows)]
+    if argv.len() >= 3 && argv[0] == "cmd.exe" && argv[1] == "/c" {
+        use std::os::windows::process::CommandExt;
+        let mut c = Command::new("cmd.exe");
+        c.raw_arg("/c")
+            .raw_arg(cmd_line(Path::new(&argv[2]), &argv[3..]));
+        return c;
+    }
+    let mut c = Command::new(&argv[0]);
+    c.args(&argv[1..]);
+    c
 }
 
 /// The argv that starts the controller. Off Windows the bare name and the arguments (the OS finds

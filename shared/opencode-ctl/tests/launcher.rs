@@ -17,11 +17,12 @@ use opencode_ctl::engine::Engine;
 use opencode_ctl::error::{ErrorCode, ToolError};
 use opencode_ctl::host::Host;
 use opencode_ctl::launcher::{
-    attach, cmd_wrap, controller_command, controller_env, install_launcher_as, pair,
-    resolve_executable, resume, resume_with, select_terminal, select_windows_shell, strip_verbatim,
-    tab_command, validate_launch_values, wrapper_path, wrapper_script_posix, wrapper_script_ps1,
-    write_wrapper, wt_directory_arg, LauncherCtx, PairArgs, Terminal, WindowsShell, WrapperInput,
-    WrapperKind, BOOT_ID_EXPR_POSIX, STARTTIME_EXPR_POSIX,
+    attach, cmd_line, cmd_wrap, controller_command, controller_env, controller_process,
+    install_launcher_as, pair, resolve_executable, resume, resume_with, select_terminal,
+    select_windows_shell, strip_verbatim, tab_command, validate_launch_values, wrapper_path,
+    wrapper_script_posix, wrapper_script_ps1, write_wrapper, wt_directory_arg, LauncherCtx,
+    PairArgs, Terminal, WindowsShell, WrapperInput, WrapperKind, BOOT_ID_EXPR_POSIX,
+    STARTTIME_EXPR_POSIX,
 };
 use opencode_ctl::liveness::ProcessProbe;
 use opencode_ctl::settings::{PermissionPolicy, Settings};
@@ -773,6 +774,43 @@ fn launcher_resolves_cmd_controller_windows() {
     assert_eq!(
         controller_command("claude", &s(&["-p"]), false, None, None).unwrap(),
         s(&["claude", "-p"])
+    );
+}
+
+#[test]
+fn cmd_line_is_one_outer_quote_pair_around_a_quoted_exe() {
+    // `cmd /c` strips the first and last quote of a line that holds more than two, so the whole line is
+    // wrapped once; the executable is always quoted, an argument only when it has whitespace or is empty,
+    // and a trailing backslash inside quotes is doubled so it cannot escape the closing quote.
+    let args = s(&["--resume", "x y", "(z)", "!w", r"C:\d e\", ""]);
+    assert_eq!(
+        cmd_line(Path::new(r"C:\a b\x.cmd"), &args),
+        "\"\"C:\\a b\\x.cmd\" --resume \"x y\" (z) !w \"C:\\d e\\\\\" \"\"\""
+    );
+    assert_eq!(cmd_line(Path::new(r"C:\x.cmd"), &[]), "\"\"C:\\x.cmd\"\"");
+}
+
+/// MEASURED on Windows 11 (Task 25): with a space in the `.cmd` path and one quoted argument the plain
+/// argv form failed (`'C:\Users\x' is not recognized`) and a quoted `a&echo INJECTED` ran the injected
+/// command. The rebuilt command line must deliver every argument intact and run nothing extra.
+#[cfg(windows)]
+#[test]
+fn controller_process_runs_a_cmd_in_a_spaced_dir_with_spaced_args() {
+    let root = temp_home();
+    let d = root.path().join("dir with space");
+    fs::create_dir_all(&d).unwrap();
+    let cmd = d.join("ctl.cmd");
+    fs::write(
+        &cmd,
+        "@echo off\r\n> \"%~dp0args.txt\" echo [%~1]\r\n>> \"%~dp0args.txt\" echo [%~2]\r\n>> \"%~dp0args.txt\" echo [%~3]\r\n",
+    )
+    .unwrap();
+    let argv = cmd_wrap(&cmd, &s(&["hello world", "(z)", "x!y"]));
+    let status = controller_process(&argv).status().unwrap();
+    assert!(status.success(), "{status}");
+    assert_eq!(
+        fs::read_to_string(d.join("args.txt")).unwrap(),
+        "[hello world]\r\n[(z)]\r\n[x!y]\r\n"
     );
 }
 
