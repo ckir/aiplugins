@@ -10,6 +10,7 @@
   "opencode/plugins/todov2-opencode": "0.6.0",
   "antigravity/plugins/rtk-mcp-agy": "0.8.0",
   "antigravity/plugins/re-ghidra-mcp-agy": "0.10.0",
+  "antigravity/plugins/opencode-ctl-mcp-agy": "0.1.0",
   "claude-code/plugins/aiplugins-devtools-cc": "0.1.0",
   "claude-code/plugins/repo-user-guide-cc": "0.2.0",
   "qwen/plugins/aiplugins-devtools-qwen": "0.1.0",

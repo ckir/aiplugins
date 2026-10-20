@@ -90,6 +90,27 @@
         "pdf",
         "skills"
       ]
+    },
+    {
+      "name": "opencode-ctl-mcp-agy",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/opencode-ctl-mcp-agy-v0.1.0/opencode-ctl-mcp-agy-agy-plugin.zip"
+      },
+      "description": "An Antigravity front for opencode-ctl-mcp: delegate bounded work to an OpenCode worker session over MCP",
+      "author": {
+        "name": "AI Plugins Marketplace Contributors"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/antigravity/plugins/opencode-ctl-mcp-agy",
+      "license": "PolyForm-Noncommercial-1.0.0",
+      "category": "development",
+      "keywords": [
+        "opencode",
+        "mcp",
+        "subagent",
+        "delegate",
+        "rust"
+      ]
     }
   ]
 }

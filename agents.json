@@ -83,7 +83,8 @@
         "rtk-mcp-agy",
         "re-ghidra-mcp-agy",
         "aiplugins-devtools-agy",
-        "repo-user-guide-agy"
+        "repo-user-guide-agy",
+        "opencode-ctl-mcp-agy"
       ],
       "marketplace": ".agy-plugin/marketplace.json",
       "manifestPattern": "antigravity/plugins/{plugin}/plugin.json",

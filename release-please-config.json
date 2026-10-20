@@ -114,6 +114,13 @@
         "plugin.json"
       ]
     },
+    "antigravity/plugins/opencode-ctl-mcp-agy": {
+      "release-type": "rust",
+      "component": "opencode-ctl-mcp-agy",
+      "extra-files": [
+        "plugin.json"
+      ]
+    },
     "antigravity/plugins/aiplugins-devtools-agy": {
       "release-type": "simple",
       "component": "aiplugins-devtools-agy",

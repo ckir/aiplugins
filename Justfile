@@ -82,6 +82,16 @@ opencode-wiring:
 agy-wiring:
     bash scripts/check-agy-wiring.sh
 
+# Run Antigravity's own strict validator over the opencode-ctl-mcp-agy plugin (skipped when `agy` is absent).
+agy-validate:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if command -v agy >/dev/null 2>&1; then
+        agy plugin validate --strict antigravity/plugins/opencode-ctl-mcp-agy
+    else
+        echo "agy-validate: skipped (agy not on PATH)"
+    fi
+
 # Assemble every OpenCode plugin zip locally and check its contents (PR-time
 # smoke; tag-time bundling and published-zip verification stay in
 # opencode-bundles.yml, skills-only zips in check-skills-bundles.sh).
@@ -292,7 +302,7 @@ skills-release-wiring:
 
 # Run all pre-flight checks (what CI and lefthook run; see ci.yml — `links`
 # is hook-only and `gen-* --check` + opencode suites run in CI but not here)
-check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace agy-marketplace dispatch smoke footprint opencode-wiring agy-wiring footprint-budgets devtools-skills skills-bundles skills-release-wiring
+check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace agy-marketplace dispatch smoke footprint opencode-wiring agy-wiring agy-validate footprint-budgets devtools-skills skills-bundles skills-release-wiring
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
@@ -411,6 +421,19 @@ build-rtk-mcp-agy:
         fi; \
     done
     @echo "Plugin binaries staged in antigravity/plugins/rtk-mcp-agy/bin/"
+
+# Build the opencode-ctl-mcp-agy plugin's binary into its bin/ directory.
+build-opencode-ctl-mcp-agy:
+    cargo build -p opencode-ctl-mcp-agy --release --bin opencode-ctl-agy-mcp
+    mkdir -p antigravity/plugins/opencode-ctl-mcp-agy/bin
+    for b in opencode-ctl-agy-mcp; do \
+        if [ -f "target/release/$b.exe" ]; then \
+            cp "target/release/$b.exe" antigravity/plugins/opencode-ctl-mcp-agy/bin/; \
+        else \
+            cp "target/release/$b" antigravity/plugins/opencode-ctl-mcp-agy/bin/; \
+        fi; \
+    done
+    @echo "Plugin binaries staged in antigravity/plugins/opencode-ctl-mcp-agy/bin/"
 
 # Build the re-ghidra-mcp-agy plugin's binaries into its bin/ directory.
 build-re-ghidra-mcp-agy:
