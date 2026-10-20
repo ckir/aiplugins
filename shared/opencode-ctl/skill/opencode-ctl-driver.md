@@ -2,9 +2,9 @@
 SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 Copyright the opencode-ctl authors. License: https://polyformproject.org/licenses/noncommercial/1.0.0
 The canonical source-of-truth for the driver skill lives at `shared/opencode-ctl/skill/opencode-ctl-driver.md`.
-This file is a TEMPLATE: a later task renders it per host by substituting the host placeholders, and each
-agent plugin's binary then embeds the rendered copy at compile time; regenerate that plugin's copy from the
-shipped binary with `emit-skill opencode-ctl-driver --host <cc|qwen|agy|opencode>` so it can never drift.
+This file is a TEMPLATE: a later task renders it per host by substituting the host placeholders; the
+engine embeds this template and renders it per host at run time, and the committed copies under each plugin's
+`skills/` are generated from that output; regenerate that plugin's copy from the shipped binary with `emit-skill opencode-ctl-driver --host <cc|qwen|agy|opencode>` so it can never drift.
 Edit ONLY that canonical file - if the copy you are viewing is under a plugin/CLI `skills/` dir, it is
 generated; do NOT edit it, your changes will be overwritten on the next emit.
 -->
