@@ -56,6 +56,10 @@ pub async fn dispatch(
             boot_smoke().await;
             0
         }
+        Some("--version" | "-V" | "--help" | "-h") => {
+            usage(product, version);
+            0
+        }
         _ => {
             usage(product, version);
             2
@@ -287,6 +291,21 @@ mod tests {
         assert_eq!(code, 2);
         let code = dispatch("p", "0", vec![], crate::config::RawConfig::default()).await;
         assert_eq!(code, 2);
+    }
+
+    /// Asking for the version or help is not bad usage: exit 0, same output.
+    #[tokio::test]
+    async fn version_and_help_flags_exit_0() {
+        for flag in ["--version", "-V", "--help", "-h"] {
+            let code = dispatch(
+                "p",
+                "0",
+                vec![flag.into()],
+                crate::config::RawConfig::default(),
+            )
+            .await;
+            assert_eq!(code, 0, "{flag}");
+        }
     }
 
     #[test]
