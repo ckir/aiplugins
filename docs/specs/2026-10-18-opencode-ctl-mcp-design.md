@@ -1041,8 +1041,10 @@ Claude Code: `claude plugin marketplace add ckir/aiplugins` once (as the sibling
   drive root, and `C:` opens the drive's current directory (`C:\WINDOWS\system32`), so `wt_directory_arg` no longer
   strips the backslash. `opencode.exe` on PATH after the official installer: UNMEASURED (not installed here; this
   host's OpenCode 2.0.32 is an npm install with `opencode.cmd`/`opencode.ps1` shims and no `.exe`, which
-  `resolve_binary` reports as `OPENCODE_NOT_FOUND`: `doctor-json` `binary` and `server_info` both fail; product gap
-  for the owner).
+  `resolve_binary` reported as `OPENCODE_NOT_FOUND`: `doctor-json` `binary` and `server_info` both failed). FIXED
+  (owner, 2026-10-20): on Windows `resolve_binary` follows an `opencode.cmd` shim on PATH to the executable beside it
+  (`node_modules\@opencode\cli\bin\opencode.exe`, the file the shim runs) and never starts `cmd.exe`, which would
+  expand `%VAR%` in prompt text; other npm layouts still read as not found.
 - Whether `wt` honours `-d` with a path containing spaces when the script path is also quoted.
   MEASURED: yes (see above).
 - `powershell.exe` 5.1 and the `.ps1` wrapper. MEASURED (5.1.26100, ANSI code page 1252): a BOM-less `.ps1` in a home
@@ -1051,14 +1053,18 @@ Claude Code: `claude plugin marketplace add ckir/aiplugins` once (as the sibling
 - `cmd.exe /c` controller arguments. MEASURED: `(`, `)` and `!` as arguments pass through unchanged (delayed expansion
   is off by default), so the refusal list needs no addition. FOUND: when the `.cmd` path contains a space AND any
   argument is quoted, `cmd /c` strips the outer quotes and fails (`'C:\Users\x' is not recognized`), and a quoted
-  `a&echo INJECTED` argument executed the injected command; `cmd_wrap` needs the whole command line wrapped in one
-  extra pair of quotes (owner decision, not changed here).
+  `a&echo INJECTED` argument executed the injected command. FIXED (owner, 2026-10-20): the spawn site builds one raw
+  command line (`cmd_line`: one outer quote pair, quoted executable, trailing backslashes doubled); `cmd_wrap`'s argv
+  form is unchanged for the dry-run output.
 - Windows job object versus a service auto-started by a managed-mode call. MEASURED (isolated home, port 45999):
   `session_list` with the service stopped succeeded and auto-started it, and `service_status` right afterwards
   reported `running: false`; controls: a plain `opencode api session.list` outside the job object left the service
   running, and `service_status` reported `running: true` for a live one. The job object kills the auto-started
-  service, so the transport must start it explicitly through `lifecycle(Start)` before a managed-mode `call` when
-  `service.status` reports stopped (plan amendment for the owner, not made here).
+  service. The plan's proposed remedy (start it through `lifecycle(Start)` first) would not have worked: that verb
+  runs through the same guarded `run`, and the spike's `service_start` answered `running: false`. FIXED (owner,
+  2026-10-20) at the guard instead: `proc-guard` gains `release()`, and on Windows `run` releases the job on a normal
+  exit instead of killing it, so a service the call started outlives the call; a deadline or the stdout ceiling
+  still kills the tree. POSIX is unchanged (`detached: true` already lets the service escape its group).
 - macOS `date -j` conversion and `wrapper_starttime_matches_probe`: UNMEASURED (no macOS host).
 - The MCP tool-call ceiling of each host must exceed `wait_max_s` + 30 s: Claude Code (`MCP_TOOL_TIMEOUT`), Qwen
   Code (the extension's `timeout`), Antigravity (`mcp_config.json`); set it in each manifest where configurable,
@@ -1066,10 +1072,10 @@ Claude Code: `claude plugin marketplace add ckir/aiplugins` once (as the sibling
   MEASURED (stub tool that answers after exactly 130 s, i.e. `wait_max_s` 100 + 30): Claude Code 2.1.304 with
   `MCP_TOOL_TIMEOUT` unset returned the result (138 s); Qwen Code 0.22.0 with no `timeout` field returned it
   (159 s), and the project-scope `timeout` field is accepted and honoured (60000 ms gave `MCP error -32001: Request
-  timed out`, 200000 ms returned the result), so the Qwen manifest can raise it; Antigravity 1.3.4: UNMEASURED,
-  headless `agy -p` auto-denies an MCP call without a `permissions.allow` rule (`mcp(<target>)`), and the only ways
-  past that were `--dangerously-skip-permissions` or editing the user-level `settings.json`, neither of which was
-  done. A stub whose read loop blocks during the call is dropped by Qwen as "failed to start" even for a 20 s call
+  timed out`, 200000 ms returned the result), so the Qwen manifest can raise it; Antigravity 1.3.4 returned
+  it too with its default (157 s), once the owner allowed a temporary `mcp(slow/*)` rule in the user-level
+  `settings.json` (headless `agy -p` auto-denies an MCP call without one; the file was restored byte-identical), so
+  no host needs a manifest change or a lower `wait_max_s` clamp. A stub whose read loop blocks during the call is dropped by Qwen as "failed to start" even for a 20 s call
   (it never answers `ping`): the server must keep answering requests during a slow call (rmcp does).
 - The `konsole --new-tab -e` form (unmeasured; mate, gnome and xfce are the measured three).
   UNMEASURED in Task 25 (konsole not installed on the Windows host).
@@ -1094,7 +1100,10 @@ Claude Code: `claude plugin marketplace add ckir/aiplugins` once (as the sibling
   model's own turns; background load uncontrolled), one `session_wait` slice each (13 s and 40 s, `idle`), no
   re-prompt needed. `session_changes` returned `files: []` both times although the worker created the files: the
   directory was not a git repository. The serve log records no CLI spawns, so the spawn count is not recoverable
-  from it (5 tool calls per run).
+  from it (5 tool calls per run). After the three fixes above, the plan's own scenario (service stopped, no
+  `OPENCODE_CTL_BIN`, `opencode` found through the npm shim) completes: `service_start` answers `running: true`,
+  two runs took 90 s and 82 s wall (range; background load uncontrolled), one `session_wait` slice each (11 s and
+  13 s, `idle`), no re-prompt, and the service was still running afterwards.
 
 ## Decision: how the human invokes the one command (owner, 2026-10-18)
 

@@ -852,7 +852,8 @@ fn pair_commands_per_terminal() {
             "0",
             "nt",
             "-d",
-            "C:",
+            // MEASURED (Task 25): `C:` opens the drive's current directory, `C:\` opens the drive root.
+            r"C:\",
             "powershell.exe",
             "-NoProfile",
             "-ExecutionPolicy",
