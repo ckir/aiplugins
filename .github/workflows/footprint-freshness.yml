@@ -43,12 +43,12 @@ jobs:
           just build-opencode-ctl-mcp-agy
           just build-opencode-ctl-mcp-opencode
           just footprint-regen
-          if git diff --quiet -- docs/footprints/ README.md claude-code/plugins/*/README.md opencode/plugins/*/README.md; then
+          if git diff --quiet -- docs/footprints/ README.md claude-code/plugins/*/README.md opencode/plugins/*/README.md antigravity/plugins/*/README.md; then
             echo "Fresh. Nothing to do."
             exit 0
           fi
           git checkout -B chore/footprint-freshness
-          git add docs/footprints/ README.md claude-code/plugins/*/README.md opencode/plugins/*/README.md
+          git add docs/footprints/ README.md claude-code/plugins/*/README.md opencode/plugins/*/README.md antigravity/plugins/*/README.md
           git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" \
             commit -m "chore(footprint): regenerate stale documents (scheduled)"
           git push --force-with-lease origin chore/footprint-freshness

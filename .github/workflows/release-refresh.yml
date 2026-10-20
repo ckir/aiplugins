@@ -96,7 +96,8 @@ jobs:
             docs/footprints/ \
             README.md \
             claude-code/plugins/*/README.md \
-            opencode/plugins/*/README.md
+            opencode/plugins/*/README.md \
+            antigravity/plugins/*/README.md
           if git diff --cached --quiet; then
             echo "Derived files already fresh; nothing to commit."
           else
