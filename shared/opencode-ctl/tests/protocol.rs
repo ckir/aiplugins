@@ -501,9 +501,35 @@ async fn no_session_without_pairing() {
     assert!(r.fake.calls().is_empty());
 }
 
+/// Paired, with an Env-identity server carrying userinfo (only the render path can redact it).
+async fn redaction_rig(setup: impl FnOnce(&FakeTransport)) -> Rig {
+    let home = temp_home();
+    let fake = FakeTransport::new();
+    setup(&fake);
+    let mut env = env_paired(&home, SID, None);
+    env.server = Some("https://srvuser:srvpw@srv.example:4096".to_string());
+    let settings = Settings {
+        server_url: Some("https://srv.example:4096".to_string()),
+        ..Settings::default()
+    };
+    let e = engine(
+        fake.clone(),
+        TestClock::new(1_000),
+        Host::Claude,
+        settings,
+        env,
+    );
+    let client = client_for(e).await;
+    Rig {
+        fake,
+        client,
+        _home: home,
+    }
+}
+
 #[tokio::test]
 async fn redaction_applied_to_every_result() {
-    let r = plain(|f| {
+    let r = redaction_rig(|f| {
         let mut s = sess(SID);
         s["title"] = json!("see https://user:pw@host.example/x");
         f.on("session.list", vec![Ok(json!({"data": [s], "cursor": {}}))]);
@@ -531,6 +557,11 @@ async fn redaction_applied_to_every_result() {
         .await
         .to_string();
     assert!(!st.contains("u:p@") && st.contains("127.0.0.1"), "{st}");
+    // `paired.server_url` is the raw OPENCODE_CTL_SERVER: nothing but `render` redacts it
+    assert!(
+        !st.contains("srvuser") && !st.contains("srvpw") && st.contains("srv.example"),
+        "{st}"
+    );
     let err = call(&r.client, "session_get", json!({"session_id": SID}))
         .await
         .to_string();
