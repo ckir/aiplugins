@@ -16,13 +16,14 @@ use opencode_ctl::clock::TestClock;
 use opencode_ctl::engine::Engine;
 use opencode_ctl::error::{ErrorCode, ToolError};
 use opencode_ctl::host::Host;
+#[cfg(windows)]
+use opencode_ctl::launcher::controller_process;
 use opencode_ctl::launcher::{
-    attach, cmd_line, cmd_wrap, controller_command, controller_env, controller_process,
-    install_launcher_as, pair, resolve_executable, resume, resume_with, select_terminal,
-    select_windows_shell, strip_verbatim, tab_command, validate_launch_values, wrapper_path,
-    wrapper_script_posix, wrapper_script_ps1, write_wrapper, wt_directory_arg, LauncherCtx,
-    PairArgs, Terminal, WindowsShell, WrapperInput, WrapperKind, BOOT_ID_EXPR_POSIX,
-    STARTTIME_EXPR_POSIX,
+    attach, cmd_line, cmd_wrap, controller_command, controller_env, install_launcher_as, pair,
+    resolve_executable, resume, resume_with, select_terminal, select_windows_shell, strip_verbatim,
+    tab_command, validate_launch_values, wrapper_path, wrapper_script_posix, wrapper_script_ps1,
+    write_wrapper, wt_directory_arg, LauncherCtx, PairArgs, Terminal, WindowsShell, WrapperInput,
+    WrapperKind, BOOT_ID_EXPR_POSIX, STARTTIME_EXPR_POSIX,
 };
 use opencode_ctl::liveness::ProcessProbe;
 use opencode_ctl::settings::{PermissionPolicy, Settings};
