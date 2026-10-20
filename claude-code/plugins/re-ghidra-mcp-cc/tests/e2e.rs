@@ -214,7 +214,7 @@ fn mcp_binary_keeps_usage_off_stdout() {
         .output()
         .expect("run the server binary");
 
-    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(out.status.code(), Some(2));
     assert!(
         out.stdout.is_empty(),
         "stdout belongs to the protocol, got: {}",
