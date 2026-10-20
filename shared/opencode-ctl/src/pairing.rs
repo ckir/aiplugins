@@ -357,7 +357,11 @@ pub fn read_record(home: &Path, id: &str) -> Result<Option<Record>, ToolError> {
     }
     let path = record_path(home, id);
     match std::fs::read_to_string(&path) {
-        Ok(raw) => Ok(parse_record(&path, &raw)),
+        Ok(raw) => Ok(parse_record(&path, &raw).map(|mut r| {
+            // the FILE NAME's id is the key; a differing id inside the file must never steer another pair's files
+            r.pair_id = id.to_string();
+            r
+        })),
         Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
         Err(e) => Err(ToolError::new(
             ErrorCode::IoError,
@@ -366,30 +370,30 @@ pub fn read_record(home: &Path, id: &str) -> Result<Option<Record>, ToolError> {
     }
 }
 
-/// Every parsable `pair.<id>.json`; an unparsable one is logged and skipped.
-pub fn list_records(home: &Path) -> Vec<Record> {
+/// The valid pair ids named by `pair.<id>.json` FILE NAMES, sorted (whatever the file holds).
+pub fn record_ids(home: &Path) -> Vec<String> {
     let Ok(entries) = std::fs::read_dir(home) else {
         return Vec::new();
     };
-    let mut out = Vec::new();
-    for entry in entries.flatten() {
-        let name = entry.file_name();
-        let Some(id) = name
-            .to_str()
-            .and_then(|n| n.strip_prefix("pair."))
-            .and_then(|n| n.strip_suffix(".json"))
-        else {
-            continue;
-        };
-        if !valid_pair_id(id) {
-            continue;
-        }
-        let path = entry.path();
-        if let Ok(raw) = std::fs::read_to_string(&path) {
-            out.extend(parse_record(&path, &raw));
-        }
-    }
-    out
+    let mut ids: Vec<String> = entries
+        .flatten()
+        .filter_map(|e| {
+            let name = e.file_name().into_string().ok()?;
+            let id = name.strip_prefix("pair.")?.strip_suffix(".json")?;
+            valid_pair_id(id).then(|| id.to_string())
+        })
+        .collect();
+    ids.sort();
+    ids
+}
+
+/// Every parsable `pair.<id>.json`, keyed on the FILE NAME's id (see `read_record`); an unparsable one is
+/// logged and skipped.
+pub fn list_records(home: &Path) -> Vec<Record> {
+    record_ids(home)
+        .into_iter()
+        .filter_map(|id| read_record(home, &id).ok().flatten())
+        .collect()
 }
 
 /// Rewrite only `generation` and `tab`, under the pair's lock, never lowering the generation.

@@ -1006,3 +1006,32 @@ fn attach_record_controller_side_follows_a_resumed_controller() {
         Liveness::Dead
     );
 }
+
+#[test]
+fn rebind_on_spawn_refuses_an_empty_boot_id() {
+    let (h, _) = rebind_rig(900);
+    let probe = FakeProbe::new(""); // the boot read failed
+    probe.set_alive(900, "77");
+    touch(&pf(h.path(), "claude-exited"), "123");
+    let err =
+        rebind_on_spawn(h.path(), PID, 900, &probe).expect_err("an empty boot id is no value");
+    assert_eq!(err.code, opencode_ctl::error::ErrorCode::IoError);
+    assert!(pf(h.path(), "claude-exited").exists(), "nothing changed");
+    assert!(!pf(h.path(), "claude-pid").exists(), "no sentinel written");
+}
+
+#[test]
+fn records_are_keyed_on_the_file_name_id() {
+    let h = temp_home();
+    let other = "ffffffffffff";
+    // pair.<PID>.json whose contents claim another pair id
+    let mut r = rec(1, true, Some("claude"));
+    r.pair_id = other.to_string();
+    let body = serde_json::to_string(&r).unwrap();
+    touch(&record_path(h.path(), PID), &body);
+    let got = read_record(h.path(), PID).unwrap().expect("record");
+    assert_eq!(got.pair_id, PID);
+    let all = list_records(h.path());
+    assert_eq!(all.len(), 1);
+    assert_eq!(all[0].pair_id, PID);
+}

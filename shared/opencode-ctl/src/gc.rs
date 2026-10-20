@@ -2,7 +2,7 @@
 //! (spec "Pairing contract", `gc`).
 //!
 //! Every decision and every path keys on the id in the FILE NAME (`pair.<id>.json`), validated
-//! first: `pairing::list_records` trusts the id inside the file, and this module deletes files.
+//! first: `pairing::read_record` and `list_records` key on it too, and this module deletes files.
 //! `gc` never opens a log: the caller (the `gc` subcommand, or `pair` with its own log) owns that.
 
 use std::path::{Path, PathBuf};
@@ -109,7 +109,7 @@ fn verdict(record: &Record, home: &Path, probe: &dyn ProcessProbe, now_ms: i64) 
 }
 
 /// The record behind `pair.<id>.json`, keyed on the file name: a regular file (never a symlink)
-/// that parses. The id inside the file is overwritten with the file name's.
+/// that parses (`read_record` keys it on the file name's id).
 fn load_record(home: &Path, id: &str) -> Option<Record> {
     if !valid_pair_id(id) {
         return None;
@@ -118,26 +118,7 @@ fn load_record(home: &Path, id: &str) -> Option<Record> {
     if !meta.file_type().is_file() {
         return None;
     }
-    let mut r = pairing::read_record(home, id).ok().flatten()?;
-    r.pair_id = id.to_string();
-    Some(r)
-}
-
-/// Valid pair ids from the `pair.<id>.json` FILE NAMES, sorted.
-fn record_ids(home: &Path) -> Vec<String> {
-    let Ok(entries) = std::fs::read_dir(home) else {
-        return Vec::new();
-    };
-    let mut ids: Vec<String> = entries
-        .flatten()
-        .filter_map(|e| {
-            let name = e.file_name().into_string().ok()?;
-            let id = name.strip_prefix("pair.")?.strip_suffix(".json")?;
-            valid_pair_id(id).then(|| id.to_string())
-        })
-        .collect();
-    ids.sort();
-    ids
+    pairing::read_record(home, id).ok().flatten()
 }
 
 /// `dead-seen` content as `<epoch ms>`; absent or unparsable is `None`.
@@ -229,7 +210,7 @@ pub async fn gc<T: Transport, C: Clock>(
         report.skipped_service_down = true;
         return report;
     };
-    for id in record_ids(home) {
+    for id in pairing::record_ids(home) {
         let Some(record) = load_record(home, &id) else {
             continue;
         };

@@ -492,6 +492,15 @@ pub fn rebind_on_spawn(
     if pairing::read_record(home, pair_id)?.is_none() {
         return Ok(RebindOutcome::NoRecord);
     }
+    // A failed boot read is no value: a sentinel written with it could never verify, and a live
+    // controller could not be told from a dead one.
+    let boot_id = probe.boot_id();
+    if boot_id.is_empty() {
+        return Err(ToolError::new(
+            crate::error::ErrorCode::IoError,
+            "cannot read the boot id of this machine",
+        ));
+    }
     let pid_file = pair_file(home, pair_id, "claude-pid");
     if pairing::read_sentinel(&pid_file).is_some_and(|s| sentinel_alive(&s, probe)) {
         tracing::info!("pair {pair_id}: controller alive, no re-bind");
@@ -505,7 +514,7 @@ pub fn rebind_on_spawn(
     })?;
     let sentinel = Sentinel {
         pid: parent_pid,
-        boot_id: probe.boot_id(),
+        boot_id,
         starttime,
     };
     remove_if_present(&pair_file(home, pair_id, "claude-exited"))?;

@@ -23,7 +23,7 @@ use crate::error::{ErrorCode, ToolError};
 use crate::host::Host;
 use crate::liveness::{side_liveness, Liveness, Side};
 use crate::openapi::TableSource;
-use crate::pairing::{read_record, valid_pair_id, Record};
+use crate::pairing::{list_records, read_record, Record};
 use crate::settings::{self, Note, NoteReason, Source};
 use crate::transport::cli::resolve_binary;
 use crate::transport::{parse_cli_version, service_running, Lifecycle, Transport};
@@ -481,31 +481,6 @@ fn launcher_link_check<T: Transport, C: Clock>(engine: &Engine<T, C>, ctx: &Doct
 
 // ------------------------------------------------------------------ pair files (file-name ids)
 
-/// Every parsable `pair.<id>.json`, each record's `pair_id` REPLACED by the id in its file name:
-/// `read_record` trusts the file contents, the doctor must not (a record whose inner id differs
-/// must not make the doctor read another pair's sentinels).
-fn records_by_name(home: &Path) -> Vec<Record> {
-    let Ok(entries) = std::fs::read_dir(home) else {
-        return Vec::new();
-    };
-    let mut ids: Vec<String> = entries
-        .flatten()
-        .filter_map(|e| {
-            let name = e.file_name().into_string().ok()?;
-            let id = name.strip_prefix("pair.")?.strip_suffix(".json")?;
-            valid_pair_id(id).then(|| id.to_string())
-        })
-        .collect();
-    ids.sort();
-    ids.into_iter()
-        .filter_map(|id| {
-            let mut r = read_record(home, &id).ok().flatten()?;
-            r.pair_id = id;
-            Some(r)
-        })
-        .collect()
-}
-
 fn side_words(side: Side, l: Liveness) -> String {
     let why = match (l, side) {
         (Liveness::Alive, Side::Tui) => "the tab is running",
@@ -745,7 +720,7 @@ async fn pairing_check<T: Transport, C: Clock>(
         return Check::new(ID, Status::Skip, "", &[]);
     };
     let home = &engine.env.home;
-    let mut record = match read_record(home, pair) {
+    let record = match read_record(home, pair) {
         Ok(Some(r)) => r,
         Ok(None) => return Check::new(ID, Status::Fail, "record", &[("pair", pair)]),
         Err(e) => {
@@ -757,8 +732,6 @@ async fn pairing_check<T: Transport, C: Clock>(
             )
         }
     };
-    // Key on the id we were asked about (the file name), not on the one inside the file.
-    record.pair_id = pair.to_string();
     let now = engine.clock().now_ms();
     let tui = side_liveness(Side::Tui, &record, home, &*engine.probe, now);
     let controller = side_liveness(Side::Controller, &record, home, &*engine.probe, now);
@@ -956,7 +929,7 @@ fn log_check<T: Transport, C: Clock>(engine: &Engine<T, C>) -> Check {
 fn orphaned_controllers<T: Transport, C: Clock>(engine: &Engine<T, C>) -> Check {
     let home = &engine.env.home;
     let now = engine.clock().now_ms();
-    let ids: Vec<String> = records_by_name(home)
+    let ids: Vec<String> = list_records(home)
         .into_iter()
         .filter(|r| {
             side_liveness(Side::Controller, r, home, &*engine.probe, now) == Liveness::Dead
@@ -991,7 +964,7 @@ async fn orphaned_workers<T: Transport, C: Clock>(
     };
     let home = &engine.env.home;
     let now = engine.clock().now_ms();
-    let records = records_by_name(home);
+    let records = list_records(home);
     let living = |l: Liveness| matches!(l, Liveness::Alive | Liveness::Starting);
     let mut ids: Vec<String> = active
         .as_object()
