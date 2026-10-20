@@ -113,8 +113,20 @@ fn from_tool(e: ToolError) -> TransportError {
     }
 }
 
-/// Explicit path; else the first `opencode`/`opencode.exe` on `path`; else
-/// `<home>/.opencode/bin/opencode[.exe]`; else `OPENCODE_NOT_FOUND`. Pure: nothing is spawned.
+/// The executable an npm install of opencode keeps beside its `opencode.cmd` shim in `dir`
+/// (`node_modules\@opencode\cli\bin\opencode.exe`, the very file the shim runs), when both exist. The
+/// shim itself is never started: `cmd.exe` would expand `%VAR%` inside prompt text passed as arguments.
+pub fn npm_shim_exe(dir: &Path) -> Option<PathBuf> {
+    if !dir.join("opencode.cmd").is_file() {
+        return None;
+    }
+    let exe = dir.join("node_modules/@opencode/cli/bin/opencode.exe");
+    exe.is_file().then_some(exe)
+}
+
+/// Explicit path; else the first `opencode`/`opencode.exe` on `path` (on Windows also the executable behind
+/// an npm `opencode.cmd` shim, see `npm_shim_exe`); else `<home>/.opencode/bin/opencode[.exe]`; else
+/// `OPENCODE_NOT_FOUND`. Pure: nothing is spawned.
 pub fn resolve_binary(
     explicit: Option<&Path>,
     path: Option<&str>,
@@ -130,9 +142,17 @@ pub fn resolve_binary(
     }
     if let Some(path) = path {
         for dir in std::env::split_paths(OsStr::new(path)) {
+            if dir.as_os_str().is_empty() {
+                continue;
+            }
             let cand = dir.join(name);
-            if !dir.as_os_str().is_empty() && cand.is_file() {
+            if cand.is_file() {
                 return Ok(cand);
+            }
+            if cfg!(windows) {
+                if let Some(exe) = npm_shim_exe(&dir) {
+                    return Ok(exe);
+                }
             }
         }
     }

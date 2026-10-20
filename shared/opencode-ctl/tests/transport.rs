@@ -17,7 +17,7 @@ use opencode_ctl::testing::mock::UNREACHABLE_STDERR;
 use opencode_ctl::testing::{temp_home, FakeProbe, TempHome};
 use opencode_ctl::tools::{SessionWaitArgs, WorkspaceStatusArgs};
 use opencode_ctl::transport::cli::{
-    map_cli_failure, resolve_binary, CliTransport, Mapped, STDOUT_READ_CEILING,
+    map_cli_failure, npm_shim_exe, resolve_binary, CliTransport, Mapped, STDOUT_READ_CEILING,
 };
 use opencode_ctl::transport::{
     parse_cli_version, service_running, Lifecycle, Transport, TransportError, WaitOutcome,
@@ -907,6 +907,58 @@ fn transport_binary_resolution_order() {
     assert_eq!(
         resolve_binary(Some(&explicit), Some(path), &home).unwrap(),
         explicit
+    );
+}
+
+/// An npm install puts `opencode.cmd` on PATH and the real executable under
+/// `node_modules\@opencode\cli\bin` (MEASURED on Windows with opencode 2.0.32). The shim is never run:
+/// that would pass every argument through `cmd.exe`, which expands `%VAR%` inside prompt text.
+fn npm_install(dir: &Path, with_exe: bool) -> PathBuf {
+    fs::write(dir.join("opencode.cmd"), "@echo off\r\n").unwrap();
+    let exe_dir = dir.join("node_modules/@opencode/cli/bin");
+    fs::create_dir_all(&exe_dir).unwrap();
+    let exe = exe_dir.join("opencode.exe");
+    if with_exe {
+        fs::write(&exe, "").unwrap();
+    }
+    exe
+}
+
+#[test]
+fn npm_shim_exe_finds_the_real_executable_beside_the_cmd_shim() {
+    let root = temp_home();
+    let dir = root.path().join("npm");
+    fs::create_dir_all(&dir).unwrap();
+    assert_eq!(npm_shim_exe(&dir), None, "no shim");
+    let exe = npm_install(&dir, false);
+    assert_eq!(npm_shim_exe(&dir), None, "shim without the executable");
+    fs::write(&exe, "").unwrap();
+    assert_eq!(npm_shim_exe(&dir), Some(exe));
+    fs::remove_file(dir.join("opencode.cmd")).unwrap();
+    assert_eq!(npm_shim_exe(&dir), None, "executable without the shim");
+}
+
+#[cfg(windows)]
+#[test]
+fn resolve_binary_follows_an_npm_cmd_shim_on_windows() {
+    let root = temp_home();
+    let (npm, other, home) = (
+        root.path().join("npm"),
+        root.path().join("other"),
+        root.path().join("home"),
+    );
+    for d in [&npm, &other, &home] {
+        fs::create_dir_all(d).unwrap();
+    }
+    let exe = npm_install(&npm, true);
+    let path = std::env::join_paths([&other, &npm]).unwrap();
+    let path = path.to_str().unwrap();
+    assert_eq!(resolve_binary(None, Some(path), &home).unwrap(), exe);
+    // A real opencode.exe earlier on PATH still wins over a later npm shim.
+    fs::write(other.join("opencode.exe"), "").unwrap();
+    assert_eq!(
+        resolve_binary(None, Some(path), &home).unwrap(),
+        other.join("opencode.exe")
     );
 }
 
