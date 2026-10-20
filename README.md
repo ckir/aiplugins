@@ -60,6 +60,9 @@ verification) and asks whether to install project-local or global first:
 | `aiplugins-devtools-agy` | ≥ 369 | ≥ 20,674 |
 | `aiplugins-devtools-cc` | ≥ 369 | ≥ 20,674 |
 | `aiplugins-devtools-opencode` | ≥ 388 | ≥ 20,674 |
+| `opencode-ctl-mcp-agy` | ≥ 10,138 | ≥ 8,545 |
+| `opencode-ctl-mcp-cc` | ≥ 10,137 | ≥ 8,592 |
+| `opencode-ctl-mcp-opencode` | ≥ 10,066 | ≥ 8,544 |
 | `re-ghidra-mcp-agy` | ≥ 21,528 | ≥ 36,815 |
 | `re-ghidra-mcp-cc` | ≥ 21,631 | ≥ 36,903 |
 | `re-ghidra-mcp-opencode` | ≥ 21,297 | ≥ 37,147 |
@@ -128,20 +131,24 @@ Plugin and example READMEs, by agent directory:
   - [`re-ghidra-mcp-cc`](claude-code/plugins/re-ghidra-mcp-cc/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
   - [`repo-user-guide-cc`](claude-code/plugins/repo-user-guide-cc/) — PDF user guides for a repository, with verified examples; published as `repo-user-guide`.
   - [`rtk-mcp-cc`](claude-code/plugins/rtk-mcp-cc/) — `rtk` shell-command rewriting for 60–90% fewer output tokens, plus analytics MCP tools.
+  - [`opencode-ctl-mcp-cc`](claude-code/plugins/opencode-ctl-mcp-cc/) — delegate bounded work to an OpenCode worker session over MCP, with a paired-TUI launcher plus driver and doctor skills.
   - [`example`](claude-code/plugins/example/) — template Rust Claude Code plugin (TODO/FIXME/HACK tracker).
 - `antigravity/plugins/`
   - [`aiplugins-devtools-agy`](antigravity/plugins/aiplugins-devtools-agy/) — dev-tool skills container published as `aiplugins-devtools`; first skill `code-review-and-quality` (multi-axis code review).
   - [`re-ghidra-mcp-agy`](antigravity/plugins/re-ghidra-mcp-agy/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
   - [`rtk-mcp-agy`](antigravity/plugins/rtk-mcp-agy/) — `rtk` shell-command rewriting via MCP proxy plus `PreInvocation` hook.
+  - [`opencode-ctl-mcp-agy`](antigravity/plugins/opencode-ctl-mcp-agy/) — delegate bounded work to an OpenCode worker session over MCP, with driver and doctor skills.
 - `qwen/plugins/`
   - [`aiplugins-devtools-qwen`](qwen/plugins/aiplugins-devtools-qwen/) — dev-tool skills container published as `aiplugins-devtools`; first skill `code-review-and-quality` (multi-axis code review).
   - [`re-ghidra-mcp-qwen`](qwen/plugins/re-ghidra-mcp-qwen/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
   - [`rtk-mcp-qwen`](qwen/plugins/rtk-mcp-qwen/) — `rtk` `PreToolUse` hook rewriting `run_shell_command` calls.
+  - [`opencode-ctl-mcp-qwen`](qwen/plugins/opencode-ctl-mcp-qwen/) — delegate bounded work to an OpenCode worker session over MCP, with driver and doctor skills.
   - [`example`](qwen/plugins/example/) — example Rust-based MCP server extension.
 - `opencode/plugins/`
   - [`aiplugins-devtools-opencode`](opencode/plugins/aiplugins-devtools-opencode/) — dev-tool skills container published as `aiplugins-devtools`; first skill `code-review-and-quality` (multi-axis code review).
   - [`re-ghidra-mcp-opencode`](opencode/plugins/re-ghidra-mcp-opencode/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools, plus session hooks.
   - [`rtk-mcp-opencode`](opencode/plugins/rtk-mcp-opencode/) — `rtk` shell-command rewriting for OpenCode, plus analytics MCP tools.
+  - [`opencode-ctl-mcp-opencode`](opencode/plugins/opencode-ctl-mcp-opencode/) — lets an OpenCode session delegate bounded work to a worker OpenCode session over MCP (source-only bundle).
   - [`todov2-opencode`](opencode/plugins/todov2-opencode/) — the V2-removed `todowrite` session tool plus a live todo sidebar list.
   - [`repo-user-guide-opencode`](opencode/plugins/repo-user-guide-opencode/) — PDF user guides for a repository, with verified examples; published as `repo-user-guide`.
 
