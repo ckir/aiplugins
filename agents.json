@@ -59,7 +59,8 @@
         "re-ghidra-mcp-opencode",
         "todov2-opencode",
         "aiplugins-devtools-opencode",
-        "repo-user-guide-opencode"
+        "repo-user-guide-opencode",
+        "opencode-ctl-mcp-opencode"
       ],
       "marketplace": ".opencode-plugin/marketplace.json",
       "manifestPattern": "opencode/plugins/{plugin}/package.json",

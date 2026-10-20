@@ -46,7 +46,7 @@ spellcheck:
 # does not filter them on Windows (mlc 1.2.2); extend the list when a new
 # node_modules/ or build-output dir appears.
 links:
-    mlc --offline --ignore-path "./node_modules,./opencode/plugins/re-ghidra-mcp-opencode/node_modules,./opencode/plugins/rtk-mcp-opencode/node_modules,./opencode/plugins/todov2-opencode/node_modules,./target"
+    mlc --offline --ignore-path "./node_modules,./opencode/plugins/re-ghidra-mcp-opencode/node_modules,./opencode/plugins/opencode-ctl-mcp-opencode/node_modules,./opencode/plugins/rtk-mcp-opencode/node_modules,./opencode/plugins/todov2-opencode/node_modules,./target"
 
 # Verify plugin configs point at binaries this workspace actually builds.
 # Nothing else checks those strings: rename a [[bin]] and every test still
@@ -387,6 +387,17 @@ build-opencode-ctl-mcp-qwen:
     done
     @echo "Plugin binaries staged in qwen/plugins/opencode-ctl-mcp-qwen/bin/"
 
+# Stage opencode-ctl-mcp-opencode's MCP binary (the cc front's) into its bin/ directory.
+build-opencode-ctl-mcp-opencode:
+    cargo build -p opencode-ctl-mcp-cc --release --bin opencode-ctl-cc-mcp
+    mkdir -p opencode/plugins/opencode-ctl-mcp-opencode/bin
+    if [ -f "target/release/opencode-ctl-cc-mcp.exe" ]; then \
+        cp "target/release/opencode-ctl-cc-mcp.exe" opencode/plugins/opencode-ctl-mcp-opencode/bin/; \
+    else \
+        cp "target/release/opencode-ctl-cc-mcp" opencode/plugins/opencode-ctl-mcp-opencode/bin/; \
+    fi
+    @echo "Plugin binary staged in opencode/plugins/opencode-ctl-mcp-opencode/bin/"
+
 # Stage rtk-mcp-opencode's MCP binary into its bin/ directory.
 build-rtk-mcp-opencode:
     cargo build -p rtk-mcp-cc --release --bin rtk-cc-mcp
@@ -545,6 +556,21 @@ emit-ghidra-skill: build-re-ghidra-mcp-cc
         > antigravity/plugins/re-ghidra-mcp-agy/skills/ghidra-re-driver/SKILL.md
     @echo "Regenerated the committed ghidra-re-driver skill copies (claude-code, qwen, opencode, antigravity)"
 
+# Regenerate the committed opencode-ctl-driver / opencode-ctl-doctor skill copies
+# for all four hosts (eight files) from the one engine binary.
+emit-opencode-ctl-skills: build-opencode-ctl-mcp-cc
+    #!/usr/bin/env bash
+    set -euo pipefail
+    bin=./claude-code/plugins/opencode-ctl-mcp-cc/bin/opencode-ctl-cc-mcp
+    for pair in cc:claude-code/plugins/opencode-ctl-mcp-cc qwen:qwen/plugins/opencode-ctl-mcp-qwen agy:antigravity/plugins/opencode-ctl-mcp-agy opencode:opencode/plugins/opencode-ctl-mcp-opencode; do
+        host=${pair%%:*}; dir=${pair#*:}
+        for name in opencode-ctl-driver opencode-ctl-doctor; do
+            mkdir -p "$dir/skills/$name"
+            "$bin" emit-skill "$name" --host "$host" > "$dir/skills/$name/SKILL.md"
+        done
+    done
+    echo "Regenerated the committed opencode-ctl skill copies (cc, qwen, agy, opencode)"
+
 # Run the live Ghidra suite. Needs a real Ghidra 12.1.2 + JDK 21 and an analyzed
 # fixture project; see shared/ghidra-mcp/tests/fixtures/README.md to build one.
 #
@@ -619,7 +645,7 @@ clean-stale:
 # full rebuild.
 clean:
     cargo clean
-    rm -rf claude-code/plugins/example/bin claude-code/plugins/rtk-mcp-cc/bin claude-code/plugins/re-ghidra-mcp-cc/bin claude-code/plugins/opencode-ctl-mcp-cc/bin opencode/plugins/rtk-mcp-opencode/bin opencode/plugins/re-ghidra-mcp-opencode/bin qwen/plugins/*/bin antigravity/plugins/*/bin
+    rm -rf claude-code/plugins/example/bin claude-code/plugins/rtk-mcp-cc/bin claude-code/plugins/re-ghidra-mcp-cc/bin claude-code/plugins/opencode-ctl-mcp-cc/bin opencode/plugins/opencode-ctl-mcp-opencode/bin opencode/plugins/rtk-mcp-opencode/bin opencode/plugins/re-ghidra-mcp-opencode/bin qwen/plugins/*/bin antigravity/plugins/*/bin
     @echo "Removed target/ and staged plugin binaries."
 
 

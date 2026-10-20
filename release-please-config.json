@@ -100,6 +100,13 @@
         "package.json"
       ]
     },
+    "opencode/plugins/opencode-ctl-mcp-opencode": {
+      "release-type": "simple",
+      "component": "opencode-ctl-mcp-opencode",
+      "extra-files": [
+        "package.json"
+      ]
+    },
     "antigravity/plugins/rtk-mcp-agy": {
       "release-type": "rust",
       "component": "rtk-mcp-agy",
@@ -114,13 +121,6 @@
         "plugin.json"
       ]
     },
-    "antigravity/plugins/opencode-ctl-mcp-agy": {
-      "release-type": "rust",
-      "component": "opencode-ctl-mcp-agy",
-      "extra-files": [
-        "plugin.json"
-      ]
-    },
     "antigravity/plugins/aiplugins-devtools-agy": {
       "release-type": "simple",
       "component": "aiplugins-devtools-agy",
@@ -131,6 +131,13 @@
     "antigravity/plugins/repo-user-guide-agy": {
       "release-type": "simple",
       "component": "repo-user-guide-agy",
+      "extra-files": [
+        "plugin.json"
+      ]
+    },
+    "antigravity/plugins/opencode-ctl-mcp-agy": {
+      "release-type": "rust",
+      "component": "opencode-ctl-mcp-agy",
       "extra-files": [
         "plugin.json"
       ]
