@@ -430,3 +430,122 @@ async fn opencode_operations_filter_substring() {
     let all = call(&r.client, "opencode_operations", json!({})).await;
     assert!(all["operations"].as_array().unwrap().len() > list.len());
 }
+
+// ---- path-parameter segments: a `..` value would be collapsed by the CLI's URL handling into a blocked route.
+
+#[tokio::test]
+async fn hatch_dotdot_path_param_rejected() {
+    let r = rig(|f| {
+        with_info(f);
+        f.on("session.inbox.update", vec![Ok(json!({"data": {}}))]);
+        f.on("session.inbox.cancel", vec![Ok(json!({"data": {}}))]);
+        f.on("session.form.cancel", vec![Ok(json!({"data": {}}))]);
+    })
+    .await;
+    for (op, key) in [
+        ("session.inbox.update", "inboxID"),
+        ("session.inbox.cancel", "inboxID"),
+        ("session.form.cancel", "formID"),
+    ] {
+        for bad in [
+            "..", ".", "a/b", "a?b", "a#b", "a%2e", "a b", "a\tb", "a\\b",
+        ] {
+            let out = call(
+                &r.client,
+                "opencode_api",
+                json!({"operation": op, "allow_mutation": true,
+                       "params": {"sessionID": SID, key: bad},
+                       "body": {"permissions": []}}),
+            )
+            .await;
+            assert_eq!(code(&out), "INVALID_ARGUMENT", "{op} {bad:?}: {out}");
+        }
+    }
+    assert!(
+        r.fake
+            .calls()
+            .iter()
+            .all(|c| !c.op.starts_with("session.inbox") && !c.op.starts_with("session.form")),
+        "no rejected call reaches the transport"
+    );
+}
+
+#[tokio::test]
+async fn hatch_real_id_shapes_still_pass() {
+    let r = rig(|f| {
+        with_info(f);
+        f.on("session.inbox.cancel", vec![Ok(json!({"data": {}}))]);
+        f.on("session.form.get", vec![Ok(json!({"data": {}}))]);
+        f.on("provider.get", vec![Ok(json!({"data": {}}))]);
+    })
+    .await;
+    let out = call(
+        &r.client,
+        "opencode_api",
+        json!({"operation": "session.inbox.cancel", "allow_mutation": true,
+               "params": {"sessionID": SID, "inboxID": "inb_01HZX-abc.def:1"}}),
+    )
+    .await;
+    assert!(out.get("error").is_none(), "{out}");
+    for (op, k, v) in [
+        ("session.form.get", "formID", "frm_01ABCdef"),
+        ("provider.get", "providerID", "github-copilot"),
+    ] {
+        let mut params = json!({ k: v });
+        if k == "formID" {
+            params["sessionID"] = json!(SID);
+        }
+        let out = call(
+            &r.client,
+            "opencode_api",
+            json!({"operation": op, "params": params}),
+        )
+        .await;
+        assert!(out.get("error").is_none(), "{op}: {out}");
+    }
+}
+
+#[tokio::test]
+async fn named_tools_reject_dotdot_ids() {
+    let r = rig(|f| {
+        f.on(
+            "session.permission.list",
+            vec![Ok(
+                json!({"data": [{"id": "..", "action": "bash", "resources": ["*"], "save": []}]}),
+            )],
+        );
+        f.on("session.permission.reply", vec![Ok(json!({"ok": true}))]);
+        f.on("session.form.reply", vec![Ok(json!({"ok": true}))]);
+        f.on("permission.saved.list", vec![Ok(json!({"data": []}))]);
+        f.on("permission.saved.remove", vec![Ok(json!({"ok": true}))]);
+    })
+    .await;
+    let out = call(
+        &r.client,
+        "permission_reply",
+        json!({"session_id": SID, "request_id": "..", "decision": "once"}),
+    )
+    .await;
+    assert_eq!(code(&out), "INVALID_ARGUMENT", "{out}");
+    let out = call(
+        &r.client,
+        "form_reply",
+        json!({"session_id": SID, "form_id": "..", "answer": {}}),
+    )
+    .await;
+    assert_eq!(code(&out), "INVALID_ARGUMENT", "{out}");
+    let out = call(
+        &r.client,
+        "saved_permissions",
+        json!({"remove_id": "..", "confirm": true}),
+    )
+    .await;
+    assert_eq!(code(&out), "INVALID_ARGUMENT", "{out}");
+    for op in [
+        "session.permission.reply",
+        "session.form.reply",
+        "permission.saved.remove",
+    ] {
+        assert!(calls_of(&r, op).is_empty(), "{op} must not be called");
+    }
+}

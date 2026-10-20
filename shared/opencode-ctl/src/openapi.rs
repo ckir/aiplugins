@@ -467,6 +467,14 @@ fn blocked(id: &str, why: &str) -> ToolError {
     ToolError::new(ErrorCode::BlockedOperation, format!("{id}: {why}"))
 }
 
+fn path_segment_ok(v: &str) -> bool {
+    v != "."
+        && v != ".."
+        && !v.chars().any(|c| {
+            c.is_control() || c.is_whitespace() || matches!(c, '/' | '\\' | '?' | '#' | '%')
+        })
+}
+
 pub fn validate_params(op: &Operation, params: &[(String, String)]) -> Result<(), ToolError> {
     let bad = |m: String| ToolError::new(ErrorCode::InvalidArgument, m);
     for (name, value) in params {
@@ -491,7 +499,7 @@ pub fn validate_params(op: &Operation, params: &[(String, String)]) -> Result<()
         {
             return Err(bad("headers cannot be set".into()));
         }
-        if !op.params.iter().any(|p| p.name == base) {
+        let Some(decl) = op.params.iter().find(|p| p.name == base) else {
             return Err(
                 bad(format!("param {base} is not declared by {}", op.id)).hint(&format!(
                     "declared: {}",
@@ -502,6 +510,13 @@ pub fn validate_params(op: &Operation, params: &[(String, String)]) -> Result<()
                         .join(", ")
                 )),
             );
+        };
+        // A path value is one URL segment. The CLI builds the URL with `new URL(path, base)`, which collapses a
+        // literal `.`/`..` segment, so `inboxID=..` would reach a different (blocked) route.
+        if decl.location == ParamIn::Path && !path_segment_ok(value) {
+            return Err(bad(format!(
+                "param {base}: a path value must be a single plain segment (not `.`/`..`, and without `/`, `\\`, `?`, `#`, `%` or whitespace)"
+            )));
         }
     }
     Ok(())
