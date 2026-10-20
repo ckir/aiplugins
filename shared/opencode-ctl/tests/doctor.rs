@@ -27,7 +27,7 @@ use opencode_ctl::transport::{Lifecycle, TransportError};
 use serde_json::{json, Value};
 
 const PAIR: &str = "0123456789ab";
-const OTHER_PAIR: &str = "ba9876543210";
+const OTHER_PAIR: &str = "fe9876543210";
 const URL: &str = "http://127.0.0.1:49374";
 /// The registration file's `password` (Service.Info, packages/client/src/effect/service.ts:146).
 const SECRET: &str = "hunter2-fixture-secret";

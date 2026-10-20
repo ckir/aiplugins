@@ -851,8 +851,8 @@ fn saved(f: &FakeTransport) {
     f.on(
         "permission.saved.list",
         vec![data(json!([
-            {"id": "sav_1", "action": "bash"},
-            {"id": "sav_2", "action": "edit"}
+            {"id": "sev_1", "action": "bash"},
+            {"id": "sev_2", "action": "edit"}
         ]))],
     );
     f.on("permission.saved.remove", vec![Ok(json!({"ok": true}))]);
@@ -862,8 +862,8 @@ fn saved(f: &FakeTransport) {
 async fn saved_permissions_remove_needs_confirm() {
     let r = plain(saved).await;
     for args in [
-        json!({"remove_id": "sav_1"}),
-        json!({"remove_id": "sav_1", "confirm": false}),
+        json!({"remove_id": "sev_1"}),
+        json!({"remove_id": "sev_1", "confirm": false}),
     ] {
         let out = call(&r.client, "saved_permissions", args).await;
         assert_eq!(code(&out), "CONFIRM_REQUIRED", "{out}");
@@ -899,11 +899,11 @@ async fn saved_permissions_remove_with_confirm_executes() {
     let out = call(
         &r.client,
         "saved_permissions",
-        json!({"remove_id": "sav_1", "confirm": true}),
+        json!({"remove_id": "sev_1", "confirm": true}),
     )
     .await;
     let c = calls_of(&r, "permission.saved.remove");
     assert_eq!(c.len(), 1, "{out}");
-    assert_eq!(param(&c[0], "id"), Some("sav_1"));
-    assert_eq!(out["rules"], json!([{"id": "sav_2", "action": "edit"}]));
+    assert_eq!(param(&c[0], "id"), Some("sev_1"));
+    assert_eq!(out["rules"], json!([{"id": "sev_2", "action": "edit"}]));
 }
