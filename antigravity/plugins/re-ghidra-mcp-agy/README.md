@@ -11,11 +11,11 @@ server without a second implementation of any of it.
 <!-- footprint:begin -->
 ### Context footprint
 
-Installing this plugin adds **≥ 21,528 bytes** to every request, for the whole session. A further **≥ 36,815 bytes** load only when one of its skills or agents is actually invoked.
+Installing this plugin adds **≥ 21,586 bytes** to every request, for the whole session. A further **≥ 36,815 bytes** load only when one of its skills or agents is actually invoked.
 
 | Tier | Bytes | When you pay it |
 |---|---|---|
-| Resident | ≥ 21,528 | Every request, for the whole session |
+| Resident | ≥ 21,586 | Every request, for the whole session |
 | Invocation | ≥ 36,815 | Only when that skill or agent runs |
 
 **Bytes, not tokens.** This is the exact serialised size of what the host loads, measured by probing the plugin's own MCP server and reading its skill and agent frontmatter. It is not a token count and does not convert to one at a fixed rate — treat it as a figure you can compare between plugins, not as a context budget.
@@ -147,7 +147,7 @@ copy's `bin/` (under your agy user config, e.g.
 agy plugin validate <installed plugin directory>
 ```
 
-which fails `not found on PATH` until the binaries resolve.
+which passes with a `command ... isn't on this machine's PATH` warning until the binaries resolve (`--strict` turns that warning into a failure). The PATH problem otherwise surfaces at the first tool call.
 
 Then configure the project — see `examples/re-ghidra-mcp-agy.local.md` and copy
 it to `.agents/re-ghidra-mcp-agy.local.md`.
