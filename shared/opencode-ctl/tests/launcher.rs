@@ -1,5 +1,10 @@
 //! The launcher, part 1: `pair`, the tab wrappers, the terminal walk, `install-launcher`, name
 //! dispatch and the pure Windows resolvers (Task 18).
+//!
+//! The tests that drive the real `pair`/`attach`/`resume` flow are `cfg(unix)`: they assume bare controller
+//! names, `.sh` wrappers and POSIX paths, while Windows resolves controllers through PATH/PATHEXT and writes
+//! `.ps1` wrappers (measured on a real Windows box in Task 25). Their helpers go unused there.
+#![cfg_attr(windows, allow(unused_imports, dead_code))]
 
 mod common;
 
@@ -375,6 +380,7 @@ fn pair_wrapper_exports_server_password_only_with_server_url() {
     }
 }
 
+#[cfg(unix)]
 #[test]
 fn wrapper_paths_absolute() {
     let (home, bin, dir) = (
@@ -595,6 +601,7 @@ mod shell_roundtrip {
     }
 }
 
+#[cfg(unix)]
 #[test]
 fn wrapper_quotes_home_with_space_text() {
     let sh = wrapper_script_posix(&wrapper_input(
@@ -931,6 +938,7 @@ fn terminal_walk_prefers_the_parent_then_path_order() {
 
 // ------------------------------------------------------------------ pair (dry run)
 
+#[cfg(unix)]
 #[tokio::test]
 async fn pair_dry_run_writes_nothing() {
     let mut rig = Rig::new();
@@ -947,6 +955,7 @@ async fn pair_dry_run_writes_nothing() {
     assert!(out.lines().all(|l| l.starts_with("would ")), "{out}");
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn pair_dry_run_lines_and_order() {
     let rig = Rig::new();
@@ -987,6 +996,7 @@ fn basename(p: &Path) -> String {
         .into_owned()
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn pair_runs_gc_after_service_up() {
     let rig = Rig::new();
@@ -1009,6 +1019,7 @@ async fn pair_runs_gc_after_service_up() {
     assert_eq!(ops[1], "session.create");
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn pair_skips_service_start_with_server_url() {
     let settings = Settings {
@@ -1032,6 +1043,7 @@ async fn pair_skips_service_start_with_server_url() {
     );
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn pair_passes_server_url_to_wrapper() {
     let settings = Settings {
@@ -1067,6 +1079,7 @@ async fn pair_passes_server_url_to_wrapper() {
     assert!(!log.contains("secret"), "{log}");
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn pair_applies_permission_policy() {
     let settings = Settings {
@@ -1115,6 +1128,7 @@ async fn pair_applies_permission_policy() {
     assert_eq!(r.unwrap_err().code, ErrorCode::InvalidArgument);
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn pair_controller_flag() {
     for (host, flag, want) in [
@@ -1164,6 +1178,7 @@ async fn pair_controller_flag() {
     );
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn pair_no_terminal_tab_false() {
     // No parent matches and nothing on PATH: no tab, the attach command is printed.
@@ -1237,6 +1252,7 @@ fn pair_controller_env_server_empty_for_background() {
     assert_eq!(get(&url, "OPENCODE_CTL_SERVER"), Some(URL.into()));
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn pair_controller_env_reaches_the_spawned_command() {
     let rig = Rig::new();
@@ -1264,6 +1280,7 @@ async fn pair_controller_env_reaches_the_spawned_command() {
 
 // ------------------------------------------------------------------ pair (real run, fakes)
 
+#[cfg(unix)]
 #[tokio::test]
 async fn pair_record_written_once() {
     let rig = Rig::new();
@@ -1335,6 +1352,7 @@ async fn wrapper_and_record_modes() {
     assert_eq!(mode(&format!("pair.{id}.claude-exited")), 0o600);
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn pair_rolls_back_wrapper_on_tab_failure() {
     let rig = Rig::new();
@@ -1436,6 +1454,7 @@ async fn launcher_validation_precedes_everything() {
     }
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn launcher_writes_pair_log() {
     let rig = Rig::new();
@@ -1461,6 +1480,7 @@ async fn launcher_writes_pair_log() {
     assert!(!rig.home.path().join("logs").exists());
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn controller_not_found_keeps_record() {
     for kind in [io::ErrorKind::NotFound, io::ErrorKind::PermissionDenied] {
@@ -1516,6 +1536,7 @@ fn rig_with_synthetic(script: Vec<Result<Value, TransportError>>) -> Rig {
     rig
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn exit_notice_409_retry() {
     let rig = rig_with_synthetic(vec![
@@ -1954,6 +1975,7 @@ fn pair_files(home: &Path) -> Vec<String> {
         .collect()
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn attach_bumps_generation() {
     let rig = Rig::new();
@@ -2013,6 +2035,7 @@ async fn attach_wrapper_mode_is_0700() {
     assert_eq!(mode, 0o700);
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn attach_deletes_generations_older_than_n() {
     let rig = Rig::new();
@@ -2091,6 +2114,7 @@ fn attach_alone(
     (r, tabs.into_inner())
 }
 
+#[cfg(unix)]
 #[test]
 fn attach_exclusive_create() {
     let rig = Rig::new();
@@ -2137,6 +2161,7 @@ fn attach_exclusive_create() {
     assert_eq!(tabs.len(), 2);
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn attach_loser_retries_then_conflict() {
     // A racing winner takes n+1 between the read and the claim: the loser takes n+2.
@@ -2181,6 +2206,7 @@ async fn attach_loser_retries_then_conflict() {
     assert_eq!(read_json(&rig, &id)["generation"], 6);
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn attach_skips_orphaned_claims() {
     let rig = Rig::new();
@@ -2205,6 +2231,7 @@ async fn attach_clears_dead_seen() {
     assert!(!has(&rig, &format!("pair.{id}.dead-seen")));
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn attach_session_id_new_record() {
     let rig = Rig::new();
@@ -2234,6 +2261,7 @@ async fn attach_session_id_new_record() {
         .is_file());
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn attach_sets_tab_true() {
     let rig = Rig::new();
@@ -2294,6 +2322,7 @@ async fn attach_session_id_checks_binary_before_record() {
     assert!(rig.tabs.borrow().is_empty());
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn attach_session_id_rolls_back_on_tab_failure() {
     let rig = Rig::new();
@@ -2318,6 +2347,7 @@ async fn attach_session_id_missing_session_writes_nothing() {
     assert_eq!(entries(rig.home.path()), before);
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn resume_execs_controller_from_record() {
     for (url, want) in [(None, ""), (Some(URL), URL)] {
@@ -2361,6 +2391,7 @@ async fn resume_execs_controller_from_record() {
     }
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn resume_controller_precedence() {
     // --controller, else the record, else the host constant (an attach record has null).
@@ -2399,6 +2430,7 @@ async fn resume_controller_precedence() {
     assert!(rig.ctrl.borrow().is_empty());
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn resume_refuses_alive_controller() {
     let rig = Rig::new();
@@ -2421,6 +2453,7 @@ async fn resume_refuses_alive_controller() {
     assert_eq!(rig.ctrl.borrow().len(), 1);
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn resume_lock_exclusive() {
     let rig = Rig::new();
@@ -2443,6 +2476,7 @@ async fn resume_lock_exclusive() {
     assert!(rig.ctrl.borrow().is_empty());
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn resume_holds_its_own_lock_until_claude_pid_is_written() {
     let rig = Rig::new();
@@ -2459,6 +2493,7 @@ async fn resume_holds_its_own_lock_until_claude_pid_is_written() {
     assert!(!has(&rig, &format!("pair.{id}.resume-lock")));
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn resume_clears_exited_and_dead_seen() {
     let rig = Rig::new();
@@ -2479,6 +2514,7 @@ async fn resume_clears_exited_and_dead_seen() {
     assert!(!has(&rig, &format!("pair.{id}.dead-seen")));
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn resume_sweeps_dead_lock_first() {
     let rig = Rig::new();
@@ -2573,6 +2609,7 @@ async fn resume_and_attach_refused_on_the_opencode_host() {
     assert!(rig.fake.calls().is_empty());
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn resume_rechecks_claude_pid_after_claim() {
     let rig = Rig::new();
@@ -2597,6 +2634,7 @@ async fn resume_rechecks_claude_pid_after_claim() {
     );
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn resume_dead_lock_replaced_by_fresh_lock_is_not_deleted() {
     let rig = Rig::new();
