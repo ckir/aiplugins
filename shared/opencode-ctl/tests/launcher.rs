@@ -83,7 +83,7 @@ impl Rig {
         let home = temp_home();
         let ws = temp_home();
         let bin = temp_home();
-        let probe = Arc::new(FakeProbe::new("boot"));
+        let probe = Arc::new(FakeProbe::new("1000"));
         probe.set_alive(4242, "777");
         // `resume` writes its own pid into the lock, so the probe must know it.
         probe.set_alive(std::process::id(), "own-start");
@@ -1285,7 +1285,7 @@ async fn pair_record_written_once() {
     assert_eq!(id.len(), 12);
     // claude-pid / claude-exited were written around the controller.
     let pid = fs::read_to_string(rig.home.path().join(format!("pair.{id}.claude-pid"))).unwrap();
-    assert_eq!(pid, "4242:boot:777");
+    assert_eq!(pid, "4242:1000:777");
     assert!(rig
         .home
         .path()
@@ -1665,7 +1665,7 @@ impl Installer {
         windows: bool,
         on_path: bool,
     ) -> (Result<(), ToolError>, String) {
-        let probe = FakeProbe::new("boot");
+        let probe = FakeProbe::new("1000");
         let mut out: Vec<u8> = Vec::new();
         let home = temp_home();
         let now = || NOW;
@@ -1789,7 +1789,7 @@ fn install_launcher_creates_bin_dir() {
     use std::os::unix::fs::PermissionsExt;
     let i = Installer::new();
     let nested = i.bin.path().join("a").join("bin");
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     let home = temp_home();
     let exe = i.exe("opencode-ctl-cc-mcp");
     let mut out: Vec<u8> = Vec::new();
@@ -2041,7 +2041,7 @@ fn attach_alone(
     id: &str,
     before: Option<&dyn Fn()>,
 ) -> (Result<i32, ToolError>, Vec<Vec<String>>) {
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     let fake = FakeTransport::new();
     let engine = Engine::new(
         Settings::default(),
@@ -2050,7 +2050,7 @@ fn attach_alone(
         opencode_ctl::engine::EnvSnapshot::for_tests(ws.to_path_buf(), home.to_path_buf()),
         fake,
         TestClock::new(NOW),
-        Arc::new(FakeProbe::new("boot")) as Arc<dyn ProcessProbe>,
+        Arc::new(FakeProbe::new("1000")) as Arc<dyn ProcessProbe>,
     );
     let tabs = RefCell::new(Vec::new());
     let now = || NOW;
@@ -2405,7 +2405,7 @@ async fn resume_refuses_alive_controller() {
     script_session_get(&rig);
     let id = seed(&rig, 1, true, None, None);
     // 4242 is alive in the rig with start time 777.
-    put(&rig, &format!("pair.{id}.claude-pid"), "4242:boot:777");
+    put(&rig, &format!("pair.{id}.claude-pid"), "4242:1000:777");
     put(&rig, &format!("pair.{id}.claude-exited"), "1");
     let (r, _) = rig.resume(&id, &[]).await;
     assert_eq!(r.unwrap_err().code, ErrorCode::LauncherConflict);
@@ -2416,7 +2416,7 @@ async fn resume_refuses_alive_controller() {
         "nothing was changed"
     );
     // A claude-pid naming a dead process does not refuse.
-    put(&rig, &format!("pair.{id}.claude-pid"), "9999:boot:1");
+    put(&rig, &format!("pair.{id}.claude-pid"), "9999:1000:1");
     rig.resume(&id, &[]).await.0.unwrap();
     assert_eq!(rig.ctrl.borrow().len(), 1);
 }
@@ -2427,13 +2427,13 @@ async fn resume_lock_exclusive() {
     script_session_get(&rig);
     let id = seed(&rig, 1, true, None, None);
     // Another resume holds the lock and its owner is alive.
-    put(&rig, &format!("pair.{id}.resume-lock"), "4242:boot:777");
+    put(&rig, &format!("pair.{id}.resume-lock"), "4242:1000:777");
     let (r, _) = rig.resume(&id, &[]).await;
     assert_eq!(r.unwrap_err().code, ErrorCode::LauncherConflict);
     assert!(rig.ctrl.borrow().is_empty());
     assert_eq!(
         fs::read_to_string(rig.home.path().join(format!("pair.{id}.resume-lock"))).unwrap(),
-        "4242:boot:777",
+        "4242:1000:777",
         "the winner's lock is untouched"
     );
     // An empty lock may be mid-creation: left alone, so the resume loses.
@@ -2455,7 +2455,7 @@ async fn resume_holds_its_own_lock_until_claude_pid_is_written() {
         .iter()
         .find(|(n, _)| n == &format!("pair.{id}.resume-lock"))
         .expect("the lock exists while the controller is being spawned");
-    assert_eq!(lock.1, format!("{}:boot:own-start", std::process::id()));
+    assert_eq!(lock.1, format!("{}:1000:own-start", std::process::id()));
     assert!(!has(&rig, &format!("pair.{id}.resume-lock")));
 }
 
@@ -2486,7 +2486,7 @@ async fn resume_sweeps_dead_lock_first() {
     rig.probe.set_alive(std::process::id(), "own-start");
     let id = seed(&rig, 1, true, None, None);
     // A crash between the lock's create and the claude-pid write left this (pid 9999 is dead).
-    put(&rig, &format!("pair.{id}.resume-lock"), "9999:boot:1");
+    put(&rig, &format!("pair.{id}.resume-lock"), "9999:1000:1");
     let (r, out) = rig.resume(&id, &[]).await;
     assert_eq!(r.unwrap(), 0, "{out}");
     assert_eq!(rig.ctrl.borrow().len(), 1);
@@ -2583,7 +2583,7 @@ async fn resume_rechecks_claude_pid_after_claim() {
     // Another resume's controller (pid 4242, alive) is bound after our first check passed.
     let home = rig.home.path().to_path_buf();
     let pid_file = home.join(format!("pair.{id}.claude-pid"));
-    let hook = move || fs::write(&pid_file, "4242:boot:777").unwrap();
+    let hook = move || fs::write(&pid_file, "4242:1000:777").unwrap();
     let (r, _) = rig
         .drive(Op::Resume(id.clone(), None, Vec::new()), Some(&hook))
         .await;
@@ -2602,17 +2602,17 @@ async fn resume_dead_lock_replaced_by_fresh_lock_is_not_deleted() {
     let rig = Rig::new();
     script_session_get(&rig);
     let id = seed(&rig, 1, true, None, None);
-    put(&rig, &format!("pair.{id}.resume-lock"), "9999:boot:1");
+    put(&rig, &format!("pair.{id}.resume-lock"), "9999:1000:1");
     // Between the dead-lock read and the unlink another resumer replaces it with a live lock.
     let lock = rig.home.path().join(format!("pair.{id}.resume-lock"));
-    let hook = move || fs::write(&lock, "4242:boot:777").unwrap();
+    let hook = move || fs::write(&lock, "4242:1000:777").unwrap();
     let (r, _) = rig
         .drive(Op::Resume(id.clone(), None, Vec::new()), Some(&hook))
         .await;
     assert_eq!(r.unwrap_err().code, ErrorCode::LauncherConflict);
     assert_eq!(
         fs::read_to_string(rig.home.path().join(format!("pair.{id}.resume-lock"))).unwrap(),
-        "4242:boot:777",
+        "4242:1000:777",
         "the fresh lock survives"
     );
     assert!(rig.ctrl.borrow().is_empty());

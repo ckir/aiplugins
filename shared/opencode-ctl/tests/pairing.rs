@@ -129,23 +129,23 @@ fn modes_records_sentinels_wrappers() {
 
 #[test]
 fn liveness_boot_id_and_starttime() {
-    let probe = FakeProbe::new("boot-1");
+    let probe = FakeProbe::new("1000");
     probe.set_alive(100, "555");
-    assert!(sentinel_alive(&sent(100, "boot-1", "555"), &probe));
+    assert!(sentinel_alive(&sent(100, "1000", "555"), &probe));
     assert!(
-        !sentinel_alive(&sent(100, "boot-1", "556"), &probe),
+        !sentinel_alive(&sent(100, "1000", "556"), &probe),
         "start time differs"
     );
     assert!(
-        !sentinel_alive(&sent(100, "boot-0", "555"), &probe),
+        !sentinel_alive(&sent(100, "5000", "555"), &probe),
         "another boot"
     );
     assert!(
-        !sentinel_alive(&sent(101, "boot-1", "555"), &probe),
+        !sentinel_alive(&sent(101, "1000", "555"), &probe),
         "no such pid"
     );
     probe.set_dead(100);
-    assert!(!sentinel_alive(&sent(100, "boot-1", "555"), &probe));
+    assert!(!sentinel_alive(&sent(100, "1000", "555"), &probe));
 }
 
 #[test]
@@ -187,12 +187,12 @@ const NOW: i64 = T0 + 1_000_000;
 
 fn alive_pid(probe: &FakeProbe, home: &Path, suffix: &str, pid: u32) {
     probe.set_alive(pid, "st");
-    write_sent(&pf(home, suffix), &sent(pid, "boot", "st"));
+    write_sent(&pf(home, suffix), &sent(pid, "1000", "st"));
 }
 
 #[test]
 fn liveness_values_per_side() {
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     let tui = |home: &Path, r: &Record| side_liveness(Side::Tui, r, home, &probe, NOW);
     let ctl = |home: &Path, r: &Record| side_liveness(Side::Controller, r, home, &probe, NOW);
 
@@ -250,7 +250,7 @@ fn liveness_values_per_side() {
 
 #[test]
 fn liveness_reads_record_generation_then_fallback() {
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     let h = temp_home();
     let r = rec(3, true, Some("claude"));
     put(h.path(), &r);
@@ -285,7 +285,7 @@ fn liveness_reads_record_generation_then_fallback() {
 
 #[test]
 fn liveness_reopened_tab_is_starting_over_a_dead_older_generation() {
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     let h = temp_home();
     let r = rec(2, true, Some("claude"));
     put(h.path(), &r);
@@ -324,7 +324,7 @@ fn liveness_reopened_tab_is_starting_over_a_dead_older_generation() {
 
 #[test]
 fn liveness_reopened_tab_that_exited_before_its_pid_is_dead() {
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     let h = temp_home();
     let r = rec(2, true, Some("claude"));
     put(h.path(), &r);
@@ -356,7 +356,7 @@ fn liveness_reopened_tab_that_exited_before_its_pid_is_dead() {
 
 #[test]
 fn liveness_starting_from_wrapper_mtime() {
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     let h = temp_home();
     let r = rec(2, true, Some("claude"));
     put(h.path(), &r);
@@ -623,7 +623,7 @@ fn apply_identity_userinfo_url_is_ignored() {
 fn rebind_rig(parent: u32) -> (opencode_ctl::testing::TempHome, FakeProbe) {
     let h = temp_home();
     put(h.path(), &rec(1, true, Some("claude")));
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     probe.set_alive(parent, "77");
     (h, probe)
 }
@@ -633,14 +633,14 @@ fn rebind_on_spawn_clears_claude_exited() {
     let (h, probe) = rebind_rig(900);
     touch(&pf(h.path(), "claude-exited"), "123");
     touch(&pf(h.path(), "dead-seen"), "456");
-    write_sent(&pf(h.path(), "claude-pid"), &sent(5, "boot", "x")); // dead pid
+    write_sent(&pf(h.path(), "claude-pid"), &sent(5, "1000", "x")); // dead pid
     let out = rebind_on_spawn(h.path(), PID, 900, &probe).unwrap();
     assert_eq!(out, RebindOutcome::Rebound);
     assert!(!pf(h.path(), "claude-exited").exists());
     assert!(!pf(h.path(), "dead-seen").exists());
     assert_eq!(
         read_sentinel(&pf(h.path(), "claude-pid")),
-        Some(sent(900, "boot", "77"))
+        Some(sent(900, "1000", "77"))
     );
 }
 
@@ -651,7 +651,7 @@ fn rebind_on_dead_claude_pid() {
         let (h, probe) = rebind_rig(900);
         touch(&pf(h.path(), "dead-seen"), "456");
         match setup {
-            "dead" => write_sent(&pf(h.path(), "claude-pid"), &sent(5, "boot", "x")),
+            "dead" => write_sent(&pf(h.path(), "claude-pid"), &sent(5, "1000", "x")),
             "garbage" => touch(&pf(h.path(), "claude-pid"), "zzz"),
             _ => {}
         }
@@ -660,13 +660,13 @@ fn rebind_on_dead_claude_pid() {
         assert!(!pf(h.path(), "dead-seen").exists(), "{setup}");
         assert_eq!(
             read_sentinel(&pf(h.path(), "claude-pid")),
-            Some(sent(900, "boot", "77")),
+            Some(sent(900, "1000", "77")),
             "{setup}"
         );
     }
     // no record at all
     let h = temp_home();
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     assert_eq!(
         rebind_on_spawn(h.path(), PID, 900, &probe).unwrap(),
         RebindOutcome::NoRecord
@@ -678,7 +678,7 @@ fn rebind_on_dead_claude_pid() {
 fn rebind_never_over_alive_controller() {
     let (h, probe) = rebind_rig(900);
     probe.set_alive(50, "st");
-    write_sent(&pf(h.path(), "claude-pid"), &sent(50, "boot", "st"));
+    write_sent(&pf(h.path(), "claude-pid"), &sent(50, "1000", "st"));
     touch(&pf(h.path(), "claude-exited"), "123");
     touch(&pf(h.path(), "dead-seen"), "456");
     let before = fs::read_to_string(pf(h.path(), "claude-pid")).unwrap();
@@ -742,7 +742,7 @@ async fn pair_status_unpaired_returns_null() {
 }
 
 fn paired_probe_rig(h: &opencode_ctl::testing::TempHome) -> FakeProbe {
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     let mut r = rec(2, true, Some("claude"));
     r.server_url = Some("http://127.0.0.1:4096".to_string());
     put(h.path(), &r);
@@ -1049,7 +1049,7 @@ fn resume_applies_the_record_server_url_like_a_file_identity() {
 #[test]
 fn attach_record_controller_side_follows_a_resumed_controller() {
     let h = temp_home();
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     let r = rec(1, false, None);
     // a genuine attach record with no controller files reads none
     assert_eq!(
@@ -1062,7 +1062,7 @@ fn attach_record_controller_side_follows_a_resumed_controller() {
         &pf(h.path(), "claude-pid"),
         &Sentinel {
             pid: 7100,
-            boot_id: "boot".into(),
+            boot_id: "1000".into(),
             starttime: "st".into(),
         },
     )

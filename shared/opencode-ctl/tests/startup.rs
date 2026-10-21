@@ -159,7 +159,7 @@ fn apply_identity_invalid_session_runs_unpaired() {
     assert_eq!(settings.sources["server_url"], Source::UserFile);
 
     // handed to startup, the warning lands in the Scoped log file
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     let report = run_startup(h.path(), &env, &probe, &warns);
     assert!(report.log.is_some());
     assert!(report.identity_stderr.is_empty());
@@ -175,7 +175,7 @@ fn apply_identity_invalid_session_warning_goes_to_stderr_when_log_unwritable() {
     fs::write(h.path().join("logs"), b"a regular file").unwrap();
     let env = env_with(h.path(), &[("OPENCODE_CTL_SESSION", "nonsense")]);
     let (_, warns) = resolve_identity(&env, h.path());
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     let report = run_startup(h.path(), &env, &probe, &warns);
     assert!(report.log.is_none());
     assert!(report.log_warning.is_some());
@@ -191,7 +191,7 @@ fn apply_identity_invalid_session_warning_goes_to_stderr_when_log_unwritable() {
 fn serve_startup_sweep() {
     let h = temp_home();
     let home = h.path();
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     probe.set_alive(7001, "700");
     let stdout = home.join("stdout");
     fs::create_dir_all(stdout.join("7000-600")).unwrap(); // dead pid
@@ -220,7 +220,7 @@ fn serve_startup_sweep() {
 fn serve_startup_sweep_pair_leftovers() {
     let h = temp_home();
     let home = h.path();
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     probe.set_alive(8001, "800");
     let id = "aaaaaaaaaaaa";
     let f = |name: &str, age_days: i64, body: &str| {
@@ -230,12 +230,12 @@ fn serve_startup_sweep_pair_leftovers() {
         p
     };
     // resume-lock: owner dead -> removed; owner alive -> kept
-    let dead_lock = f(&format!("pair.{id}.resume-lock"), 0, "8000:boot:799");
+    let dead_lock = f(&format!("pair.{id}.resume-lock"), 0, "8000:1000:799");
     let live_id = "bbbbbbbbbbbb";
-    let live_lock = f(&format!("pair.{live_id}.resume-lock"), 0, "8001:boot:800");
+    let live_lock = f(&format!("pair.{live_id}.resume-lock"), 0, "8001:1000:800");
     // sentinels without a record: old removed, young kept; with a record: kept
-    let old_sentinel = f(&format!("pair.{id}.claude-pid"), 2, "1:boot:1");
-    let young_sentinel = f(&format!("pair.{id}.g1.tui-pid"), 0, "1:boot:1");
+    let old_sentinel = f(&format!("pair.{id}.claude-pid"), 2, "1:1000:1");
+    let young_sentinel = f(&format!("pair.{id}.g1.tui-pid"), 0, "1:1000:1");
     write_record_new(
         home,
         &Record {
@@ -244,7 +244,7 @@ fn serve_startup_sweep_pair_leftovers() {
         },
     )
     .unwrap();
-    let guarded = f(&format!("pair.{live_id}.claude-pid"), 5, "8001:boot:800");
+    let guarded = f(&format!("pair.{live_id}.claude-pid"), 5, "8001:1000:800");
     // claim temps older than 24 h
     let old_tmp = f("pair.cccccccccccc.json.tmp-1234", 2, "x");
     let young_tmp = f("pair.cccccccccccc.json.tmp-5678", 0, "x");
@@ -273,7 +273,7 @@ async fn serve_without_log_dir_still_serves() {
         eprintln!("skipped: running as root");
         return;
     }
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     let report = run_startup(h.path(), &env_unpaired(&h), &probe, &[]);
     fs::set_permissions(&logs, fs::Permissions::from_mode(0o700)).unwrap();
     assert!(report.log_warning.is_some());
@@ -296,7 +296,7 @@ fn startup_rebinds_when_pair_set() {
     use opencode_ctl::liveness::RebindOutcome;
     let h = temp_home();
     write_record_new(h.path(), &rec(None)).unwrap();
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     let me = std::process::id();
     probe.parents.lock().unwrap().insert(me, 4242);
     probe.set_alive(4242, "77");
@@ -306,14 +306,14 @@ fn startup_rebinds_when_pair_set() {
     let report = run_startup(h.path(), &env, &probe, &[]);
     assert_eq!(report.rebind, Some(RebindOutcome::Rebound));
     let raw = fs::read_to_string(h.path().join(format!("pair.{PID}.claude-pid"))).unwrap();
-    assert!(raw.starts_with("4242:boot:77"), "{raw}");
+    assert!(raw.starts_with("4242:1000:77"), "{raw}");
     assert!(record_path(h.path(), PID).exists());
 }
 
 #[test]
 fn startup_without_pair_does_not_rebind() {
     let h = temp_home();
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     let report = run_startup(h.path(), &env_unpaired(&h), &probe, &[]);
     assert!(report.rebind.is_none());
 }
@@ -356,7 +356,7 @@ fn prepare_serve_applies_pair_record_before_transport() {
 fn pair_is_dead_keys_on_the_file_name_id() {
     use opencode_ctl::sweep::pair_is_dead;
     let h = temp_home();
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     // no record: dead
     assert!(pair_is_dead(h.path(), PID, T0, &probe));
     // a record under PID whose CONTENTS name another pair: liveness is read for PID's files
@@ -364,7 +364,7 @@ fn pair_is_dead_keys_on_the_file_name_id() {
     r.pair_id = "ffffffffffff".to_string();
     fs::write(record_path(h.path(), PID), serde_json::to_vec(&r).unwrap()).unwrap();
     probe.set_alive(55, "5");
-    fs::write(h.path().join(format!("pair.{PID}.claude-pid")), "55:boot:5").unwrap();
+    fs::write(h.path().join(format!("pair.{PID}.claude-pid")), "55:1000:5").unwrap();
     fs::write(h.path().join("pair.ffffffffffff.claude-exited"), "1").unwrap();
     assert!(!pair_is_dead(h.path(), PID, T0, &probe));
 }
@@ -397,7 +397,7 @@ fn userinfo_warning_reaches_the_log_not_the_void() {
             "{:?}",
             prep.identity_warnings
         );
-        let probe = FakeProbe::new("boot");
+        let probe = FakeProbe::new("1000");
         let report = run_startup(h.path(), &prep.env, &probe, &prep.identity_warnings);
         assert!(report.identity_stderr.is_empty());
         drop(report);
@@ -413,7 +413,7 @@ fn userinfo_warning_reaches_stderr_when_log_unwritable() {
     let h = temp_home();
     fs::write(h.path().join("logs"), b"a regular file").unwrap();
     let prep = userinfo_prep(h.path(), false);
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     let report = run_startup(h.path(), &prep.env, &probe, &prep.identity_warnings);
     assert!(report.log.is_none());
     assert_eq!(report.identity_stderr.len(), 1);

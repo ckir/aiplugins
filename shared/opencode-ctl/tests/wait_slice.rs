@@ -911,7 +911,7 @@ async fn wait_search_cut_by_deadline_is_running() {
         env_unpaired(&home),
         slow,
         clock.clone(),
-        Arc::new(FakeProbe::new("boot")),
+        Arc::new(FakeProbe::new("1000")),
     ));
     let out = driven(
         &clock,
@@ -991,7 +991,7 @@ async fn wait_search_cut_result_has_running_key_set() {
             env_unpaired(&home),
             slow,
             clock.clone(),
-            Arc::new(FakeProbe::new("boot")),
+            Arc::new(FakeProbe::new("1000")),
         ));
         let out = driven(
             &clock,

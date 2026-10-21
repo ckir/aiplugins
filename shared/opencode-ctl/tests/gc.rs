@@ -38,7 +38,7 @@ struct Rig {
 impl Rig {
     fn new() -> Self {
         let home = temp_home();
-        let probe = Arc::new(FakeProbe::new("boot"));
+        let probe = Arc::new(FakeProbe::new("1000"));
         let fake = FakeTransport::new();
         fake.on("session.active", vec![Ok(json!({"data": {}}))]);
         let engine = Engine::new(
@@ -103,7 +103,7 @@ impl Rig {
             &self.pf(id, suffix),
             &Sentinel {
                 pid,
-                boot_id: "boot".into(),
+                boot_id: "1000".into(),
                 starttime: "st".into(),
             },
         )
@@ -406,7 +406,7 @@ async fn gc_orphan_sentinels_24h() {
     let rig = Rig::new();
     let f = |name: &str, age: i64| {
         let p = rig.path().join(name);
-        fs::write(&p, "1:boot:1").unwrap();
+        fs::write(&p, "1:1000:1").unwrap();
         set_mtime(&p, NOW - age);
         p
     };
@@ -428,8 +428,8 @@ async fn gc_orphan_sentinels_24h() {
 async fn gc_dead_resume_lock_swept() {
     let rig = Rig::new();
     rig.probe.set_alive(8001, "st");
-    fs::write(rig.pf(A, "resume-lock"), "8000:boot:st").unwrap();
-    fs::write(rig.pf(B, "resume-lock"), "8001:boot:st").unwrap();
+    fs::write(rig.pf(A, "resume-lock"), "8000:1000:st").unwrap();
+    fs::write(rig.pf(B, "resume-lock"), "8001:1000:st").unwrap();
     let r = rig.run(NOW).await;
     assert!(!rig.pf(A, "resume-lock").exists());
     assert!(r.swept.contains(&rig.pf(A, "resume-lock")));

@@ -1422,7 +1422,7 @@ fn sweep_stdout_dirs_removes_dead_and_mismatched() {
         fs::create_dir_all(stdout.join(n)).unwrap();
         fs::write(stdout.join(n).join("x.json"), "{}").unwrap();
     }
-    let probe = FakeProbe::new("boot");
+    let probe = FakeProbe::new("1000");
     probe.set_alive(20, "bbb"); // same starttime: kept
     probe.set_alive(30, "other"); // pid reused: swept
     probe.set_alive(40, "0"); // "0" is the name used when the start time was unreadable
@@ -1454,7 +1454,7 @@ fn engine(rig: &Rig) -> Engine<CliTransport, SystemClock> {
         EnvSnapshot::for_tests(cwd.clone(), cwd),
         rig.transport(),
         SystemClock,
-        Arc::new(FakeProbe::new("boot")),
+        Arc::new(FakeProbe::new("1000")),
     )
 }
 

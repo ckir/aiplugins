@@ -136,7 +136,7 @@ impl Rig {
         let fake = FakeTransport::new();
         fake.on("server.info", vec![Ok(info("2.0.32", 7))]);
         fake.on("session.active", vec![Ok(json!({"data": {}}))]);
-        let probe = Arc::new(FakeProbe::new("boot"));
+        let probe = Arc::new(FakeProbe::new("1000"));
         probe.set_alive(4242, "s");
         let mut env = EnvSnapshot::for_tests(home.path().join("cwd"), ctl.clone());
         env.pair = o.pair.clone();
@@ -242,7 +242,7 @@ fn sentinel(rig: &Rig, file: &str, pid: u32) {
     rig.probe.set_alive(pid, "s");
     let s = Sentinel {
         pid,
-        boot_id: "boot".to_string(),
+        boot_id: "1000".to_string(),
         starttime: "s".to_string(),
     };
     write_sentinel(&rig.ctl().join(file), &s).unwrap();
@@ -304,7 +304,6 @@ async fn doctor_json_check_ids_in_order() {
 async fn doctor_json_baseline_all_checks() {
     let rig = Rig::new();
     let v = rig.run().await;
-    let ctl = rig.ctl().display().to_string();
     expect(
         &v,
         "ctl_home_override",
@@ -349,7 +348,12 @@ async fn doctor_json_baseline_all_checks() {
         "ok",
         "no pair has a dead controller beside a live TUI",
     );
-    expect(&v, "log", "skip", &format!("no log file in {ctl}/logs"));
+    expect(
+        &v,
+        "log",
+        "skip",
+        &format!("no log file in {}", rig.ctl().join("logs").display()),
+    );
     assert_eq!(rig.fake.openapi_fetches(), 1, "one fetch, by server.info");
 }
 
