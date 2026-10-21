@@ -1352,6 +1352,7 @@ async fn wrapper_and_record_modes() {
     assert_eq!(mode(&format!("pair.{id}.claude-exited")), 0o600);
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn pair_rolls_back_wrapper_on_tab_failure() {
     let rig = Rig::new();
@@ -2034,6 +2035,7 @@ async fn attach_wrapper_mode_is_0700() {
     assert_eq!(mode, 0o700);
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn attach_deletes_generations_older_than_n() {
     let rig = Rig::new();
@@ -2320,6 +2322,7 @@ async fn attach_session_id_checks_binary_before_record() {
     assert!(rig.tabs.borrow().is_empty());
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn attach_session_id_rolls_back_on_tab_failure() {
     let rig = Rig::new();
