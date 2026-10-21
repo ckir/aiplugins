@@ -1034,6 +1034,13 @@ Claude Code: `claude plugin marketplace add ckir/aiplugins` once (as the sibling
   THREE nested `node.exe` processes below the `qwen.cmd` shell, so a controller pid taken from the launched process
   or the outermost `node.exe` is not the stub's parent (owner decision: should `rebind_on_spawn` match any ancestor
   on Windows/Qwen?). Measured from a headless `-p` launch, not from an interactive tab.
+  DECIDED (owner, 2026-10-21, agy-first ALIGNED): no ancestor matching. In the launcher flow `claude-pid` is the
+  spawned `cmd.exe /c qwen.cmd` (`bind_controller`), alive for the whole chain, so `rebind_on_spawn` never fires; for
+  a controller started by hand under `OPENCODE_CTL_PAIR` it binds the innermost `node.exe`, the process holding the
+  MCP stdio pipe, which ends exactly when the session does. Matching any ancestor would let a long-lived one
+  (`wt.exe`, `explorer.exe`) keep a dead pair alive. Residual risk: a Qwen relaunch of its inner process reads as
+  dead until the next MCP spawn re-binds; gc still needs 24 h of continuous death and an inactive session
+  (`gc.rs` `DEAD_SEEN_GRACE_MS`), so it cannot reap a live pair.
   CONFIRMED (Windows 11, 2026-10-21, Antigravity 1.4.4, `docs/superpowers/acceptance/2026-10-21-task25-windows.md`
   Step 2): both variables arrive, the server variable as `""`, and the stub's parent pid is the launched `agy.exe` in
   3 of 3 launches.
@@ -1115,7 +1122,11 @@ Claude Code: `claude plugin marketplace add ckir/aiplugins` once (as the sibling
   a `ready` probe of the registered service (`packages/client/src/effect/service.ts:25-27`). So the status read right
   after the restart gets something other than `ready`; the exact cause on Windows is UNVERIFIED. Linux does not
   reproduce it: raw `restart` then `status` 3 of 3, and the plugin's `service_restart` 2 of 2 answered `running: true`
-  with the new pid (isolated home, port 45998). Open: fix or accept (owner).
+  with the new pid (isolated home, port 45998). FIXED (owner, 2026-10-21, agy-first ALIGNED): after a start or
+  restart that succeeded, `service_start` and `service_restart` read status again every 500 ms for up to 5 s and
+  answer what the last read saw; no `server.info` runs while it reads stopped, so a service that really died is
+  reported as stopped and never started to answer (`tests/protocol.rs` `service_*_rereads_status_until_running`,
+  `service_restart_reports_stopped_after_settle_window`). Not yet re-measured on Windows.
 - Step 1 spike through the tools (Claude Code 2.1.304, `--plugin-dir`, free model `opencode/deepseek-v4.1-flash-free`,
   4-task PLAN.md, isolated home). With the service STOPPED, as the plan wrote it, the sequence does not complete on
   Windows: run 1 `service_start` answered `running: false` and `session_create` failed with `EPERM ... rename
