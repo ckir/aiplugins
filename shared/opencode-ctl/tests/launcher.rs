@@ -121,7 +121,12 @@ impl Rig {
                 "gnome-terminal-server".into(),
                 "systemd".into(),
             ],
-            on_path: Vec::new(),
+            // Windows picks the terminal by `wt` on PATH alone (select_terminal), not by the parent chain.
+            on_path: if cfg!(windows) {
+                vec!["wt".into()]
+            } else {
+                Vec::new()
+            },
             password: None,
             tabs: RefCell::default(),
             tab_fails: Cell::new(false),
@@ -1918,6 +1923,13 @@ fn put(rig: &Rig, name: &str, content: &str) {
     fs::write(rig.home.path().join(name), content).unwrap();
 }
 
+/// The tab wrapper's name suffix: `.ps1` where the terminal is Windows Terminal, `.sh` elsewhere.
+const WRAPPER: &str = if cfg!(windows) {
+    "wrapper.ps1"
+} else {
+    "wrapper.sh"
+};
+
 fn has(rig: &Rig, name: &str) -> bool {
     rig.home.path().join(name).exists()
 }
@@ -1976,7 +1988,7 @@ async fn attach_bumps_generation() {
     }
     let w = wrapper_path(rig.home.path(), &id, 2, false);
     assert!(w.is_file(), "the g2 wrapper is the claim token");
-    assert!(!has(&rig, &format!("pair.{id}.g1.wrapper.sh")));
+    assert!(!has(&rig, &format!("pair.{id}.g1.{WRAPPER}")));
     let script = fs::read_to_string(&w).unwrap();
     assert!(
         script.contains(&format!("pair.{id}.g2.tui-pid")),
@@ -2018,18 +2030,18 @@ async fn attach_deletes_generations_older_than_n() {
     let rig = Rig::new();
     let id = seed(&rig, 3, true, None, None);
     for g in 1..=3 {
-        for f in ["wrapper.sh", "tui-pid", "tui-exited"] {
+        for f in [WRAPPER, "tui-pid", "tui-exited"] {
             put(&rig, &format!("pair.{id}.g{g}.{f}"), "x");
         }
     }
     rig.attach(&id).await.0.unwrap();
     for g in 1..=2 {
-        for f in ["wrapper.sh", "tui-pid", "tui-exited"] {
+        for f in [WRAPPER, "tui-pid", "tui-exited"] {
             assert!(!has(&rig, &format!("pair.{id}.g{g}.{f}")), "g{g} {f}");
         }
     }
     assert!(has(&rig, &format!("pair.{id}.g3.tui-pid")), "g<n> is kept");
-    assert!(has(&rig, &format!("pair.{id}.g4.wrapper.sh")));
+    assert!(has(&rig, &format!("pair.{id}.g4.{WRAPPER}")));
     assert_eq!(read_json(&rig, &id)["generation"], 4);
 }
 
@@ -2117,13 +2129,13 @@ fn attach_exclusive_create() {
     assert_eq!(b.0.unwrap(), 0);
     let claimed: Vec<String> = entries(&home)
         .into_iter()
-        .filter(|n| n.ends_with(".wrapper.sh"))
+        .filter(|n| n.ends_with(&format!(".{WRAPPER}")))
         .collect();
     assert_eq!(
         claimed,
         vec![
-            format!("pair.{id}.g2.wrapper.sh"),
-            format!("pair.{id}.g3.wrapper.sh")
+            format!("pair.{id}.g2.{WRAPPER}"),
+            format!("pair.{id}.g3.{WRAPPER}")
         ],
         "winner n+1 and loser n+2"
     );
@@ -2156,7 +2168,7 @@ async fn attach_loser_retries_then_conflict() {
     let rig = Rig::new();
     let id = seed(&rig, 1, false, None, None);
     for g in 2..=6 {
-        put(&rig, &format!("pair.{id}.g{g}.wrapper.sh"), "claimed");
+        put(&rig, &format!("pair.{id}.g{g}.{WRAPPER}"), "claimed");
     }
     let record = fs::read(rig.home.path().join(format!("pair.{id}.json"))).unwrap();
     let (r, _) = rig.attach(&id).await;
@@ -2167,7 +2179,7 @@ async fn attach_loser_retries_then_conflict() {
     );
     assert!(rig.tabs.borrow().is_empty());
     assert!(
-        !has(&rig, &format!("pair.{id}.g7.wrapper.sh")),
+        !has(&rig, &format!("pair.{id}.g7.{WRAPPER}")),
         "five tries only"
     );
 
@@ -2175,7 +2187,7 @@ async fn attach_loser_retries_then_conflict() {
     let rig = Rig::new();
     let id = seed(&rig, 1, false, None, None);
     for g in 2..=5 {
-        put(&rig, &format!("pair.{id}.g{g}.wrapper.sh"), "claimed");
+        put(&rig, &format!("pair.{id}.g{g}.{WRAPPER}"), "claimed");
     }
     rig.attach(&id).await.0.unwrap();
     assert_eq!(read_json(&rig, &id)["generation"], 6);
@@ -2186,7 +2198,7 @@ async fn attach_skips_orphaned_claims() {
     let rig = Rig::new();
     let id = seed(&rig, 1, false, None, None);
     // A crashed attach claimed g2 and never rewrote the record.
-    put(&rig, &format!("pair.{id}.g2.wrapper.sh"), "orphan");
+    put(&rig, &format!("pair.{id}.g2.{WRAPPER}"), "orphan");
     rig.attach(&id).await.0.unwrap();
     assert_eq!(read_json(&rig, &id)["generation"], 3);
     assert_eq!(
