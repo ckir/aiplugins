@@ -82,12 +82,16 @@ opencode-wiring:
 agy-wiring:
     bash scripts/check-agy-wiring.sh
 
-# Run Antigravity's own strict validator over the opencode-ctl-mcp-agy plugin (skipped when `agy` is absent).
+# Run Antigravity's own validator over every antigravity/plugins/* front (skipped when `agy` is absent).
+# Not --strict: strict also fails on "command isn't on this machine's PATH" warnings, which describe the
+# machine (the bin/ is not installed), not the repo; errors, such as an agent the loader would skip, still fail.
 agy-validate:
     #!/usr/bin/env bash
     set -euo pipefail
     if command -v agy >/dev/null 2>&1; then
-        agy plugin validate --strict antigravity/plugins/opencode-ctl-mcp-agy
+        for manifest in antigravity/plugins/*/plugin.json; do
+            agy plugin validate "$(dirname "$manifest")"
+        done
     else
         echo "agy-validate: skipped (agy not on PATH)"
     fi

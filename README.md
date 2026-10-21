@@ -63,7 +63,7 @@ verification) and asks whether to install project-local or global first:
 | `opencode-ctl-mcp-agy` | ≥ 10,138 | ≥ 8,545 |
 | `opencode-ctl-mcp-cc` | ≥ 10,137 | ≥ 8,592 |
 | `opencode-ctl-mcp-opencode` | ≥ 10,066 | ≥ 8,544 |
-| `re-ghidra-mcp-agy` | ≥ 21,528 | ≥ 36,815 |
+| `re-ghidra-mcp-agy` | ≥ 21,586 | ≥ 36,815 |
 | `re-ghidra-mcp-cc` | ≥ 21,631 | ≥ 36,903 |
 | `re-ghidra-mcp-opencode` | ≥ 21,297 | ≥ 37,147 |
 | `repo-user-guide-agy` | ≥ 468 | ≥ 11,474 |
