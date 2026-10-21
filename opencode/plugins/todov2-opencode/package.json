@@ -35,7 +35,7 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@opencode/plugin": "2.0.29"
+    "@opencode/plugin": "2.0.32"
   },
   "peerDependencies": {
     "@opentui/core": ">=0.5.8",
@@ -54,10 +54,10 @@
     }
   },
   "devDependencies": {
-    "@opentui/core": "0.5.8",
-    "@opentui/solid": "0.5.8",
+    "@opentui/core": "0.6.6",
+    "@opentui/solid": "0.6.6",
     "@types/bun": "^1.4.0",
-    "solid-js": "1.9.10",
-    "typescript": "^5.9.2"
+    "solid-js": "1.9.17",
+    "typescript": "^7.0.2"
   }
 }
