@@ -17,7 +17,8 @@ the plan are left unchanged for the session that folds these results in.
   `XDG_CACHE_HOME` pointed under `E:\tmp\oci`, `OPENCODE_CTL_HOME` pointed under it too, and
   `opencode service set port 45999` was applied. The user's own service was stopped before the session and
   is still stopped.
-- **Code fixes needed to run the plugin: none.** No commits besides this file.
+- **Code fixes needed to run the plugin: none in this session.** The branch already carried the five Windows fixes
+  from the 2026-10-20 pass (`2251c47`, `9bef438`, `478f64f`, `81a65d6`, `d55f711`); this session added only this file.
 
 ## Step 1: spike reproduction through the MCP tools
 

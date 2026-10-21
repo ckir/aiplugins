@@ -1034,6 +1034,9 @@ Claude Code: `claude plugin marketplace add ckir/aiplugins` once (as the sibling
   THREE nested `node.exe` processes below the `qwen.cmd` shell, so a controller pid taken from the launched process
   or the outermost `node.exe` is not the stub's parent (owner decision: should `rebind_on_spawn` match any ancestor
   on Windows/Qwen?). Measured from a headless `-p` launch, not from an interactive tab.
+  CONFIRMED (Windows 11, 2026-10-21, Antigravity 1.4.4, `docs/superpowers/acceptance/2026-10-21-task25-windows.md`
+  Step 2): both variables arrive, the server variable as `""`, and the stub's parent pid is the launched `agy.exe` in
+  3 of 3 launches.
 - `files` attachments on `session.prompt` (`PromptInput.FileAttachment` shape) for `session_prompt.files`.
 - Windows: `wt` argument quoting and whether `opencode.exe` is on PATH after the official installer.
   MEASURED (Windows 11, 2026-10-20): `wt -d` and the script path both quoted and containing spaces work
@@ -1045,6 +1048,10 @@ Claude Code: `claude plugin marketplace add ckir/aiplugins` once (as the sibling
   (owner, 2026-10-20): on Windows `resolve_binary` follows an `opencode.cmd` shim on PATH to the executable beside it
   (`node_modules\@opencode\cli\bin\opencode.exe`, the file the shim runs) and never starts `cmd.exe`, which would
   expand `%VAR%` in prompt text; other npm layouts still read as not found.
+  CONFIRMED after the fixes (2026-10-21, acceptance Step 4a and 4c): a real `pair` in `E:\tmp\proj with space` with
+  a home containing `ä`, `ö`, `é` and `’` spawned `wt -w 0 nt -d <dir> powershell.exe ... -File <wrapper>` and the TUI
+  received the directory intact; `-d E:\` and `-d C:\` open the drive root; a `subst` drive is canonicalised to its
+  target before `wt`. `doctor-json` reports `binary ok` through the npm shim. The official installer stays UNMEASURED.
 - Whether `wt` honours `-d` with a path containing spaces when the script path is also quoted.
   MEASURED: yes (see above).
 - `powershell.exe` 5.1 and the `.ps1` wrapper. MEASURED (5.1.26100, ANSI code page 1252): a BOM-less `.ps1` in a home
@@ -1056,6 +1063,8 @@ Claude Code: `claude plugin marketplace add ckir/aiplugins` once (as the sibling
   `a&echo INJECTED` argument executed the injected command. FIXED (owner, 2026-10-20): the spawn site builds one raw
   command line (`cmd_line`: one outer quote pair, quoted executable, trailing backslashes doubled); `cmd_wrap`'s argv
   form is unchanged for the dry-run output.
+  CONFIRMED after the fix (2026-10-21, acceptance Step 4d): a fake `qwen.cmd` at a path with a space received
+  `-p "(a) b! c" "x!y" "(z)"` as exactly those four arguments.
 - Windows job object versus a service auto-started by a managed-mode call. MEASURED (isolated home, port 45999):
   `session_list` with the service stopped succeeded and auto-started it, and `service_status` right afterwards
   reported `running: false`; controls: a plain `opencode api session.list` outside the job object left the service
@@ -1065,6 +1074,9 @@ Claude Code: `claude plugin marketplace add ckir/aiplugins` once (as the sibling
   2026-10-20) at the guard instead: `proc-guard` gains `release()`, and on Windows `run` releases the job on a normal
   exit instead of killing it, so a service the call started outlives the call; a deadline or the stdout ceiling
   still kills the tree. POSIX is unchanged (`detached: true` already lets the service escape its group).
+  CONFIRMED after the fix (2026-10-21, acceptance Step 4e): from a stopped service, `session_list` auto-started it,
+  the MCP server exited 0, and `opencode service status` and a fresh `service_status` (`running: true`, pid 8272) both
+  showed it alive; in Step 1 the service `service_start` started outlived `claude` in both runs.
 - macOS `date -j` conversion and `wrapper_starttime_matches_probe`: UNMEASURED (no macOS host).
 - The MCP tool-call ceiling of each host must exceed `wait_max_s` + 30 s: Claude Code (`MCP_TOOL_TIMEOUT`), Qwen
   Code (the extension's `timeout`), Antigravity (`mcp_config.json`); set it in each manifest where configurable,
@@ -1077,6 +1089,8 @@ Claude Code: `claude plugin marketplace add ckir/aiplugins` once (as the sibling
   `settings.json` (headless `agy -p` auto-denies an MCP call without one; the file was restored byte-identical), so
   no host needs a manifest change or a lower `wait_max_s` clamp. A stub whose read loop blocks during the call is dropped by Qwen as "failed to start" even for a 20 s call
   (it never answers `ping`): the server must keep answering requests during a slow call (rmcp does).
+  CONFIRMED (2026-10-21, acceptance Step 3): Claude Code 2.1.306 (`MCP_TOOL_TIMEOUT` unset, 152 s wall) and
+  Antigravity 1.4.4 (default, with a temporary `mcp(ocstub/*)` allow rule, 173.3 s wall) both returned the 130 s result.
 - The `konsole --new-tab -e` form (unmeasured; mate, gnome and xfce are the measured three).
   UNMEASURED in Task 25 (konsole not installed on the Windows host).
 - CLOSED from the source (round 8): the id `session_prompt` returns is the inbox id and the eventual message id for
@@ -1091,6 +1105,17 @@ Claude Code: `claude plugin marketplace add ckir/aiplugins` once (as the sibling
   `confirm` it answers `CONFIRM_REQUIRED` and restarts nothing); the tab showed no error or banner; a
   `session_prompt` sent afterwards appeared in the tab live (the user message, the reply, the `10.1K (5%)` token
   counter and the tab title `OC | RECONNECTED`), so the TUI reattached on its own.
+  CONFIRMED (2026-10-21, acceptance Step 5, `powershell.exe` 5.1 tab): the TUI process survived two restarts, opened a
+  new connection to the new listener with no action in the tab, and showed a post-restart turn live.
+  FOUND (Windows only, 2 of 2): the RESULT of `service_restart {confirm: true}` reads `running: false, pid: null` after
+  a restart that succeeded; a `service_status` 3.8 to 4.4 s later shows the new pid. `tools/service.rs` reads
+  `service_status` immediately after `Lifecycle::Restart`. OpenCode's `service restart` is stop plus `Service.ensure`
+  (`packages/cli/src/commands/handlers/service/restart.ts:15-16`), and `ensure` returns only on a `ready` probe
+  (`packages/client/src/service-probe.ts:29`), while `service status` prints `stopped` whenever `discover` does not get
+  a `ready` probe of the registered service (`packages/client/src/effect/service.ts:25-27`). So the status read right
+  after the restart gets something other than `ready`; the exact cause on Windows is UNVERIFIED. Linux does not
+  reproduce it: raw `restart` then `status` 3 of 3, and the plugin's `service_restart` 2 of 2 answered `running: true`
+  with the new pid (isolated home, port 45998). Open: fix or accept (owner).
 - Step 1 spike through the tools (Claude Code 2.1.304, `--plugin-dir`, free model `opencode/deepseek-v4.1-flash-free`,
   4-task PLAN.md, isolated home). With the service STOPPED, as the plan wrote it, the sequence does not complete on
   Windows: run 1 `service_start` answered `running: false` and `session_create` failed with `EPERM ... rename
@@ -1098,12 +1123,23 @@ Claude Code: `claude plugin marketplace add ckir/aiplugins` once (as the sibling
   (`session_wait`: socket closed, then unable to connect), the job-object kill measured above. With the service
   started outside the job object first, two runs completed: 64 s and 109 s wall (range; includes the controller
   model's own turns; background load uncontrolled), one `session_wait` slice each (13 s and 40 s, `idle`), no
-  re-prompt needed. `session_changes` returned `files: []` both times although the worker created the files: the
-  directory was not a git repository. The serve log records no CLI spawns, so the spawn count is not recoverable
+  re-prompt needed. `session_changes` returned `files: []` both times although the worker created the files. This
+  was put down to the directory not being a git repository; the 2026-10-21 runs point to a different cause (below),
+  so treat that as UNVERIFIED. The serve log records no CLI spawns, so the spawn count is not recoverable
   from it (5 tool calls per run). After the three fixes above, the plan's own scenario (service stopped, no
   `OPENCODE_CTL_BIN`, `opencode` found through the npm shim) completes: `service_start` answers `running: true`,
   two runs took 90 s and 82 s wall (range; background load uncontrolled), one `session_wait` slice each (11 s and
   13 s, `idle`), no re-prompt, and the service was still running afterwards.
+  MEASURED (2026-10-21, Claude Code 2.1.306, branch at `d55f711`, acceptance Step 1): from a STOPPED service, in a
+  throwaway git repository, two runs completed the plan's sequence (`service_status` -> `service_start` ->
+  `session_create` -> `session_prompt` -> `session_wait` -> `session_changes`): 59.4 to 82.5 s wall (two runs, range;
+  background load uncontrolled, CPU 35 % before the runs; includes the controller model's turns), one `idle` slice
+  each (`turn_s` 14 and 35), no re-prompt, `session_changes` listed all four files, and 22 to 26 CLI spawns per run
+  counted from `cli starting` lines in the isolated `opencode.log` (run 2 by operation in the acceptance file). A
+  discarded first attempt with the OpenCode data directory under a long `%TEMP%` path got `files: []` from
+  `session_changes` and from a direct `opencode api session.diff`, and `opencode.log` had 24 `failed to capture
+  snapshot ... Filename too long` warnings: snapshots under a deep data directory exceed the Windows path limit, so
+  `session.diff` has nothing to diff (an OpenCode limitation, not the plugin's).
 
 ## Decision: how the human invokes the one command (owner, 2026-10-18)
 
