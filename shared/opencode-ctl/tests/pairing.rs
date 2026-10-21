@@ -323,6 +323,38 @@ fn liveness_reopened_tab_is_starting_over_a_dead_older_generation() {
 }
 
 #[test]
+fn liveness_reopened_tab_that_exited_before_its_pid_is_dead() {
+    let probe = FakeProbe::new("boot");
+    let h = temp_home();
+    let r = rec(2, true, Some("claude"));
+    put(h.path(), &r);
+    // g1's tab is dead; the g2 tab `attach` re-opened exited before it wrote its `tui-pid`
+    alive_pid(&probe, h.path(), "g1.tui-pid", 11);
+    probe.set_dead(11);
+    let w = pf(h.path(), "g2.wrapper.sh");
+    touch(&w, "x");
+    set_mtime(&w, NOW - 1_000);
+    touch(&pf(h.path(), "g2.tui-exited"), "1");
+    assert_eq!(
+        side_liveness(Side::Tui, &r, h.path(), &probe, NOW),
+        Liveness::Dead,
+        "an exited re-opened tab is dead, not starting"
+    );
+    // an unreadable older sentinel does not turn it into unknown either
+    touch(&pf(h.path(), "g1.tui-pid"), "garbage");
+    assert_eq!(
+        side_liveness(Side::Tui, &r, h.path(), &probe, NOW),
+        Liveness::Dead
+    );
+    // a live older tab still wins
+    alive_pid(&probe, h.path(), "g1.tui-pid", 11);
+    assert_eq!(
+        side_liveness(Side::Tui, &r, h.path(), &probe, NOW),
+        Liveness::Alive
+    );
+}
+
+#[test]
 fn liveness_starting_from_wrapper_mtime() {
     let probe = FakeProbe::new("boot");
     let h = temp_home();

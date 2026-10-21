@@ -438,12 +438,15 @@ pub fn side_liveness(
                 }
             };
             // The fallback keeps a live older tab visible past a failed `attach`; a dead older tab must
-            // not hide the tab `attach` has just re-opened, whose fresh wrapper reads `starting`.
-            if generation != wanted
-                && state != Liveness::Alive
-                && starting_or_unknown(wrapper_origin(wanted), now_ms) == Liveness::Starting
-            {
-                return Liveness::Starting;
+            // not hide the tab `attach` has just re-opened, whose fresh wrapper reads `starting`. That
+            // tab can exit before it writes its `tui-pid` (its EXIT trap runs first): then it is dead.
+            if generation != wanted && state != Liveness::Alive {
+                if pair_file(home, id, &format!("g{wanted}.tui-exited")).exists() {
+                    return Liveness::Dead;
+                }
+                if starting_or_unknown(wrapper_origin(wanted), now_ms) == Liveness::Starting {
+                    return Liveness::Starting;
+                }
             }
             state
         }
