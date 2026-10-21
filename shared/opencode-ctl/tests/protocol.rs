@@ -321,6 +321,42 @@ async fn session_create_defaults_from_settings() {
 }
 
 #[tokio::test]
+async fn session_create_result_reports_agent_and_model() {
+    let mut s = Settings::default();
+    s.default_model = Some("openai/gpt-5#high".into());
+    s.default_agent = Some("build".into());
+    let mut served = sess(SID);
+    served["agent"] = json!("plan");
+    served["model"] = json!({"providerID":"anthropic","id":"claude"});
+    let mut bare = sess(SID);
+    bare.as_object_mut().unwrap().remove("agent");
+    bare.as_object_mut().unwrap().remove("model");
+    let r = rig(Host::Claude, s, false, |f| {
+        f.on(
+            "session.create",
+            vec![Ok(json!({"data": served})), Ok(json!({"data": bare}))],
+        )
+    })
+    .await;
+    // the service's own answer wins over what was sent
+    let out = call(&r.client, "session_create", json!({})).await;
+    assert!(out.get("error").is_none(), "{out}");
+    assert_eq!(out["agent"], json!("plan"));
+    assert_eq!(
+        out["model"],
+        json!({"providerID":"anthropic","id":"claude"})
+    );
+    // a service that echoes neither falls back to the sent values
+    let out = call(&r.client, "session_create", json!({})).await;
+    assert!(out.get("error").is_none(), "{out}");
+    assert_eq!(out["agent"], json!("build"));
+    assert_eq!(
+        out["model"],
+        json!({"providerID":"openai","id":"gpt-5","variant":"high"})
+    );
+}
+
+#[tokio::test]
 async fn session_list_fields_exactly_route() {
     let r = plain(|f| {
         f.on(

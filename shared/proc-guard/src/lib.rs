@@ -368,6 +368,26 @@ mod tests {
         }
     }
 
+    // `release` disarms the guard WITHOUT killing: the group must outlive both the release and the
+    // drop (the Unix twin of `release_lets_the_tree_outlive_the_job`).
+    #[test]
+    fn release_lets_the_group_outlive_the_guard() {
+        let mut cmd = Command::new("sh");
+        cmd.args(["-c", "sleep 60"]);
+        let mut guard = ProcessGroupGuard::new().expect("create guard");
+        guard.configure_command(&mut cmd);
+        let mut child = cmd.spawn().expect("spawn sh");
+        guard.assign(&child);
+        guard.release().expect("release the guard");
+        assert!(!guard.is_armed(), "release must disarm the guard");
+        drop(guard);
+        std::thread::sleep(Duration::from_millis(300));
+        let status = child.try_wait().expect("try_wait");
+        let _ = child.kill();
+        let _ = child.wait();
+        assert!(status.is_none(), "a released guard must not kill the group");
+    }
+
     // Spawn a shell that spawns a grandchild and waits; assign the LEADER pid to the guard, read
     // the grandchild pid from stdout, then drop the guard: the whole group — leader and grandchild
     // — must die. This is the guarantee the guard exists for.

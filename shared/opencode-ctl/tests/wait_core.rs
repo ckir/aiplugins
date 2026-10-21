@@ -1171,3 +1171,41 @@ async fn wait_after_unknown_empty_list_stalls_after_stall_s() {
     assert_eq!(out["state"], "running", "{out}");
     assert_eq!(out["turn_s"], Value::Null);
 }
+
+#[test]
+fn evaluate_budget_boundary_is_strictly_past_max_turn_s() {
+    let settings = Settings::default();
+    let anchor = Anchor {
+        id: "msg_a".into(),
+        created_ms: NOW,
+        source: AnchorSource::Message,
+    };
+    let turn_user = opencode_ctl::compact::Message {
+        id: "msg_a".into(),
+        r#type: "user".into(),
+        outcome: None,
+        created: NOW,
+        text: "do it".into(),
+        last_text: None,
+        tools: vec![],
+    };
+    let snap = |now_ms| Snapshot {
+        messages: vec![turn_user.clone()],
+        inbox: vec![],
+        active: true,
+        permissions: vec![],
+        forms: vec![],
+        now_ms,
+    };
+    let max_ms = settings.max_turn_s as i64 * 1000;
+    let at = evaluate(&anchor, &snap(NOW + max_ms), &settings);
+    assert_eq!(
+        at.state,
+        WaitState::Running,
+        "a turn of exactly max_turn_s is within budget"
+    );
+    assert_eq!(at.turn_s, Some(1800));
+    let past = evaluate(&anchor, &snap(NOW + max_ms + 1000), &settings);
+    assert_eq!(past.state, WaitState::BudgetExceeded);
+    assert_eq!(past.turn_s, Some(1801));
+}

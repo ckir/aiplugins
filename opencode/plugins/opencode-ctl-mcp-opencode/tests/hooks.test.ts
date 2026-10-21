@@ -40,7 +40,10 @@ describe("plugin", () => {
     handler!(event);
     handler!(event);
     expect(event.system).toHaveLength(1);
-    expect((event.system[0] as { type: string }).type).toBe("text");
+    expect(event.system[0]).toEqual({
+      type: "text",
+      text: "opencode-ctl-mcp: use the opencode-ctl-driver skill to delegate work to a worker session; service_stop and service_restart are refused on this host.",
+    });
     handler!({});
   });
 });
