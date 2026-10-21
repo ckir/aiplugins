@@ -421,25 +421,31 @@ pub fn side_liveness(
             } else {
                 highest_tui_generation(home, id).unwrap_or(wanted)
             };
-            if pair_file(home, id, &format!("g{generation}.tui-exited")).exists() {
-                return Liveness::Dead;
-            }
-            match sentinel_state(
-                &pair_file(home, id, &format!("g{generation}.tui-pid")),
-                probe,
-            ) {
-                Some(state) => state,
-                None => {
-                    let origin = ["sh", "ps1"].iter().find_map(|ext| {
-                        mtime_ms(&pair_file(
-                            home,
-                            id,
-                            &format!("g{generation}.wrapper.{ext}"),
-                        ))
-                    });
-                    starting_or_unknown(origin, now_ms)
+            let wrapper_origin = |g: u32| {
+                ["sh", "ps1"]
+                    .iter()
+                    .find_map(|ext| mtime_ms(&pair_file(home, id, &format!("g{g}.wrapper.{ext}"))))
+            };
+            let state = if pair_file(home, id, &format!("g{generation}.tui-exited")).exists() {
+                Liveness::Dead
+            } else {
+                match sentinel_state(
+                    &pair_file(home, id, &format!("g{generation}.tui-pid")),
+                    probe,
+                ) {
+                    Some(state) => state,
+                    None => starting_or_unknown(wrapper_origin(generation), now_ms),
                 }
+            };
+            // The fallback keeps a live older tab visible past a failed `attach`; a dead older tab must
+            // not hide the tab `attach` has just re-opened, whose fresh wrapper reads `starting`.
+            if generation != wanted
+                && state != Liveness::Alive
+                && starting_or_unknown(wrapper_origin(wanted), now_ms) == Liveness::Starting
+            {
+                return Liveness::Starting;
             }
+            state
         }
         Side::Controller => {
             // An attach record carries no controller. Once `resume` (or a re-binding MCP server) has put

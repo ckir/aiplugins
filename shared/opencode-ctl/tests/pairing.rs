@@ -284,6 +284,45 @@ fn liveness_reads_record_generation_then_fallback() {
 }
 
 #[test]
+fn liveness_reopened_tab_is_starting_over_a_dead_older_generation() {
+    let probe = FakeProbe::new("boot");
+    let h = temp_home();
+    let r = rec(2, true, Some("claude"));
+    put(h.path(), &r);
+    // g1's tab ran and exited; `attach` claimed g2 and wrote its wrapper, whose tab has not started yet
+    alive_pid(&probe, h.path(), "g1.tui-pid", 11);
+    touch(&pf(h.path(), "g1.tui-exited"), "1");
+    let w = pf(h.path(), "g2.wrapper.sh");
+    touch(&w, "x");
+    set_mtime(&w, NOW - 1_000);
+    assert_eq!(
+        side_liveness(Side::Tui, &r, h.path(), &probe, NOW),
+        Liveness::Starting,
+        "a dead older tab does not hide the re-opened one"
+    );
+    // the same with g1 dead by its pid check rather than by its exited file
+    std::fs::remove_file(pf(h.path(), "g1.tui-exited")).unwrap();
+    probe.set_dead(11);
+    assert_eq!(
+        side_liveness(Side::Tui, &r, h.path(), &probe, NOW),
+        Liveness::Starting
+    );
+    // a live older tab still wins over the fresh wrapper
+    probe.set_alive(11, "st");
+    assert_eq!(
+        side_liveness(Side::Tui, &r, h.path(), &probe, NOW),
+        Liveness::Alive
+    );
+    // once the wrapper is 30 s old with no sentinel, the older generation's reading is back
+    probe.set_dead(11);
+    set_mtime(&w, NOW - 30_000);
+    assert_eq!(
+        side_liveness(Side::Tui, &r, h.path(), &probe, NOW),
+        Liveness::Dead
+    );
+}
+
+#[test]
 fn liveness_starting_from_wrapper_mtime() {
     let probe = FakeProbe::new("boot");
     let h = temp_home();
