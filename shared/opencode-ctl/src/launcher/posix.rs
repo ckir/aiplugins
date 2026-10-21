@@ -14,10 +14,11 @@ pub const BOOT_ID_EXPR_POSIX: &str = "cat /proc/sys/kernel/random/boot_id";
 #[cfg(target_os = "linux")]
 pub const STARTTIME_EXPR_POSIX: &str = "s=$(cat /proc/$$/stat); s=${s##*) }; set -- $s; echo ${20}";
 
-/// `kern.boottime`'s `sec = N` field.
+/// `kern.boottime`'s `sec = N` field. `{ sec = N, usec = M } ...`: the `[^u]` keeps the greedy `.*`
+/// from backtracking onto `usec = M` (that read `M`, and `0` on a round second).
 #[cfg(target_os = "macos")]
 pub const BOOT_ID_EXPR_POSIX: &str =
-    r#"sysctl -n kern.boottime | sed 's/.*sec = \([0-9]*\).*/\1/'"#;
+    r#"sysctl -n kern.boottime | sed 's/.*[^u]sec = \([0-9]*\).*/\1/'"#;
 /// `ps -o lstart=` as epoch seconds, both sides forced to UTC. UNVERIFIED here: the `date -j`
 /// format string is measured on a Mac in Task 25 Step 4.
 #[cfg(target_os = "macos")]
