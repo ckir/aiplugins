@@ -30,7 +30,26 @@ description: |-
   </commentary>
   </example>
 model: inherit
-tools: mcp__re-ghidra-mcp__list_project_programs, mcp__re-ghidra-mcp__attach_program, mcp__re-ghidra-mcp__inspect_function, mcp__re-ghidra-mcp__find_functions, mcp__re-ghidra-mcp__list_symbols, mcp__re-ghidra-mcp__list_strings, mcp__re-ghidra-mcp__list_data_items, mcp__re-ghidra-mcp__list_segments, mcp__re-ghidra-mcp__resolve_symbol, mcp__re-ghidra-mcp__describe_address, mcp__re-ghidra-mcp__get_xrefs, mcp__re-ghidra-mcp__get_disassembly, mcp__re-ghidra-mcp__read_bytes, mcp__re-ghidra-mcp__get_datatype, mcp__re-ghidra-mcp__rename, mcp__re-ghidra-mcp__comment, mcp__re-ghidra-mcp__set_datatype, mcp__re-ghidra-mcp__set_prototype, mcp__re-ghidra-mcp__set_local
+tools:
+  - mcp__re-ghidra-mcp__list_project_programs
+  - mcp__re-ghidra-mcp__attach_program
+  - mcp__re-ghidra-mcp__inspect_function
+  - mcp__re-ghidra-mcp__find_functions
+  - mcp__re-ghidra-mcp__list_symbols
+  - mcp__re-ghidra-mcp__list_strings
+  - mcp__re-ghidra-mcp__list_data_items
+  - mcp__re-ghidra-mcp__list_segments
+  - mcp__re-ghidra-mcp__resolve_symbol
+  - mcp__re-ghidra-mcp__describe_address
+  - mcp__re-ghidra-mcp__get_xrefs
+  - mcp__re-ghidra-mcp__get_disassembly
+  - mcp__re-ghidra-mcp__read_bytes
+  - mcp__re-ghidra-mcp__get_datatype
+  - mcp__re-ghidra-mcp__rename
+  - mcp__re-ghidra-mcp__comment
+  - mcp__re-ghidra-mcp__set_datatype
+  - mcp__re-ghidra-mcp__set_prototype
+  - mcp__re-ghidra-mcp__set_local
 ---
 
 You are a reverse engineer performing a first-pass naming and annotation sweep over a Ghidra program
