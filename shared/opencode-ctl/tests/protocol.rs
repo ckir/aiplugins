@@ -841,3 +841,100 @@ async fn service_stop_and_restart_with_confirm() {
         [Lifecycle::Stop, Lifecycle::Restart, Lifecycle::Status]
     );
 }
+
+/// A rig on virtual time: the fake and the engine share `clock`, so the settle re-reads cost no wall time.
+async fn timed(clock: &TestClock, setup: impl FnOnce(&FakeTransport)) -> Rig {
+    let home = temp_home();
+    let fake = FakeTransport::new().with_clock(clock.clone());
+    setup(&fake);
+    let env = env_unpaired(&home);
+    let e = engine(
+        fake.clone(),
+        clock.clone(),
+        Host::Claude,
+        Settings::default(),
+        env,
+    );
+    let client = client_for(e).await;
+    Rig {
+        fake,
+        client,
+        _home: home,
+    }
+}
+
+async fn call_timed(r: &Rig, clock: &TestClock, tool: &str, args: Value) -> Value {
+    tokio::select! {
+        out = call(&r.client, tool, args) => out,
+        () = clock.run_until_idle() => unreachable!("run_until_idle never returns"),
+    }
+}
+
+fn status_times(r: &Rig) -> Vec<i64> {
+    r.fake
+        .lifecycle_calls()
+        .iter()
+        .filter(|(v, _)| *v == Lifecycle::Status)
+        .map(|(_, at)| *at)
+        .collect()
+}
+
+// MEASURED on Windows (Task 25 Step 5): the status read right after a restart that succeeded said stopped.
+#[tokio::test]
+async fn service_restart_rereads_status_until_running() {
+    let clock = TestClock::new(1_000);
+    let r = timed(&clock, |f| {
+        f.on_lifecycle_seq(
+            Lifecycle::Status,
+            vec![Ok("stopped".into()), Ok("stopped".into())],
+        );
+        f.on("server.info", vec![Ok(info_ok())]);
+    })
+    .await;
+    let out = call_timed(&r, &clock, "service_restart", json!({"confirm": true})).await;
+    assert_eq!(out["running"], json!(true), "{out}");
+    assert_eq!(out["pid"], json!(4242), "{out}");
+    assert_eq!(status_times(&r), [1_000, 1_500, 2_000]);
+    assert_eq!(
+        r.fake.calls().len(),
+        1,
+        "one server.info, after the read that saw it running"
+    );
+}
+
+#[tokio::test]
+async fn service_start_rereads_status_until_running() {
+    let clock = TestClock::new(1_000);
+    let r = timed(&clock, |f| {
+        f.on_lifecycle_seq(Lifecycle::Status, vec![Ok("stopped".into())]);
+        f.on("server.info", vec![Ok(info_ok())]);
+    })
+    .await;
+    let out = call_timed(&r, &clock, "service_start", json!({})).await;
+    assert_eq!(out["running"], json!(true), "{out}");
+    assert_eq!(status_times(&r), [1_000, 1_500]);
+}
+
+#[tokio::test]
+async fn service_restart_reports_stopped_after_settle_window() {
+    let clock = TestClock::new(1_000);
+    let r = timed(&clock, |f| {
+        f.on_lifecycle(Lifecycle::Status, Ok("stopped".into()));
+    })
+    .await;
+    let out = call_timed(&r, &clock, "service_restart", json!({"confirm": true})).await;
+    assert_eq!(out["running"], json!(false), "{out}");
+    assert_eq!(out["pid"], json!(null), "{out}");
+    let times = status_times(&r);
+    assert_eq!(times.first(), Some(&1_000));
+    assert_eq!(
+        times.last(),
+        Some(&6_000),
+        "the last read lands on the 5 s deadline: {times:?}"
+    );
+    assert_eq!(times.len(), 11, "every 500 ms from 0 to 5 s: {times:?}");
+    assert!(
+        r.fake.calls().is_empty(),
+        "no server.info while stopped: a managed call would start a service to answer"
+    );
+}

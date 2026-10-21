@@ -29,6 +29,7 @@ struct State {
     scripts: HashMap<String, Vec<Script>>,
     waits: VecDeque<(Result<WaitOutcome, TransportError>, u64)>,
     lifecycle: HashMap<Lifecycle, Result<String, TransportError>>,
+    lifecycle_seq: HashMap<Lifecycle, VecDeque<Result<String, TransportError>>>,
     cli_version: Result<String, TransportError>,
     openapi: Option<Value>,
     calls: Vec<RecordedCall>,
@@ -69,6 +70,7 @@ impl FakeTransport {
                 scripts: HashMap::new(),
                 waits: VecDeque::new(),
                 lifecycle: HashMap::new(),
+                lifecycle_seq: HashMap::new(),
                 cli_version: Ok("opencode v2.0.32".to_string()),
                 openapi: Some(openapi),
                 calls: Vec::new(),
@@ -123,6 +125,15 @@ impl FakeTransport {
 
     pub fn on_lifecycle(&self, verb: Lifecycle, result: Result<String, TransportError>) {
         self.state.lock().unwrap().lifecycle.insert(verb, result);
+    }
+
+    /// Answers for `verb` in order, one per call; once used up, `on_lifecycle`'s answer (or the default).
+    pub fn on_lifecycle_seq(&self, verb: Lifecycle, results: Vec<Result<String, TransportError>>) {
+        self.state
+            .lock()
+            .unwrap()
+            .lifecycle_seq
+            .insert(verb, results.into());
     }
 
     pub fn on_cli_version(&self, result: Result<String, TransportError>) {
@@ -198,6 +209,13 @@ impl Transport for FakeTransport {
         let at_ms = self.now();
         let mut st = self.state.lock().unwrap();
         st.lifecycle_calls.push((verb, at_ms));
+        if let Some(r) = st
+            .lifecycle_seq
+            .get_mut(&verb)
+            .and_then(VecDeque::pop_front)
+        {
+            return r;
+        }
         match st.lifecycle.get(&verb) {
             Some(r) => r.clone(),
             None => Ok(match verb {
