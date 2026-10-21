@@ -9,7 +9,7 @@
     and extracting the bundle directly into ~/.qwen/extensions/<name>/.
 
 .PARAMETER ExtensionName
-    The extension to install: re-ghidra-mcp-qwen or rtk-mcp-qwen
+    The extension to install: re-ghidra-mcp-qwen, rtk-mcp-qwen or opencode-ctl-mcp-qwen
 
 .EXAMPLE
     # One-liner install (PowerShell):
@@ -21,7 +21,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('re-ghidra-mcp-qwen', 'rtk-mcp-qwen')]
+    [ValidateSet('re-ghidra-mcp-qwen', 'rtk-mcp-qwen', 'opencode-ctl-mcp-qwen')]
     [string]$ExtensionName
 )
 
@@ -31,7 +31,7 @@ function Install-QwenExtension {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory, Position = 0)]
-        [ValidateSet('re-ghidra-mcp-qwen', 'rtk-mcp-qwen')]
+        [ValidateSet('re-ghidra-mcp-qwen', 'rtk-mcp-qwen', 'opencode-ctl-mcp-qwen')]
         [string]$Name
     )
 
@@ -118,6 +118,7 @@ else {
     Write-Host "Available extensions:" -ForegroundColor Yellow
     Write-Host "  re-ghidra-mcp-qwen   Ghidra MCP for Qwen Code (19 RE tools)"
     Write-Host "  rtk-mcp-qwen         RTK command rewriter hook"
+    Write-Host "  opencode-ctl-mcp-qwen  OpenCode worker sessions (20 MCP tools)"
     Write-Host ""
     Write-Host "Or use the function directly after piping:" -ForegroundColor Yellow
     Write-Host '  Install-QwenExtension re-ghidra-mcp-qwen'

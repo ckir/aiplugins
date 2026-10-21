@@ -30,6 +30,13 @@
         ".claude-plugin/plugin.json"
       ]
     },
+    "claude-code/plugins/opencode-ctl-mcp-cc": {
+      "release-type": "rust",
+      "component": "opencode-ctl-mcp-cc",
+      "extra-files": [
+        ".claude-plugin/plugin.json"
+      ]
+    },
     "qwen/plugins/rtk-mcp-qwen": {
       "release-type": "rust",
       "component": "rtk-mcp-qwen",
@@ -47,6 +54,13 @@
     "qwen/plugins/aiplugins-devtools-qwen": {
       "release-type": "simple",
       "component": "aiplugins-devtools-qwen",
+      "extra-files": [
+        "qwen-extension.json"
+      ]
+    },
+    "qwen/plugins/opencode-ctl-mcp-qwen": {
+      "release-type": "rust",
+      "component": "opencode-ctl-mcp-qwen",
       "extra-files": [
         "qwen-extension.json"
       ]
@@ -86,6 +100,13 @@
         "package.json"
       ]
     },
+    "opencode/plugins/opencode-ctl-mcp-opencode": {
+      "release-type": "simple",
+      "component": "opencode-ctl-mcp-opencode",
+      "extra-files": [
+        "package.json"
+      ]
+    },
     "antigravity/plugins/rtk-mcp-agy": {
       "release-type": "rust",
       "component": "rtk-mcp-agy",
@@ -103,6 +124,20 @@
     "antigravity/plugins/aiplugins-devtools-agy": {
       "release-type": "simple",
       "component": "aiplugins-devtools-agy",
+      "extra-files": [
+        "plugin.json"
+      ]
+    },
+    "antigravity/plugins/repo-user-guide-agy": {
+      "release-type": "simple",
+      "component": "repo-user-guide-agy",
+      "extra-files": [
+        "plugin.json"
+      ]
+    },
+    "antigravity/plugins/opencode-ctl-mcp-agy": {
+      "release-type": "rust",
+      "component": "opencode-ctl-mcp-agy",
       "extra-files": [
         "plugin.json"
       ]

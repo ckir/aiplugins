@@ -56,9 +56,13 @@ pub async fn dispatch(
             boot_smoke().await;
             0
         }
-        _ => {
+        Some("--version" | "-V" | "--help" | "-h") => {
             usage(product, version);
             0
+        }
+        _ => {
+            usage(product, version);
+            2
         }
     }
 }
@@ -273,6 +277,36 @@ fn mk(id: i64, method: &str, params: serde_json::Value) -> ghidra_ipc::rpc::RpcR
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Bad usage is exit 2, as the `dispatch` contract says.
+    #[tokio::test]
+    async fn unknown_command_exits_2() {
+        let code = dispatch(
+            "p",
+            "0",
+            vec!["bogus".into()],
+            crate::config::RawConfig::default(),
+        )
+        .await;
+        assert_eq!(code, 2);
+        let code = dispatch("p", "0", vec![], crate::config::RawConfig::default()).await;
+        assert_eq!(code, 2);
+    }
+
+    /// Asking for the version or help is not bad usage: exit 0, same output.
+    #[tokio::test]
+    async fn version_and_help_flags_exit_0() {
+        for flag in ["--version", "-V", "--help", "-h"] {
+            let code = dispatch(
+                "p",
+                "0",
+                vec![flag.into()],
+                crate::config::RawConfig::default(),
+            )
+            .await;
+            assert_eq!(code, 0, "{flag}");
+        }
+    }
 
     #[test]
     fn parses_both_flag_spellings() {

@@ -6,7 +6,7 @@
 //! manifest is repo content, so on a pull request it is contributor-authored
 //! input that this tool is about to execute.
 
-use plugin_footprint::manifest::{read_mcp_servers, ManifestError};
+use plugin_footprint::manifest::{read_agy_servers, read_mcp_servers, ManifestError};
 use std::path::{Path, PathBuf};
 
 /// A throwaway plugin directory carrying a `.mcp.json`.
@@ -199,4 +199,42 @@ fn a_sibling_whose_name_merely_starts_with_the_root_is_refused() {
         matches!(err, ManifestError::CommandEscapesPluginRoot { .. }),
         "expected a confinement refusal, got: {err}"
     );
+}
+
+#[test]
+fn reads_antigravity_servers_from_mcp_config_json() {
+    let dir = std::env::temp_dir().join(format!(
+        "plugin-footprint-manifest-agy-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    std::fs::create_dir_all(&dir).expect("create fixture");
+    std::fs::write(
+        dir.join("mcp_config.json"),
+        r#"{
+          "mcpServers": {
+            "rtkmcp": {
+              "command": "rtk-mcp",
+              "args": ["serve"],
+              "env": { "RUST_LOG": "info" }
+            }
+          }
+        }"#,
+    )
+    .expect("write mcp_config.json");
+
+    let servers = read_agy_servers(&dir).expect("manifest reads");
+    assert_eq!(servers.len(), 1);
+    let s = &servers[0];
+    assert_eq!(s.name, "rtkmcp");
+    assert_eq!(s.args, vec!["serve".to_string()]);
+    assert_eq!(s.env.get("RUST_LOG").map(String::as_str), Some("info"));
+    let expected_name = if cfg!(windows) {
+        "rtk-mcp.exe"
+    } else {
+        "rtk-mcp"
+    };
+    assert_eq!(s.command, dir.join("bin").join(expected_name));
+
+    std::fs::remove_dir_all(&dir).ok();
 }

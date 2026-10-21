@@ -21,12 +21,12 @@ The architecture follows a **shared engine + agent-specific front** pattern:
 
 ### Agent Plugins
 
-| Agent | re-ghidra-mcp | rtk-mcp |
-|---|---|---|
-| Claude Code | `claude-code/plugins/re-ghidra-mcp-cc` | `claude-code/plugins/rtk-mcp-cc` |
-| Qwen Code | `qwen/plugins/re-ghidra-mcp-qwen` | `qwen/plugins/rtk-mcp-qwen` |
-| Antigravity | `antigravity/plugins/re-ghidra-mcp-agy` | `antigravity/plugins/rtk-mcp-agy` |
-| OpenCode | `opencode/plugins/re-ghidra-mcp-opencode` | `opencode/plugins/rtk-mcp-opencode` (plus `opencode/plugins/todov2-opencode`: todowrite tool + TUI sidebar) |
+| Agent | re-ghidra-mcp | rtk-mcp | opencode-ctl-mcp |
+|---|---|---|---|
+| Claude Code | `claude-code/plugins/re-ghidra-mcp-cc` | `claude-code/plugins/rtk-mcp-cc` | `claude-code/plugins/opencode-ctl-mcp-cc` |
+| Qwen Code | `qwen/plugins/re-ghidra-mcp-qwen` | `qwen/plugins/rtk-mcp-qwen` | `qwen/plugins/opencode-ctl-mcp-qwen` |
+| Antigravity | `antigravity/plugins/re-ghidra-mcp-agy` | `antigravity/plugins/rtk-mcp-agy` | `antigravity/plugins/opencode-ctl-mcp-agy` |
+| OpenCode | `opencode/plugins/re-ghidra-mcp-opencode` | `opencode/plugins/rtk-mcp-opencode` (plus `opencode/plugins/todov2-opencode`: todowrite tool + TUI sidebar) | `opencode/plugins/opencode-ctl-mcp-opencode` |
 
 ## Key Technologies
 

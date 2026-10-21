@@ -46,7 +46,7 @@ spellcheck:
 # does not filter them on Windows (mlc 1.2.2); extend the list when a new
 # node_modules/ or build-output dir appears.
 links:
-    mlc --offline --ignore-path "./node_modules,./opencode/plugins/re-ghidra-mcp-opencode/node_modules,./opencode/plugins/rtk-mcp-opencode/node_modules,./opencode/plugins/todov2-opencode/node_modules,./target"
+    mlc --offline --ignore-path "./node_modules,./opencode/plugins/re-ghidra-mcp-opencode/node_modules,./opencode/plugins/opencode-ctl-mcp-opencode/node_modules,./opencode/plugins/rtk-mcp-opencode/node_modules,./opencode/plugins/todov2-opencode/node_modules,./target"
 
 # Verify plugin configs point at binaries this workspace actually builds.
 # Nothing else checks those strings: rename a [[bin]] and every test still
@@ -64,6 +64,10 @@ marketplace:
 qwen-marketplace:
     bash scripts/check-qwen-marketplace.sh
 
+# Verify the Antigravity marketplace manifest still matches the plugins it publishes.
+agy-marketplace:
+    bash scripts/check-agy-marketplace.sh
+
 # Regenerate the host marketplace manifests from the plugin manifests.
 # CI runs --check: committed copies must match, so a stale copy fails
 # the same way a stale footprint does.
@@ -73,6 +77,20 @@ gen-marketplaces:
 # Verify opencode/plugins/ plugin configs, ids, and skill copies.
 opencode-wiring:
     bash scripts/check-opencode-wiring.sh
+
+# Verify antigravity/plugins/ plugin configs, ids, binary resolution, and skill copies.
+agy-wiring:
+    bash scripts/check-agy-wiring.sh
+
+# Run Antigravity's own strict validator over the opencode-ctl-mcp-agy plugin (skipped when `agy` is absent).
+agy-validate:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if command -v agy >/dev/null 2>&1; then
+        agy plugin validate --strict antigravity/plugins/opencode-ctl-mcp-agy
+    else
+        echo "agy-validate: skipped (agy not on PATH)"
+    fi
 
 # Assemble every OpenCode plugin zip locally and check its contents (PR-time
 # smoke; tag-time bundling and published-zip verification stay in
@@ -107,6 +125,14 @@ footprint-regen:
     for plugin in $(bash scripts/registry-plugins.sh opencode | tr -d '\r'); do
         dir="opencode/plugins/$plugin"
         cargo run -q -p plugin-footprint --bin plugin-footprint -- measure "$dir" \
+            --out "docs/footprints/$plugin.json"
+        cargo run -q -p plugin-footprint --bin plugin-footprint -- ratchet \
+            --measured "docs/footprints/$plugin.json" \
+            --budgets docs/footprints/budgets.json
+        echo "regenerated docs/footprints/$plugin.json"
+    done
+    for plugin in $(bash scripts/registry-plugins.sh antigravity | tr -d '\r'); do
+        cargo run -q -p plugin-footprint --bin plugin-footprint -- measure "antigravity/plugins/$plugin" \
             --out "docs/footprints/$plugin.json"
         cargo run -q -p plugin-footprint --bin plugin-footprint -- ratchet \
             --measured "docs/footprints/$plugin.json" \
@@ -161,7 +187,7 @@ footprint:
     #
     # What actually indicates staleness is that REGENERATION CHANGED the file.
     # Unrelated prose edits are present before and after, so they cancel.
-    readmes="README.md $(ls -d claude-code/plugins/*/README.md opencode/plugins/*/README.md 2>/dev/null || true)"
+    readmes="README.md $(ls -d claude-code/plugins/*/README.md opencode/plugins/*/README.md antigravity/plugins/*/README.md 2>/dev/null || true)"
     before=$(md5sum $readmes)
 
     just footprint-regen
@@ -224,6 +250,10 @@ smoke:
         bash scripts/smoke-bundle.sh "$plugin"
     done
 
+# Assemble a host-only bundle for each Antigravity plugin and test entry points.
+smoke-agy:
+    bash scripts/smoke-agy-bundle.sh
+
 # Copy the canonical aiplugins-devtools skills into each agent's plugin folder
 # (one block per agent; scripts/check-devtools-skills.sh fails on drift)
 emit-devtools-skills:
@@ -272,7 +302,7 @@ skills-release-wiring:
 
 # Run all pre-flight checks (what CI and lefthook run; see ci.yml — `links`
 # is hook-only and `gen-* --check` + opencode suites run in CI but not here)
-check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace dispatch smoke footprint opencode-wiring footprint-budgets devtools-skills skills-bundles skills-release-wiring
+check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace agy-marketplace dispatch smoke footprint opencode-wiring agy-wiring agy-validate footprint-budgets devtools-skills skills-bundles skills-release-wiring
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
@@ -287,6 +317,19 @@ build-claude-example:
         fi; \
     done
     @echo "Plugin binaries staged in claude-code/plugins/example/bin/"
+
+# Build the example Antigravity plugin's binaries into its bin/ directory.
+build-agy-example:
+    cargo build -p agy-example --release --bin agy-example-mcp --bin agy-example-hook
+    mkdir -p antigravity/plugins/example/bin
+    for b in agy-example-mcp agy-example-hook; do \
+        if [ -f "target/release/$b.exe" ]; then \
+            cp "target/release/$b.exe" antigravity/plugins/example/bin/; \
+        else \
+            cp "target/release/$b" antigravity/plugins/example/bin/; \
+        fi; \
+    done
+    @echo "Plugin binaries staged in antigravity/plugins/example/bin/"
 
 # Build the rtk-mcp-cc Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
@@ -316,6 +359,45 @@ build-re-ghidra-mcp-cc:
     done
     @echo "Plugin binaries staged in claude-code/plugins/re-ghidra-mcp-cc/bin/"
 
+# Build the opencode-ctl-mcp-cc Claude Code plugin's binary into its bin/ directory.
+# Windows developers run this locally; CI produces the other platforms.
+build-opencode-ctl-mcp-cc:
+    cargo build -p opencode-ctl-mcp-cc --release --bin opencode-ctl-cc-mcp
+    mkdir -p claude-code/plugins/opencode-ctl-mcp-cc/bin
+    for b in opencode-ctl-cc-mcp; do \
+        if [ -f "target/release/$b.exe" ]; then \
+            cp "target/release/$b.exe" claude-code/plugins/opencode-ctl-mcp-cc/bin/; \
+        else \
+            cp "target/release/$b" claude-code/plugins/opencode-ctl-mcp-cc/bin/; \
+        fi; \
+    done
+    @echo "Plugin binaries staged in claude-code/plugins/opencode-ctl-mcp-cc/bin/"
+
+# Build the opencode-ctl-mcp-qwen Qwen Code extension's binary into its bin/ directory.
+# Windows developers run this locally; CI produces the other platforms.
+build-opencode-ctl-mcp-qwen:
+    cargo build -p opencode-ctl-mcp-qwen --release --bin opencode-ctl-qwen-mcp
+    mkdir -p qwen/plugins/opencode-ctl-mcp-qwen/bin
+    for b in opencode-ctl-qwen-mcp; do \
+        if [ -f "target/release/$b.exe" ]; then \
+            cp "target/release/$b.exe" qwen/plugins/opencode-ctl-mcp-qwen/bin/; \
+        else \
+            cp "target/release/$b" qwen/plugins/opencode-ctl-mcp-qwen/bin/; \
+        fi; \
+    done
+    @echo "Plugin binaries staged in qwen/plugins/opencode-ctl-mcp-qwen/bin/"
+
+# Stage opencode-ctl-mcp-opencode's MCP binary (the cc front's) into its bin/ directory.
+build-opencode-ctl-mcp-opencode:
+    cargo build -p opencode-ctl-mcp-cc --release --bin opencode-ctl-cc-mcp
+    mkdir -p opencode/plugins/opencode-ctl-mcp-opencode/bin
+    if [ -f "target/release/opencode-ctl-cc-mcp.exe" ]; then \
+        cp "target/release/opencode-ctl-cc-mcp.exe" opencode/plugins/opencode-ctl-mcp-opencode/bin/; \
+    else \
+        cp "target/release/opencode-ctl-cc-mcp" opencode/plugins/opencode-ctl-mcp-opencode/bin/; \
+    fi
+    @echo "Plugin binary staged in opencode/plugins/opencode-ctl-mcp-opencode/bin/"
+
 # Stage rtk-mcp-opencode's MCP binary into its bin/ directory.
 build-rtk-mcp-opencode:
     cargo build -p rtk-mcp-cc --release --bin rtk-cc-mcp
@@ -337,6 +419,45 @@ build-re-ghidra-mcp-opencode:
         cp "target/release/re-ghidra-cc-mcp" opencode/plugins/re-ghidra-mcp-opencode/bin/; \
     fi
     @echo "Plugin binary staged in opencode/plugins/re-ghidra-mcp-opencode/bin/"
+
+# Build the rtk-mcp-agy plugin's binaries into its bin/ directory.
+build-rtk-mcp-agy:
+    cargo build -p rtk-mcp-agy --release --bin rtk-mcp --bin rtk-hook-preinvocation
+    mkdir -p antigravity/plugins/rtk-mcp-agy/bin
+    for b in rtk-mcp rtk-hook-preinvocation; do \
+        if [ -f "target/release/$b.exe" ]; then \
+            cp "target/release/$b.exe" antigravity/plugins/rtk-mcp-agy/bin/; \
+        else \
+            cp "target/release/$b" antigravity/plugins/rtk-mcp-agy/bin/; \
+        fi; \
+    done
+    @echo "Plugin binaries staged in antigravity/plugins/rtk-mcp-agy/bin/"
+
+# Build the opencode-ctl-mcp-agy plugin's binary into its bin/ directory.
+build-opencode-ctl-mcp-agy:
+    cargo build -p opencode-ctl-mcp-agy --release --bin opencode-ctl-agy-mcp
+    mkdir -p antigravity/plugins/opencode-ctl-mcp-agy/bin
+    for b in opencode-ctl-agy-mcp; do \
+        if [ -f "target/release/$b.exe" ]; then \
+            cp "target/release/$b.exe" antigravity/plugins/opencode-ctl-mcp-agy/bin/; \
+        else \
+            cp "target/release/$b" antigravity/plugins/opencode-ctl-mcp-agy/bin/; \
+        fi; \
+    done
+    @echo "Plugin binaries staged in antigravity/plugins/opencode-ctl-mcp-agy/bin/"
+
+# Build the re-ghidra-mcp-agy plugin's binaries into its bin/ directory.
+build-re-ghidra-mcp-agy:
+    cargo build -p re-ghidra-mcp-agy --release --bin re-ghidra-agy-mcp --bin re-ghidra-agy-hook
+    mkdir -p antigravity/plugins/re-ghidra-mcp-agy/bin
+    for b in re-ghidra-agy-mcp re-ghidra-agy-hook; do \
+        if [ -f "target/release/$b.exe" ]; then \
+            cp "target/release/$b.exe" antigravity/plugins/re-ghidra-mcp-agy/bin/; \
+        else \
+            cp "target/release/$b" antigravity/plugins/re-ghidra-mcp-agy/bin/; \
+        fi; \
+    done
+    @echo "Plugin binaries staged in antigravity/plugins/re-ghidra-mcp-agy/bin/"
 
 # Assemble the installable plugin zips for a published release, the same way
 # .github/workflows/plugin-bundles.yml does — for testing a change to the
@@ -392,6 +513,25 @@ bundle-opencode:
         bash scripts/bundle-opencode-plugin.sh "opencode/plugins/$name" target/opencode-bundles
     done
 
+# Assemble the installable Antigravity plugin zips for a published release.
+#
+# Unix only: the bundles carry exec bits that a Windows zip cannot record, and
+# MSYS resolves `bin/foo` to `bin/foo.exe` and would overwrite the binary with
+# the dispatcher. On a Windows machine run this from WSL.
+bundle-agy tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    names=$(bash scripts/registry-plugins.sh antigravity --exclude-skills-only | tr -d '\r')
+    rm -rf target/agy-assets target/agy-bundles
+    mkdir -p target/agy-assets
+    for name in $names; do
+        gh release download "{{ tag }}" -D target/agy-assets \
+            -p "$name-*.tar.xz" -p "$name-*.zip" --clobber
+    done
+    for name in $names; do
+        bash scripts/bundle-agy-plugin.sh "$name" target/agy-assets target/agy-bundles
+    done
+
 # Regenerate EVERY plugin's committed copy of the ghidra-re-driver skill from
 # the binary that embeds it.
 #
@@ -405,13 +545,31 @@ bundle-opencode:
 # re-ghidra-mcp-qwen::skill_emit.
 emit-ghidra-skill: build-re-ghidra-mcp-cc
     cargo build -p re-ghidra-mcp-qwen --release --bin re-ghidra-qwen-mcp
+    mkdir -p antigravity/plugins/re-ghidra-mcp-agy/skills/ghidra-re-driver
     ./claude-code/plugins/re-ghidra-mcp-cc/bin/re-ghidra-cc-mcp emit-skill \
         > claude-code/plugins/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md
     ./target/release/re-ghidra-qwen-mcp emit-skill \
         > qwen/plugins/re-ghidra-mcp-qwen/skills/ghidra-re-driver/SKILL.md
     ./claude-code/plugins/re-ghidra-mcp-cc/bin/re-ghidra-cc-mcp emit-skill \
         > opencode/plugins/re-ghidra-mcp-opencode/skills/ghidra-re-driver/SKILL.md
-    @echo "Regenerated the committed ghidra-re-driver skill copies (claude-code, qwen, opencode)"
+    ./claude-code/plugins/re-ghidra-mcp-cc/bin/re-ghidra-cc-mcp emit-skill \
+        > antigravity/plugins/re-ghidra-mcp-agy/skills/ghidra-re-driver/SKILL.md
+    @echo "Regenerated the committed ghidra-re-driver skill copies (claude-code, qwen, opencode, antigravity)"
+
+# Regenerate the committed opencode-ctl-driver / opencode-ctl-doctor skill copies
+# for all four hosts (eight files) from the one engine binary.
+emit-opencode-ctl-skills: build-opencode-ctl-mcp-cc
+    #!/usr/bin/env bash
+    set -euo pipefail
+    bin=./claude-code/plugins/opencode-ctl-mcp-cc/bin/opencode-ctl-cc-mcp
+    for pair in cc:claude-code/plugins/opencode-ctl-mcp-cc qwen:qwen/plugins/opencode-ctl-mcp-qwen agy:antigravity/plugins/opencode-ctl-mcp-agy opencode:opencode/plugins/opencode-ctl-mcp-opencode; do
+        host=${pair%%:*}; dir=${pair#*:}
+        for name in opencode-ctl-driver opencode-ctl-doctor; do
+            mkdir -p "$dir/skills/$name"
+            "$bin" emit-skill "$name" --host "$host" > "$dir/skills/$name/SKILL.md"
+        done
+    done
+    echo "Regenerated the committed opencode-ctl skill copies (cc, qwen, agy, opencode)"
 
 # Run the live Ghidra suite. Needs a real Ghidra 12.1.2 + JDK 21 and an analyzed
 # fixture project; see shared/ghidra-mcp/tests/fixtures/README.md to build one.
@@ -487,7 +645,7 @@ clean-stale:
 # full rebuild.
 clean:
     cargo clean
-    rm -rf claude-code/plugins/example/bin claude-code/plugins/rtk-mcp-cc/bin claude-code/plugins/re-ghidra-mcp-cc/bin opencode/plugins/rtk-mcp-opencode/bin opencode/plugins/re-ghidra-mcp-opencode/bin qwen/plugins/*/bin antigravity/plugins/*/bin
+    rm -rf claude-code/plugins/example/bin claude-code/plugins/rtk-mcp-cc/bin claude-code/plugins/re-ghidra-mcp-cc/bin claude-code/plugins/opencode-ctl-mcp-cc/bin opencode/plugins/opencode-ctl-mcp-opencode/bin opencode/plugins/rtk-mcp-opencode/bin opencode/plugins/re-ghidra-mcp-opencode/bin qwen/plugins/*/bin antigravity/plugins/*/bin
     @echo "Removed target/ and staged plugin binaries."
 
 

@@ -1,0 +1,1 @@
+{"data":[{"id":"msg_u1","type":"user","time":{"created":"{{now-60000}}"},"text":"hi"},{"id":"msg_a1","type":"assistant","time":{"created":"{{now-50000}}"},"content":[{"type":"text","text":"ok"}]}],"cursor":{"previous":null,"next":null}}

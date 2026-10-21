@@ -1,0 +1,1 @@
+{"mcpServers":{"opencode-ctl-mcp-cc":{"command":"${CLAUDE_PLUGIN_ROOT}/bin/opencode-ctl-cc-mcp","args":["serve"]}}}

@@ -19,8 +19,14 @@ use serde_json::{json, Value};
 
 /// The server name an MCP client sees, and the key `mcp_config.json` registers.
 pub const SERVER_NAME: &str = "rtkmcp";
-/// The single tool this server exposes.
+/// Run an rtk-optimized command.
 pub const TOOL_NAME: &str = "rtk_run";
+/// Report rtk token savings.
+pub const TOOL_GAIN: &str = "rtk_gain";
+/// Show how rtk would rewrite a shell command without running it.
+pub const TOOL_CHECK: &str = "rtk_check";
+/// Analyze past session history for missed token savings.
+pub const TOOL_DISCOVER: &str = "rtk_discover";
 /// The MCP protocol revision spoken by this server.
 pub const PROTOCOL_VERSION: &str = "2024-11-05";
 /// JSON-RPC's "method not found".
@@ -167,6 +173,113 @@ pub fn call_arguments(request: &Value) -> (String, String) {
     (command, cwd)
 }
 
+/// Quote a string safely for inclusion in a shell command line.
+///
+/// Wraps the string in single quotes, replacing any internal single quote `'`
+/// with `'\''`. Single-quoted strings are interpreted literally by POSIX shells
+/// and PowerShell, preventing command injection and shell metacharacter expansion.
+pub fn shell_quote(s: &str) -> String {
+    let escaped = s.replace('\'', "'\\''");
+    format!("'{escaped}'")
+}
+
+fn validate_format(value: &str, allowed: &[&str]) -> Result<String, String> {
+    let lowered = value.trim().to_ascii_lowercase();
+    if allowed.contains(&lowered.as_str()) {
+        Ok(lowered)
+    } else {
+        Err(format!(
+            "unsupported format {value:?}; expected one of {}",
+            allowed.join(", ")
+        ))
+    }
+}
+
+/// Extract the `Cwd` argument or fall back to `"."`.
+pub fn extract_cwd(arguments: &Value) -> String {
+    arguments
+        .get("Cwd")
+        .and_then(|c| c.as_str())
+        .unwrap_or(".")
+        .to_string()
+}
+
+/// Build the command line for `rtk gain`.
+pub fn build_gain_command(arguments: &Value) -> Result<String, String> {
+    let mut cmd = "rtk gain".to_string();
+    if arguments
+        .get("history")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        cmd.push_str(" --history");
+    }
+    if arguments
+        .get("project_only")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        cmd.push_str(" --project");
+    }
+    if let Some(format) = arguments.get("format").and_then(|v| v.as_str()) {
+        let trimmed = format.trim();
+        if !trimmed.is_empty() {
+            let fmt = validate_format(trimmed, &["text", "json", "csv"])?;
+            cmd.push_str(&format!(" --format {fmt}"));
+        }
+    }
+    Ok(cmd)
+}
+
+/// Build the command line for `rtk hook check`.
+///
+/// The dry-run inspection subcommand in `rtk` is `hook check` (not `check`).
+/// The command argument is safely single-quoted via [`shell_quote`] to prevent
+/// arbitrary command injection when executed via a shell.
+pub fn build_check_command(arguments: &Value) -> Result<String, String> {
+    let command = arguments
+        .get("command")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
+    if command.is_empty() {
+        return Err("command must not be empty".to_string());
+    }
+    Ok(format!("rtk hook check -- {}", shell_quote(command)))
+}
+
+/// Build the command line for `rtk discover`.
+pub fn build_discover_command(arguments: &Value) -> Result<String, String> {
+    let mut cmd = "rtk discover".to_string();
+    if let Some(project) = arguments.get("project").and_then(|v| v.as_str()) {
+        let p = project.trim();
+        if !p.is_empty() {
+            cmd.push_str(&format!(" --project {}", shell_quote(p)));
+        }
+    }
+    if let Some(limit) = arguments.get("limit").and_then(|v| v.as_u64()) {
+        cmd.push_str(&format!(" --limit {limit}"));
+    }
+    if let Some(since) = arguments.get("since").and_then(|v| v.as_u64()) {
+        cmd.push_str(&format!(" --since {since}"));
+    }
+    if arguments
+        .get("all_projects")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        cmd.push_str(" --all");
+    }
+    if let Some(format) = arguments.get("format").and_then(|v| v.as_str()) {
+        let trimmed = format.trim();
+        if !trimmed.is_empty() {
+            let fmt = validate_format(trimmed, &["text", "json"])?;
+            cmd.push_str(&format!(" --format {fmt}"));
+        }
+    }
+    Ok(cmd)
+}
+
 // ── Method results ─────────────────────────────────────────────────────
 
 /// The `initialize` result.
@@ -178,30 +291,96 @@ pub fn server_info() -> Value {
     })
 }
 
-/// The `tools/list` result.
+/// The `tools/list` result advertising all 4 tools.
 pub fn tools_list() -> Value {
     json!({
-        "tools": [{
-            "name": TOOL_NAME,
-            "description": "Run an rtk optimized shell command",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "CommandLine": { "type": "string" },
-                    "Cwd": { "type": "string" },
-                    "WaitMsBeforeAsync": { "type": "integer" },
-                    "toolAction": {
-                        "type": "string",
-                        "description": "Brief 2-5 word summary of what this tool is doing."
+        "tools": [
+            {
+                "name": TOOL_NAME,
+                "description": "Run an rtk optimized shell command",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "CommandLine": { "type": "string" },
+                        "Cwd": { "type": "string" },
+                        "WaitMsBeforeAsync": { "type": "integer" },
+                        "toolAction": {
+                            "type": "string",
+                            "description": "Brief 2-5 word summary of what this tool is doing."
+                        },
+                        "toolSummary": {
+                            "type": "string",
+                            "description": "Brief 2-5 word noun phrase describing what this tool call is about."
+                        }
                     },
-                    "toolSummary": {
-                        "type": "string",
-                        "description": "Brief 2-5 word noun phrase describing what this tool call is about."
+                    "required": ["CommandLine", "Cwd", "toolAction", "toolSummary"]
+                }
+            },
+            {
+                "name": TOOL_GAIN,
+                "description": "Report rtk's token-savings statistics: how many tokens rtk has saved, and optionally the recent per-command history. Read-only.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "history": {
+                            "type": "boolean",
+                            "description": "Include the recent per-command history rather than the summary alone."
+                        },
+                        "project_only": {
+                            "type": "boolean",
+                            "description": "Restrict the statistics to the current working project."
+                        },
+                        "format": {
+                            "type": "string",
+                            "description": "Output format: `text` (default), `json`, or `csv`."
+                        }
                     }
-                },
-                "required": ["CommandLine", "Cwd", "toolAction", "toolSummary"]
+                }
+            },
+            {
+                "name": TOOL_CHECK,
+                "description": "Show how rtk would rewrite a given shell command, without running it. Use this to explain why a command was or was not optimized. Read-only: the command is analyzed, never executed.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "description": "The shell command to analyze, e.g. `grep -rn foo src/`. It is never executed — this reports only how rtk would rewrite it."
+                        }
+                    },
+                    "required": ["command"]
+                }
+            },
+            {
+                "name": TOOL_DISCOVER,
+                "description": "Analyze past session history for commands that rtk could have optimized but did not, i.e. missed token savings. Read-only.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "project": {
+                            "type": "string",
+                            "description": "Filter to projects whose path contains this substring."
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Maximum commands reported per section. rtk's default is 15."
+                        },
+                        "since": {
+                            "type": "integer",
+                            "description": "Only consider sessions from the last N days. rtk's default is 30."
+                        },
+                        "all_projects": {
+                            "type": "boolean",
+                            "description": "Scan every project rather than only the current one."
+                        },
+                        "format": {
+                            "type": "string",
+                            "description": "Output format: `text` (default) or `json`."
+                        }
+                    }
+                }
             }
-        }]
+        ]
     })
 }
 
@@ -216,6 +395,68 @@ pub fn method_not_found() -> Value {
 }
 
 // ── Dispatch ───────────────────────────────────────────────────────────
+
+/// Dispatch a parsed JSON-RPC request to the appropriate method handler.
+pub fn dispatch_request<R, E>(request: &Value, rewrite: &R, exec: &E) -> Option<Value>
+where
+    R: Fn(&str) -> Option<String>,
+    E: Fn(&str, &str) -> Execution,
+{
+    // A notification has no id and must not be answered.
+    let id = request.get("id")?;
+    let method = request.get("method").and_then(|m| m.as_str())?;
+
+    let result = match method {
+        "initialize" => server_info(),
+        "tools/list" => tools_list(),
+        "tools/call" => {
+            let empty = json!({});
+            let params = request.get("params").unwrap_or(&empty);
+            let tool_name = params
+                .get("name")
+                .and_then(|n| n.as_str())
+                .unwrap_or(TOOL_NAME);
+            let arguments = params.get("arguments").unwrap_or(&empty);
+            let cwd = extract_cwd(arguments);
+
+            match tool_name {
+                TOOL_GAIN => match build_gain_command(arguments) {
+                    Ok(cmd) => format_execution(&exec(&cmd, &cwd)),
+                    Err(err) => json!({
+                        "content": [{ "type": "text", "text": err }],
+                        "isError": true
+                    }),
+                },
+                TOOL_CHECK => match build_check_command(arguments) {
+                    Ok(cmd) => format_execution(&exec(&cmd, &cwd)),
+                    Err(err) => json!({
+                        "content": [{ "type": "text", "text": err }],
+                        "isError": true
+                    }),
+                },
+                TOOL_DISCOVER => match build_discover_command(arguments) {
+                    Ok(cmd) => format_execution(&exec(&cmd, &cwd)),
+                    Err(err) => json!({
+                        "content": [{ "type": "text", "text": err }],
+                        "isError": true
+                    }),
+                },
+                TOOL_NAME => {
+                    let (command, cwd) = call_arguments(request);
+                    let to_run = rewrite(&command).unwrap_or_else(|| command.clone());
+                    format_execution(&exec(&to_run, &cwd))
+                }
+                _ => json!({
+                    "content": [{ "type": "text", "text": format!("Unknown tool: {tool_name}") }],
+                    "isError": true
+                }),
+            }
+        }
+        _ => method_not_found(),
+    };
+
+    Some(envelope(id, result))
+}
 
 /// Handle one line of input, returning the response to write — or `None` when
 /// the server must stay silent.
@@ -239,22 +480,16 @@ where
     }
 
     let request: Value = serde_json::from_str(line).ok()?;
-    // A notification has no id and must not be answered.
-    let id = request.get("id")?;
-    let method = request.get("method").and_then(|m| m.as_str())?;
+    dispatch_request(&request, rewrite, exec)
+}
 
-    let result = match method {
-        "initialize" => server_info(),
-        "tools/list" => tools_list(),
-        "tools/call" => {
-            let (command, cwd) = call_arguments(&request);
-            let to_run = rewrite(&command).unwrap_or_else(|| command.clone());
-            format_execution(&exec(&to_run, &cwd))
-        }
-        _ => method_not_found(),
-    };
-
-    Some(envelope(id, result))
+/// Handle a parsed JSON-RPC request using default fallback closures.
+pub fn handle_request(request: &Value) -> Option<Value> {
+    dispatch_request(request, &|_| None, &|_, _| Execution::Ran {
+        stdout: String::new(),
+        stderr: String::new(),
+        success: true,
+    })
 }
 
 /// Wrap a result body in its JSON-RPC envelope.
@@ -556,12 +791,12 @@ mod tests {
     }
 
     #[test]
-    fn tools_list_advertises_exactly_one_tool() {
+    fn tools_list_advertises_four_tools() {
         let tools = tools_list();
         let list = tools["tools"].as_array().unwrap();
-        assert_eq!(list.len(), 1);
-        assert_eq!(list[0]["name"], TOOL_NAME);
-        assert_eq!(list[0]["inputSchema"]["type"], "object");
+        assert_eq!(list.len(), 4);
+        let names: Vec<&str> = list.iter().map(|t| t["name"].as_str().unwrap()).collect();
+        assert_eq!(names, vec![TOOL_NAME, TOOL_GAIN, TOOL_CHECK, TOOL_DISCOVER]);
     }
 
     #[test]
@@ -821,6 +1056,185 @@ mod tests {
         let response = handle_line(&line, &no_rewrite, &recording_exec(&log)).expect("a response");
         assert_eq!(log.borrow()[0], (String::new(), ".".to_string()));
         assert!(response["result"]["isError"].is_boolean());
+    }
+
+    // ── analytics tools tests ─────────────────────────────────────
+
+    #[test]
+    fn shell_quote_protects_against_injection() {
+        assert_eq!(shell_quote("hello"), "'hello'");
+        assert_eq!(shell_quote("hello world"), "'hello world'");
+        assert_eq!(shell_quote("echo 'hi'"), "'echo '\\''hi'\\'''");
+        assert_eq!(shell_quote("foo; rm -rf /"), "'foo; rm -rf /'");
+    }
+
+    #[test]
+    fn build_gain_command_handles_options() {
+        assert_eq!(build_gain_command(&json!({})).unwrap(), "rtk gain");
+        assert_eq!(
+            build_gain_command(&json!({
+                "history": true,
+                "project_only": true,
+                "format": "json"
+            }))
+            .unwrap(),
+            "rtk gain --history --project --format json"
+        );
+        assert_eq!(
+            build_gain_command(&json!({
+                "history": false,
+                "project_only": true,
+                "format": "csv"
+            }))
+            .unwrap(),
+            "rtk gain --project --format csv"
+        );
+        assert!(build_gain_command(&json!({ "format": "xml" })).is_err());
+    }
+
+    #[test]
+    fn build_check_command_formats_command() {
+        assert_eq!(
+            build_check_command(&json!({ "command": "grep -rn foo src/" })).unwrap(),
+            "rtk hook check -- 'grep -rn foo src/'"
+        );
+        assert_eq!(
+            build_check_command(&json!({ "command": "echo 'hi'; rm -rf /" })).unwrap(),
+            "rtk hook check -- 'echo '\\''hi'\\''; rm -rf /'"
+        );
+        assert!(build_check_command(&json!({})).is_err());
+        assert!(build_check_command(&json!({ "command": "   " })).is_err());
+    }
+
+    #[test]
+    fn build_discover_command_handles_options() {
+        assert_eq!(build_discover_command(&json!({})).unwrap(), "rtk discover");
+        assert_eq!(
+            build_discover_command(&json!({
+                "project": "my project",
+                "limit": 5,
+                "since": 14,
+                "all_projects": true,
+                "format": "json"
+            }))
+            .unwrap(),
+            "rtk discover --project 'my project' --limit 5 --since 14 --all --format json"
+        );
+        assert!(build_discover_command(&json!({ "format": "yaml" })).is_err());
+    }
+
+    #[test]
+    fn tools_call_dispatches_gain() {
+        let log = RefCell::new(Vec::new());
+        let line = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": TOOL_GAIN,
+                "arguments": { "history": true, "Cwd": "/my/repo" }
+            }
+        })
+        .to_string();
+
+        let response = handle_line(&line, &no_rewrite, &recording_exec(&log)).expect("a response");
+        assert_eq!(
+            log.borrow().as_slice(),
+            &[("rtk gain --history".to_string(), "/my/repo".to_string())]
+        );
+        assert_eq!(response["result"]["content"][0]["text"], "done");
+        assert_eq!(response["result"]["isError"], false);
+    }
+
+    #[test]
+    fn tools_call_dispatches_check() {
+        let log = RefCell::new(Vec::new());
+        let line = json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+                "name": TOOL_CHECK,
+                "arguments": { "command": "ls -la", "Cwd": "/my/repo" }
+            }
+        })
+        .to_string();
+
+        let response = handle_line(&line, &no_rewrite, &recording_exec(&log)).expect("a response");
+        assert_eq!(
+            log.borrow().as_slice(),
+            &[(
+                "rtk hook check -- 'ls -la'".to_string(),
+                "/my/repo".to_string()
+            )]
+        );
+        assert_eq!(response["result"]["content"][0]["text"], "done");
+        assert_eq!(response["result"]["isError"], false);
+    }
+
+    #[test]
+    fn tools_call_dispatches_discover() {
+        let log = RefCell::new(Vec::new());
+        let line = json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+                "name": TOOL_DISCOVER,
+                "arguments": { "all_projects": true }
+            }
+        })
+        .to_string();
+
+        let response = handle_line(&line, &no_rewrite, &recording_exec(&log)).expect("a response");
+        assert_eq!(
+            log.borrow().as_slice(),
+            &[("rtk discover --all".to_string(), ".".to_string())]
+        );
+        assert_eq!(response["result"]["content"][0]["text"], "done");
+        assert_eq!(response["result"]["isError"], false);
+    }
+
+    #[test]
+    fn tools_call_rejects_unknown_tool() {
+        let line = json!({
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "tools/call",
+            "params": {
+                "name": "not_a_real_tool",
+                "arguments": {}
+            }
+        })
+        .to_string();
+
+        let response = handle_line(&line, &no_rewrite, &never_exec).expect("a response");
+        assert_eq!(response["result"]["isError"], true);
+        assert_eq!(
+            response["result"]["content"][0]["text"],
+            "Unknown tool: not_a_real_tool"
+        );
+    }
+
+    #[test]
+    fn tools_call_surfaces_validation_errors() {
+        let line = json!({
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "tools/call",
+            "params": {
+                "name": TOOL_CHECK,
+                "arguments": { "command": "" }
+            }
+        })
+        .to_string();
+
+        let response = handle_line(&line, &no_rewrite, &never_exec).expect("a response");
+        assert_eq!(response["result"]["isError"], true);
+        assert_eq!(
+            response["result"]["content"][0]["text"],
+            "command must not be empty"
+        );
     }
 
     // ── PreInvocation payload ──────────────────────────────────────

@@ -1,0 +1,5 @@
+{
+  "name": "opencode-ctl-mcp-agy",
+  "version": "0.1.0",
+  "description": "An Antigravity front for opencode-ctl-mcp: delegate bounded work to an OpenCode worker session over MCP"
+}

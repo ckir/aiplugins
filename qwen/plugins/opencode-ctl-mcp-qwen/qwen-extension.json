@@ -1,0 +1,17 @@
+{
+  "name": "opencode-ctl-mcp-qwen",
+  "version": "0.1.0",
+  "displayName": "opencode-ctl-mcp-qwen — OpenCode worker sessions for Qwen Code",
+  "description": "Delegate bounded work to an OpenCode worker session from Qwen Code over MCP: start and inspect the OpenCode service, create sessions, send prompts, wait for the turn, read messages and changes, and answer permission and form requests.",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "contextFileName": "QWEN.md",
+  "mcpServers": {
+    "opencode-ctl-mcp-qwen": {
+      "command": "${extensionPath}${/}bin${/}opencode-ctl-qwen-mcp",
+      "args": [
+        "serve"
+      ],
+      "timeout": 330000
+    }
+  }
+}

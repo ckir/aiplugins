@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust (`rmcp`, `serde`, `serde_json`, `schemars`, `tokio`, `tracing`), Bash (`set -euo pipefail`), Just, GitHub Actions.
 
-**Spec:** [`docs/superpowers/specs/2026-10-17-antigravity-parity-design.md`](file:///home/user/Development/Rust/aiplugins/docs/superpowers/specs/2026-10-17-antigravity-parity-design.md)
+**Spec:** [`docs/superpowers/specs/2026-10-17-antigravity-parity-design.md`](../specs/2026-10-17-antigravity-parity-design.md)
 
 ## Global Constraints
 

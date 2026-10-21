@@ -27,10 +27,22 @@ fn main() {
         );
         println!();
         println!("Usage: rtk-mcp");
-        println!("  JSON-RPC MCP server over stdin/stdout. Exposes a single tool:");
+        println!("  JSON-RPC MCP server over stdin/stdout. Exposes 4 tools:");
         println!(
-            "    {}  — Rewrites the given CommandLine via `rtk rewrite` and executes it.",
+            "    {}      — Rewrites the given CommandLine via `rtk rewrite` and executes it.",
             rtk_mcp_agy::TOOL_NAME
+        );
+        println!(
+            "    {}     — Reports rtk token-savings statistics.",
+            rtk_mcp_agy::TOOL_GAIN
+        );
+        println!(
+            "    {}    — Shows how rtk would rewrite a shell command without running it.",
+            rtk_mcp_agy::TOOL_CHECK
+        );
+        println!(
+            "    {} — Analyzes past session history for missed token savings.",
+            rtk_mcp_agy::TOOL_DISCOVER
         );
         return;
     }

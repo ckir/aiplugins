@@ -74,7 +74,19 @@ fn main() -> ExitCode {
             return ExitCode::from(1);
         }
     };
-    let all: Vec<&String> = plugins.iter().chain(opencode.iter()).collect();
+
+    let antigravity = match antigravity_plugins() {
+        Ok(plugins) => plugins,
+        Err(e) => {
+            eprintln!("footprint-gate: {e}");
+            return ExitCode::from(1);
+        }
+    };
+    let all: Vec<&String> = plugins
+        .iter()
+        .chain(opencode.iter())
+        .chain(antigravity.iter())
+        .collect();
 
     // Budgets from the base ref. Absent on the very first run, which is not a
     // failure — every plugin is then new and only the probe layer applies.
@@ -189,6 +201,14 @@ fn published_plugins() -> Result<Vec<String>, String> {
     let text = std::fs::read_to_string("agents.json")
         .map_err(|e| format!("reading the plugin registry: {e}"))?;
     plugin_footprint::registry::published_plugin_keys(&text)
+}
+
+/// The Antigravity plugins: `agents.json`, read through
+/// `registry::antigravity_plugin_keys`.
+fn antigravity_plugins() -> Result<Vec<String>, String> {
+    let text = std::fs::read_to_string("agents.json")
+        .map_err(|e| format!("reading the plugin registry: {e}"))?;
+    plugin_footprint::registry::antigravity_plugin_keys(&text)
 }
 
 /// The OpenCode plugins: every directory under `opencode/plugins/` that looks like

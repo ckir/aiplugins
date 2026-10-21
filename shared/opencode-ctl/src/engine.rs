@@ -1,0 +1,383 @@
+//! The engine: settings, host, environment and the transport behind every tool.
+
+use std::num::NonZeroUsize;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use serde_json::Value;
+
+use crate::cli::env_nonempty;
+use crate::clock::Clock;
+use crate::compact::{cap_json, redact, redact_text, unwrap_envelope, Cap};
+use crate::created_set::CreatedSet;
+use crate::error::{ErrorCode, ToolError, ToolResult};
+use crate::host::Host;
+use crate::liveness::ProcessProbe;
+use crate::openapi::{Operation, OperationTable, TableSource, SNAPSHOT_VERSION};
+use crate::settings::{Note, Settings};
+use crate::transport::{Lifecycle, Params, Transport, WaitOutcome};
+
+/// What the pairing environment says, read once at startup. A blank value reads as `None`.
+#[derive(Debug, Clone)]
+pub struct EnvSnapshot {
+    pub session: Option<String>,
+    pub directory: Option<PathBuf>,
+    pub server: Option<String>,
+    pub pair: Option<String>,
+    pub host_env: Option<String>,
+    pub cwd: PathBuf,
+    pub home: PathBuf,
+    pub server_password_present: bool,
+}
+
+impl EnvSnapshot {
+    pub fn from_env(ctl_home: PathBuf) -> Self {
+        Self::from_lookup(
+            &|k| env_nonempty(k),
+            std::env::current_dir().unwrap_or_default(),
+            ctl_home,
+        )
+    }
+
+    pub fn from_lookup(get: &dyn Fn(&str) -> Option<String>, cwd: PathBuf, home: PathBuf) -> Self {
+        let nonblank = |k: &str| crate::cli::blank_is_unset(get(k));
+        Self {
+            session: nonblank("OPENCODE_CTL_SESSION"),
+            directory: nonblank("OPENCODE_CTL_DIR").map(PathBuf::from),
+            server: nonblank("OPENCODE_CTL_SERVER"),
+            pair: nonblank("OPENCODE_CTL_PAIR"),
+            host_env: nonblank("OPENCODE_CTL_HOST"),
+            cwd,
+            home,
+            server_password_present: nonblank("OPENCODE_SERVER_PASSWORD").is_some(),
+        }
+    }
+
+    pub fn for_tests(cwd: PathBuf, home: PathBuf) -> Self {
+        Self::from_lookup(&|_| None, cwd, home)
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct OpenapiCache {
+    pub live: Option<OperationTable>,
+    pub pid: Option<u64>,
+    pub version: Option<String>,
+    pub last_error_was_service_down: bool,
+}
+
+pub struct Engine<T: Transport, C: Clock> {
+    pub settings: Settings,
+    pub notes: Vec<Note>,
+    pub host: Host,
+    pub env: EnvSnapshot,
+    pub probe: Arc<dyn ProcessProbe>,
+    transport: T,
+    clock: C,
+    openapi: tokio::sync::Mutex<OpenapiCache>,
+    diff_cache: Mutex<lru::LruCache<DiffKey, (Value, i64)>>,
+}
+
+/// `(session, from, to, context)` of a cached `session.diff` read.
+pub type DiffKey = (String, String, String, Option<u32>);
+
+const DIFF_CACHE_CAPACITY: usize = 2;
+const DIFF_CACHE_TTL_MS: i64 = 10_000;
+const DIFF_CACHE_ENTRY_MAX: usize = 32 * 1024 * 1024;
+
+const EXEMPT_ARRAYS: &[&str] = &["pending_permissions", "pending_forms"];
+
+impl<T: Transport, C: Clock> Engine<T, C> {
+    pub fn new(
+        settings: Settings,
+        notes: Vec<Note>,
+        host: Host,
+        env: EnvSnapshot,
+        transport: T,
+        clock: C,
+        probe: Arc<dyn ProcessProbe>,
+    ) -> Self {
+        Self {
+            settings,
+            notes,
+            host,
+            env,
+            probe,
+            transport,
+            clock,
+            openapi: tokio::sync::Mutex::new(OpenapiCache::default()),
+            diff_cache: Mutex::new(lru::LruCache::new(
+                NonZeroUsize::new(DIFF_CACHE_CAPACITY).expect("nonzero"),
+            )),
+        }
+    }
+
+    /// A cached diff, promoted to most recently used; an entry older than the TTL is dropped (checked on every lookup).
+    pub fn diff_cache_get(&self, key: &DiffKey) -> Option<Value> {
+        let now = self.clock.now_ms();
+        let mut cache = self.diff_cache.lock().unwrap_or_else(|e| e.into_inner());
+        let fresh = cache
+            .peek(key)
+            .map(|(_, at)| now - *at < DIFF_CACHE_TTL_MS)?;
+        if fresh {
+            cache.get(key).map(|(v, _)| v.clone())
+        } else {
+            cache.pop(key);
+            None
+        }
+    }
+
+    /// Cache `value` unless its serialised size exceeds 32 MiB.
+    pub fn diff_cache_put(&self, key: DiffKey, value: &Value) {
+        if value.to_string().len() > DIFF_CACHE_ENTRY_MAX {
+            return;
+        }
+        let now = self.clock.now_ms();
+        let mut cache = self.diff_cache.lock().unwrap_or_else(|e| e.into_inner());
+        cache.put(key, (value.clone(), now));
+    }
+
+    pub fn clock(&self) -> &C {
+        &self.clock
+    }
+
+    /// The live table (fetched once) or, when the fetch fails, the bundled snapshot with a warning.
+    pub async fn operation_table(&self) -> (OperationTable, TableSource, Option<String>) {
+        let mut cache = self.openapi.lock().await;
+        if let Some(live) = &cache.live {
+            return (live.clone(), TableSource::Live, None);
+        }
+        let failure = match self.transport.fetch_openapi().await {
+            Ok(doc) => match OperationTable::from_openapi(&doc, TableSource::Live) {
+                Ok(table) => {
+                    cache.live = Some(table.clone());
+                    cache.last_error_was_service_down = false;
+                    return (table, TableSource::Live, None);
+                }
+                Err(e) => format!("live OpenAPI document unusable: {e}"),
+            },
+            Err(e) => {
+                cache.last_error_was_service_down = e.code == ErrorCode::ServiceDown;
+                format!(
+                    "live OpenAPI document unavailable: {}",
+                    redact_text(&e.message)
+                )
+            }
+        };
+        (
+            OperationTable::snapshot(),
+            TableSource::Snapshot,
+            Some(format!(
+                "{failure}; using the bundled snapshot v{SNAPSHOT_VERSION}"
+            )),
+        )
+    }
+
+    /// Drop the live table when `info` (a `server.info` result) shows another pid or version, or
+    /// when the service has just recovered from `SERVICE_DOWN`.
+    pub async fn invalidate_if_changed(&self, info: &Value) {
+        let pid = info.get("pid").and_then(Value::as_u64);
+        let version = info
+            .get("version")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        let mut cache = self.openapi.lock().await;
+        let changed = (cache.pid.is_some() && cache.pid != pid)
+            || (cache.version.is_some() && cache.version != version);
+        if changed || cache.last_error_was_service_down {
+            cache.live = None;
+            cache.last_error_was_service_down = false;
+        }
+        cache.pid = pid;
+        cache.version = version;
+    }
+
+    /// The `server.info` version last observed by `invalidate_if_changed`.
+    pub async fn observed_server_version(&self) -> Option<String> {
+        self.openapi.lock().await.version.clone()
+    }
+
+    pub async fn op(&self, id: &str) -> Result<Operation, ToolError> {
+        let (table, _, _) = self.operation_table().await;
+        table.get(id).cloned().ok_or_else(|| {
+            ToolError::new(
+                ErrorCode::UnknownOperation,
+                format!("unknown operation {id}"),
+            )
+            .hint(&format!("nearest: {}", table.nearest(id, 3).join(", ")))
+        })
+    }
+
+    pub async fn cli_version(&self) -> Result<String, ToolError> {
+        Ok(self.transport.cli_version().await?)
+    }
+
+    pub async fn lifecycle(&self, verb: Lifecycle) -> Result<String, ToolError> {
+        Ok(self.transport.lifecycle(verb).await?)
+    }
+
+    pub async fn wait_idle(
+        &self,
+        session_id: &str,
+        deadline: Duration,
+    ) -> Result<WaitOutcome, ToolError> {
+        Ok(self.transport.wait_idle(session_id, deadline).await?)
+    }
+
+    /// One operation call: `(data, cursor, meta)` with the envelope unwrapped and secrets redacted.
+    pub async fn call_json(
+        &self,
+        id: &str,
+        params: Params,
+        body: Option<Value>,
+    ) -> Result<(Value, Option<Value>, Option<Value>), ToolError> {
+        let op = self.op(id).await?;
+        let deadline = Duration::from_secs(self.settings.call_timeout_s);
+        let raw = self
+            .transport
+            .call(&op, &params, body.as_ref(), deadline)
+            .await?;
+        let (mut data, mut cursor, mut meta) = unwrap_envelope(raw)?;
+        redact(&mut data);
+        cursor.iter_mut().for_each(redact);
+        meta.iter_mut().for_each(redact);
+        Ok((data, cursor, meta))
+    }
+
+    /// The tool argument, else the paired session; either must look like a session id.
+    pub fn resolve_session(&self, arg: Option<&str>) -> Result<String, ToolError> {
+        let id = match arg {
+            Some(a) => a,
+            None => self.env.session.as_deref().ok_or_else(|| {
+                ToolError::new(
+                    ErrorCode::NoSession,
+                    "no session_id given and this server is not paired",
+                )
+                .hint("pass session_id, or start the controller through opencode-pair")
+            })?,
+        };
+        if valid_session_id(id) {
+            Ok(id.to_string())
+        } else {
+            Err(ToolError::new(
+                ErrorCode::SessionNotFound,
+                format!("'{}' is not a session id", redact_text(id)),
+            )
+            .hint("session ids match ^ses_[A-Za-z0-9]{26}$; list them with session_list"))
+        }
+    }
+
+    /// The created-session set kept in the ctl home.
+    pub fn created_set(&self) -> CreatedSet {
+        CreatedSet::new(self.env.home.clone())
+    }
+
+    /// On `Host::Opencode` a session-scoped tool accepts only a session this controller created.
+    /// The set is re-read from disk on every call, so a refusal never rests on stale memory.
+    pub fn guard_created(&self, id: &str) -> Result<(), ToolError> {
+        if self.host != Host::Opencode {
+            return Ok(());
+        }
+        match self.created_set().contains(id) {
+            Ok(Some(_)) => Ok(()),
+            Ok(None) => Err(ToolError::new(
+                ErrorCode::RefusedOnHost,
+                format!(
+                    "{} was not created by this controller: on the OpenCode host only sessions made with session_create are accepted",
+                    redact_text(id)
+                ),
+            )
+            .hint("create the worker session first")),
+            Err(e) => Err(ToolError::new(
+                ErrorCode::IoError,
+                format!("cannot read the created-session set: {e}"),
+            )),
+        }
+    }
+
+    /// Append a new session to the set, then probe at most five OTHER ids of that file and prune
+    /// those the service reports as `SESSION_NOT_FOUND` (any other error leaves the entry).
+    pub async fn record_created(
+        &self,
+        directory: &std::path::Path,
+        id: &str,
+    ) -> Result<(), ToolError> {
+        let set = self.created_set();
+        set.append(directory, id).map_err(|e| {
+            ToolError::new(
+                ErrorCode::IoError,
+                format!("session {id} was created but could not be recorded: {e}"),
+            )
+            .hint("the session exists; recording it failed, so this host will refuse it")
+        })?;
+        let others: Vec<String> = set
+            .ids_for(directory)
+            .into_iter()
+            .filter(|o| o != id)
+            .take(crate::created_set::PROBE_LIMIT)
+            .collect();
+        for other in others {
+            let probe = self
+                .call_json(
+                    "session.get",
+                    vec![("sessionID".to_string(), other.clone())],
+                    None,
+                )
+                .await;
+            if let Err(e) = probe {
+                if e.code == ErrorCode::SessionNotFound {
+                    let _ = set.prune(&other);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn resolve_directory(&self, arg: Option<&std::path::Path>) -> PathBuf {
+        match arg {
+            Some(p) => p.to_path_buf(),
+            None => self
+                .env
+                .directory
+                .clone()
+                .unwrap_or_else(|| self.env.cwd.clone()),
+        }
+    }
+
+    pub fn finish(&self, value: Value) -> Value {
+        cap_json(
+            value,
+            &Cap {
+                max_bytes: self.settings.output_max_bytes,
+                exempt_arrays: EXEMPT_ARRAYS,
+                exempt_entry_max: 1024,
+                exempt_len_max: 20,
+            },
+        )
+    }
+
+    /// Every tool result passes here: redaction, then the byte cap; errors keep the closed shape.
+    pub fn render(&self, result: ToolResult) -> rmcp::model::CallToolResult {
+        use rmcp::model::{CallToolResult, ContentBlock};
+        match result {
+            Ok(mut v) => {
+                redact(&mut v);
+                CallToolResult::success(vec![ContentBlock::text(self.finish(v).to_string())])
+            }
+            Err(mut e) => {
+                e.message = redact_text(&e.message);
+                e.hint = e.hint.map(|h| redact_text(&h));
+                if let Some(d) = e.details.as_mut() {
+                    redact(d);
+                }
+                CallToolResult::error(vec![ContentBlock::text(e.to_json().to_string())])
+            }
+        }
+    }
+}
+
+pub fn valid_session_id(id: &str) -> bool {
+    id.strip_prefix("ses_")
+        .is_some_and(|r| r.len() == 26 && r.chars().all(|c| c.is_ascii_alphanumeric()))
+}

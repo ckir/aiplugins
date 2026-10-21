@@ -10,11 +10,13 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/ckir/aiplugins/main/scripts/install-qwen-extension.sh | bash -s -- re-ghidra-mcp-qwen
 #   curl -fsSL https://raw.githubusercontent.com/ckir/aiplugins/main/scripts/install-qwen-extension.sh | bash -s -- rtk-mcp-qwen
+#   curl -fsSL https://raw.githubusercontent.com/ckir/aiplugins/main/scripts/install-qwen-extension.sh | bash -s -- opencode-ctl-mcp-qwen
 #
 # Or run directly:
 #
 #   bash scripts/install-qwen-extension.sh re-ghidra-mcp-qwen
 #   bash scripts/install-qwen-extension.sh rtk-mcp-qwen
+#   bash scripts/install-qwen-extension.sh opencode-ctl-mcp-qwen
 #
 set -euo pipefail
 
@@ -26,6 +28,7 @@ if [ $# -lt 1 ]; then
     echo "Available extensions:" >&2
     echo "  re-ghidra-mcp-qwen   Ghidra MCP for Qwen Code (19 RE tools)" >&2
     echo "  rtk-mcp-qwen         RTK command rewriter hook" >&2
+    echo "  opencode-ctl-mcp-qwen  OpenCode worker sessions (20 MCP tools)" >&2
     exit 2
 fi
 

@@ -42,6 +42,12 @@ the Claude marketplace plus `opencode/plugins/*/`).
 Support is best-effort by design: an agent nobody registers in `agents.json`
 is invisible to all gates — nothing fails, nothing checks it.
 
+## Qwen fronts and the footprint gate
+
+The Qwen Code fronts (for example `opencode-ctl-mcp-qwen`) are outside the footprint gate: the footprint tool
+reads only the Claude Code `${CLAUDE_PLUGIN_ROOT}` placeholder and defers Qwen's `${extensionPath}${/}` form
+(`tools/plugin-footprint/src/manifest.rs:16`), so a new Qwen front is not registered in any footprint list.
+
 ## Footprint gate override (stale-base corrections only)
 
 The delta cap compares fresh measurements against the merge-base document.
