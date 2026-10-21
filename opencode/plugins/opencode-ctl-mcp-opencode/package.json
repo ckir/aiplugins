@@ -1,0 +1,13 @@
+{
+  "name": "opencode-ctl-mcp-opencode",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenCode V2 front for opencode-ctl: lets an OpenCode session delegate bounded work to a worker OpenCode session over MCP.",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "dependencies": {
+    "@opencode/plugin": "2.0.29"
+  },
+  "scripts": {
+    "test": "bun test tests/"
+  }
+}

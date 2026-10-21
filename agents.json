@@ -7,7 +7,8 @@
         "rtk-mcp-cc",
         "re-ghidra-mcp-cc",
         "aiplugins-devtools-cc",
-        "repo-user-guide-cc"
+        "repo-user-guide-cc",
+        "opencode-ctl-mcp-cc"
       ],
       "marketplace": ".claude-plugin/marketplace.json",
       "manifestPattern": "claude-code/plugins/{plugin}/.claude-plugin/plugin.json",
@@ -32,7 +33,8 @@
       "plugins": [
         "rtk-mcp-qwen",
         "re-ghidra-mcp-qwen",
-        "aiplugins-devtools-qwen"
+        "aiplugins-devtools-qwen",
+        "opencode-ctl-mcp-qwen"
       ],
       "marketplace": ".qwen-plugin/marketplace.json",
       "manifestPattern": "qwen/plugins/{plugin}/qwen-extension.json",
@@ -57,7 +59,8 @@
         "re-ghidra-mcp-opencode",
         "todov2-opencode",
         "aiplugins-devtools-opencode",
-        "repo-user-guide-opencode"
+        "repo-user-guide-opencode",
+        "opencode-ctl-mcp-opencode"
       ],
       "marketplace": ".opencode-plugin/marketplace.json",
       "manifestPattern": "opencode/plugins/{plugin}/package.json",
@@ -80,19 +83,25 @@
       "plugins": [
         "rtk-mcp-agy",
         "re-ghidra-mcp-agy",
-        "aiplugins-devtools-agy"
+        "aiplugins-devtools-agy",
+        "repo-user-guide-agy",
+        "opencode-ctl-mcp-agy"
       ],
       "marketplace": ".agy-plugin/marketplace.json",
       "manifestPattern": "antigravity/plugins/{plugin}/plugin.json",
       "artifactSuffix": "-agy-plugin.zip",
       "sourceUrlBase": "https://github.com/ckir/aiplugins/releases/download",
       "versionedSourceUrl": true,
-      "notPublished": [],
+      "notPublished": [
+        "example"
+      ],
       "publishedNames": {
-        "aiplugins-devtools-agy": "aiplugins-devtools"
+        "aiplugins-devtools-agy": "aiplugins-devtools",
+        "repo-user-guide-agy": "repo-user-guide"
       },
       "skillsOnly": [
-        "aiplugins-devtools-agy"
+        "aiplugins-devtools-agy",
+        "repo-user-guide-agy"
       ]
     }
   ]

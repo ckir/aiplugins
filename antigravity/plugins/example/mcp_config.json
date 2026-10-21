@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "example": {
+      "command": "agy-example-mcp"
+    }
+  }
+}

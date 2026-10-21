@@ -25,6 +25,7 @@ qwen:aiplugins-devtools-qwen
 antigravity:aiplugins-devtools-agy
 opencode:aiplugins-devtools-opencode
 claude-code:repo-user-guide-cc
+antigravity:repo-user-guide-agy
 opencode:repo-user-guide-opencode"
 
 out="$tmp/out"

@@ -1,0 +1,10 @@
+{
+  "example-hook": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "agy-example-hook"
+      }
+    ]
+  }
+}

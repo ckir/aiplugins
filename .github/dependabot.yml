@@ -40,6 +40,15 @@ updates:
           - "*"
 
   - package-ecosystem: "npm"
+    directory: "/opencode/plugins/opencode-ctl-mcp-opencode"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm-opencode-ctl:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "npm"
     directory: "/opencode/plugins/todov2-opencode"
     schedule:
       interval: "weekly"

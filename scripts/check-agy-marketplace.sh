@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+#
+# Verify the Antigravity marketplace manifest still describes the plugins in this repo.
+#
+# `.agy-plugin/marketplace.json` is what the Antigravity plugin marketplace reads,
+# and every field in it is a copy of something that lives somewhere else: the
+# plugin's own manifest, the release asset name the bundle workflow produces,
+# the repository url. Nothing fails when a copy goes stale — the marketplace
+# keeps installing, it just advertises the wrong thing, or fetches an asset
+# nobody publishes any more.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+source scripts/lib/registry.sh
+
+agent=antigravity
+agent_dir=$(registry_field "$agent" dir)
+source_base=$(registry_field "$agent" sourceUrlBase)
+artifact_suffix=$(registry_field "$agent" artifactSuffix)
+
+manifest=.agy-plugin/marketplace.json
+
+# The jq on a Windows PATH emits CRLF; a stray carriage return turns every
+# comparison below into a mismatch and every path into one that does not exist.
+jqr() {
+    jq -r "$@" | tr -d '\r'
+}
+
+failures=0
+fail() {
+    echo "  FAIL  $1" >&2
+    failures=$((failures + 1))
+}
+
+[ -f "$manifest" ] || {
+    echo "ERROR: $manifest not found." >&2
+    exit 1
+}
+jq -e . "$manifest" > /dev/null || {
+    echo "ERROR: $manifest is not valid JSON." >&2
+    exit 1
+}
+
+# The repository the release assets come from, taken from the workspace manifest
+# so the url in the marketplace cannot quietly point at a different repo.
+repo_url=$(tr -d '\r' < Cargo.toml | sed -n 's/^repository = "\(.*\)"$/\1/p' | head -n 1)
+[ -n "$repo_url" ] || {
+    echo "ERROR: no [workspace.package] repository found in Cargo.toml." >&2
+    exit 1
+}
+repo_url=${repo_url%.git}
+
+# The registry pins the release-asset base url; it must stay the workspace
+# repository's releases/download endpoint so the marketplace url cannot quietly
+# point at a different repo.
+expected_base="$repo_url/releases/download"
+[ "$source_base" = "$expected_base" ] || {
+    echo "ERROR: registry sourceUrlBase for $agent ($source_base) is not $expected_base." >&2
+    exit 1
+}
+
+workspace_license=$(tr -d '\r' < Cargo.toml | sed -n 's/^license = "\(.*\)"$/\1/p' | head -n 1)
+
+entries=$(jqr '.plugins[].name' "$manifest")
+[ -n "$entries" ] || {
+    echo "ERROR: $manifest lists no plugins — has the manifest shape changed?" >&2
+    exit 1
+}
+
+checked=0
+for name in $entries; do
+    checked=$((checked + 1))
+    key=$(registry_plugin_for_published "$agent" "$name")
+    plugin_json=$(registry_manifest_path "$agent" "$key")
+
+    if [ ! -f "$plugin_json" ]; then
+        fail "$name: no such plugin ($plugin_json missing)"
+        continue
+    fi
+
+    entry=$(jq --arg n "$name" '.plugins[] | select(.name == $n)' "$manifest")
+
+    manifest_name=$(jqr '.name // ""' "$plugin_json")
+    [ "$manifest_name" = "$name" ] ||
+        fail "$name: plugin.json calls itself '$manifest_name'"
+
+    # The bundle ships this plugin.json alongside binaries built from the
+    # package's own crate at that version, and with tag-pinned urls the
+    # manifest version selects the release. Per-package releases bump crates
+    # independently, so the crate — never the workspace version — is the
+    # oracle here.
+    manifest_version=$(jqr '.version // ""' "$plugin_json")
+    if registry_is_skills_only "$agent" "$key"; then
+        # Crate-less package: its version lives in the manifest alone.
+        [ -n "$manifest_version" ] || fail "$name: no version in $plugin_json"
+    else
+        crate_version=$([ -f "$agent_dir/$key/Cargo.toml" ] && tr -d '\r' < "$agent_dir/$key/Cargo.toml" | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1 || true)
+        [ -n "$crate_version" ] || fail "$name: no version in $agent_dir/$key/Cargo.toml"
+        [ "$manifest_version" = "$crate_version" ] ||
+            fail "$name: plugin.json says $manifest_version, crate is $crate_version"
+    fi
+
+    want_desc=$(jqr '.description // ""' "$plugin_json")
+    got_desc=$(jqr '.description // ""' <<< "$entry")
+    [ "$want_desc" = "$got_desc" ] || fail "$name: description differs from $plugin_json"
+
+    want_lic=$(jqr '.license // ""' "$plugin_json")
+    [ -n "$want_lic" ] || want_lic="$workspace_license"
+    got_lic=$(jqr '.license // ""' <<< "$entry")
+    [ "$want_lic" = "$got_lic" ] || fail "$name: license differs: got '$got_lic', expected '$want_lic'"
+
+    want_url="$source_base/$key-v$manifest_version/$key$artifact_suffix"
+    got_url=$(jqr '.source.url // ""' <<< "$entry")
+    [ "$want_url" = "$got_url" ] ||
+        fail "$name: source url is '$got_url', expected '$want_url'"
+
+    got_source=$(jqr '.source.source // ""' <<< "$entry")
+    [ "$got_source" = "archive" ] ||
+        fail "$name: source type is '$got_source', expected 'archive'"
+
+    if jq -e 'has("version")' <<< "$entry" > /dev/null 2>&1; then
+        fail "$name: entry declares a version; the tag-pinned release payload owns that"
+    fi
+done
+
+# The reverse direction: a plugin added to antigravity/ and never listed here is
+# a plugin nobody can install, and nothing else in CI would notice.
+for dir in "$agent_dir"/*/; do
+    name=$(basename "$dir")
+    [ -f "$(registry_manifest_path "$agent" "$name")" ] || continue
+    if registry_is_excluded "$agent" "$name"; then continue; fi
+    printf '%s\n' "$entries" | grep -qxF "$(registry_published_name "$agent" "$name")" ||
+        fail "$name: exists in $agent_dir/ but is not listed in $manifest"
+done
+
+if [ "$failures" -gt 0 ]; then
+    echo >&2
+    echo "ERROR: $failures Antigravity marketplace problem(s)." >&2
+    exit 1
+fi
+
+echo "Antigravity marketplace lists $checked plugin(s), all consistent with their manifests."

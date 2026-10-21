@@ -70,6 +70,27 @@
         "code-review",
         "devtools"
       ]
+    },
+    {
+      "name": "opencode-ctl-mcp-qwen",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/opencode-ctl-mcp-qwen-v0.1.0/opencode-ctl-mcp-qwen-extension.zip"
+      },
+      "description": "Delegate bounded work to an OpenCode worker session from Qwen Code over MCP: start and inspect the OpenCode service, create sessions, send prompts, wait for the turn, read messages and changes, and answer permission and form requests.",
+      "author": {
+        "name": "AI Plugins Marketplace Contributors"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/qwen/plugins/opencode-ctl-mcp-qwen",
+      "license": "PolyForm-Noncommercial-1.0.0",
+      "category": "development",
+      "keywords": [
+        "opencode",
+        "mcp",
+        "subagent",
+        "delegate",
+        "rust"
+      ]
     }
   ]
 }

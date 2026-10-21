@@ -1,0 +1,1 @@
+{"$schema":"https://opencode.ai/config.json","mcp":{"servers":{"opencode-ctl":{"type":"local","command":["./bin/opencode-ctl-cc-mcp","serve","--host","opencode"],"environment":{"OPENCODE_CTL_HOST":"opencode"},"disabled":false,"timeout":{"catalog":30000,"execution":330000}}}},"permissions":[],"skills":[]}

@@ -4,9 +4,30 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
+description.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+[[bin]]
+name = "agy-example-mcp"
+path = "src/bin/mcp.rs"
+
+[[bin]]
+name = "agy-example-hook"
+path = "src/bin/hook.rs"
 
 [dependencies]
+anyhow = { workspace = true }
+rmcp = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 
-# Example package — not included in release artifacts.
+[dev-dependencies]
+rmcp = { workspace = true, features = ["client", "transport-child-process"] }
+
 [package.metadata.dist]
 dist = false

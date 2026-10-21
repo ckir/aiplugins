@@ -21,6 +21,7 @@ budgets=${1:-docs/footprints/budgets.json}
 live=$(
     bash scripts/registry-plugins.sh claude-code | tr -d '\r'
     bash scripts/registry-plugins.sh opencode | tr -d '\r'
+    bash scripts/registry-plugins.sh antigravity | tr -d '\r'
 )
 
 failures=0

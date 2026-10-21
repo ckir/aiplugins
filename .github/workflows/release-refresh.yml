@@ -67,8 +67,13 @@ jobs:
         run: |
           just build-rtk-mcp-cc
           just build-re-ghidra-mcp-cc
+          just build-opencode-ctl-mcp-cc
           just build-rtk-mcp-opencode
           just build-re-ghidra-mcp-opencode
+          just build-rtk-mcp-agy
+          just build-re-ghidra-mcp-agy
+          just build-opencode-ctl-mcp-agy
+          just build-opencode-ctl-mcp-opencode
 
       - name: Regenerate derived files
         run: |
@@ -91,7 +96,8 @@ jobs:
             docs/footprints/ \
             README.md \
             claude-code/plugins/*/README.md \
-            opencode/plugins/*/README.md
+            opencode/plugins/*/README.md \
+            antigravity/plugins/*/README.md
           if git diff --cached --quiet; then
             echo "Derived files already fresh; nothing to commit."
           else

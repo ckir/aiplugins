@@ -5,6 +5,16 @@ version = 4
 [[package]]
 name = "agy-example"
 version = "0.7.2"
+dependencies = [
+ "anyhow",
+ "rmcp",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "aho-corasick"
@@ -473,12 +483,11 @@ name = "ghidra-worker-ctl"
 version = "0.7.2"
 dependencies = [
  "ghidra-ipc",
- "nix",
+ "proc-guard",
  "serde_json",
  "thiserror",
  "tokio",
  "uuid",
- "windows",
 ]
 
 [[package]]
@@ -682,6 +691,60 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
+name = "opencode-ctl"
+version = "0.7.2"
+dependencies = [
+ "anyhow",
+ "insta",
+ "lru",
+ "nix",
+ "proc-guard",
+ "proptest",
+ "rmcp",
+ "schemars",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+ "uuid",
+ "windows",
+]
+
+[[package]]
+name = "opencode-ctl-mcp-agy"
+version = "0.1.0"
+dependencies = [
+ "opencode-ctl",
+ "rmcp",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "opencode-ctl-mcp-cc"
+version = "0.1.0"
+dependencies = [
+ "opencode-ctl",
+ "rmcp",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "opencode-ctl-mcp-qwen"
+version = "0.1.0"
+dependencies = [
+ "opencode-ctl",
+ "rmcp",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -732,6 +795,14 @@ name = "powerfmt"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
+
+[[package]]
+name = "proc-guard"
+version = "0.7.2"
+dependencies = [
+ "nix",
+ "windows",
+]
 
 [[package]]
 name = "proc-macro-crate"

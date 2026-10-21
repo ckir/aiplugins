@@ -113,6 +113,27 @@
         "pdf",
         "skills"
       ]
+    },
+    {
+      "name": "opencode-ctl-mcp-opencode",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/opencode-ctl-mcp-opencode-v0.1.0/opencode-ctl-mcp-opencode-opencode.zip"
+      },
+      "description": "OpenCode V2 front for opencode-ctl: lets an OpenCode session delegate bounded work to a worker OpenCode session over MCP.",
+      "author": {
+        "name": "AI Plugins Marketplace Contributors"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/opencode/plugins/opencode-ctl-mcp-opencode",
+      "license": "PolyForm-Noncommercial-1.0.0",
+      "category": "development",
+      "keywords": [
+        "opencode",
+        "mcp",
+        "subagent",
+        "delegate",
+        "rust"
+      ]
     }
   ]
 }

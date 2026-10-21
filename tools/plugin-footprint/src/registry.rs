@@ -1,28 +1,37 @@
 //! The plugin registry (`agents.json`) as the footprint tooling's iteration
 //! source: registry keys name folders and documents, published names do not.
 
-/// The registry keys of the `claude-code` agent's plugins, in file order.
-///
-/// Keys, not published names: a skills-only plugin is published under a name
-/// that differs from its folder and its `docs/footprints/<key>.json`.
-pub fn published_plugin_keys(agents_json: &str) -> Result<Vec<String>, String> {
+fn agent_plugin_keys(agents_json: &str, agent_id: &str) -> Result<Vec<String>, String> {
     let registry: serde_json::Value =
         serde_json::from_str(agents_json).map_err(|e| format!("parsing agents.json: {e}"))?;
     let agent = registry["agents"]
         .as_array()
-        .and_then(|agents| agents.iter().find(|a| a["id"] == "claude-code"))
-        .ok_or("agents.json has no claude-code agent")?;
+        .and_then(|agents| agents.iter().find(|a| a["id"] == agent_id))
+        .ok_or_else(|| format!("agents.json has no {agent_id} agent"))?;
     Ok(agent["plugins"]
         .as_array()
-        .ok_or("the claude-code agent in agents.json declares no plugins array")?
+        .ok_or_else(|| format!("the {agent_id} agent in agents.json declares no plugins array"))?
         .iter()
         .filter_map(|p| p.as_str().map(str::to_string))
         .collect())
 }
 
+/// The registry keys of the `claude-code` agent's plugins, in file order.
+///
+/// Keys, not published names: a skills-only plugin is published under a name
+/// that differs from its folder and its `docs/footprints/<key>.json`.
+pub fn published_plugin_keys(agents_json: &str) -> Result<Vec<String>, String> {
+    agent_plugin_keys(agents_json, "claude-code")
+}
+
+/// The registry keys of the `antigravity` agent's plugins, in file order.
+pub fn antigravity_plugin_keys(agents_json: &str) -> Result<Vec<String>, String> {
+    agent_plugin_keys(agents_json, "antigravity")
+}
+
 #[cfg(test)]
 mod tests {
-    use super::published_plugin_keys;
+    use super::*;
 
     #[test]
     fn returns_plugins_in_file_order() {
@@ -58,5 +67,41 @@ mod tests {
     #[test]
     fn errors_on_non_json() {
         assert!(published_plugin_keys("not json").is_err());
+    }
+
+    #[test]
+    fn antigravity_returns_plugins_in_file_order() {
+        let json =
+            r#"{"agents":[{"id":"antigravity","plugins":["rtk-mcp-agy","re-ghidra-mcp-agy"]}]}"#;
+        assert_eq!(
+            antigravity_plugin_keys(json).unwrap(),
+            vec!["rtk-mcp-agy", "re-ghidra-mcp-agy"]
+        );
+    }
+
+    #[test]
+    fn antigravity_returns_keys_not_published_names() {
+        let json = r#"{"agents":[{"id":"antigravity","plugins":["aiplugins-devtools-agy"],
+            "publishedNames":{"aiplugins-devtools-agy":"aiplugins-devtools"}}]}"#;
+        assert_eq!(
+            antigravity_plugin_keys(json).unwrap(),
+            vec!["aiplugins-devtools-agy"]
+        );
+    }
+
+    #[test]
+    fn antigravity_errors_without_antigravity_agent() {
+        let json = r#"{"agents":[{"id":"claude-code","plugins":["c"]}]}"#;
+        assert!(antigravity_plugin_keys(json)
+            .unwrap_err()
+            .contains("antigravity"));
+    }
+
+    #[test]
+    fn antigravity_errors_without_plugins_array() {
+        let json = r#"{"agents":[{"id":"antigravity"}]}"#;
+        assert!(antigravity_plugin_keys(json)
+            .unwrap_err()
+            .contains("plugins"));
     }
 }

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "opencode-ctl-mcp": {
+      "command": "opencode-ctl-agy-mcp",
+      "args": ["serve"]
+    }
+  }
+}

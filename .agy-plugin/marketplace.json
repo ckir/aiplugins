@@ -70,6 +70,47 @@
         "code-review",
         "devtools"
       ]
+    },
+    {
+      "name": "repo-user-guide",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/repo-user-guide-agy-v0.3.0/repo-user-guide-agy-agy-plugin.zip"
+      },
+      "description": "Antigravity plugin that ships the repo-user-guide skill: generates PDF user guides with verified examples.",
+      "author": {
+        "name": "AI Plugins Marketplace Contributors"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/antigravity/plugins/repo-user-guide-agy",
+      "license": "PolyForm-Noncommercial-1.0.0",
+      "category": "development",
+      "keywords": [
+        "documentation",
+        "user-guide",
+        "pdf",
+        "skills"
+      ]
+    },
+    {
+      "name": "opencode-ctl-mcp-agy",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/opencode-ctl-mcp-agy-v0.1.0/opencode-ctl-mcp-agy-agy-plugin.zip"
+      },
+      "description": "An Antigravity front for opencode-ctl-mcp: delegate bounded work to an OpenCode worker session over MCP",
+      "author": {
+        "name": "AI Plugins Marketplace Contributors"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/antigravity/plugins/opencode-ctl-mcp-agy",
+      "license": "PolyForm-Noncommercial-1.0.0",
+      "category": "development",
+      "keywords": [
+        "opencode",
+        "mcp",
+        "subagent",
+        "delegate",
+        "rust"
+      ]
     }
   ]
 }

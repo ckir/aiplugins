@@ -1,0 +1,18 @@
+{
+  "name": "opencode-ctl-mcp-cc",
+  "version": "0.1.0",
+  "description": "Claude Code integration for opencode: delegate work to an OpenCode session over MCP, with a paired-TUI launcher, a driver skill and a doctor skill.",
+  "author": {
+    "name": "AI Plugins Marketplace Contributors"
+  },
+  "homepage": "https://github.com/ckir/aiplugins",
+  "repository": "https://github.com/ckir/aiplugins",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "keywords": [
+    "opencode",
+    "mcp",
+    "subagent",
+    "delegate",
+    "rust"
+  ]
+}
