@@ -343,6 +343,9 @@ false:
 - In `catalog.json`, `null` appears only as `footprint` of a plugin with no
   footprint file, or as `setup` of a plugin whose footprint file has no
   `tiers.setup`; no string field is empty, and none contains `undefined` or `NaN`.
+- `catalog.json`'s `agents` list equals the registry's agents in the UI order
+  claude-code, opencode, antigravity, qwen, with the labels `Claude Code`,
+  `OpenCode`, `Antigravity` and `Qwen` (the `agent-set` invariant).
 - Each `version` matches `^[0-9]+\.[0-9]+\.[0-9]+$`, equals the tag in its entry's
   `source.url`, and equals `pluginVersion` in the plugin's footprint file whenever
   one exists (measured equal for all 16 today).
@@ -361,7 +364,8 @@ false:
   positive fixture's generated catalog, a loop of one-line `jq` mutations in a
   temporary directory, one per invariant in this list (plugin set by dropping or
   duplicating an entry, tier totals, budget, `skillsOnly`, name, version, readme,
-  URL prefix, install counts, null and empty fields, the family set), is fed
+  URL prefix, install counts, null and empty fields, the family set, the agent
+  list), is fed
   straight to `check-site.sh`, without
   regenerating, and each must fail naming that invariant. Part (b) is what keeps
   the invariants from being circular: a working generator always agrees with its
