@@ -323,7 +323,7 @@ skills-release-wiring:
     bash scripts/check-skills-release-wiring.sh
 
 # Check the GitHub Pages catalog: generate it from the repo inputs, verify the
-# thirteen invariants, then prove the checker rejects each seeded defect
+# the catalog invariants, then prove the checker rejects each seeded defect
 site-check:
     bash scripts/gen-marketplaces.sh --check
     bash scripts/gen-site.sh target/site-check/catalog.json

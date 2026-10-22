@@ -11,8 +11,9 @@
 #             docs/footprints/*.json (with budgets.json) and
 #             docs/site/families.txt.
 # --selftest  run tests/site/gen-test.sh, require the generator's fixture
-#             catalog to pass, then require one mutated copy of the oracle
-#             catalog per invariant to fail with its `FAIL <id>` line.
+#             catalog to pass, then require mutated copies of the oracle
+#             catalog (one or more per invariant id) to fail with their
+#             `FAIL <id>` line.
 #
 # Every failure is one line `FAIL <id>: <plugin>: <detail>` (<plugin> is the
 # dirKey, or `-` when catalog-wide). All checks run, so one defect shows up
@@ -88,7 +89,18 @@ selftest() {
     mutate install-label-opencode install-shape "(${alpha}.opencode.install[0].label) = \"Foo\""
     mutate install-label-antigravity install-shape "(${alpha}.antigravity.install[0].label) = \"Foo\""
     mutate install-label-agy-override install-shape "(${rug}.antigravity.install[0].label) = \"Foo\""
-    [ "$case_n" -eq 18 ] || { echo "FAIL selftest: ran $case_n cases, expected 18" >&2; exit 1; }
+    local gamma='.families[] | select(.key == "gamma-skills") | .plugins'
+    mutate agent-set-missing agent-set 'del(.agents[] | select(.id == "qwen"))'
+    mutate agent-set-label agent-set '(.agents[] | select(.id == "qwen") | .label) = "Gwen"'
+    mutate agent-set-order agent-set '.agents |= reverse'
+    mutate install-shape-chmod-missing install-shape \
+        "($alpha.qwen.install[0].command) |= sub(\"\\nfind [^\\n]*\$\"; \"\")"
+    mutate install-shape-chmod-unexpected install-shape \
+        "($gamma.qwen.install[0].command) += \"\\nfind ~/.qwen/extensions/gamma-skills-qwen/bin -type f ! -name '*.exe' -exec chmod 755 {} +\""
+    mutate install-shape-path-missing install-shape \
+        "($alpha.antigravity.install[0].command) |= sub(\"\\nexport PATH[^\\n]*\$\"; \"\")"
+    mutate readme-scheme url-prefix "(${alpha}[\"claude-code\"].readme) = \"javascript:alert(1)\""
+    [ "$case_n" -eq 25 ] || { echo "FAIL selftest: ran $case_n cases, expected 25" >&2; exit 1; }
 
     # --- (c) staging and the staged-tree gate over the synthetic doc tree
     # stage-site.sh only removes an --out strictly inside the repository, so the
@@ -247,7 +259,27 @@ fail() {
 footprints="$root/docs/footprints"
 oc_raw=https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main
 
-# --- catalog-wide: plugin-set, family-set, stray nulls and empty strings -----
+# --- catalog-wide: agent-set, plugin-set, family-set, stray nulls and empty strings
+# agent-set: .agents is the registry's agents in the fixed UI order with the
+# fixed labels (the order is set by the spec, not by agents.json).
+want_agents=
+for pair in claude-code:'Claude Code' opencode:OpenCode antigravity:Antigravity qwen:Qwen; do
+    id=${pair%%:*}
+    if jqr --arg id "$id" '[.agents[].id] | index($id) | tostring' "$REGISTRY" | grep -qxv null; then
+        want_agents="${want_agents}${id}|${pair#*:}"$'\n'
+    fi
+done
+for id in $(jqr '.agents[].id' "$REGISTRY"); do
+    case "$id" in
+        claude-code | opencode | antigravity | qwen) ;;
+        *) fail agent-set - "registry agent '$id' has no fixed UI position or label; add it to the agents array in scripts/gen-site.sh and to the filter chips in docs/site/index.html, then to this check" ;;
+    esac
+done
+have_agents=$(jqr '(.agents // [])[] | "\(.id // "")|\(.label // "")"' "$catalog")
+if [ "$want_agents" != "${have_agents:+$have_agents$'\n'}" ]; then
+    fail agent-set - "catalog agents [$(tr '\n' ' ' <<< "$have_agents")] differ from the expected [$(tr '\n' ' ' <<< "$want_agents")] (registry agents in UI order with fixed labels); fix the agents array in scripts/gen-site.sh and the filter chips in docs/site/index.html"
+fi
+
 expected_keys=$(
     for agent in $(jqr '.agents[].id' "$REGISTRY"); do
         registry_plugins "$agent"
@@ -303,7 +335,9 @@ label_is() {
 
 # check_install KEY AGENT NAME URL SKILLS_ONLY P
 check_install() {
-    local key=$1 agent=$2 name=$3 url=$4 p=$6
+    local key=$1 agent=$2 name=$3 url=$4 so=$5 p=$6
+    local chmod_line="find ~/.qwen/extensions/$name/bin -type f ! -name '*.exe' -exec chmod 755 {} +"
+    local path_line="export PATH=\"\$HOME/.gemini/config/plugins/$name/bin:\$PATH\""
     local n i label cmd saw_linux=0 saw_win=0
     n=$(jqr '(.install // []) | length' <<< "$p")
     case "$agent" in
@@ -326,6 +360,13 @@ check_install() {
                         saw_linux=1
                         [[ $cmd == *unzip* ]] \
                             || fail install-shape "$key" "Qwen 'Linux and macOS' entry lacks unzip; install table is in scripts/gen-site.sh"
+                        if grep -qxF -- "$chmod_line" <<< "$cmd"; then
+                            [ "$so" = false ] \
+                                || fail install-shape "$key" "skills-only Qwen 'Linux and macOS' entry must not have the bin chmod line; install table is in scripts/gen-site.sh"
+                        else
+                            [ "$so" = true ] \
+                                || fail install-shape "$key" "Qwen 'Linux and macOS' entry lacks the line: $chmod_line; install table is in scripts/gen-site.sh"
+                        fi
                         ;;
                     "Windows (PowerShell)")
                         saw_win=1
@@ -358,6 +399,13 @@ check_install() {
                     label_is "$key" "$p" "$i" "Install"
                     [[ $cmd == *"agy plugin install"* ]] \
                         || fail install-shape "$key" "Antigravity command lacks agy plugin install; install table is in scripts/gen-site.sh"
+                    if grep -qxF -- "$path_line" <<< "$cmd"; then
+                        [ "$so" = false ] \
+                            || fail install-shape "$key" "skills-only Antigravity command must not have the PATH line; install table is in scripts/gen-site.sh"
+                    else
+                        [ "$so" = true ] \
+                            || fail install-shape "$key" "Antigravity command lacks the line: $path_line; install table is in scripts/gen-site.sh"
+                    fi
                 fi
             done
             ;;
@@ -445,6 +493,11 @@ while IFS= read -r row; do
     [ "$badstr" -eq 0 ] || fail null-fields "$key" "$badstr string(s) are empty or contain undefined/NaN"
 
     # url-prefix
+    readme_val=$(jqr '.readme // ""' <<< "$p")
+    case "$readme_val" in
+        https://github.com/ckir/aiplugins/* | https://raw.githubusercontent.com/ckir/aiplugins/*) ;;
+        *) fail url-prefix "$key" "readme '$readme_val' does not start with https://github.com/ckir/aiplugins/ or https://raw.githubusercontent.com/ckir/aiplugins/" ;;
+    esac
     while IFS= read -r url; do
         [ -n "$url" ] || continue
         case "$url" in
