@@ -118,7 +118,7 @@
       "name": "opencode-ctl-mcp-opencode",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/opencode-ctl-mcp-opencode-v0.1.0/opencode-ctl-mcp-opencode-opencode.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/opencode-ctl-mcp-opencode-v0.2.0/opencode-ctl-mcp-opencode-opencode.zip"
       },
       "description": "OpenCode V2 front for opencode-ctl: lets an OpenCode session delegate bounded work to a worker OpenCode session over MCP.",
       "author": {
