@@ -192,6 +192,8 @@ selftest() {
     gate_case gate-rejects-denied-crate-listed bash -c 'echo "<a href=\"../mock_rtk/index.html\">mock_rtk</a>" >> api/index.html'
     gate_case gate-rejects-root-absolute-href bash -c 'echo "<a href=\"/x\">x</a>" >> index.html'
     gate_case gate-rejects-innerhtml-in-app bash -c 'echo "x.innerHTML = 1;" >> app.js'
+    gate_case gate-rejects-fetch-absolute bash -c 'echo "fetch('"'"'/x'"'"');" >> app.js'
+    gate_case gate-rejects-css-url-quoted bash -c 'echo "a{background:url(\"/x\")}" >> styles.css'
     gate_case gate-rejects-footer-link-missing bash -c 'sed "s|href=\"api/index.html\"|href=\"api/\"|" index.html > index.html.new && mv index.html.new index.html'
     # --- (c) confinement: --out must be strictly inside <repo>/target/. Each case
     # points --out at a throwaway directory holding a sentinel, so even a broken

@@ -123,7 +123,7 @@ gate_staged_tree() {
     # f. no root-absolute references in the files this script writes or copies
     for f in index.html api/index.html styles.css app.js; do
         [ -f "$out/$f" ] || continue
-        for pat in 'href="/' 'src="/' "href='/" "src='/" 'url(/'; do
+        for pat in 'href="/' 'src="/' "href='/" "src='/" 'url(/' 'url("/' "url('/" "fetch('/" 'fetch("/' 'fetch(`/'; do
             if grep -qF -- "$pat" "$out/$f"; then gfail "$f contains the root-absolute reference $pat"; fi
         done
     done
