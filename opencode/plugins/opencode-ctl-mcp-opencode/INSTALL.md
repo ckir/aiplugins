@@ -16,7 +16,7 @@ You will install `opencode-ctl-mcp-opencode`: a plugin that lets an OpenCode
 session delegate work to a worker OpenCode session through the
 `opencode-ctl` MCP server. Install is a file copy plus a config merge: no
 registry, no build of the TypeScript itself. Tested with OpenCode **v2.0.20**
-and `@opencode/plugin` **2.0.29**; if the user runs anything older, say so
+and `@opencode/plugin` **2.0.32**; if the user runs anything older, say so
 before continuing.
 
 ## Step 0 - prerequisites
@@ -106,7 +106,7 @@ Reuse that zip and take only the binary for this machine:
 config dir needs that package resolvable:
 
 ```bash
-cd "$DEST/.." && bun add @opencode/plugin@2.0.29
+cd "$DEST/.." && bun add @opencode/plugin@2.0.32
 ```
 
 Run it in `.opencode/`'s parent for a project-local install, or in
