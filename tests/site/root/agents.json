@@ -26,7 +26,8 @@
       "id": "qwen",
       "dir": "qwen/plugins",
       "plugins": [
-        "alpha-mcp-qwen"
+        "alpha-mcp-qwen",
+        "gamma-skills-qwen"
       ],
       "marketplace": ".qwen-plugin/marketplace.json",
       "manifestPattern": "qwen/plugins/{plugin}/qwen-extension.json",
@@ -37,7 +38,9 @@
       ],
       "versionedSourceUrl": true,
       "publishedNames": {},
-      "skillsOnly": []
+      "skillsOnly": [
+        "gamma-skills-qwen"
+      ]
     },
     {
       "id": "opencode",

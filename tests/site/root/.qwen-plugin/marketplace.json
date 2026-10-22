@@ -24,6 +24,23 @@
       "keywords": [
         "fixture"
       ]
+    },
+    {
+      "name": "gamma-skills-qwen",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/gamma-skills-qwen-v0.1.0/gamma-skills-qwen-extension.zip"
+      },
+      "description": "Fixture plugin gamma-skills-qwen",
+      "author": {
+        "name": "Fixture Owner"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/qwen/plugins/gamma-skills-qwen",
+      "license": "MIT",
+      "category": "development",
+      "keywords": [
+        "fixture"
+      ]
     }
   ]
 }

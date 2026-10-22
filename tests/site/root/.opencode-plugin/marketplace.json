@@ -12,7 +12,7 @@
       "name": "alpha-mcp-opencode",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/alpha-mcp-opencode-v0.1.0/alpha-mcp-opencode-opencode.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/alpha-mcp-opencode-v0.2.3/alpha-mcp-opencode-opencode.zip"
       },
       "description": "Fixture plugin alpha-mcp-opencode",
       "author": {
