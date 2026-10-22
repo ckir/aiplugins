@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.1](https://github.com/ckir/aiplugins/compare/re-ghidra-mcp-cc-v0.9.0...re-ghidra-mcp-cc-v0.9.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* **re-ghidra-mcp-cc:** e2e expects exit 2 on bad usage ([1c50fb7](https://github.com/ckir/aiplugins/commit/1c50fb72718704d479b0aff67e3a618c970adfca))
+
+
+### Reverts
+
+* **re-ghidra-mcp-cc:** e2e --help expects exit 0 again ([45a2396](https://github.com/ckir/aiplugins/commit/45a2396343cec4b9d97c557bc0afba70f44c6b4a))
+
 ## [0.9.0](https://github.com/ckir/aiplugins/compare/re-ghidra-mcp-cc-v0.8.0...re-ghidra-mcp-cc-v0.9.0) (2026-10-17)
 
 
