@@ -78,7 +78,9 @@ Measured at `e32170a` before writing:
   `aiplugins-devtools-cc` is published as `aiplugins-devtools`), and the
   normalized marketplace files already carry the published name. Qwen's native
   install is broken upstream (QwenLM/qwen-code
-  issue 10741), so Qwen uses `scripts/install-qwen-extension.sh`. OpenCode installs
+  issue 10741), so the repo's Qwen READMEs offer `scripts/install-qwen-extension.sh`
+  and, for three of the four plugins, a manual download-and-extract; the site uses
+  the manual form (next bullets). OpenCode installs
   by file copy or an agent prompt that fetches the plugin's `INSTALL.md`.
   Antigravity unzips a release asset and runs `agy plugin install`, plus a `PATH`
   step for plugins that are not `skillsOnly`.
@@ -198,7 +200,14 @@ Release URLs and versions are never copied from README
 text, which lags the marketplace; they come from the entry's `source.url`. Only the
 command shape and argument (directory key or published name) are taken from each
 plugin's README or `INSTALL.md`, and the plan cites the `path:line` for every one
-before the table is written. A plugin whose own documentation differs from its
+before the table is written. Qwen is the documented exception: its shape is
+synthesized from the manual download-and-extract sections of the
+`rtk-mcp-qwen`, `re-ghidra-mcp-qwen` and `aiplugins-devtools-qwen` READMEs (the
+`unzip` and `Expand-Archive` lines at `rtk-mcp-qwen/README.md:55,61`,
+`re-ghidra-mcp-qwen/README.md:96,102` and `aiplugins-devtools-qwen/README.md:38,44`)
+plus the `chmod 755` step at `scripts/install-qwen-extension.sh:88`, because
+`opencode-ctl-mcp-qwen`'s README documents only the script. A plugin whose own
+documentation differs from its
 agent's shape (`repo-user-guide-agy` copies a skill folder instead of running
 `agy plugin install`) gets a per-plugin override in the table, and the check
 requires every plugin to resolve to one shape or one override.
@@ -215,8 +224,8 @@ requires every plugin to resolve to one shape or one override.
    rustdoc never supplies a root `index.html`. The message names the colliding
    path and says to run `cargo clean --doc`, since a stale `target/doc/index.html`
    from an older local run is the likely cause.
-3. Runs `scripts/gen-site.sh target/site/catalog.json`, then
-   `scripts/check-site.sh target/site/catalog.json`, so a bad catalog stops the
+3. Runs `bash scripts/gen-site.sh target/site/catalog.json`, then
+   `bash scripts/check-site.sh target/site/catalog.json`, so a bad catalog stops the
    script here. Copies in the files from `docs/site/` and injects the generated
    `<noscript>` list at the placeholder. The list is HTML-escaped (`&`, `<`, `>`,
    `"`) and spliced in by printing the file around the marker line, not by a
@@ -283,12 +292,19 @@ names and README links.
 ### `just site-check` (generator output)
 
 The recipe runs, in order: `bash scripts/gen-marketplaces.sh --check` (so it never
-validates against stale marketplace files); `gen-site.sh target/site-check/catalog.json`
-(under `target/`, so the working tree stays clean); `check-site.sh --root .
-target/site-check/catalog.json`; and `check-site.sh --selftest`. `check-site.sh`
-takes its input root as an argument so fixtures can be checked without touching
-the repository, and it never calls `gen-marketplaces.sh` itself. The check fails
-if any of these is false:
+validates against stale marketplace files); `bash scripts/gen-site.sh
+target/site-check/catalog.json` (under `target/`, so the working tree stays
+clean); `bash scripts/check-site.sh target/site-check/catalog.json`; and `bash
+scripts/check-site.sh --selftest`.
+
+Command-line conventions, so the three scripts and the recipe agree: every script
+is invoked as `bash scripts/<name>.sh`. `gen-site.sh [--root DIR] OUT` and
+`check-site.sh [--root DIR] CATALOG` default `--root` to `.`; `stage-site.sh
+[--doc-dir DIR] [--out DIR]` defaults to `target/doc` and `target/site`. The
+`--root` and `--doc-dir` arguments exist so the selftest can run the real scripts
+over fixtures without touching the repository. `check-site.sh` never calls
+`gen-marketplaces.sh` itself; the recipe does. The check fails if any of these is
+false:
 
 - Every plugin entry in `agents.json` appears exactly once.
 - Each footprint file's tier totals match the catalog byte for byte, including the
@@ -313,15 +329,22 @@ if any of these is false:
   plugin has at least one.
 - `footprint.budget` equals `budgets.json[dirKey]`, and `skillsOnly` equals
   membership in that agent's `skillsOnly` list in `agents.json`.
-- `check-site.sh --selftest` has two parts. (a) For each fixture input set under
-  `tests/site/`, `gen-site.sh` plus `check-site.sh` must accept the positive
-  fixture, and `gen-site.sh` must refuse inputs that break a generator
-  precondition (for example a plugin key with no known agent suffix). (b) For each
-  invariant that compares the catalog with its inputs (tier totals, budget,
-  `skillsOnly`, name, readme, version), a hand-corrupted `catalog.json` is fed
-  straight to `check-site.sh`, without regenerating, and must fail naming that
-  invariant. Part (b) is what keeps the invariants from being circular: a working
-  generator always agrees with its own inputs.
+- `check-site.sh --selftest` has three parts. (a) For each fixture input set under
+  `tests/site/`, `gen-site.sh --root` plus `check-site.sh --root` must accept the
+  positive fixture, and `gen-site.sh` must refuse inputs that break a generator
+  precondition (for example a plugin key with no known agent suffix). (b) From the
+  positive fixture's generated catalog, a loop of one-line `jq` mutations in a
+  temporary directory, one per invariant in this list (tier totals, budget,
+  `skillsOnly`, name, version, readme, URL prefix, install counts, null and empty
+  fields, the family set), is fed straight to `check-site.sh`, without
+  regenerating, and each must fail naming that invariant. Part (b) is what keeps
+  the invariants from being circular: a working generator always agrees with its
+  own inputs. (c) `stage-site.sh --doc-dir tests/site/doc --out <temp>` runs over
+  a small synthetic doc tree (two crate directories, one denied crate, a `src`
+  directory with no `index.html`, and an input description containing `&`): the
+  positive tree must stage and pass the gate, and a copy with a root
+  `index.html` must be refused as a collision. This tests the staging logic in
+  well under a second without a cold `cargo doc`.
 - The family key rule yields exactly the six expected families and every plugin
   maps to exactly one.
 - Each failure names the invariant and the offending plugin. The family-set and
@@ -364,23 +387,31 @@ here so a green gate is not read as proof the page renders correctly.
   `gen-marketplaces.sh --check`. A second job runs `stage-site.sh` on pull requests
   only (`if: github.event_name == 'pull_request'`), because `ci.yml` also runs on
   push to `main`, where `docs.yml` already stages.
-- Before any push, preview `target/site/` under a `/aiplugins/` prefix locally (a
-  static server over a directory holding an `aiplugins` link to it) at phone and
-  desktop widths in light and dark. No remote CI iteration to find problems a
+- Before any push, preview `target/site/` under a `/aiplugins/` prefix locally: a
+  `just site-preview` recipe copies it to `target/preview/aiplugins` (a copy, not
+  a symlink, because creating symlinks needs elevation on Windows) and a static
+  server serves `target/preview`. Check at phone and desktop widths in light and
+  dark. No remote CI iteration to find problems a
   local run would show.
 
 ### Tests
 
 Fixture-based, written first: fake inputs in, expected `catalog.json` out. Fixtures
 cover a sparse family, a missing-footprint plugin, a `setup`-only plugin and a
-`publishedNames` remap. The checker also gets hand-corrupted catalogs (see the
-`--selftest` description), one per catalog-versus-input invariant.
+`publishedNames` remap. The checker gets in-memory mutations of the positive
+catalog (see `--selftest`), one per invariant, and the staging script gets the
+synthetic `tests/site/doc/` tree. The real `cargo doc` run stays in the
+pull-request job, which tests the staging against actual rustdoc output.
 
 ## Rollout
 
 Steps, one commit each, execution index in memory refreshed after each:
 
-1. Fixtures and `gen-site.sh` until `just site-check` passes.
+1. `.gitattributes` pins (`docs/site/**` and `tests/site/**` as `text eol=lf`, so
+   the marker-line splice and the fixture comparisons behave on a Windows
+   checkout), then fixtures and `gen-site.sh` until `just site-check` passes.
+   `gen-site.sh` writes LF output through the same carriage-return helper it reads
+   with.
 2. Static page and local preview.
 3. `docs.yml` rewrite with the staged-tree gate.
 4. `just check` and CI wiring, plus a README link to the live site.
