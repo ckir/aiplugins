@@ -475,3 +475,18 @@ README on GitHub), a custom domain, analytics, fixing
 `scripts/install-qwen-extension.sh` (the site does not use it; the defect is logged
 as an anomaly), and the other untriaged anomalies in `.clavity/local-anomalies.md`,
 which get their own triage.
+
+## Review record
+
+Adversarial panel, five rounds (solo seats plus the live agy peer each round). Every
+finding from rounds 1-5 was folded after the driver measured it; none was stood
+down as below-floor. The owner stopped the panel at the round-6 cap and took the
+spec to their own review. The panel did not reach a round with no live challenge,
+so this is not a GREEN verdict.
+
+## Stand-downs
+
+- `UNVERIFIED-ACCEPTED: client-side rendering in app.js (cards, tabs, footprint
+  bars, copy button) is not machine-gated` because the toolchain has no Node or
+  headless browser. Covered by the manual preview in the verification gates. Pending
+  the owner's confirmation at spec review.
