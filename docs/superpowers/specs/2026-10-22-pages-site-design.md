@@ -78,14 +78,19 @@ Measured at `e32170a` before writing:
 - The repo root `package.json` is a stub kept for the OpenCode plugin pin; the site
   must not touch it.
 
-Not yet verified (the plan must check before relying on them, as its step 0, by
-running `cargo doc` once): the crate directories under `target/doc`; that the
-non-crate directories rustdoc writes there (`src`, `static.files`, `trait.impl`,
-`implementors`) have no top-level `index.html`, which is how the crate list tells
-them apart; that no rustdoc output path equals a site file name (`index.html`,
-`styles.css`, `app.js`, `catalog.json`, `USER_GUIDE.pdf`, `api`); and that the
-Pages source is already set to GitHub Actions (a read-only
-`gh api repos/ckir/aiplugins/pages`).
+Measured in panel round 2 by running `cargo doc --workspace --no-deps
+--document-private-items` into a temporary directory, then re-counted by the
+driver on that output: `target/doc` holds 40 top-level crate directories (each with
+an `index.html`), 5 non-crate directories without one (`search.index`, `src`,
+`static.files`, `trait.impl`, `type.impl`) and 5 top-level files (`.lock`,
+`crates.js`, `help.html`, `settings.html`, `src-files.js`), 25 MB in 1,677 files.
+None of those names equals a site file name. Sixteen of the 40 crate directories
+are unpublished examples, test mocks or maintainer tools. A cold build took about
+37 seconds.
+
+Not yet verified (plan step 0): that the Pages source is already set to GitHub
+Actions (a read-only `gh api repos/ckir/aiplugins/pages`), and a re-run of the
+`cargo doc` measurement above on the branch the plan starts from.
 
 ## Architecture
 
@@ -138,13 +143,13 @@ stripping helper as `gen-marketplaces.sh`, so they work on a Windows `jq`.
       "claude-code": {
         "dirKey": "aiplugins-devtools-cc",
         "name": "aiplugins-devtools",
-        "version": "string",
+        "version": "0.1.0",
         "description": "string",
         "skillsOnly": true,
-        "readme": "claude-code/plugins/aiplugins-devtools-cc/README.md",
+        "readme": "https://github.com/ckir/aiplugins/tree/main/claude-code/plugins/aiplugins-devtools-cc",
         "install": [{ "label": "string", "command": "string" }],
         "footprint": { "resident": 0, "invocation": 0, "setup": null,
-                       "budget": { } }
+                       "budget": { "residentBytes": 2369 } }
       }
     }
   }]
@@ -157,7 +162,8 @@ files' internal `plugin` field carry the published name, not the directory key:
 the footprint file and `budgets.json` entry are looked up by `dirKey`.
 
 - `name` is the marketplace entry name (already the published name).
-- `version` is the `-v<semver>` tag from the entry's `source.url`.
+- `version` is the bare `<semver>` after the `-v` in the entry's `source.url`, with
+  no `v` prefix; `app.js` adds the `v` when it displays it.
 - `description` is the entry's own description. There is no family-level
   description, so a card never shows one agent's branding on another agent's tab.
 - `readme` is the entry's `homepage`, a full GitHub URL.
@@ -172,7 +178,7 @@ the footprint file and `budgets.json` entry are looked up by `dirKey`.
 
 | Agent | Shape |
 |---|---|
-| Claude Code | `claude plugin install <name>@aiplugins` after the marketplace-add command |
+| Claude Code | two entries: `claude plugin marketplace add ckir/aiplugins`, then `claude plugin install <name>@aiplugins`, so a card works on its own |
 | Qwen | the `install-qwen-extension.sh` one-liner for the plugin (and the `.ps1` form for Windows) |
 | OpenCode | the agent prompt that fetches the plugin's `INSTALL.md` |
 | Antigravity | download and unzip the release asset, `agy plugin install <dir>`, plus the `PATH` step unless `skillsOnly` |
@@ -196,19 +202,30 @@ requires every plugin to resolve to one shape or one override.
 2. Fails if any site file name already exists in the copy: `index.html`,
    `styles.css`, `app.js`, `catalog.json`, `USER_GUIDE.pdf` or `api`. The old
    `docs.yml` step that wrote a root redirect to `rtk_mcp_qwen` is removed, so
-   rustdoc never supplies a root `index.html`.
-3. Copies in the files from `docs/site/` and `catalog.json`, and injects the
-   generated `<noscript>` list at the placeholder.
+   rustdoc never supplies a root `index.html`. The message names the colliding
+   path and says to run `cargo clean --doc`, since a stale `target/doc/index.html`
+   from an older local run is the likely cause.
+3. Runs `scripts/gen-site.sh target/site/catalog.json`, then
+   `scripts/check-site.sh target/site/catalog.json`, so a bad catalog stops the
+   script here. Copies in the files from `docs/site/` and injects the generated
+   `<noscript>` list at the placeholder. The list is HTML-escaped (`&`, `<`, `>`,
+   `"`) and spliced in by printing the file around the marker line, not by a
+   substitution that treats `&` specially.
 4. Writes `api/index.html`, a plain list linking each crate's
-   `../<crate>/index.html`. The crates are the top-level directories of the copy
-   that contain an `index.html`, so rustdoc's non-crate directories are skipped.
+   `../<crate>/index.html`. A crate is a top-level directory of the copy that
+   contains an `index.html`, found before `api/` exists (so `api` is never its own
+   entry), and whose name matches none of the deny patterns `*example*`, `mock_*`,
+   `probe_target`, `footprint_gate` and `plugin_footprint` (unpublished examples,
+   test mocks and maintainer tools: 16 of today's 40). Denied crates stay on the
+   site and reachable by URL; they are only left out of the list.
 5. Copies `docs/USER_GUIDE.pdf` to the root.
 6. Runs the staged-tree gate.
 
 `docs.yml` then uploads `target/site/` as one artifact. If the gate fails, nothing
 is uploaded and the previously deployed site stays live. A pull-request CI job runs
-the same script (with `cargo doc` cached), so a staging failure is seen before the
-merge and not after it.
+the same script, so a staging failure is seen before the merge and not after it.
+That job pays a cold `cargo doc` (about 37 seconds, measured); no cache for
+rustdoc output is assumed.
 
 The built site is never committed. **Rollback:** revert the merge commit; `docs.yml`
 redeploys the previous layout.
@@ -218,11 +235,14 @@ redeploys the previous layout.
 One scrollable page, no router.
 
 1. **Hero:** one-line pitch, the `claude plugin marketplace add ckir/aiplugins`
-   command with a copy button, and four agent chips that double as the filter.
+   command labeled for Claude Code with a copy button, and four agent chips that
+   double as the filter. Each card also carries its own full install steps, so no
+   card depends on the hero command.
 2. **Catalog:** one card per plugin family. Each card has the description, a
    version, and an agent tab strip. Agents without the family are greyed out, not
    hidden. Picking a tab swaps the description, install command, version and
-   footprint bar, because each agent's description is its own. With the "All"
+   footprint bar, because each agent's description is its own. A card renders every
+   entry of `install[]`, each with its label and its own copy button. With the "All"
    filter a card opens on its first available agent in the order claude-code,
    opencode, antigravity, qwen.
 3. **Footprint bar:** three labeled figures, because the budgets cover only two of
@@ -233,8 +253,8 @@ One scrollable page, no router.
    README's "compare between plugins, not a context budget". A measured zero reads
    "0 B". A missing measurement shows a "Not measured" badge and no bar, so the two
    cases are never confused.
-4. **Why it matters:** a short explanation of resident versus invocation cost, in
-   the wording of the README footprint section.
+4. **Why it matters:** a short explanation of resident, invocation and (OpenCode
+   only) setup cost, in the wording of the README footprint section.
 5. **Footer:** links to the API docs, the User Guide PDF, GitHub, and the changelog
    and license as GitHub blob URLs (those two files are not staged into the site).
    Each card's README link is the entry's `homepage`, also a full GitHub URL.
@@ -267,7 +287,19 @@ validates against stale marketplace files. It then fails if any of these is fals
 - In `catalog.json`, `null` appears only as `footprint` of a plugin with no
   footprint file, or as `setup` of a plugin whose footprint file has no
   `tiers.setup`; no string field is empty, and none contains `undefined` or `NaN`.
-- Each `version` matches the `-v<semver>` tag of its entry's `source.url`.
+- Each `version` matches `^[0-9]+\.[0-9]+\.[0-9]+$`, equals the tag in its entry's
+  `source.url`, and equals `pluginVersion` in the plugin's footprint file whenever
+  one exists (measured equal for all 16 today).
+- `readme` equals the entry's `homepage`, and every URL in the catalog starts with
+  `https://github.com/ckir/aiplugins/`.
+- `footprint.budget` equals `budgets.json[dirKey]`, and `skillsOnly` equals
+  membership in that agent's `skillsOnly` list in `agents.json`.
+- `docs/site/app.js` contains no `innerHTML`; catalog strings go in through
+  `textContent` or attribute setters, so placeholders such as `<dir>` display as
+  text.
+- `check-site.sh --selftest` runs `gen-site.sh` and `check-site.sh` over
+  `tests/site/` and requires the positive fixture to pass and each negative
+  fixture to fail on its named invariant.
 - The family key rule yields exactly the six expected families and every plugin
   maps to exactly one.
 - Each failure names the invariant and the offending plugin.
@@ -276,8 +308,9 @@ validates against stale marketplace files. It then fails if any of these is fals
 
 `target/site/` must contain `index.html` (with the `<noscript>` placeholder
 replaced), `catalog.json`, `USER_GUIDE.pdf`, and `api/index.html` linking every
-crate directory that has an `index.html`, with each of those links resolving to an
-existing file. The footer's API link must point at `api/index.html`. The files
+every crate in the step-4 set (computed before `api/` existed, so `api` is not its
+own entry), with each link resolved relative to `api/` (`../<crate>/index.html`
+must exist as `target/site/<crate>/index.html`) and no denied crate listed. The footer's API link must point at `api/index.html`. The files
 this script writes or copies from `docs/site/` contain no root-absolute
 `href="/..."` or `src="/..."` (rustdoc's own files are not checked).
 
@@ -290,9 +323,11 @@ here so a green gate is not read as proof the page renders correctly.
 
 - `typos` and `mlc` pass on the new files; add exclusions only if a check proves
   one is needed.
-- `site-check` joins `just check` and the CI job that already guards generated
-  marketplaces and footprints; a second CI job runs `stage-site.sh` on pull
-  requests.
+- `site-check` (which includes the `--selftest` run) joins `just check` and the
+  `wiring` job of `ci.yml`, the job that already runs
+  `gen-marketplaces.sh --check`. A second job runs `stage-site.sh` on pull requests
+  only (`if: github.event_name == 'pull_request'`), because `ci.yml` also runs on
+  push to `main`, where `docs.yml` already stages.
 - Before any push, preview `target/site/` under a `/aiplugins/` prefix locally (a
   static server over a directory holding an `aiplugins` link to it) at phone and
   desktop widths in light and dark. No remote CI iteration to find problems a
