@@ -56,7 +56,7 @@
       "name": "aiplugins-devtools",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/aiplugins-devtools-cc-v0.1.0/aiplugins-devtools-cc-plugin.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/aiplugins-devtools-cc-v0.2.0/aiplugins-devtools-cc-plugin.zip"
       },
       "description": "Dev-tool skills container for AI coding agents; first skill: code-review-and-quality, a multi-axis code review.",
       "author": {

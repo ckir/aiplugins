@@ -1,6 +1,6 @@
 {
   "name": "aiplugins-devtools",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Dev-tool skills container for AI coding agents; first skill: code-review-and-quality, a multi-axis code review.",
   "license": "PolyForm-Noncommercial-1.0.0"
