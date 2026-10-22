@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Plugins Marketplace</title>
+<meta name="description" content="Plugins for Claude Code, Antigravity, Qwen and OpenCode.">
+<link rel="stylesheet" href="styles.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <div class="topbar">
+      <h1>AI Plugins Marketplace</h1>
+      <button type="button" id="theme-toggle" class="btn" aria-label="Toggle dark and light theme">Theme</button>
+    </div>
+    <p class="pitch">Plugins for Claude Code, Antigravity, Qwen and OpenCode</p>
+    <div class="install-block">
+      <div class="install-label">Claude Code</div>
+      <div class="cmd-row">
+        <pre class="cmd"><code>claude plugin marketplace add ckir/aiplugins</code></pre>
+        <button type="button" class="btn copy" id="hero-copy" aria-label="Copy the Claude Code marketplace command">Copy</button>
+      </div>
+    </div>
+    <div class="chips" role="group" aria-label="Filter by agent">
+      <button type="button" class="chip" data-filter="all" aria-pressed="true">All</button>
+      <button type="button" class="chip" data-filter="claude-code" aria-pressed="false">Claude Code</button>
+      <button type="button" class="chip" data-filter="opencode" aria-pressed="false">OpenCode</button>
+      <button type="button" class="chip" data-filter="antigravity" aria-pressed="false">Antigravity</button>
+      <button type="button" class="chip" data-filter="qwen" aria-pressed="false">Qwen</button>
+    </div>
+  </div>
+</header>
+<main class="wrap">
+  <section aria-labelledby="catalog-h">
+    <h2 id="catalog-h">Catalog</h2>
+    <div id="catalog" class="grid"></div>
+<!-- NOSCRIPT -->
+  </section>
+  <section class="why" aria-labelledby="why-h">
+    <h2 id="why-h">Why it matters</h2>
+    <dl>
+      <dt>Resident</dt>
+      <dd>What the host holds in every request, for the whole session: the MCP tool schemas plus the frontmatter it reads to decide what each skill and agent is for.</dd>
+      <dt>Invocation</dt>
+      <dd>Loads only when one of them actually runs.</dd>
+      <dt>Setup (OpenCode only)</dt>
+      <dd>An OpenCode plugin also loads its setup module in-process with the host on every request, a third tier on top of the two above.</dd>
+    </dl>
+    <p>These are bytes, not tokens: the exact serialised size of what the host loads. Compare them between plugins; they are not a context budget.</p>
+  </section>
+</main>
+<footer class="wrap">
+  <nav aria-label="Project links">
+    <a href="api/index.html">API docs</a>
+    <a href="USER_GUIDE.pdf">User Guide</a>
+    <a href="https://github.com/ckir/aiplugins">GitHub</a>
+    <a href="https://github.com/ckir/aiplugins/blob/main/CHANGELOG.md">Changelog</a>
+    <a href="https://github.com/ckir/aiplugins/blob/main/LICENSE">License</a>
+  </nav>
+</footer>
+<div role="status" aria-live="polite" id="live" class="visually-hidden"></div>
+</body>
+</html>
