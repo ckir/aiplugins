@@ -1,5 +1,5 @@
 {
   "name": "repo-user-guide",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Antigravity plugin that ships the repo-user-guide skill: generates PDF user guides with verified examples."
 }

@@ -615,9 +615,9 @@ checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
 name = "lru"
-version = "0.18.5"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef9ac18847474e638e3702b76c65d4eb93428471a74778ef0f1be711717f89b5"
+checksum = "4a9f71e3591c7ec44d3e563e87bf14ddc2bada8519dca046e5b0e560cd004e2d"
 dependencies = [
  "hashbrown",
 ]
@@ -716,7 +716,7 @@ dependencies = [
 
 [[package]]
 name = "opencode-ctl-mcp-agy"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "opencode-ctl",
  "rmcp",
@@ -726,7 +726,7 @@ dependencies = [
 
 [[package]]
 name = "opencode-ctl-mcp-cc"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "opencode-ctl",
  "rmcp",
@@ -736,7 +736,7 @@ dependencies = [
 
 [[package]]
 name = "opencode-ctl-mcp-qwen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "opencode-ctl",
  "rmcp",
@@ -915,7 +915,7 @@ dependencies = [
 
 [[package]]
 name = "re-ghidra-mcp-agy"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "ghidra-mcp",
  "serde",
@@ -925,7 +925,7 @@ dependencies = [
 
 [[package]]
 name = "re-ghidra-mcp-cc"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "ghidra-mcp",
  "serde_json",
@@ -1027,7 +1027,7 @@ dependencies = [
 
 [[package]]
 name = "rtk-mcp-agy"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1035,7 +1035,7 @@ dependencies = [
 
 [[package]]
 name = "rtk-mcp-cc"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "rmcp",

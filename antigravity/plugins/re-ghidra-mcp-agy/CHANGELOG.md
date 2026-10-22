@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.11.0](https://github.com/ckir/aiplugins/compare/re-ghidra-mcp-agy-v0.10.0...re-ghidra-mcp-agy-v0.11.0) (2026-10-22)
+
+
+### Features
+
+* **footprint:** measure Antigravity plugins, ratchet budgets, and publish footprint table (G7, G8) ([3d95ff8](https://github.com/ckir/aiplugins/commit/3d95ff85cd63b86adabeaf1e284621313d93fb4d))
+* **re-ghidra-mcp-agy:** add doctor/driver skills, re-analyst agent, and settings (G4) ([b92ee00](https://github.com/ckir/aiplugins/commit/b92ee0006351bca64f6cc0cb71abf30c317e3401))
+
+
+### Bug Fixes
+
+* **re-ghidra-mcp-agy:** re-analyst tools as a YAML list; agy-validate covers every front ([6fb9539](https://github.com/ckir/aiplugins/commit/6fb953949b8c0a6a8f63c1c59bd3a7f119aeb796))
+* **re-ghidra-mcp-agy:** write the re-analyst tools as a YAML list; validate every agy front ([55b9fad](https://github.com/ckir/aiplugins/commit/55b9fad2f8e7e7dc0b37bf355dea0f3c825d9c7a)), closes [#101](https://github.com/ckir/aiplugins/issues/101)
+
 ## [0.10.0](https://github.com/ckir/aiplugins/compare/re-ghidra-mcp-agy-v0.9.0...re-ghidra-mcp-agy-v0.10.0) (2026-10-12)
 
 

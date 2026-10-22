@@ -12,7 +12,7 @@
       "name": "rtk-mcp-agy",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/rtk-mcp-agy-v0.8.0/rtk-mcp-agy-agy-plugin.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/rtk-mcp-agy-v0.9.0/rtk-mcp-agy-agy-plugin.zip"
       },
       "description": "An Antigravity hook integration for rtk (Rust Token Killer)",
       "author": {
@@ -34,7 +34,7 @@
       "name": "re-ghidra-mcp-agy",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-agy-v0.10.0/re-ghidra-mcp-agy-agy-plugin.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-agy-v0.11.0/re-ghidra-mcp-agy-agy-plugin.zip"
       },
       "description": "An Antigravity plugin for Ghidra reverse engineering",
       "author": {
@@ -56,7 +56,7 @@
       "name": "aiplugins-devtools",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/aiplugins-devtools-agy-v0.1.0/aiplugins-devtools-agy-agy-plugin.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/aiplugins-devtools-agy-v0.2.0/aiplugins-devtools-agy-agy-plugin.zip"
       },
       "description": "Dev-tool skills container for AI coding agents; first skill: code-review-and-quality, a multi-axis code review.",
       "author": {
@@ -75,7 +75,7 @@
       "name": "repo-user-guide",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/repo-user-guide-agy-v0.3.0/repo-user-guide-agy-agy-plugin.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/repo-user-guide-agy-v0.4.0/repo-user-guide-agy-agy-plugin.zip"
       },
       "description": "Antigravity plugin that ships the repo-user-guide skill: generates PDF user guides with verified examples.",
       "author": {
@@ -95,7 +95,7 @@
       "name": "opencode-ctl-mcp-agy",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/opencode-ctl-mcp-agy-v0.1.0/opencode-ctl-mcp-agy-agy-plugin.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/opencode-ctl-mcp-agy-v0.2.0/opencode-ctl-mcp-agy-agy-plugin.zip"
       },
       "description": "An Antigravity front for opencode-ctl-mcp: delegate bounded work to an OpenCode worker session over MCP",
       "author": {

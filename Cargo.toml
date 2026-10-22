@@ -41,7 +41,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
 sha2 = "0.11"
-lru = "0.18"
+lru = "0.19"
 tracing-appender = "0.2"
 
 # Windows-only. The Ghidra worker JVM is held in a Job Object so it cannot
