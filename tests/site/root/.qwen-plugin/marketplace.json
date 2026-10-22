@@ -1,0 +1,46 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "fixture-qwen",
+  "owner": {
+    "name": "Fixture Owner"
+  },
+  "metadata": {
+    "description": "Fixture qwen"
+  },
+  "plugins": [
+    {
+      "name": "alpha-mcp-qwen",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/alpha-mcp-qwen-v0.1.0/alpha-mcp-qwen-extension.zip"
+      },
+      "description": "Fixture plugin alpha-mcp-qwen",
+      "author": {
+        "name": "Fixture Owner"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/qwen/plugins/alpha-mcp-qwen",
+      "license": "MIT",
+      "category": "development",
+      "keywords": [
+        "fixture"
+      ]
+    },
+    {
+      "name": "gamma-skills-qwen",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/gamma-skills-qwen-v0.1.0/gamma-skills-qwen-extension.zip"
+      },
+      "description": "Fixture plugin gamma-skills-qwen",
+      "author": {
+        "name": "Fixture Owner"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/qwen/plugins/gamma-skills-qwen",
+      "license": "MIT",
+      "category": "development",
+      "keywords": [
+        "fixture"
+      ]
+    }
+  ]
+}

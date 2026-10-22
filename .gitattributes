@@ -64,3 +64,7 @@ shared/devtools/commands/*.md text eol=lf
 # their working-copy bytes ARE the rendered bytes; the eight committed copies are LF. Same class as the
 # ghidra skill above: a Windows checkout would compile CRLF and fail the byte-identity tests.
 shared/opencode-ctl/skill/*.md text eol=lf
+
+# The pages-site generator splices a marker line and compares fixtures byte for byte, so these stay LF.
+docs/site/** text eol=lf
+tests/site/** text eol=lf

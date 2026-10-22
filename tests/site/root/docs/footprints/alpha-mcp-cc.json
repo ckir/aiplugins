@@ -1,0 +1,1 @@
+{"agent":"claude-code","plugin":"alpha-mcp-cc","pluginVersion":"0.1.0","probe":{"binary":"","promptCount":0,"status":"ok","toolCount":1},"schemaVersion":1,"tiers":{"invocation":{"bytes":222,"sources":[]},"resident":{"bytes":111,"sources":[]}},"tree":"dev"}

@@ -44,9 +44,11 @@ spellcheck:
 # Offline (no web requests: fast and hermetic for a push hook) and limited to
 # our own docs. Vendored trees are listed explicitly because mlc's --gitignore
 # does not filter them on Windows (mlc 1.2.2); extend the list when a new
-# node_modules/ or build-output dir appears.
+# node_modules/ or build-output dir appears. docs/site is the page template: its
+# links to api/index.html and USER_GUIDE.pdf resolve only in the staged tree,
+# which scripts/stage-site.sh checks.
 links:
-    mlc --offline --ignore-path "./node_modules,./opencode/plugins/re-ghidra-mcp-opencode/node_modules,./opencode/plugins/opencode-ctl-mcp-opencode/node_modules,./opencode/plugins/rtk-mcp-opencode/node_modules,./opencode/plugins/todov2-opencode/node_modules,./target"
+    mlc --offline --ignore-path "./node_modules,./opencode/plugins/re-ghidra-mcp-opencode/node_modules,./opencode/plugins/opencode-ctl-mcp-opencode/node_modules,./opencode/plugins/rtk-mcp-opencode/node_modules,./opencode/plugins/todov2-opencode/node_modules,./target,./docs/site"
 
 # Verify plugin configs point at binaries this workspace actually builds.
 # Nothing else checks those strings: rename a [[bin]] and every test still
@@ -320,9 +322,29 @@ skills-bundles:
 skills-release-wiring:
     bash scripts/check-skills-release-wiring.sh
 
+# Check the GitHub Pages catalog: generate it from the repo inputs, verify the
+# the catalog invariants, then prove the checker rejects each seeded defect
+site-check:
+    bash scripts/gen-marketplaces.sh --check
+    bash scripts/gen-site.sh target/site-check/catalog.json
+    bash scripts/check-site.sh target/site-check/catalog.json
+    bash scripts/check-site.sh --selftest
+
+# Stage the site and serve it under /aiplugins/ exactly as Pages does. A
+# preview aid, not a gate. Use `python` where `python3` is absent. The page is
+# then at http://localhost:8000/aiplugins/
+site-preview:
+    bash scripts/stage-site.sh
+    rm -rf target/preview
+    mkdir -p target/preview
+    cp -R target/site target/preview/aiplugins
+    @echo 'Preview: http://localhost:8000/aiplugins/ (Ctrl-C stops the server)'
+    @echo 'Check: 1) 320 px and desktop widths; 2) light, dark and the theme toggle; 3) a sparse card (todov2 has three greyed tabs); 4) a Qwen card shows Not measured; 5) an OpenCode card shows the setup bar and resident 0 B; 6) every copy button, and the page with JavaScript disabled'
+    python3 -m http.server --bind 127.0.0.1 --directory target/preview 8000
+
 # Run all pre-flight checks (what CI and lefthook run; see ci.yml — `links`
 # is hook-only and `gen-* --check` + opencode suites run in CI but not here)
-check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace agy-marketplace dispatch smoke footprint opencode-wiring agy-wiring agy-validate footprint-budgets devtools-skills skills-bundles skills-release-wiring
+check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace agy-marketplace dispatch smoke footprint opencode-wiring agy-wiring agy-validate footprint-budgets devtools-skills skills-bundles skills-release-wiring site-check
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
