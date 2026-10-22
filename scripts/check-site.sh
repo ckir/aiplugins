@@ -89,6 +89,83 @@ selftest() {
     mutate install-label-antigravity install-shape "(${alpha}.antigravity.install[0].label) = \"Foo\""
     mutate install-label-agy-override install-shape "(${rug}.antigravity.install[0].label) = \"Foo\""
     [ "$case_n" -eq 18 ] || { echo "FAIL selftest: ran $case_n cases, expected 18" >&2; exit 1; }
+
+    # --- (c) staging and the staged-tree gate over the synthetic doc tree
+    # stage-site.sh only removes an --out strictly inside the repository, so the
+    # staging runs write under the git-ignored target/ (still a mktemp -d dir).
+    mkdir -p target
+    stg=$(mktemp -d target/selftest-stage.XXXXXX)
+    trap 'rm -rf "$tmp" "$stg"' EXIT
+    local good="$stg/out" s_rc s_out
+
+    # stage_case NAME DOCDIR OUTDIR: sets s_rc and s_out
+    stage_case() {
+        s_rc=0
+        s_out=$(bash scripts/stage-site.sh --root tests/site/root --doc-dir "$2" --out "$3" 2>&1) || s_rc=$?
+    }
+    # require NAME CONDITION-DESCRIPTION: fail the selftest unless the preceding test passed
+    s_fail() {
+        echo "FAIL $1: $2" >&2
+        exit 1
+    }
+
+    stage_case stages-and-gates tests/site/doc "$good"
+    [ "$s_rc" -eq 0 ] || s_fail stages-and-gates "expected exit 0, got $s_rc: $s_out"
+    echo "ok stages-and-gates"
+
+    if grep -qF '../alpha_crate/index.html' "$good/api/index.html" \
+        && grep -qF '../rtk_mcp_cc/index.html' "$good/api/index.html" \
+        && ! grep -qF 'mock_rtk' "$good/api/index.html" \
+        && [ -f "$good/mock_rtk/index.html" ]; then
+        echo "ok deny-filter"
+    else
+        s_fail deny-filter "api/index.html must list alpha_crate and rtk_mcp_cc, omit mock_rtk, and mock_rtk/index.html must still be staged"
+    fi
+
+    if grep -qF 'Fixture plugin A &amp; B' "$good/index.html" \
+        && ! grep -qF 'Fixture plugin A & B' "$good/index.html"; then
+        echo "ok escapes-ampersand"
+    else
+        s_fail escapes-ampersand "staged index.html lacks 'A &amp; B' or still has the raw ampersand"
+    fi
+
+    cp -R tests/site/doc "$stg/doc-collide"
+    echo '<!doctype html><title>stale</title>' > "$stg/doc-collide/index.html"
+    stage_case collision-refused "$stg/doc-collide" "$stg/out-collide"
+    if [ "$s_rc" -ne 0 ] && [[ $s_out == *"cargo clean --doc"* ]]; then
+        echo "ok collision-refused"
+    else
+        s_fail collision-refused "expected non-zero exit with 'cargo clean --doc', got exit $s_rc: $s_out"
+    fi
+
+    mkdir -p "$stg/doc-empty/static.files"
+    echo 'a{}' > "$stg/doc-empty/static.files/a.css"
+    stage_case gate-catches-empty-set "$stg/doc-empty" "$stg/out-empty"
+    [ "$s_rc" -ne 0 ] || s_fail gate-catches-empty-set "staging a tree with no crate directory exited 0: $s_out"
+    echo "ok gate-catches-empty-set"
+
+    # gate_case NAME MUTATION-COMMAND...: mutate a fresh copy of the good output
+    # (cwd is the copy during the mutation) and require --gate-only to reject it.
+    gate_case() {
+        local name=$1 copy="$stg/gate-$1" g_rc=0 g_out
+        shift
+        cp -R "$good" "$copy"
+        (cd "$copy" && "$@") || s_fail "$name" "mutation command failed"
+        g_out=$(bash scripts/stage-site.sh --gate-only --out "$copy" 2>&1) || g_rc=$?
+        [ "$g_rc" -ne 0 ] || s_fail "$name" "gate accepted the mutated tree: $g_out"
+        echo "ok $name"
+    }
+    # The unmutated copy must pass, so a rejection cannot come from a broken harness.
+    cp -R "$good" "$stg/gate-control"
+    s_out=$(bash scripts/stage-site.sh --gate-only --out "$stg/gate-control" 2>&1) \
+        || s_fail gate-control "the unmutated staged copy was rejected: $s_out"
+    gate_case gate-rejects-missing-styles rm styles.css
+    gate_case gate-rejects-placeholder-left bash -c 'echo "<!-- NOSCRIPT -->" >> index.html'
+    gate_case gate-rejects-denied-crate-listed bash -c 'echo "<a href=\"../mock_rtk/index.html\">mock_rtk</a>" >> api/index.html'
+    gate_case gate-rejects-root-absolute-href bash -c 'echo "<a href=\"/x\">x</a>" >> index.html'
+    gate_case gate-rejects-innerhtml-in-app bash -c 'echo "x.innerHTML = 1;" >> app.js'
+    gate_case gate-rejects-footer-link-missing sed -i 's|href="api/index.html"|href="api/"|' index.html
+    rm -rf "$stg"
 }
 
 if [ "${1:-}" = "--selftest" ]; then
