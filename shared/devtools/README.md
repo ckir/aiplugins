@@ -6,28 +6,42 @@ on purpose, so the drift check ignores it.
 ## Layout
 
 - `shared/devtools/skills/<skill>/` is the single source of the skills.
-- `just emit-devtools-skills` copies it into the four plugins
+- `shared/devtools/commands/<name>.md` is the single source of the OpenCode
+  slash-command files. Claude Code, Qwen Code and Antigravity make every skill a
+  `/` command by themselves; OpenCode lists no skill in its `/` menu, so it needs
+  a command file that loads the skill (its prefixed name) and takes the target
+  path as `$ARGUMENTS`.
+- `just emit-devtools-skills` copies them into the four plugins
   (`claude-code/plugins/aiplugins-devtools-cc`, `qwen/plugins/aiplugins-devtools-qwen`,
   `antigravity/plugins/aiplugins-devtools-agy`, `opencode/plugins/aiplugins-devtools-opencode`).
   OpenCode gets the prefixed folder name (`aiplugins-devtools-<skill>`) and one
-  rewritten `name:` line in its `SKILL.md`.
+  rewritten `name:` line in its `SKILL.md`, plus the command files in `commands/`.
 - Checks: `just devtools-skills` (source and copies), `just skills-bundles`
   (the bundled zips) and `just skills-release-wiring` (the release workflows).
 - `agents.json` marks these plugins with `publishedNames` (folder name to the
   published name `aiplugins-devtools`) and `skillsOnly` (no crate, no binary).
 
-## Adding a second skill
+## Adding another skill
 
-Nothing discovers skills automatically. Edit by hand:
+Skills are discovered from `shared/devtools/skills/*/`, so the emit recipe and
+the drift check (`scripts/check-devtools-skills.sh`) pick a new folder up by
+themselves. Do this:
 
-- the `emit-devtools-skills` recipe in the `Justfile`, which hardcodes
-  `code-review-and-quality` for the OpenCode copy (prefixed folder plus the
-  `name:` rewrite);
-- the copies list in `scripts/check-devtools-skills.sh`;
-- note that `scripts/check-skills-bundles.sh` needs no edit: its `pairs` list
-  names the four host plugins, and it finds skills with `find`;
-- note that the drift check only compares the named skill folder, so a new skill
-  is not covered until it is added to that list.
+- create `shared/devtools/skills/<skill>/SKILL.md` with `name: <skill>` as its
+  frontmatter name (the drift check fails otherwise);
+- if the skill should be a slash command on OpenCode, add
+  `shared/devtools/commands/<skill>.md`: a `description:` frontmatter and a body
+  that names `aiplugins-devtools-<skill>` and contains `$ARGUMENTS` (the drift
+  check requires both);
+- run `just emit-devtools-skills`, then `just devtools-skills` and
+  `just skills-bundles`;
+- run `just footprint-regen`: the resident cost of every new `SKILL.md`
+  frontmatter (and every OpenCode command file's frontmatter) counts against the
+  500-byte per-change delta cap in `docs/footprints/budgets.json`, and new growth
+  that trips it is never overridden, so keep frontmatter short.
+
+Only a vendored upstream skill needs a `THIRD-PARTY-NOTICE.md`; the bundler asks
+for one somewhere in the zip, which `code-review-and-quality` supplies.
 
 ## First release order
 

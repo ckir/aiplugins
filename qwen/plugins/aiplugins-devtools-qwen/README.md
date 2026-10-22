@@ -1,8 +1,13 @@
 # aiplugins-devtools-qwen
 
-A Qwen Code extension that ships dev-tool skills. The first skill is
-`code-review-and-quality`, a multi-axis code review (correctness, readability,
-architecture, security, performance) with security and performance checklists.
+A Qwen Code extension that ships two dev-tool skills:
+
+- `code-review-and-quality`, a multi-axis code review (correctness, readability,
+  architecture, security, performance) with security and performance checklists.
+- `spec-panel-review`, an adversarial multi-seat review of a spec or an
+  implementation plan (not code), report-only.
+
+Slash command: `/aiplugins-devtools:spec-panel-review <path>`.
 
 ## Installation
 
@@ -57,7 +62,7 @@ qwen extensions link ./qwen/plugins/aiplugins-devtools-qwen
 
 ## Attribution
 
-The skill is adapted from Addy Osmani's agent-skills; see
+The `code-review-and-quality` skill is adapted from Addy Osmani's agent-skills; see
 `skills/code-review-and-quality/THIRD-PARTY-NOTICE.md` for attribution and the
 upstream licence. The canonical source lives in `shared/devtools/` and is copied
 here by `just emit-devtools-skills`.

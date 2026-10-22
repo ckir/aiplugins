@@ -1,8 +1,13 @@
 # aiplugins-devtools-agy
 
-An Antigravity plugin that ships dev-tool skills. The first skill is
-`code-review-and-quality`, a multi-axis code review (correctness, readability,
-architecture, security, performance) with security and performance checklists.
+An Antigravity plugin that ships two dev-tool skills:
+
+- `code-review-and-quality`, a multi-axis code review (correctness, readability,
+  architecture, security, performance) with security and performance checklists.
+- `spec-panel-review`, an adversarial multi-seat review of a spec or an
+  implementation plan (not code), report-only.
+
+Slash command: `/spec-panel-review <path>`.
 It carries only skills: no hooks, no MCP servers, no binaries.
 
 ## Installation
@@ -32,7 +37,7 @@ It carries only skills: no hooks, no MCP servers, no binaries.
 
 ## Attribution
 
-The skill is adapted from Addy Osmani's agent-skills; see
+The `code-review-and-quality` skill is adapted from Addy Osmani's agent-skills; see
 `skills/code-review-and-quality/THIRD-PARTY-NOTICE.md` for attribution and the
 upstream licence. The canonical source lives in `shared/devtools/` and is copied
 here by `just emit-devtools-skills`.
@@ -40,12 +45,12 @@ here by `just emit-devtools-skills`.
 <!-- footprint:begin -->
 ### Context footprint
 
-Installing this plugin adds **≥ 369 bytes** to every request, for the whole session. A further **≥ 20,674 bytes** load only when one of its skills or agents is actually invoked.
+Installing this plugin adds **≥ 582 bytes** to every request, for the whole session. A further **≥ 28,227 bytes** load only when one of its skills or agents is actually invoked.
 
 | Tier | Bytes | When you pay it |
 |---|---|---|
-| Resident | ≥ 369 | Every request, for the whole session |
-| Invocation | ≥ 20,674 | Only when that skill or agent runs |
+| Resident | ≥ 582 | Every request, for the whole session |
+| Invocation | ≥ 28,227 | Only when that skill or agent runs |
 
 **Bytes, not tokens.** This is the exact serialised size of what the host loads, measured by probing the plugin's own MCP server and reading its skill and agent frontmatter. It is not a token count and does not convert to one at a fixed rate — treat it as a figure you can compare between plugins, not as a context budget.
 
