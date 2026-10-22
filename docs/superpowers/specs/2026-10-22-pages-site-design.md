@@ -38,8 +38,13 @@ Measured at `e32170a` before writing:
   filter), builds `cargo doc --workspace --no-deps --document-private-items` and
   publishes `target/doc` at the site root with a root redirect to
   `rtk_mcp_qwen/index.html`.
-- Install commands live in no manifest. Claude Code remaps directory keys through
-  `publishedNames`. Qwen's native install is broken upstream (QwenLM/qwen-code
+- `ci.yml` runs on push and pull request to `main`; `docs.yml` runs only on push to
+  `main`.
+- Install commands live in no manifest. `publishedNames` remaps directory keys for
+  four agents (Claude Code, Qwen, OpenCode, Antigravity; for example
+  `aiplugins-devtools-cc` is published as `aiplugins-devtools`), and the
+  normalized marketplace files already carry the published name. Qwen's native
+  install is broken upstream (QwenLM/qwen-code
   issue 10741), so Qwen uses `scripts/install-qwen-extension.sh`. OpenCode installs
   by file copy or an agent prompt that fetches the plugin's `INSTALL.md`.
   Antigravity unzips a release asset and runs `agy plugin install`, plus a `PATH`
@@ -49,17 +54,21 @@ Measured at `e32170a` before writing:
 - The repo root `package.json` is a stub kept for the OpenCode plugin pin; the site
   must not touch it.
 
-Not yet verified (the plan must check before relying on them): the exact crate
-directory names under `target/doc`, and that the Pages source is already set to
-GitHub Actions.
+Not yet verified (the plan must check before relying on them, as its step 0): the
+exact crate directory names under `target/doc`, that the Pages source is already
+set to GitHub Actions (a read-only `gh api repos/ckir/aiplugins/pages`), and that
+GitHub Pages serves a root `404.html` for missing paths on this project site.
 
 ## Architecture
 
 ### Source layout
 
 - `docs/site/index.html`, `docs/site/styles.css`, `docs/site/app.js`: hand-written,
-  unminified, no external requests.
+  unminified, no external requests. `index.html` holds one placeholder comment
+  where the staging step injects the generated `<noscript>` plugin list.
 - `scripts/gen-site.sh`: builds `catalog.json` with `jq`.
+- `scripts/stage-site.sh`: assembles `_site/` (steps under Deploy). Both `docs.yml`
+  and a pull-request CI job call it, so the staging logic exists once.
 - `scripts/check-site.sh` (behind `just site-check`): the invariants below.
 - `tests/site/` fixtures: a small fake `agents.json`, marketplace files and
   footprint set, plus expected `catalog.json`.
@@ -81,18 +90,79 @@ GitHub Actions.
 The output is `catalog.json`, grouped by plugin family, with agent availability as
 a sparse map.
 
+**Family key.** A plugin's key in `agents.json` with its trailing agent suffix
+(`-cc`, `-qwen`, `-opencode`, `-agy`) removed. Today that gives six families:
+`rtk-mcp`, `re-ghidra-mcp`, `aiplugins-devtools`, `opencode-ctl-mcp`,
+`repo-user-guide`, `todov2`. The check fails if a plugin key has no recognized
+suffix or maps to a different family than its siblings' descriptions imply.
+
+**`catalog.json` schema** (no timestamp, so the output is reproducible):
+
+```json
+{
+  "agents": [{ "id": "claude-code", "label": "Claude Code" }],
+  "families": [{
+    "key": "aiplugins-devtools",
+    "description": "string",
+    "plugins": {
+      "claude-code": {
+        "dirKey": "aiplugins-devtools-cc",
+        "name": "aiplugins-devtools",
+        "version": "string",
+        "description": "string",
+        "skillsOnly": true,
+        "readme": "claude-code/plugins/aiplugins-devtools-cc/README.md",
+        "install": [{ "label": "string", "command": "string" }],
+        "footprint": { "resident": 0, "invocation": 0, "setup": null,
+                       "budget": { } }
+      }
+    }
+  }]
+}
+```
+
+`name` is the marketplace entry name (already the published name). The family
+`description` comes from the first agent that has the family, in the order
+claude-code, opencode, antigravity, qwen. `setup` is `null` for tiers an agent
+does not measure. `footprint` is `null`, and the UI shows "Not measured", only for
+a plugin with no footprint file. `budget` copies the matching `budgets.json` entry
+verbatim.
+
+**Install templates.** One table in `gen-site.sh`, one shape per agent:
+
+| Agent | Shape |
+|---|---|
+| Claude Code | `claude plugin install <name>@aiplugins` after the marketplace-add command |
+| Qwen | the `install-qwen-extension.sh` one-liner for the plugin (and the `.ps1` form for Windows) |
+| OpenCode | the agent prompt that fetches the plugin's `INSTALL.md` |
+| Antigravity | download and unzip the release asset, `agy plugin install <dir>`, plus the `PATH` step unless `skillsOnly` |
+
+The exact commands and the argument each one takes (directory key or published
+name) are copied from each plugin's README or `INSTALL.md`; the plan cites the
+`path:line` for every one before the table is written.
+
 ### Deploy (`docs.yml`, the only Pages workflow)
 
-1. Build `cargo doc` as today.
-2. Stage `_site/`: site files, `catalog.json`, `target/doc` moved to `_site/api/`.
-3. Write a redirect stub at each old `/<crate>/index.html` pointing to
-   `./api/<crate>/index.html`, so existing links do not 404. Crate names are read
-   from `target/doc` at build time, not hardcoded. The old root redirect to
-   `rtk_mcp_qwen` is replaced by the landing page.
-4. Copy `docs/USER_GUIDE.pdf` to `_site/USER_GUIDE.pdf`.
-5. Run the staged-tree gate, then upload `_site/` as one artifact.
+`docs.yml` builds `cargo doc` as today, then calls `scripts/stage-site.sh`, which:
 
-The built site is never committed.
+1. Stages `_site/`: site files, `catalog.json`, the generated `<noscript>` list
+   injected at the placeholder, and `target/doc` moved to `_site/api/`.
+2. Writes a redirect stub at each old `/<crate>/index.html` pointing to
+   `./api/<crate>/index.html`, plus a root `404.html` that maps any other old
+   `/<crate>/...` path to the same path under `/api/<crate>/`, so deep rustdoc
+   links keep working. Crate names are read from `target/doc` at build time, not
+   hardcoded. The old root redirect to `rtk_mcp_qwen` is replaced by the landing
+   page.
+3. Copies `docs/USER_GUIDE.pdf` to `_site/USER_GUIDE.pdf`.
+4. Runs the staged-tree gate.
+
+`docs.yml` then uploads `_site/` as one artifact. If the gate fails, nothing is
+uploaded and the previously deployed site stays live. A pull-request CI job runs
+the same script (with `cargo doc` cached), so a staging failure is seen before the
+merge and not after it.
+
+The built site is never committed. **Rollback:** revert the merge commit; `docs.yml`
+redeploys the previous layout.
 
 ## Page design
 
@@ -131,22 +201,35 @@ The check fails if any of these is false:
   `setup` tier.
 - A plugin with no footprint file is flagged "Not measured" and carries
   `footprint: null`; a plugin without one that is not flagged fails.
-- The Claude Code install command uses the published name.
-- Every plugin entry has exactly one install template.
-- The rendered output contains no literal `null`, `undefined` or `NaN`.
+- For every agent, `name` equals the marketplace entry name (the published name
+  where `publishedNames` remaps it), never the directory key.
+- Every plugin entry has exactly one install template, and no install command
+  is empty.
+- In `catalog.json`, `null` appears only as `footprint` of a plugin flagged
+  "Not measured", or as `setup` of a plugin whose agent has no setup tier; no
+  string field is empty, and none contains `undefined` or `NaN`.
+- The family key rule yields the expected six families and every plugin maps to
+  exactly one.
+- Each failure names the invariant and the offending plugin.
 
 ### Staged-tree gate (in `docs.yml` and runnable locally)
 
-`_site/` must contain `index.html`, `catalog.json`, `USER_GUIDE.pdf`, an
-`api/<crate>/index.html` and a root stub for every crate built, and no root-absolute
-`href="/..."` or `src="/..."`.
+`_site/` must contain `index.html` (with the `<noscript>` placeholder replaced),
+`catalog.json`, `404.html`, `USER_GUIDE.pdf`, an `api/<crate>/index.html` and a root
+stub for every crate built, and no root-absolute `href="/..."` or `src="/..."`.
+
+The client-side rendering in `app.js` (cards, tabs, footprint bars, copy button)
+is not machine-gated, because there is no Node or headless browser in the
+toolchain. It is checked by the manual preview below, and that limit is stated
+here so a green gate is not read as proof the page renders correctly.
 
 ### Repo gates
 
 - `typos` and `mlc` pass on the new files; add exclusions only if a check proves
   one is needed.
 - `site-check` joins `just check` and the CI job that already guards generated
-  marketplaces and footprints.
+  marketplaces and footprints; a second CI job runs `stage-site.sh` on pull
+  requests.
 - Before any push, preview `_site/` under a `/aiplugins/` prefix locally at phone
   and desktop widths in light and dark. No remote CI iteration to find problems a
   local run would show.
