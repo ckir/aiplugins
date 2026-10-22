@@ -9,7 +9,9 @@
 #                styles.css, app.js) and docs/USER_GUIDE.pdf are always read
 #                from the real repository root.
 # --doc-dir DIR  rustdoc output to copy (default target/doc).
-# --out DIR      staged tree to write (default target/site).
+# --out DIR      staged tree to write (default target/site). It is removed
+#                first, so it must resolve (symlinks followed) to a path
+#                strictly inside <repo-root>/target/; anything else is refused.
 # --gate-only    run only the staged-tree gate on an existing --out directory.
 #
 # Relative paths resolve against the repository root. Every failure is
@@ -174,8 +176,8 @@ out_abs=$(realpath -m -- "$out")
 doc_abs=$(realpath -m -- "$doc")
 [ -d "$doc_abs" ] || die "no such doc directory: $doc (run cargo doc first)"
 case "$out_abs" in
-    "$repo"/*) ;;
-    *) die "refusing to remove $out_abs" ;;
+    "$repo/target"/?*) ;;
+    *) die "refusing to remove $out_abs: --out must be inside $repo/target/" ;;
 esac
 case "$doc_abs/" in
     "$out_abs"/*) die "refusing to remove $out_abs" ;;
