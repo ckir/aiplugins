@@ -46,7 +46,12 @@ async function loadCatalog() {
   }
 }
 
-/** @param {string} text @returns {Promise<void>} */
+/**
+ * Copy text and announce the result in the live region. Never throws and
+ * always resolves.
+ * @param {string} text
+ * @returns {Promise<boolean>} true when a copy succeeded, false otherwise
+ */
 async function copyText(text) {
   let done = false;
   if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
@@ -83,9 +88,31 @@ async function copyText(text) {
   }
   const live = document.getElementById('live');
   if (live) {
+    // Clear first and set later, so a repeated identical message is announced again.
     live.textContent = '';
-    live.textContent = done ? 'Copied' : 'Copy failed. Select the text and copy it manually.';
+    setTimeout(() => {
+      live.textContent = done ? 'Copied' : 'Copy failed. Select the text and copy it manually.';
+    }, 50);
   }
+  return done;
+}
+
+/**
+ * Make a button copy text and show the outcome on itself for about two seconds.
+ * @param {HTMLElement} btn @param {string} text @returns {void}
+ */
+function wireCopy(btn, text) {
+  let timer = null;
+  btn.addEventListener('click', () => {
+    copyText(text).then((ok) => {
+      btn.textContent = ok ? 'Copied' : 'Copy failed';
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(() => {
+        btn.textContent = 'Copy';
+        timer = null;
+      }, 2000);
+    });
+  });
 }
 
 /** @param {string} text @param {string} what @returns {HTMLElement} */
@@ -93,7 +120,7 @@ function copyButton(text, what) {
   const b = el('button', 'btn copy', 'Copy');
   b.setAttribute('type', 'button');
   b.setAttribute('aria-label', 'Copy ' + what);
-  b.addEventListener('click', () => { copyText(text); });
+  wireCopy(b, text);
   return b;
 }
 
@@ -144,6 +171,7 @@ function renderPanelBody(plugin) {
   meta.append(el('span', 'version', 'v' + plugin.version));
   if (plugin.readme) {
     const a = el('a', '', 'README');
+    a.setAttribute('aria-label', 'README for ' + plugin.name);
     a.setAttribute('href', plugin.readme);
     meta.append(a);
   }
@@ -289,7 +317,7 @@ function main() {
   initTheme();
   const heroCopy = document.getElementById('hero-copy');
   if (heroCopy) {
-    heroCopy.addEventListener('click', () => { copyText('claude plugin marketplace add ckir/aiplugins'); });
+    wireCopy(heroCopy, 'claude plugin marketplace add ckir/aiplugins');
   }
   const container = document.getElementById('catalog');
   loadCatalog().then((catalog) => {
