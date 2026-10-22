@@ -128,11 +128,15 @@ for cmd in "${cmd_files[@]}"; do
     [ -f "$cmd" ] || continue
     sed -n '1p' "$cmd" | grep -qx -- '---' || bad "$cmd: no frontmatter"
     [ "$(grep -cx -- '---' "$cmd")" -ge 2 ] || bad "$cmd: frontmatter is never closed"
-    grep -q '^description: ' "$cmd" || bad "$cmd: frontmatter lacks 'description:'"
-    grep -qF '$ARGUMENTS' "$cmd" || bad "$cmd: body lacks \$ARGUMENTS, so the path would not be passed on"
+    # Frontmatter is line 2 to the closing `---`; the body is everything after it.
+    # (awk, not a sed range: a sed range would run on to EOF when line 2 is the closer.)
+    frontmatter=$(awk 'NR == 1 { next } /^---$/ { exit } { print }' "$cmd")
+    body=$(awk 'NR == 1 { next } done { print; next } /^---$/ { done = 1 }' "$cmd")
+    grep -q '^description: ' <<<"$frontmatter" || bad "$cmd: frontmatter lacks 'description:'"
+    grep -qF '$ARGUMENTS' <<<"$body" || bad "$cmd: body lacks \$ARGUMENTS, so the path would not be passed on"
     # A command naming no prefixed skill would load nothing under OpenCode, so
     # zero matches is a failure, not an empty loop.
-    refs=$(grep -o 'aiplugins-devtools-[a-z0-9-]*' "$cmd" | sort -u || true)
+    refs=$(grep -o 'aiplugins-devtools-[a-z0-9-]*' <<<"$body" | sort -u || true)
     [ -n "$refs" ] || bad "$cmd: names no aiplugins-devtools-<skill>, so OpenCode would load no skill"
     while IFS= read -r ref; do
         [ -n "$ref" ] || continue

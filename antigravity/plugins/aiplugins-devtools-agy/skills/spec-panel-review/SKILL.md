@@ -74,7 +74,7 @@ Every finding ends in exactly one of these. There is no "noted".
 - `DEFERRED: <file:line or n/a>`: reachable, real, not for this artifact to fix. Allowed only for a defect that existed before the artifact and that the artifact does not cause.
 - `UNVERIFIED: <finding>`: neither provable nor refutable from what you can read.
 
-A defect's age is never a disposition: "pre-existing" and "out of scope" are not reasons. Severity floor: stylistic or trivial observations that touch no correctness, safety, contract or completeness question are dropped, not listed.
+A defect's age or scope alone never justifies dropping a finding or calling it `BELOW-FLOOR`; only the `DEFERRED` test above (it predates the artifact and the artifact does not cause it) applies. Severity floor: stylistic or trivial observations that touch no correctness, safety, contract or completeness question are dropped, not listed.
 
 ## Step 5: Report
 
@@ -85,7 +85,7 @@ Write the report in the conversation, in this order:
 3. The one or two most significant `BELOW-FLOOR` items you dropped, each with its cited guard, so a real defect cannot be swept under the floor unseen. Count any others without listing them.
 4. What was not examined: files unread, behaviour never exercised, lenses not applied. A round that finds nothing has told you about its coverage, not about the artifact.
 5. One closing line: `PANEL VERDICT: GREEN`, `REVISE` or `BLOCK`, then a short reason.
-   - `GREEN` only when no `CONFIRMED` and no `UNVERIFIED` finding remains and the seated lenses actually cover the artifact's risk surface. Name any `DEFERRED` finding in the reason.
+   - `GREEN` only when no `CONFIRMED` and no `UNVERIFIED` finding remains and the seated lenses actually cover the artifact's risk surface. An `UNVERIFIED` finding clears only when the user explicitly accepts that risk in the conversation; say so in the reason. Name any `DEFERRED` finding in the reason.
    - `REVISE` when `CONFIRMED` findings can be fixed in the artifact, or `UNVERIFIED` findings need the author to settle them.
    - `BLOCK` when a `CONFIRMED` finding challenges a decision the artifact cannot proceed without.
 
