@@ -26,8 +26,8 @@
           "dirKey": "alpha-mcp-agy",
           "footprint": {
             "budget": {
-              "deltaBytes": 500,
-              "headroomBytes": 2000,
+              "deltaBytes": 321,
+              "headroomBytes": 1234,
               "residentBytes": 1333
             },
             "invocation": 444,
@@ -96,7 +96,7 @@
           "name": "alpha-mcp-opencode",
           "readme": "https://github.com/ckir/aiplugins/tree/main/opencode/plugins/alpha-mcp-opencode",
           "skillsOnly": false,
-          "version": "0.1.0"
+          "version": "0.2.3"
         },
         "qwen": {
           "description": "Fixture plugin alpha-mcp-qwen",
@@ -115,6 +115,30 @@
           "name": "alpha-mcp-qwen",
           "readme": "https://github.com/ckir/aiplugins/tree/main/qwen/plugins/alpha-mcp-qwen",
           "skillsOnly": false,
+          "version": "0.1.0"
+        }
+      }
+    },
+    {
+      "key": "gamma-skills",
+      "plugins": {
+        "qwen": {
+          "description": "Fixture plugin gamma-skills-qwen",
+          "dirKey": "gamma-skills-qwen",
+          "footprint": null,
+          "install": [
+            {
+              "command": "curl -fsSL -o gamma-skills-qwen-extension.zip https://github.com/ckir/aiplugins/releases/download/gamma-skills-qwen-v0.1.0/gamma-skills-qwen-extension.zip\nmkdir -p ~/.qwen/extensions/gamma-skills-qwen\nunzip -q -o gamma-skills-qwen-extension.zip -d ~/.qwen/extensions/gamma-skills-qwen/",
+              "label": "Linux and macOS"
+            },
+            {
+              "command": "Invoke-WebRequest -Uri https://github.com/ckir/aiplugins/releases/download/gamma-skills-qwen-v0.1.0/gamma-skills-qwen-extension.zip -OutFile gamma-skills-qwen-extension.zip\nNew-Item -ItemType Directory -Force -Path \"$env:USERPROFILE\\.qwen\\extensions\\gamma-skills-qwen\"\nExpand-Archive -Path gamma-skills-qwen-extension.zip -DestinationPath \"$env:USERPROFILE\\.qwen\\extensions\\gamma-skills-qwen\" -Force",
+              "label": "Windows (PowerShell)"
+            }
+          ],
+          "name": "gamma-skills-qwen",
+          "readme": "https://github.com/ckir/aiplugins/tree/main/qwen/plugins/gamma-skills-qwen",
+          "skillsOnly": true,
           "version": "0.1.0"
         }
       }

@@ -1,7 +1,7 @@
 {
   "alpha-mcp-agy": {
-    "deltaBytes": 500,
-    "headroomBytes": 2000,
+    "deltaBytes": 321,
+    "headroomBytes": 1234,
     "residentBytes": 1333
   },
   "alpha-mcp-cc": {
