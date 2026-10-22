@@ -95,7 +95,8 @@ selftest() {
     # staging runs write under the git-ignored target/ (still a mktemp -d dir).
     mkdir -p target
     stg=$(mktemp -d target/selftest-stage.XXXXXX)
-    trap 'rm -rf "$tmp" "$stg"' EXIT
+    sent_out='' sent_nt='' sent_ln='' link=''
+    trap 'rm -rf "$tmp" "$stg" "$sent_out" "$sent_nt" "$sent_ln" "$link"' EXIT
     local good="$stg/out" s_rc s_out
 
     # stage_case NAME DOCDIR OUTDIR: sets s_rc and s_out
@@ -165,7 +166,34 @@ selftest() {
     gate_case gate-rejects-root-absolute-href bash -c 'echo "<a href=\"/x\">x</a>" >> index.html'
     gate_case gate-rejects-innerhtml-in-app bash -c 'echo "x.innerHTML = 1;" >> app.js'
     gate_case gate-rejects-footer-link-missing sed -i 's|href="api/index.html"|href="api/"|' index.html
-    rm -rf "$stg"
+    # --- (c) confinement: --out must be strictly inside <repo>/target/. Each case
+    # points --out at a throwaway directory holding a sentinel, so even a broken
+    # guard could only remove that throwaway directory.
+    # refuse_case NAME OUTDIR SENTINEL
+    refuse_case() {
+        local name=$1 r_rc=0 r_out
+        r_out=$(bash scripts/stage-site.sh --root tests/site/root --doc-dir tests/site/doc --out "$2" 2>&1) || r_rc=$?
+        [ "$r_rc" -ne 0 ] || s_fail "$name" "staging into $2 exited 0: $r_out"
+        [[ $r_out == *"refusing to remove"* ]] || s_fail "$name" "output lacks 'refusing to remove': $r_out"
+        [ -e "$3" ] || s_fail "$name" "the sentinel $3 was removed"
+        echo "ok $name"
+    }
+    # (globals: the EXIT trap runs after this function's locals are gone)
+    sent_out=$(mktemp -d)
+    echo keep > "$sent_out/sentinel"
+    refuse_case out-outside-repo-refused "$sent_out" "$sent_out/sentinel"
+    sent_nt=$(mktemp -d "$(pwd -P)/selftest-notarget.XXXXXX")
+    echo keep > "$sent_nt/sentinel"
+    refuse_case out-in-repo-not-target-refused "$sent_nt" "$sent_nt/sentinel"
+    sent_ln=$(mktemp -d)
+    echo keep > "$sent_ln/sentinel"
+    link=$(mktemp -u "$(pwd -P)/target/selftest-link.XXXXXX")
+    if ln -s "$sent_ln" "$link" 2> /dev/null && [ -L "$link" ]; then
+        refuse_case out-symlink-escape-refused "$link" "$sent_ln/sentinel"
+    else
+        echo "ok out-symlink-escape-refused (skipped: no symlinks)"
+    fi
+    rm -rf "$stg" "$sent_out" "$sent_nt" "$sent_ln" "$link"
 }
 
 if [ "${1:-}" = "--selftest" ]; then
