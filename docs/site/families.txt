@@ -1,0 +1,6 @@
+aiplugins-devtools
+opencode-ctl-mcp
+re-ghidra-mcp
+repo-user-guide
+rtk-mcp
+todov2
