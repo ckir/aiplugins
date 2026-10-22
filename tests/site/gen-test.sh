@@ -70,10 +70,43 @@ expect_refusal unknown-suffix "$tmp/suffix" "agent suffix"
 
 # --- crlf-input -------------------------------------------------------------
 fresh_root crlf
-find "$tmp/crlf" -name '*.json' -exec sed -i 's/$/\r/' {} +
+cr=$(printf '\r')
+while IFS= read -r f; do
+    while IFS= read -r line || [ -n "$line" ]; do
+        printf '%s%s\n' "$line" "$cr"
+    done < "$f" > "$f.crlf"
+    mv "$f.crlf" "$f"
+done < <(find "$tmp/crlf" -name '*.json')
 grep -q $'\r' "$tmp/crlf/agents.json" || fail crlf-input "fixture was not converted to CRLF"
 run_gen "$tmp/crlf" "$tmp/crlf-out.json"
 [ "$status" -eq 0 ] || fail crlf-input "exit $status: $err"
 cmp -s "$tmp/out.json" "$tmp/crlf-out.json" || fail crlf-input "output differs from the LF run"
 if grep -q $'\r' "$tmp/crlf-out.json"; then fail crlf-input "output contains a carriage return"; fi
 echo "ok crlf-input"
+
+# --- crlf-shim --------------------------------------------------------------
+# A jq that appends a carriage return to every output line (as the jq on a
+# Windows PATH does). The generator must still emit a byte-identical catalog
+# with no carriage return, which only holds while it strips CR from jq output.
+real_jq=$(command -v jq)
+mkdir -p "$tmp/shim"
+{
+    echo '#!/usr/bin/env bash'
+    printf 'real_jq=%q\n' "$real_jq"
+    cat <<'SHIM'
+rc=0
+"$real_jq" "$@" > "${TMPDIR:-/tmp}/jqshim.$$" || rc=$?
+while IFS= read -r line || [ -n "$line" ]; do
+    printf '%s\r\n' "$line"
+done < "${TMPDIR:-/tmp}/jqshim.$$"
+rm -f "${TMPDIR:-/tmp}/jqshim.$$"
+exit "$rc"
+SHIM
+} > "$tmp/shim/jq"
+chmod +x "$tmp/shim/jq"
+shim_rc=0
+PATH="$tmp/shim:$PATH" bash scripts/gen-site.sh --root tests/site/root "$tmp/shim-out.json" 2> "$tmp/err" > /dev/null || shim_rc=$?
+[ "$shim_rc" -eq 0 ] || fail crlf-shim "exit $shim_rc: $(cat "$tmp/err")"
+cmp -s "$tmp/out.json" "$tmp/shim-out.json" || fail crlf-shim "output differs from the normal run"
+if grep -q $'\r' "$tmp/shim-out.json"; then fail crlf-shim "output contains a carriage return"; fi
+echo "ok crlf-shim"

@@ -142,6 +142,13 @@ selftest() {
         s_fail escapes-ampersand "staged index.html lacks 'A &amp; B' or still has the raw ampersand"
     fi
 
+    if grep -qF 'A &amp; B &lt;c&gt; &quot;d&quot;' "$good/index.html" \
+        && ! grep -qF '<c>' "$good/index.html"; then
+        echo "ok escapes-angle-quote"
+    else
+        s_fail escapes-angle-quote "staged index.html lacks 'A &amp; B &lt;c&gt; &quot;d&quot;' or still has a raw <c>"
+    fi
+
     cp -R tests/site/doc "$stg/doc-collide"
     echo '<!doctype html><title>stale</title>' > "$stg/doc-collide/index.html"
     stage_case collision-refused "$stg/doc-collide" "$stg/out-collide"
@@ -177,7 +184,7 @@ selftest() {
     gate_case gate-rejects-denied-crate-listed bash -c 'echo "<a href=\"../mock_rtk/index.html\">mock_rtk</a>" >> api/index.html'
     gate_case gate-rejects-root-absolute-href bash -c 'echo "<a href=\"/x\">x</a>" >> index.html'
     gate_case gate-rejects-innerhtml-in-app bash -c 'echo "x.innerHTML = 1;" >> app.js'
-    gate_case gate-rejects-footer-link-missing sed -i 's|href="api/index.html"|href="api/"|' index.html
+    gate_case gate-rejects-footer-link-missing bash -c 'sed "s|href=\"api/index.html\"|href=\"api/\"|" index.html > index.html.new && mv index.html.new index.html'
     # --- (c) confinement: --out must be strictly inside <repo>/target/. Each case
     # points --out at a throwaway directory holding a sentinel, so even a broken
     # guard could only remove that throwaway directory.
