@@ -14,6 +14,7 @@
 #                strictly inside <repo-root>/target/; anything else is refused.
 # --gate-only    run only the staged-tree gate on an existing --out directory.
 #
+# Needs GNU `realpath -m` (Linux, WSL and Git for Windows have it; stock macOS does not).
 # Relative paths resolve against the repository root. Every failure is
 # `stage-site: <reason>` on stderr with exit 1.
 set -euo pipefail

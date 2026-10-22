@@ -179,6 +179,8 @@ jobs:
     name: Site staging
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -188,6 +190,12 @@ jobs:
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
+
+      # A restored rust-cache must never carry a stale target/doc/index.html (the
+      # old redirect) into stage-site.sh's collision guard, so drop the rustdoc
+      # output before rebuilding it.
+      - name: Remove stale rustdoc output
+        run: cargo clean --doc
 
       - name: Build documentation
         run: cargo doc --workspace --no-deps --document-private-items

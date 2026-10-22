@@ -331,14 +331,16 @@ site-check:
     bash scripts/check-site.sh --selftest
 
 # Stage the site and serve it under /aiplugins/ exactly as Pages does. A
-# preview aid, not a gate.
+# preview aid, not a gate. Use `python` where `python3` is absent. The page is
+# then at http://localhost:8000/aiplugins/
 site-preview:
     bash scripts/stage-site.sh
     rm -rf target/preview
     mkdir -p target/preview
     cp -R target/site target/preview/aiplugins
-    # Use `python` where `python3` is absent. The page is then at http://localhost:8000/aiplugins/
-    python3 -m http.server --directory target/preview 8000
+    @echo 'Preview: http://localhost:8000/aiplugins/ (Ctrl-C stops the server)'
+    @echo 'Check: 1) 320 px and desktop widths; 2) light, dark and the theme toggle; 3) a sparse card (todov2 has three greyed tabs); 4) a Qwen card shows Not measured; 5) an OpenCode card shows the setup bar and resident 0 B; 6) every copy button, and the page with JavaScript disabled'
+    python3 -m http.server --bind 127.0.0.1 --directory target/preview 8000
 
 # Run all pre-flight checks (what CI and lefthook run; see ci.yml — `links`
 # is hook-only and `gen-* --check` + opencode suites run in CI but not here)
