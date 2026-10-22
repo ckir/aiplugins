@@ -17,10 +17,15 @@ into staleness. The existing `cargo doc` deployment keeps working.
 - **Generator:** repo-native `jq` script plus hand-written HTML, CSS and an ES
   module. No Node, no npm, no SSG binary. Chosen by the owner after the AGY-FIRST
   consult (peer and driver agreed; Zola and Astro/VitePress ranked lower).
-- **Hosting:** one Pages deployment from the existing `docs.yml`, site at the root,
-  rustdoc under `/api/`. Two workflows must never both call `deploy-pages`: a Pages
-  deployment replaces the whole site, so the last workflow to finish would erase the
-  other's content.
+- **Hosting:** one Pages deployment from the existing `docs.yml`. The rustdoc output
+  stays at the site root, where it is today, so every existing rustdoc URL keeps
+  working with no redirects; the landing page takes over only the root
+  `index.html`. Chosen by the owner after the AGY-FIRST consult and the panel's
+  round 1 (peer and driver both recommended it over moving rustdoc to `/api/`,
+  which had four concrete defects: wrong relative stubs, no `api/index.html`,
+  non-crate directories in the crate list, and a depth-sensitive `404.html`).
+  Two workflows must never both call `deploy-pages`: a Pages deployment replaces
+  the whole site, so the last workflow to finish would erase the other's content.
 - **Qwen footprint:** the four Qwen plugins have no measurement. The catalog shows a
   "Not measured" badge and the generator emits `footprint: null`. Measuring Qwen is
   a separate task.
@@ -73,10 +78,14 @@ Measured at `e32170a` before writing:
 - The repo root `package.json` is a stub kept for the OpenCode plugin pin; the site
   must not touch it.
 
-Not yet verified (the plan must check before relying on them, as its step 0): the
-exact crate directory names under `target/doc`, that the Pages source is already
-set to GitHub Actions (a read-only `gh api repos/ckir/aiplugins/pages`), and that
-GitHub Pages serves a root `404.html` for missing paths on this project site.
+Not yet verified (the plan must check before relying on them, as its step 0, by
+running `cargo doc` once): the crate directories under `target/doc`; that the
+non-crate directories rustdoc writes there (`src`, `static.files`, `trait.impl`,
+`implementors`) have no top-level `index.html`, which is how the crate list tells
+them apart; that no rustdoc output path equals a site file name (`index.html`,
+`styles.css`, `app.js`, `catalog.json`, `USER_GUIDE.pdf`, `api`); and that the
+Pages source is already set to GitHub Actions (a read-only
+`gh api repos/ckir/aiplugins/pages`).
 
 ## Architecture
 
@@ -86,7 +95,8 @@ GitHub Pages serves a root `404.html` for missing paths on this project site.
   unminified, no external requests. `index.html` holds one placeholder comment
   where the staging step injects the generated `<noscript>` plugin list.
 - `scripts/gen-site.sh`: builds `catalog.json` with `jq`.
-- `scripts/stage-site.sh`: assembles `_site/` (steps under Deploy). Both `docs.yml`
+- `scripts/stage-site.sh`: assembles `target/site/` (steps under Deploy; `target/`
+  is already ignored by git and by the `mlc` link check). Both `docs.yml`
   and a pull-request CI job call it, so the staging logic exists once.
 - `scripts/check-site.sh` (behind `just site-check`): the invariants below.
 - `tests/site/` fixtures: a small fake `agents.json`, marketplace files and
@@ -181,19 +191,22 @@ requires every plugin to resolve to one shape or one override.
 
 `docs.yml` builds `cargo doc` as today, then calls `scripts/stage-site.sh`, which:
 
-1. Stages `_site/`: site files, `catalog.json`, the generated `<noscript>` list
-   injected at the placeholder, and `target/doc` moved to `_site/api/`.
-2. Writes a redirect stub at each old `/<crate>/index.html` pointing to
-   `./api/<crate>/index.html`, plus a root `404.html` that maps any other old
-   `/<crate>/...` path to the same path under `/api/<crate>/`, so deep rustdoc
-   links keep working. Crate names are read from `target/doc` at build time, not
-   hardcoded. The old root redirect to `rtk_mcp_qwen` is replaced by the landing
-   page.
-3. Copies `docs/USER_GUIDE.pdf` to `_site/USER_GUIDE.pdf`.
-4. Runs the staged-tree gate.
+1. Starts `target/site/` clean and copies `target/doc` into it (a copy, so
+   re-running the script locally works without rebuilding rustdoc).
+2. Fails if any site file name already exists in the copy: `index.html`,
+   `styles.css`, `app.js`, `catalog.json`, `USER_GUIDE.pdf` or `api`. The old
+   `docs.yml` step that wrote a root redirect to `rtk_mcp_qwen` is removed, so
+   rustdoc never supplies a root `index.html`.
+3. Copies in the files from `docs/site/` and `catalog.json`, and injects the
+   generated `<noscript>` list at the placeholder.
+4. Writes `api/index.html`, a plain list linking each crate's
+   `../<crate>/index.html`. The crates are the top-level directories of the copy
+   that contain an `index.html`, so rustdoc's non-crate directories are skipped.
+5. Copies `docs/USER_GUIDE.pdf` to the root.
+6. Runs the staged-tree gate.
 
-`docs.yml` then uploads `_site/` as one artifact. If the gate fails, nothing is
-uploaded and the previously deployed site stays live. A pull-request CI job runs
+`docs.yml` then uploads `target/site/` as one artifact. If the gate fails, nothing
+is uploaded and the previously deployed site stays live. A pull-request CI job runs
 the same script (with `cargo doc` cached), so a staging failure is seen before the
 merge and not after it.
 
@@ -261,9 +274,12 @@ validates against stale marketplace files. It then fails if any of these is fals
 
 ### Staged-tree gate (in `docs.yml` and runnable locally)
 
-`_site/` must contain `index.html` (with the `<noscript>` placeholder replaced),
-`catalog.json`, `404.html`, `USER_GUIDE.pdf`, an `api/<crate>/index.html` and a root
-stub for every crate built, and no root-absolute `href="/..."` or `src="/..."`.
+`target/site/` must contain `index.html` (with the `<noscript>` placeholder
+replaced), `catalog.json`, `USER_GUIDE.pdf`, and `api/index.html` linking every
+crate directory that has an `index.html`, with each of those links resolving to an
+existing file. The footer's API link must point at `api/index.html`. The files
+this script writes or copies from `docs/site/` contain no root-absolute
+`href="/..."` or `src="/..."` (rustdoc's own files are not checked).
 
 The client-side rendering in `app.js` (cards, tabs, footprint bars, copy button)
 is not machine-gated, because there is no Node or headless browser in the
@@ -277,8 +293,9 @@ here so a green gate is not read as proof the page renders correctly.
 - `site-check` joins `just check` and the CI job that already guards generated
   marketplaces and footprints; a second CI job runs `stage-site.sh` on pull
   requests.
-- Before any push, preview `_site/` under a `/aiplugins/` prefix locally at phone
-  and desktop widths in light and dark. No remote CI iteration to find problems a
+- Before any push, preview `target/site/` under a `/aiplugins/` prefix locally (a
+  static server over a directory holding an `aiplugins` link to it) at phone and
+  desktop widths in light and dark. No remote CI iteration to find problems a
   local run would show.
 
 ### Tests
@@ -301,12 +318,17 @@ before declaring complete (in a fresh session if this one is long).
 
 ## Risks
 
-- The first deploy replaces the live root with a landing page. Mitigation: crate
-  stubs keep old links alive, and the staged tree is verified locally first.
+- The first deploy replaces the live root redirect with a landing page. Rustdoc
+  paths do not move, so existing links keep working. Mitigation: the staged tree is
+  verified locally first.
+- A future crate or rustdoc output file could collide with a site file name.
+  Mitigation: the staging script fails on any collision, and the PR job runs it.
 - Install templates can drift from what each plugin's README says. Mitigation: one
   table and a one-template-per-plugin assertion. Comparing the templates against
   the README text is out of scope.
-- Crate names under `target/doc` are unverified. Mitigation: read at build time.
+- How rustdoc lays out `target/doc` is unverified here. Mitigation: plan step 0
+  runs `cargo doc` and checks it before the staging script is written; the crate
+  list is derived at build time, never hardcoded.
 
 ## Out of scope
 
