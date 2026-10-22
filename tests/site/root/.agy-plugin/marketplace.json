@@ -14,7 +14,7 @@
         "source": "archive",
         "url": "https://github.com/ckir/aiplugins/releases/download/alpha-mcp-agy-v0.1.0/alpha-mcp-agy-agy-plugin.zip"
       },
-      "description": "Fixture plugin A & B",
+      "description": "Fixture plugin A & B <c> \"d\"",
       "author": {
         "name": "Fixture Owner"
       },

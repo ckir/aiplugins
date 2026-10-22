@@ -22,7 +22,7 @@
       "key": "alpha-mcp",
       "plugins": {
         "antigravity": {
-          "description": "Fixture plugin A & B",
+          "description": "Fixture plugin A & B <c> \"d\"",
           "dirKey": "alpha-mcp-agy",
           "footprint": {
             "budget": {
