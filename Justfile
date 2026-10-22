@@ -281,12 +281,21 @@ emit-devtools-skills:
     oc=opencode/plugins/aiplugins-devtools-opencode/skills
     rm -rf "$oc"
     mkdir -p "$oc"
-    cp -r "$src/code-review-and-quality" "$oc/aiplugins-devtools-code-review-and-quality"
-    # (temp file plus mv, not `sed -i`: GNU and BSD sed disagree on its argument)
-    skill_md="$oc/aiplugins-devtools-code-review-and-quality/SKILL.md"
-    sed 's/^name: code-review-and-quality$/name: aiplugins-devtools-code-review-and-quality/' \
-        "$skill_md" > "$skill_md.tmp"
-    mv "$skill_md.tmp" "$skill_md"
+    for skill_dir in "$src"/*/; do
+        skill=$(basename "$skill_dir")
+        cp -r "$src/$skill" "$oc/aiplugins-devtools-$skill"
+        # (temp file plus mv, not `sed -i`: GNU and BSD sed disagree on its argument)
+        skill_md="$oc/aiplugins-devtools-$skill/SKILL.md"
+        sed "s/^name: $skill\$/name: aiplugins-devtools-$skill/" \
+            "$skill_md" > "$skill_md.tmp"
+        mv "$skill_md.tmp" "$skill_md"
+    done
+    # opencode alone lists skills nowhere in its `/` menu, so each slash command
+    # is a command file (shared/devtools/commands/<name>.md), copied unchanged
+    occ=opencode/plugins/aiplugins-devtools-opencode/commands
+    rm -rf "$occ"
+    mkdir -p "$occ"
+    cp "shared/devtools/commands"/*.md "$occ"/
 
 # Check that every key in docs/footprints/budgets.json names a live plugin
 footprint-budgets:

@@ -716,7 +716,7 @@ dependencies = [
 
 [[package]]
 name = "opencode-ctl-mcp-agy"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "opencode-ctl",
  "rmcp",
@@ -726,7 +726,7 @@ dependencies = [
 
 [[package]]
 name = "opencode-ctl-mcp-cc"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "opencode-ctl",
  "rmcp",
@@ -736,7 +736,7 @@ dependencies = [
 
 [[package]]
 name = "opencode-ctl-mcp-qwen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "opencode-ctl",
  "rmcp",
@@ -915,7 +915,7 @@ dependencies = [
 
 [[package]]
 name = "re-ghidra-mcp-agy"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "ghidra-mcp",
  "serde",
@@ -925,7 +925,7 @@ dependencies = [
 
 [[package]]
 name = "re-ghidra-mcp-cc"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "ghidra-mcp",
  "serde_json",
@@ -1027,7 +1027,7 @@ dependencies = [
 
 [[package]]
 name = "rtk-mcp-agy"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1035,7 +1035,7 @@ dependencies = [
 
 [[package]]
 name = "rtk-mcp-cc"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "rmcp",

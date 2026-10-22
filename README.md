@@ -57,9 +57,9 @@ verification) and asks whether to install project-local or global first:
 <!-- footprint:begin -->
 | Plugin | Resident bytes | Invocation bytes |
 |---|---|---|
-| `aiplugins-devtools-agy` | ≥ 369 | ≥ 20,674 |
-| `aiplugins-devtools-cc` | ≥ 369 | ≥ 20,674 |
-| `aiplugins-devtools-opencode` | ≥ 388 | ≥ 20,674 |
+| `aiplugins-devtools-agy` | ≥ 582 | ≥ 28,227 |
+| `aiplugins-devtools-cc` | ≥ 582 | ≥ 28,227 |
+| `aiplugins-devtools-opencode` | ≥ 661 | ≥ 28,341 |
 | `opencode-ctl-mcp-agy` | ≥ 10,138 | ≥ 8,545 |
 | `opencode-ctl-mcp-cc` | ≥ 10,137 | ≥ 8,592 |
 | `opencode-ctl-mcp-opencode` | ≥ 10,066 | ≥ 8,544 |
