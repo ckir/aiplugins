@@ -64,6 +64,15 @@ Measured at `e32170a` before writing:
   `just check`.
 - `.gitignore` and the `mlc` ignore list in the `Justfile` both cover `target/`
   but not any other build-output directory.
+- `scripts/install-qwen-extension.sh:37` downloads
+  `releases/latest/download/<ext>-extension.zip`, and the PowerShell form accepts
+  only three plugins (`ValidateSet` at `install-qwen-extension.ps1:24,34`, which
+  excludes `aiplugins-devtools-qwen`). GitHub's "latest" is the repo's newest
+  release, which today is `opencode-ctl-mcp-agy-v0.2.0` and carries no
+  `*-extension.zip`, so the script's download 404s for the Qwen plugins. The
+  `aiplugins-devtools-qwen` README already uses a tag-pinned manual download. The
+  site therefore builds Qwen commands from `source.url` and does not use the
+  script; the script's defect is logged as an anomaly, not fixed here.
 - Install commands live in no manifest. `publishedNames` remaps directory keys for
   four agents (Claude Code, Qwen, OpenCode, Antigravity; for example
   `aiplugins-devtools-cc` is published as `aiplugins-devtools`), and the
@@ -179,12 +188,13 @@ the footprint file and `budgets.json` entry are looked up by `dirKey`.
 | Agent | Shape |
 |---|---|
 | Claude Code | two entries: `claude plugin marketplace add ckir/aiplugins`, then `claude plugin install <name>@aiplugins`, so a card works on its own |
-| Qwen | the `install-qwen-extension.sh` one-liner for the plugin (and the `.ps1` form for Windows) |
+| Qwen | two entries (shell, PowerShell): download the entry's tag-pinned `source.url` and extract it into `~/.qwen/extensions/<name>`, plus the executable-bit step for plugins that ship binaries. `install-qwen-extension.sh` is not used (see Facts) |
 | OpenCode | the agent prompt that fetches the plugin's `INSTALL.md` |
 | Antigravity | download and unzip the release asset, `agy plugin install <dir>`, plus the `PATH` step unless `skillsOnly` |
 
-Qwen's `install` has two labeled entries (shell and PowerShell); every other
-agent has at least one. Release URLs and versions are never copied from README
+Claude Code and Qwen plugins each have exactly two labeled `install` entries;
+every other plugin has at least one, and the check asserts those counts per agent.
+Release URLs and versions are never copied from README
 text, which lags the marketplace; they come from the entry's `source.url`. Only the
 command shape and argument (directory key or published name) are taken from each
 plugin's README or `INSTALL.md`, and the plan cites the `path:line` for every one
@@ -272,8 +282,13 @@ names and README links.
 
 ### `just site-check` (generator output)
 
-The check first runs `bash scripts/gen-marketplaces.sh --check`, so it never
-validates against stale marketplace files. It then fails if any of these is false:
+The recipe runs, in order: `bash scripts/gen-marketplaces.sh --check` (so it never
+validates against stale marketplace files); `gen-site.sh target/site-check/catalog.json`
+(under `target/`, so the working tree stays clean); `check-site.sh --root .
+target/site-check/catalog.json`; and `check-site.sh --selftest`. `check-site.sh`
+takes its input root as an argument so fixtures can be checked without touching
+the repository, and it never calls `gen-marketplaces.sh` itself. The check fails
+if any of these is false:
 
 - Every plugin entry in `agents.json` appears exactly once.
 - Each footprint file's tier totals match the catalog byte for byte, including the
@@ -290,29 +305,50 @@ validates against stale marketplace files. It then fails if any of these is fals
 - Each `version` matches `^[0-9]+\.[0-9]+\.[0-9]+$`, equals the tag in its entry's
   `source.url`, and equals `pluginVersion` in the plugin's footprint file whenever
   one exists (measured equal for all 16 today).
-- `readme` equals the entry's `homepage`, and every URL in the catalog starts with
-  `https://github.com/ckir/aiplugins/`.
+- `readme` equals the entry's `homepage`, and every URL in `readme` and inside
+  `install[].command` starts with `https://github.com/ckir/aiplugins/` or
+  `https://raw.githubusercontent.com/ckir/aiplugins/` (the OpenCode `INSTALL.md`
+  prompt uses the second form).
+- Claude Code and Qwen plugins have exactly two `install` entries; every other
+  plugin has at least one.
 - `footprint.budget` equals `budgets.json[dirKey]`, and `skillsOnly` equals
   membership in that agent's `skillsOnly` list in `agents.json`.
-- `docs/site/app.js` contains no `innerHTML`; catalog strings go in through
-  `textContent` or attribute setters, so placeholders such as `<dir>` display as
-  text.
-- `check-site.sh --selftest` runs `gen-site.sh` and `check-site.sh` over
-  `tests/site/` and requires the positive fixture to pass and each negative
-  fixture to fail on its named invariant.
+- `check-site.sh --selftest` has two parts. (a) For each fixture input set under
+  `tests/site/`, `gen-site.sh` plus `check-site.sh` must accept the positive
+  fixture, and `gen-site.sh` must refuse inputs that break a generator
+  precondition (for example a plugin key with no known agent suffix). (b) For each
+  invariant that compares the catalog with its inputs (tier totals, budget,
+  `skillsOnly`, name, readme, version), a hand-corrupted `catalog.json` is fed
+  straight to `check-site.sh`, without regenerating, and must fail naming that
+  invariant. Part (b) is what keeps the invariants from being circular: a working
+  generator always agrees with its own inputs.
 - The family key rule yields exactly the six expected families and every plugin
   maps to exactly one.
-- Each failure names the invariant and the offending plugin.
+- Each failure names the invariant and the offending plugin. The family-set and
+  missing-install-shape failures also name the file to update (the expected
+  families in `check-site.sh`, the install table in `gen-site.sh`), so adding a
+  seventh family is a guided edit and not a puzzle.
 
 ### Staged-tree gate (in `docs.yml` and runnable locally)
 
 `target/site/` must contain `index.html` (with the `<noscript>` placeholder
-replaced), `catalog.json`, `USER_GUIDE.pdf`, and `api/index.html` linking every
-every crate in the step-4 set (computed before `api/` existed, so `api` is not its
-own entry), with each link resolved relative to `api/` (`../<crate>/index.html`
-must exist as `target/site/<crate>/index.html`) and no denied crate listed. The footer's API link must point at `api/index.html`. The files
-this script writes or copies from `docs/site/` contain no root-absolute
-`href="/..."` or `src="/..."` (rustdoc's own files are not checked).
+replaced), `styles.css`, `app.js`, `catalog.json`, `USER_GUIDE.pdf` and
+`api/index.html`.
+
+The gate recomputes the crate set itself, independently of step 4: the top-level
+directories of `target/site/`, other than `api`, that contain an `index.html`,
+minus the deny patterns (one constant in `stage-site.sh`, used by both step 4 and
+the gate). That set must be non-empty, and `api/index.html` must link exactly that
+set, with each link resolved relative to `api/` (`../<crate>/index.html` must exist
+as `target/site/<crate>/index.html`) and no denied crate listed. Recomputing it
+means a bug in step 4's scan or filter shows up as a mismatch, not as a gate that
+passes on zero links. The footer's API link must point at `api/index.html`.
+
+The files this script writes or copies from `docs/site/` contain no root-absolute
+`href="/..."` or `src="/..."` (rustdoc's own files are not checked). `app.js`
+contains no `innerHTML`; catalog strings go in through `textContent` or attribute
+setters, so placeholders such as `<dir>` display as text. That check lives here
+and not in `site-check` because `app.js` does not exist until rollout step 2.
 
 The client-side rendering in `app.js` (cards, tabs, footprint bars, copy button)
 is not machine-gated, because there is no Node or headless browser in the
@@ -337,7 +373,8 @@ here so a green gate is not read as proof the page renders correctly.
 
 Fixture-based, written first: fake inputs in, expected `catalog.json` out. Fixtures
 cover a sparse family, a missing-footprint plugin, a `setup`-only plugin and a
-`publishedNames` remap.
+`publishedNames` remap. The checker also gets hand-corrupted catalogs (see the
+`--selftest` description), one per catalog-versus-input invariant.
 
 ## Rollout
 
@@ -361,13 +398,15 @@ before declaring complete (in a fresh session if this one is long).
 - Install templates can drift from what each plugin's README says. Mitigation: one
   table and a one-template-per-plugin assertion. Comparing the templates against
   the README text is out of scope.
-- How rustdoc lays out `target/doc` is unverified here. Mitigation: plan step 0
-  runs `cargo doc` and checks it before the staging script is written; the crate
-  list is derived at build time, never hardcoded.
+- A new internal crate whose name matches no deny pattern shows up in
+  `api/index.html` until it is added to the deny constant. Mitigation: it is one
+  constant in `stage-site.sh`, and plan step 0 prints today's list for review. The
+  crate list itself is derived at build time, never hardcoded.
 
 ## Out of scope
 
 Qwen footprint measurement, per-plugin sub-pages (cards link to each plugin's
-README on GitHub), a custom domain, analytics, and the two untriaged anomalies in
-`.clavity/local-anomalies.md` (devtools skill-sync checks), which get their own
-triage.
+README on GitHub), a custom domain, analytics, fixing
+`scripts/install-qwen-extension.sh` (the site does not use it; the defect is logged
+as an anomaly), and the other untriaged anomalies in `.clavity/local-anomalies.md`,
+which get their own triage.
