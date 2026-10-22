@@ -40,6 +40,25 @@ Measured at `e32170a` before writing:
   `rtk_mcp_qwen/index.html`.
 - `ci.yml` runs on push and pull request to `main`; `docs.yml` runs only on push to
   `main`.
+- `docs/footprints/budgets.json` budgets only `residentBytes` (and `setupBytes` on
+  four OpenCode plugins); it has no `invocation` budget. The README says the
+  footprint figure is "not a context budget".
+- The marketplace entries carry no `version` field. The version is the
+  `-v<semver>` release tag inside `source.url`, present for every entry of all four
+  marketplaces, and every entry has a `homepage` (a GitHub tree URL).
+- The two OpenCode `skillsOnly` plugins (`aiplugins-devtools-opencode`,
+  `repo-user-guide-opencode`) have no `setup` tier in their footprint file.
+- Marketplace descriptions are agent-branded: the Claude Code entries for
+  `rtk-mcp`, `re-ghidra-mcp` and `opencode-ctl-mcp` say "Claude Code".
+- Plugin READMEs hardcode release versions that lag the marketplace (for example
+  `rtk-mcp-agy-v0.7.2` in the README against `v0.9.0` in `.agy-plugin`), and
+  `repo-user-guide-agy`'s `INSTALL.md` is a skill-copy procedure with no
+  `agy plugin install`.
+- `scripts/gen-marketplaces.sh` strips the carriage returns that a Windows `jq`
+  emits (its `jqr` helper); `gen-marketplaces.sh --check` runs in CI but not in
+  `just check`.
+- `.gitignore` and the `mlc` ignore list in the `Justfile` both cover `target/`
+  but not any other build-output directory.
 - Install commands live in no manifest. `publishedNames` remaps directory keys for
   four agents (Claude Code, Qwen, OpenCode, Antigravity; for example
   `aiplugins-devtools-cc` is published as `aiplugins-devtools`), and the
@@ -93,8 +112,10 @@ a sparse map.
 **Family key.** A plugin's key in `agents.json` with its trailing agent suffix
 (`-cc`, `-qwen`, `-opencode`, `-agy`) removed. Today that gives six families:
 `rtk-mcp`, `re-ghidra-mcp`, `aiplugins-devtools`, `opencode-ctl-mcp`,
-`repo-user-guide`, `todov2`. The check fails if a plugin key has no recognized
-suffix or maps to a different family than its siblings' descriptions imply.
+`repo-user-guide`, `todov2`. The check strips `-(cc|qwen|opencode|agy)$` from every
+plugin key in `agents.json` and fails unless the result is exactly that set.
+`gen-site.sh` and `check-site.sh` read `jq` output through the same carriage-return
+stripping helper as `gen-marketplaces.sh`, so they work on a Windows `jq`.
 
 **`catalog.json` schema** (no timestamp, so the output is reproducible):
 
@@ -103,7 +124,6 @@ suffix or maps to a different family than its siblings' descriptions imply.
   "agents": [{ "id": "claude-code", "label": "Claude Code" }],
   "families": [{
     "key": "aiplugins-devtools",
-    "description": "string",
     "plugins": {
       "claude-code": {
         "dirKey": "aiplugins-devtools-cc",
@@ -121,12 +141,22 @@ suffix or maps to a different family than its siblings' descriptions imply.
 }
 ```
 
-`name` is the marketplace entry name (already the published name). The family
-`description` comes from the first agent that has the family, in the order
-claude-code, opencode, antigravity, qwen. `setup` is `null` for tiers an agent
-does not measure. `footprint` is `null`, and the UI shows "Not measured", only for
-a plugin with no footprint file. `budget` copies the matching `budgets.json` entry
-verbatim.
+Joins use the directory key, because the marketplace files and the footprint
+files' internal `plugin` field carry the published name, not the directory key:
+`expectedName = publishedNames[dirKey] // dirKey` finds the marketplace entry, and
+the footprint file and `budgets.json` entry are looked up by `dirKey`.
+
+- `name` is the marketplace entry name (already the published name).
+- `version` is the `-v<semver>` tag from the entry's `source.url`.
+- `description` is the entry's own description. There is no family-level
+  description, so a card never shows one agent's branding on another agent's tab.
+- `readme` is the entry's `homepage`, a full GitHub URL.
+- `footprint` is `null`, and the UI shows "Not measured", only for a plugin with no
+  footprint file.
+- `setup` is `null` exactly when that plugin's footprint file has no `tiers.setup`
+  (so Qwen, non-OpenCode plugins and the OpenCode `skillsOnly` plugins).
+- `budget` copies the matching `budgets.json` entry verbatim; it can lack
+  `setupBytes`, and it never has an invocation figure.
 
 **Install templates.** One table in `gen-site.sh`, one shape per agent:
 
@@ -137,9 +167,15 @@ verbatim.
 | OpenCode | the agent prompt that fetches the plugin's `INSTALL.md` |
 | Antigravity | download and unzip the release asset, `agy plugin install <dir>`, plus the `PATH` step unless `skillsOnly` |
 
-The exact commands and the argument each one takes (directory key or published
-name) are copied from each plugin's README or `INSTALL.md`; the plan cites the
-`path:line` for every one before the table is written.
+Qwen's `install` has two labeled entries (shell and PowerShell); every other
+agent has at least one. Release URLs and versions are never copied from README
+text, which lags the marketplace; they come from the entry's `source.url`. Only the
+command shape and argument (directory key or published name) are taken from each
+plugin's README or `INSTALL.md`, and the plan cites the `path:line` for every one
+before the table is written. A plugin whose own documentation differs from its
+agent's shape (`repo-user-guide-agy` copies a skill folder instead of running
+`agy plugin install`) gets a per-plugin override in the table, and the check
+requires every plugin to resolve to one shape or one override.
 
 ### Deploy (`docs.yml`, the only Pages workflow)
 
@@ -172,14 +208,23 @@ One scrollable page, no router.
    command with a copy button, and four agent chips that double as the filter.
 2. **Catalog:** one card per plugin family. Each card has the description, a
    version, and an agent tab strip. Agents without the family are greyed out, not
-   hidden. Picking a tab swaps the install command, version and footprint bar.
-3. **Footprint bar:** stacked resident, invocation and setup bytes against the
-   budget. A measured zero reads "0 B". A missing measurement shows a "Not
-   measured" badge and no bar, so the two cases are never confused.
+   hidden. Picking a tab swaps the description, install command, version and
+   footprint bar, because each agent's description is its own. With the "All"
+   filter a card opens on its first available agent in the order claude-code,
+   opencode, antigravity, qwen.
+3. **Footprint bar:** three labeled figures, because the budgets cover only two of
+   the tiers. Resident is drawn against `budget.residentBytes`, and setup (when
+   present) against `budget.setupBytes`. Invocation is shown as a plain number
+   with no ceiling, since it loads only when a skill runs and `budgets.json` has no
+   figure for it. Nothing is stacked against a budget, and a note repeats the
+   README's "compare between plugins, not a context budget". A measured zero reads
+   "0 B". A missing measurement shows a "Not measured" badge and no bar, so the two
+   cases are never confused.
 4. **Why it matters:** a short explanation of resident versus invocation cost, in
    the wording of the README footprint section.
-5. **Footer:** links to `./api/`, the User Guide PDF, GitHub, the changelog and the
-   license.
+5. **Footer:** links to the API docs, the User Guide PDF, GitHub, and the changelog
+   and license as GitHub blob URLs (those two files are not staged into the site).
+   Each card's README link is the entry's `homepage`, also a full GitHub URL.
 
 Look and feel: system font stack, colors as tokens on `:root`, dark theme through
 `prefers-color-scheme` with a manual toggle remembered in `localStorage` (wrapped
@@ -194,7 +239,8 @@ names and README links.
 
 ### `just site-check` (generator output)
 
-The check fails if any of these is false:
+The check first runs `bash scripts/gen-marketplaces.sh --check`, so it never
+validates against stale marketplace files. It then fails if any of these is false:
 
 - Every plugin entry in `agents.json` appears exactly once.
 - Each footprint file's tier totals match the catalog byte for byte, including the
@@ -203,13 +249,14 @@ The check fails if any of these is false:
   `footprint: null`; a plugin without one that is not flagged fails.
 - For every agent, `name` equals the marketplace entry name (the published name
   where `publishedNames` remaps it), never the directory key.
-- Every plugin entry has exactly one install template, and no install command
-  is empty.
-- In `catalog.json`, `null` appears only as `footprint` of a plugin flagged
-  "Not measured", or as `setup` of a plugin whose agent has no setup tier; no
-  string field is empty, and none contains `undefined` or `NaN`.
-- The family key rule yields the expected six families and every plugin maps to
-  exactly one.
+- Every plugin resolves to exactly one install shape or override, has at least one
+  `install` entry, and no install command is empty.
+- In `catalog.json`, `null` appears only as `footprint` of a plugin with no
+  footprint file, or as `setup` of a plugin whose footprint file has no
+  `tiers.setup`; no string field is empty, and none contains `undefined` or `NaN`.
+- Each `version` matches the `-v<semver>` tag of its entry's `source.url`.
+- The family key rule yields exactly the six expected families and every plugin
+  maps to exactly one.
 - Each failure names the invariant and the offending plugin.
 
 ### Staged-tree gate (in `docs.yml` and runnable locally)
