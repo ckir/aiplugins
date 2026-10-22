@@ -122,14 +122,22 @@ oc_cmds="$oc_plugin/commands"
 if [ ! -d "$oc_cmds" ] || ! diff -r "$commands_root" "$oc_cmds" >/dev/null 2>&1; then
     bad "stale copy: $oc_cmds"
 fi
-for cmd in "$commands_root"/*.md; do
+cmd_files=("$commands_root"/*.md)
+[ -f "${cmd_files[0]}" ] || bad "no commands under $commands_root"
+for cmd in "${cmd_files[@]}"; do
     [ -f "$cmd" ] || continue
     sed -n '1p' "$cmd" | grep -qx -- '---' || bad "$cmd: no frontmatter"
+    [ "$(grep -cx -- '---' "$cmd")" -ge 2 ] || bad "$cmd: frontmatter is never closed"
     grep -q '^description: ' "$cmd" || bad "$cmd: frontmatter lacks 'description:'"
     grep -qF '$ARGUMENTS' "$cmd" || bad "$cmd: body lacks \$ARGUMENTS, so the path would not be passed on"
+    # A command naming no prefixed skill would load nothing under OpenCode, so
+    # zero matches is a failure, not an empty loop.
+    refs=$(grep -o 'aiplugins-devtools-[a-z0-9-]*' "$cmd" | sort -u || true)
+    [ -n "$refs" ] || bad "$cmd: names no aiplugins-devtools-<skill>, so OpenCode would load no skill"
     while IFS= read -r ref; do
+        [ -n "$ref" ] || continue
         [ -d "$oc_root/$ref" ] || bad "$cmd: names skill '$ref' which $oc_root does not ship"
-    done < <(grep -o 'aiplugins-devtools-[a-z0-9-]*' "$cmd" | sort -u)
+    done <<<"$refs"
 done
 
 # --- registry helpers ---

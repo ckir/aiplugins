@@ -23,12 +23,12 @@ here by `just emit-devtools-skills`.
 <!-- footprint:begin -->
 ### Context footprint
 
-Installing this plugin adds **≥ 582 bytes** to every request, for the whole session. A further **≥ 28,227 bytes** load only when one of its skills or agents is actually invoked.
+Installing this plugin adds **≥ 634 bytes** to every request, for the whole session. A further **≥ 28,535 bytes** load only when one of its skills or agents is actually invoked.
 
 | Tier | Bytes | When you pay it |
 |---|---|---|
-| Resident | ≥ 582 | Every request, for the whole session |
-| Invocation | ≥ 28,227 | Only when that skill or agent runs |
+| Resident | ≥ 634 | Every request, for the whole session |
+| Invocation | ≥ 28,535 | Only when that skill or agent runs |
 
 **Bytes, not tokens.** This is the exact serialised size of what the host loads, measured by probing the plugin's own MCP server and reading its skill and agent frontmatter. It is not a token count and does not convert to one at a fixed rate — treat it as a figure you can compare between plugins, not as a context budget.
 

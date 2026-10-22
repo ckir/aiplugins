@@ -1,6 +1,6 @@
 ---
 name: spec-panel-review
-description: Adversarial multi-seat review of a spec or implementation plan (not code). Use for a "panel review" or "spec panel" of a design doc, spec or plan before anyone builds from it.
+description: Standalone, report-only adversarial multi-seat review of a spec or implementation plan (not code), run inline without clavity. Use for a "panel review" or "spec panel" of a design doc, spec or plan before anyone builds from it.
 ---
 
 # Spec Panel Review
@@ -48,7 +48,7 @@ Before convening, write down which use-when conditions fired and which specialis
 
 **If you have a subagent tool**, dispatch one fresh-context, read-only subagent per seat, in parallel. Each gets only: the target path, its single seat definition, the stance, and the output rules below. Give it no session history, no author rationale and no other seat's output. A seat that shares your context repeats your reasoning; a fresh one can contradict it.
 
-**If you have no subagent tool**, run the seats one after another in this conversation, each under its own heading. State plainly in the report that the seats shared one context, so their findings are correlated and the verdict is weaker than a fresh-context panel would give. Do not let a seat repeat a defect an earlier seat already claimed.
+**If you have no subagent tool**, run the seats one after another in this conversation, each under its own heading as working notes; Steps 3 to 5 turn them into the report. State plainly in the report that the seats shared one context, so their findings are correlated and the verdict is weaker than a fresh-context panel would give. Do not let a seat repeat a defect an earlier seat already claimed.
 
 Output rules for every seat:
 
@@ -81,12 +81,12 @@ A defect's age is never a disposition: "pre-existing" and "out of scope" are not
 Write the report in the conversation, in this order:
 
 1. Stance, seated seats, which use-when conditions fired, dropped seats and why, and whether the seats were fresh-context or shared-context.
-2. Each seat's findings under its own heading, each with its disposition.
-3. The one or two most significant `BELOW-FLOOR` items you dropped, so a real defect cannot be swept under the floor unseen.
+2. Each seat's findings under its own heading, each with its disposition. `BELOW-FLOOR` findings are not repeated here; they go in item 3.
+3. The one or two most significant `BELOW-FLOOR` items you dropped, each with its cited guard, so a real defect cannot be swept under the floor unseen. Count any others without listing them.
 4. What was not examined: files unread, behaviour never exercised, lenses not applied. A round that finds nothing has told you about its coverage, not about the artifact.
 5. One closing line: `PANEL VERDICT: GREEN`, `REVISE` or `BLOCK`, then a short reason.
-   - `GREEN` only when no `CONFIRMED` finding remains and the seated lenses actually cover the artifact's risk surface.
-   - `REVISE` when `CONFIRMED` findings can be fixed in the artifact.
+   - `GREEN` only when no `CONFIRMED` and no `UNVERIFIED` finding remains and the seated lenses actually cover the artifact's risk surface. Name any `DEFERRED` finding in the reason.
+   - `REVISE` when `CONFIRMED` findings can be fixed in the artifact, or `UNVERIFIED` findings need the author to settle them.
    - `BLOCK` when a `CONFIRMED` finding challenges a decision the artifact cannot proceed without.
 
 A panel reasons over the artifact as written; it does not run anything. Follow a GREEN with the artifact's own oracle (the tests, the build, the real tool) before relying on it.

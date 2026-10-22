@@ -33,7 +33,7 @@ TypeScript itself. Per plugin (full steps in its README):
 
 | Plugin | Copies | Binary staging |
 |---|---|---|
-| [`aiplugins-devtools-opencode`](opencode/plugins/aiplugins-devtools-opencode/) | `skills/*` → `.opencode/skills/` | none (skills only, no binary) |
+| [`aiplugins-devtools-opencode`](opencode/plugins/aiplugins-devtools-opencode/) | `skills/*` → `.opencode/skills/`, `commands/*` → `.opencode/command/` | none (skills and a command, no binary) |
 | [`rtk-mcp-opencode`](opencode/plugins/rtk-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/`, `skills/*` → `.opencode/skills/` | `just build-rtk-mcp-opencode` |
 | [`re-ghidra-mcp-opencode`](opencode/plugins/re-ghidra-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/`, `skills/*` → `.opencode/skills/`, `agents/*` → `.opencode/agents/` | `just build-re-ghidra-mcp-opencode` |
 | [`todov2-opencode`](opencode/plugins/todov2-opencode/) | whole folder → `.opencode/plugins/todov2-opencode/` (multi-file: `plugin.ts`, `tui.tsx`, `tool/`) | none (pure TypeScript, no binary) |
@@ -57,9 +57,9 @@ verification) and asks whether to install project-local or global first:
 <!-- footprint:begin -->
 | Plugin | Resident bytes | Invocation bytes |
 |---|---|---|
-| `aiplugins-devtools-agy` | ≥ 582 | ≥ 28,227 |
-| `aiplugins-devtools-cc` | ≥ 582 | ≥ 28,227 |
-| `aiplugins-devtools-opencode` | ≥ 661 | ≥ 28,341 |
+| `aiplugins-devtools-agy` | ≥ 634 | ≥ 28,535 |
+| `aiplugins-devtools-cc` | ≥ 634 | ≥ 28,535 |
+| `aiplugins-devtools-opencode` | ≥ 713 | ≥ 28,649 |
 | `opencode-ctl-mcp-agy` | ≥ 10,138 | ≥ 8,545 |
 | `opencode-ctl-mcp-cc` | ≥ 10,137 | ≥ 8,592 |
 | `opencode-ctl-mcp-opencode` | ≥ 10,066 | ≥ 8,544 |
