@@ -84,7 +84,11 @@ selftest() {
     mutate budget budget "($alpha.antigravity.footprint.budget.deltaBytes) = 500"
     mutate skills-only skills-only "(${rug}[\"claude-code\"].skillsOnly) = false"
     mutate family-set family-set "(.families[] | select(.key == \"alpha-mcp\") | .key) = \"alpha-mcpx\""
-    [ "$case_n" -eq 14 ] || { echo "FAIL selftest: ran $case_n cases, expected 14" >&2; exit 1; }
+    mutate install-label-claude-code install-shape "(${alpha}[\"claude-code\"].install[0].label) = \"Foo\""
+    mutate install-label-opencode install-shape "(${alpha}.opencode.install[0].label) = \"Foo\""
+    mutate install-label-antigravity install-shape "(${alpha}.antigravity.install[0].label) = \"Foo\""
+    mutate install-label-agy-override install-shape "(${rug}.antigravity.install[0].label) = \"Foo\""
+    [ "$case_n" -eq 18 ] || { echo "FAIL selftest: ran $case_n cases, expected 18" >&2; exit 1; }
 }
 
 if [ "${1:-}" = "--selftest" ]; then
@@ -184,6 +188,14 @@ agent_of() {
     done
 }
 
+# label_is KEY P INDEX WANT: the install entry's label must equal WANT.
+label_is() {
+    local got
+    got=$(jqr --argjson i "$3" '.install[$i].label // ""' <<< "$2")
+    [ "$got" = "$4" ] \
+        || fail install-shape "$1" "install entry $3 label is '$got', expected '$4'; install table is in scripts/gen-site.sh"
+}
+
 # check_install KEY AGENT NAME URL SKILLS_ONLY P
 check_install() {
     local key=$1 agent=$2 name=$3 url=$4 p=$6
@@ -191,10 +203,12 @@ check_install() {
     n=$(jqr '(.install // []) | length' <<< "$p")
     case "$agent" in
         claude-code)
-                if ! jq -e --arg a "claude plugin marketplace add ckir/aiplugins" --arg b "claude plugin install ${name}@aiplugins" \
+            if ! jq -e --arg a "claude plugin marketplace add ckir/aiplugins" --arg b "claude plugin install ${name}@aiplugins" \
                 '[(.install // [])[] | .command] == [$a, $b]' <<< "$p" > /dev/null; then
                 fail install-shape "$key" "Claude Code entries are not the two literal commands (claude plugin marketplace add ckir/aiplugins; claude plugin install ${name}@aiplugins); install table is in scripts/gen-site.sh"
             fi
+            label_is "$key" "$p" 0 "Add the marketplace"
+            label_is "$key" "$p" 1 "Install"
             ;;
         qwen)
             for ((i = 0; i < n; i++)); do
@@ -223,6 +237,7 @@ check_install() {
                 cmd=$(jqr --argjson i "$i" '.install[$i].command // ""' <<< "$p")
                 [[ $cmd == *"$oc_raw/opencode/plugins/$key/INSTALL.md"* ]] \
                     || fail install-shape "$key" "OpenCode command lacks $oc_raw/opencode/plugins/$key/INSTALL.md; install table is in scripts/gen-site.sh"
+                label_is "$key" "$p" "$i" "Ask your agent"
             done
             ;;
         antigravity)
@@ -231,9 +246,11 @@ check_install() {
                 [[ $cmd == *"$url"* ]] \
                     || fail install-shape "$key" "Antigravity command lacks the marketplace source.url; install table is in scripts/gen-site.sh"
                 if [ "$key" = repo-user-guide-agy ]; then
+                    label_is "$key" "$p" "$i" "Copy the skill"
                     { [[ $cmd == *"cp -r"* ]] && [[ $cmd != *"agy plugin install"* ]]; } \
                         || fail install-shape "$key" "the repo-user-guide-agy override needs cp -r and no agy plugin install; install table is in scripts/gen-site.sh"
                 else
+                    label_is "$key" "$p" "$i" "Install"
                     [[ $cmd == *"agy plugin install"* ]] \
                         || fail install-shape "$key" "Antigravity command lacks agy plugin install; install table is in scripts/gen-site.sh"
                 fi
