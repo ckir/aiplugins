@@ -1,0 +1,46 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "fixture-antigravity",
+  "owner": {
+    "name": "Fixture Owner"
+  },
+  "metadata": {
+    "description": "Fixture antigravity"
+  },
+  "plugins": [
+    {
+      "name": "alpha-mcp-agy",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/alpha-mcp-agy-v0.1.0/alpha-mcp-agy-agy-plugin.zip"
+      },
+      "description": "Fixture plugin A & B",
+      "author": {
+        "name": "Fixture Owner"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/antigravity/plugins/alpha-mcp-agy",
+      "license": "MIT",
+      "category": "development",
+      "keywords": [
+        "fixture"
+      ]
+    },
+    {
+      "name": "repo-user-guide",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/repo-user-guide-agy-v0.1.0/repo-user-guide-agy-agy-plugin.zip"
+      },
+      "description": "Fixture plugin repo-user-guide-agy",
+      "author": {
+        "name": "Fixture Owner"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/antigravity/plugins/repo-user-guide-agy",
+      "license": "MIT",
+      "category": "development",
+      "keywords": [
+        "fixture"
+      ]
+    }
+  ]
+}

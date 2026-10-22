@@ -1,0 +1,80 @@
+{
+  "agents": [
+    {
+      "id": "claude-code",
+      "dir": "claude-code/plugins",
+      "plugins": [
+        "alpha-mcp-cc",
+        "repo-user-guide-cc"
+      ],
+      "marketplace": ".claude-plugin/marketplace.json",
+      "manifestPattern": "claude-code/plugins/{plugin}/.claude-plugin/plugin.json",
+      "artifactSuffix": "-plugin.zip",
+      "sourceUrlBase": "https://github.com/ckir/aiplugins/releases/download",
+      "notPublished": [
+        "example"
+      ],
+      "versionedSourceUrl": true,
+      "publishedNames": {
+        "repo-user-guide-cc": "repo-user-guide"
+      },
+      "skillsOnly": [
+        "repo-user-guide-cc"
+      ]
+    },
+    {
+      "id": "qwen",
+      "dir": "qwen/plugins",
+      "plugins": [
+        "alpha-mcp-qwen"
+      ],
+      "marketplace": ".qwen-plugin/marketplace.json",
+      "manifestPattern": "qwen/plugins/{plugin}/qwen-extension.json",
+      "artifactSuffix": "-extension.zip",
+      "sourceUrlBase": "https://github.com/ckir/aiplugins/releases/download",
+      "notPublished": [
+        "example"
+      ],
+      "versionedSourceUrl": true,
+      "publishedNames": {},
+      "skillsOnly": []
+    },
+    {
+      "id": "opencode",
+      "dir": "opencode/plugins",
+      "plugins": [
+        "alpha-mcp-opencode"
+      ],
+      "marketplace": ".opencode-plugin/marketplace.json",
+      "manifestPattern": "opencode/plugins/{plugin}/package.json",
+      "artifactSuffix": "-opencode.zip",
+      "sourceUrlBase": "https://github.com/ckir/aiplugins/releases/download",
+      "versionedSourceUrl": true,
+      "notPublished": [],
+      "publishedNames": {},
+      "skillsOnly": []
+    },
+    {
+      "id": "antigravity",
+      "dir": "antigravity/plugins",
+      "plugins": [
+        "alpha-mcp-agy",
+        "repo-user-guide-agy"
+      ],
+      "marketplace": ".agy-plugin/marketplace.json",
+      "manifestPattern": "antigravity/plugins/{plugin}/plugin.json",
+      "artifactSuffix": "-agy-plugin.zip",
+      "sourceUrlBase": "https://github.com/ckir/aiplugins/releases/download",
+      "versionedSourceUrl": true,
+      "notPublished": [
+        "example"
+      ],
+      "publishedNames": {
+        "repo-user-guide-agy": "repo-user-guide"
+      },
+      "skillsOnly": [
+        "repo-user-guide-agy"
+      ]
+    }
+  ]
+}
