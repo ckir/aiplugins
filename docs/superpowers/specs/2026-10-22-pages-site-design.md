@@ -108,15 +108,18 @@ Actions (a read-only `gh api repos/ckir/aiplugins/pages`), and a re-run of the
 ### Source layout
 
 - `docs/site/index.html`, `docs/site/styles.css`, `docs/site/app.js`: hand-written,
-  unminified, no external requests. `index.html` holds one placeholder comment
-  where the staging step injects the generated `<noscript>` plugin list.
+  unminified, no external requests. `index.html` holds the placeholder comment
+  `<!-- NOSCRIPT -->` on a line of its own, where the staging step injects the
+  generated `<noscript>` plugin list.
 - `scripts/gen-site.sh`: builds `catalog.json` with `jq`.
 - `scripts/stage-site.sh`: assembles `target/site/` (steps under Deploy; `target/`
   is already ignored by git and by the `mlc` link check). Both `docs.yml`
   and a pull-request CI job call it, so the staging logic exists once.
 - `scripts/check-site.sh` (behind `just site-check`): the invariants below.
-- `tests/site/` fixtures: a small fake `agents.json`, marketplace files and
-  footprint set, plus expected `catalog.json`.
+- `tests/site/` fixtures: `tests/site/root/` (a small fake `agents.json`,
+  marketplace files and footprint set, with one description containing `&`),
+  `tests/site/doc/` (the synthetic rustdoc tree for selftest part (c)) and the
+  expected `catalog.json`.
 
 ### Data flow
 
@@ -131,6 +134,16 @@ Actions (a read-only `gh api repos/ckir/aiplugins/pages`), and a re-run of the
    optional `setup` tiers. A plugin with no footprint file gets `footprint: null`.
 3. A per-agent install-template table inside the script, keyed by agent, plugin,
    published name and `skillsOnly`.
+
+**Input fields (measured).** `agents.json`: `.agents[]` with `id`, `plugins[]`,
+`publishedNames{}`, `skillsOnly[]` and `marketplace`, the path of that agent's
+marketplace file (`.claude-plugin/marketplace.json`, `.qwen-plugin/marketplace.json`,
+`.opencode-plugin/marketplace.json`, `.agy-plugin/marketplace.json`). Marketplace
+files: `.plugins[]` with `name`, `description`, `homepage` and `source.url`.
+Footprint files `docs/footprints/<dirKey>.json`: `pluginVersion` and
+`tiers.{resident,invocation,setup}.bytes`. `budgets.json`:
+`<dirKey>.{residentBytes,setupBytes}`. A plugin "ships binaries" when its key is not
+in its own agent's `skillsOnly` list.
 
 The output is `catalog.json`, grouped by plugin family, with agent availability as
 a sparse map.
@@ -196,6 +209,9 @@ the footprint file and `budgets.json` entry are looked up by `dirKey`.
 
 Claude Code and Qwen plugins each have exactly two labeled `install` entries;
 every other plugin has at least one, and the check asserts those counts per agent.
+Labels are fixed strings: Claude Code "Add the marketplace" and "Install"; Qwen
+"Linux and macOS" and "Windows (PowerShell)"; OpenCode "Ask your agent";
+Antigravity "Install"; the `repo-user-guide-agy` override "Copy the skill".
 Release URLs and versions are never copied from README
 text, which lags the marketplace; they come from the entry's `source.url`. Only the
 command shape and argument (directory key or published name) are taken from each
@@ -214,20 +230,26 @@ requires every plugin to resolve to one shape or one override.
 
 ### Deploy (`docs.yml`, the only Pages workflow)
 
-`docs.yml` builds `cargo doc` as today, then calls `scripts/stage-site.sh`, which:
+`docs.yml` builds `cargo doc` as today, then calls `scripts/stage-site.sh`. With its
+defaults the script works on `.`, `target/doc` and `target/site`; every step below
+uses the `--root`, `--doc-dir` and `--out` values it was given and never a fixed
+path, so the selftest can run it over fixtures without touching the real output.
+It:
 
-1. Starts `target/site/` clean and copies `target/doc` into it (a copy, so
-   re-running the script locally works without rebuilding rustdoc).
+1. Starts the output directory clean and copies the doc directory into it (a copy,
+   so re-running the script locally works without rebuilding rustdoc).
 2. Fails if any site file name already exists in the copy: `index.html`,
    `styles.css`, `app.js`, `catalog.json`, `USER_GUIDE.pdf` or `api`. The old
    `docs.yml` step that wrote a root redirect to `rtk_mcp_qwen` is removed, so
    rustdoc never supplies a root `index.html`. The message names the colliding
    path and says to run `cargo clean --doc`, since a stale `target/doc/index.html`
    from an older local run is the likely cause.
-3. Runs `bash scripts/gen-site.sh target/site/catalog.json`, then
-   `bash scripts/check-site.sh target/site/catalog.json`, so a bad catalog stops the
-   script here. Copies in the files from `docs/site/` and injects the generated
-   `<noscript>` list at the placeholder. The list is HTML-escaped (`&`, `<`, `>`,
+3. Runs `bash scripts/gen-site.sh --root <root> <out>/catalog.json`, then
+   `bash scripts/check-site.sh --root <root> <out>/catalog.json`, so a bad catalog
+   stops the script here. Copies in the files from `docs/site/` and injects the
+   generated `<noscript>` list at the placeholder: one `<li>` per plugin entry, with
+   the name linked to its `readme`, the agent label and the description. The list
+   is HTML-escaped (`&`, `<`, `>`,
    `"`) and spliced in by printing the file around the marker line, not by a
    substitution that treats `&` specially.
 4. Writes `api/index.html`, a plain list linking each crate's
@@ -284,8 +306,9 @@ in try/catch so the page works without it), responsive down to phone width,
 all URLs relative because the site lives under `/aiplugins/`.
 
 Accessibility: keyboard navigation, ARIA roles on the tabs, visible focus, a live
-region announcing "Copied". Without JavaScript, a `<noscript>` list gives plugin
-names and README links.
+region announcing "Copied". Without JavaScript, a `<noscript>` list gives one
+item per plugin entry (20 today): the name linked to its README, the agent, and the
+description.
 
 ## Verification gates
 
@@ -300,8 +323,9 @@ scripts/check-site.sh --selftest`.
 Command-line conventions, so the three scripts and the recipe agree: every script
 is invoked as `bash scripts/<name>.sh`. `gen-site.sh [--root DIR] OUT` and
 `check-site.sh [--root DIR] CATALOG` default `--root` to `.`; `stage-site.sh
-[--doc-dir DIR] [--out DIR]` defaults to `target/doc` and `target/site`. The
-`--root` and `--doc-dir` arguments exist so the selftest can run the real scripts
+[--root DIR] [--doc-dir DIR] [--out DIR]` defaults to `.`, `target/doc` and
+`target/site`, and passes its `--root` to both of the other scripts. The `--root`,
+`--doc-dir` and `--out` arguments exist so the selftest can run the real scripts
 over fixtures without touching the repository. `check-site.sh` never calls
 `gen-marketplaces.sh` itself; the recipe does. The check fails if any of these is
 false:
@@ -309,8 +333,9 @@ false:
 - Every plugin entry in `agents.json` appears exactly once.
 - Each footprint file's tier totals match the catalog byte for byte, including the
   `setup` tier.
-- A plugin with no footprint file is flagged "Not measured" and carries
-  `footprint: null`; a plugin without one that is not flagged fails.
+- `footprint` is `null` exactly when `docs/footprints/<dirKey>.json` does not
+  exist, and non-null otherwise. (The "Not measured" badge is drawn from that null
+  by `app.js` and is not machine-checked.)
 - For every agent, `name` equals the marketplace entry name (the published name
   where `publishedNames` remaps it), never the directory key.
 - Every plugin resolves to exactly one install shape or override, has at least one
@@ -334,17 +359,22 @@ false:
   positive fixture, and `gen-site.sh` must refuse inputs that break a generator
   precondition (for example a plugin key with no known agent suffix). (b) From the
   positive fixture's generated catalog, a loop of one-line `jq` mutations in a
-  temporary directory, one per invariant in this list (tier totals, budget,
-  `skillsOnly`, name, version, readme, URL prefix, install counts, null and empty
-  fields, the family set), is fed straight to `check-site.sh`, without
+  temporary directory, one per invariant in this list (plugin set by dropping or
+  duplicating an entry, tier totals, budget, `skillsOnly`, name, version, readme,
+  URL prefix, install counts, null and empty fields, the family set), is fed
+  straight to `check-site.sh`, without
   regenerating, and each must fail naming that invariant. Part (b) is what keeps
   the invariants from being circular: a working generator always agrees with its
-  own inputs. (c) `stage-site.sh --doc-dir tests/site/doc --out <temp>` runs over
-  a small synthetic doc tree (two crate directories, one denied crate, a `src`
-  directory with no `index.html`, and an input description containing `&`): the
-  positive tree must stage and pass the gate, and a copy with a root
-  `index.html` must be refused as a collision. This tests the staging logic in
-  well under a second without a cold `cargo doc`.
+  own inputs. (c) `stage-site.sh --root tests/site/root --doc-dir tests/site/doc
+  --out <temp>` runs over the fixture inputs and a small synthetic doc tree (two
+  crate directories, one denied crate, a `src` directory with no `index.html`;
+  one fixture description contains `&`). The positive run must stage and pass
+  the gate, the staged `index.html` must contain the description as `&amp;` and
+  no raw `&` from it, and a copy of the doc tree with a root `index.html` must be
+  refused as a collision. This tests the staging logic in well under a second
+  without a cold `cargo doc`. Part (c) needs `stage-site.sh` and the real
+  `docs/site/` files, so it joins the selftest in rollout step 3; steps 1 and 2
+  run parts (a) and (b) only.
 - The family key rule yields exactly the six expected families and every plugin
   maps to exactly one.
 - Each failure names the invariant and the offending plugin. The family-set and
@@ -370,8 +400,9 @@ passes on zero links. The footer's API link must point at `api/index.html`.
 The files this script writes or copies from `docs/site/` contain no root-absolute
 `href="/..."` or `src="/..."` (rustdoc's own files are not checked). `app.js`
 contains no `innerHTML`; catalog strings go in through `textContent` or attribute
-setters, so placeholders such as `<dir>` display as text. That check lives here
-and not in `site-check` because `app.js` does not exist until rollout step 2.
+setters, so placeholders such as `<dir>` display as text. That check lives in the
+gate, which `site-check` first reaches through selftest part (c) in rollout step 3;
+it cannot run earlier because `app.js` does not exist until rollout step 2.
 
 The client-side rendering in `app.js` (cards, tabs, footprint bars, copy button)
 is not machine-gated, because there is no Node or headless browser in the
@@ -409,11 +440,14 @@ Steps, one commit each, execution index in memory refreshed after each:
 
 1. `.gitattributes` pins (`docs/site/**` and `tests/site/**` as `text eol=lf`, so
    the marker-line splice and the fixture comparisons behave on a Windows
-   checkout), then fixtures and `gen-site.sh` until `just site-check` passes.
-   `gen-site.sh` writes LF output through the same carriage-return helper it reads
-   with.
-2. Static page and local preview.
-3. `docs.yml` rewrite with the staged-tree gate.
+   checkout), then fixtures, `gen-site.sh` and `check-site.sh` until `just
+   site-check` passes with selftest parts (a) and (b). `gen-site.sh` writes LF
+   output through the same carriage-return helper it reads with.
+2. Static page and local preview (`just site-preview`, which serves
+   `target/preview` with `python3 -m http.server --directory target/preview`, or
+   `python` where `python3` is absent; a preview aid, not a gate).
+3. `stage-site.sh`, the staged-tree gate, selftest part (c) with its
+   `tests/site/root` and `tests/site/doc` fixtures, and the `docs.yml` rewrite.
 4. `just check` and CI wiring, plus a README link to the live site.
 
 Finishing: AGY-CAPSTONE on the committed implementation, then AGY-TEST-AUDIT,
