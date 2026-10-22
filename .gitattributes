@@ -56,6 +56,9 @@ qwen/plugins/re-ghidra-mcp-qwen/skills/ghidra-re-driver/SKILL.md text eol=lf
 # main merge, with byte-identical blobs on both sides.)
 **/SKILL.md text eol=lf
 **/agents/*.md text eol=lf
+# The canonical devtools command files are diffed against their LF-pinned
+# opencode/** copies and read line by line by check-devtools-skills.sh.
+shared/devtools/commands/*.md text eol=lf
 
 # The opencode-ctl skill templates are `include_str!`'d by shared/opencode-ctl/src/skill_asset.rs, so
 # their working-copy bytes ARE the rendered bytes; the eight committed copies are LF. Same class as the
