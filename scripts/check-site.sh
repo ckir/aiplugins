@@ -90,6 +90,7 @@ selftest() {
     mutate install-label-antigravity install-shape "(${alpha}.antigravity.install[0].label) = \"Foo\""
     mutate install-label-agy-override install-shape "(${rug}.antigravity.install[0].label) = \"Foo\""
     local gamma='.families[] | select(.key == "gamma-skills") | .plugins'
+    mutate family-set-order family-set '.families |= reverse'
     mutate agent-set-missing agent-set 'del(.agents[] | select(.id == "qwen"))'
     mutate agent-set-label agent-set '(.agents[] | select(.id == "qwen") | .label) = "Gwen"'
     mutate agent-set-order agent-set '.agents |= reverse'
@@ -108,7 +109,7 @@ selftest() {
         "($rug.antigravity.install[0].command) |= "'sub("-d /tmp/repo-user-guide"; "-d /tmp/repo-user-guide-agy")'
     mutate install-name-agy-cp install-shape \
         "($rug.antigravity.install[0].command) |= "'sub("cp -r /tmp/repo-user-guide/"; "cp -r /tmp/repo-user-guide-agy/")'
-    [ "$case_n" -eq 29 ] || { echo "FAIL selftest: ran $case_n cases, expected 29" >&2; exit 1; }
+    [ "$case_n" -eq 30 ] || { echo "FAIL selftest: ran $case_n cases, expected 30" >&2; exit 1; }
 
     # --- (c) staging and the staged-tree gate over the synthetic doc tree
     # stage-site.sh only removes an --out strictly inside the repository, so the
@@ -320,9 +321,9 @@ else
     want_families=
     fail family-set - "$families_file is missing"
 fi
-have_families=$(jqr '[.families[]?.key // ""] | .[]' "$catalog" | LC_ALL=C sort)
+have_families=$(jqr '[.families[]?.key // ""] | .[]' "$catalog")
 if [ "$want_families" != "$have_families" ]; then
-    fail family-set - "catalog family keys [$(tr '\n' ' ' <<< "$have_families")] differ from docs/site/families.txt [$(tr '\n' ' ' <<< "$want_families")]"
+    fail family-set - "catalog family keys [$(tr '\n' ' ' <<< "$have_families")] differ from docs/site/families.txt [$(tr '\n' ' ' <<< "$want_families")]; the catalog's families must be sorted by key"
 fi
 
 rest_nulls=$(jqr '[del(.families[]?.plugins) | paths(. == null)] | length' "$catalog")
