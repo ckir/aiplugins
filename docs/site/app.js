@@ -58,23 +58,33 @@ async function copyText(text) {
     }
   }
   if (!done) {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.setAttribute('readonly', '');
-    ta.setAttribute('style', 'position:fixed;top:0;left:0;opacity:0');
-    document.body.append(ta);
-    ta.select();
+    const prev = document.activeElement;
     try {
-      document.execCommand('copy');
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.setAttribute('style', 'position:fixed;top:0;left:0;opacity:0');
+      document.body.append(ta);
+      try {
+        ta.select();
+        done = document.execCommand('copy') === true;
+      } catch (e) {
+        done = false;
+      }
+      ta.remove();
     } catch (e) {
-      /* nothing more to try */
+      done = false;
     }
-    ta.remove();
+    try {
+      if (prev && typeof prev.focus === 'function') prev.focus();
+    } catch (e) {
+      /* focus could not be restored */
+    }
   }
   const live = document.getElementById('live');
   if (live) {
     live.textContent = '';
-    live.textContent = 'Copied';
+    live.textContent = done ? 'Copied' : 'Copy failed. Select the text and copy it manually.';
   }
 }
 
