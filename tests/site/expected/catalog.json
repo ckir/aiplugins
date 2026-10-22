@@ -128,15 +128,15 @@
           "footprint": null,
           "install": [
             {
-              "command": "curl -fsSL -o gamma-skills-qwen-extension.zip https://github.com/ckir/aiplugins/releases/download/gamma-skills-qwen-v0.1.0/gamma-skills-qwen-extension.zip\nmkdir -p ~/.qwen/extensions/gamma-skills-qwen\nunzip -q -o gamma-skills-qwen-extension.zip -d ~/.qwen/extensions/gamma-skills-qwen/",
+              "command": "curl -fsSL -o gamma-skills-qwen-extension.zip https://github.com/ckir/aiplugins/releases/download/gamma-skills-qwen-v0.1.0/gamma-skills-qwen-extension.zip\nmkdir -p ~/.qwen/extensions/gamma-skills\nunzip -q -o gamma-skills-qwen-extension.zip -d ~/.qwen/extensions/gamma-skills/",
               "label": "Linux and macOS"
             },
             {
-              "command": "Invoke-WebRequest -Uri https://github.com/ckir/aiplugins/releases/download/gamma-skills-qwen-v0.1.0/gamma-skills-qwen-extension.zip -OutFile gamma-skills-qwen-extension.zip\nNew-Item -ItemType Directory -Force -Path \"$env:USERPROFILE\\.qwen\\extensions\\gamma-skills-qwen\"\nExpand-Archive -Path gamma-skills-qwen-extension.zip -DestinationPath \"$env:USERPROFILE\\.qwen\\extensions\\gamma-skills-qwen\" -Force",
+              "command": "Invoke-WebRequest -Uri https://github.com/ckir/aiplugins/releases/download/gamma-skills-qwen-v0.1.0/gamma-skills-qwen-extension.zip -OutFile gamma-skills-qwen-extension.zip\nNew-Item -ItemType Directory -Force -Path \"$env:USERPROFILE\\.qwen\\extensions\\gamma-skills\"\nExpand-Archive -Path gamma-skills-qwen-extension.zip -DestinationPath \"$env:USERPROFILE\\.qwen\\extensions\\gamma-skills\" -Force",
               "label": "Windows (PowerShell)"
             }
           ],
-          "name": "gamma-skills-qwen",
+          "name": "gamma-skills",
           "readme": "https://github.com/ckir/aiplugins/tree/main/qwen/plugins/gamma-skills-qwen",
           "skillsOnly": true,
           "version": "0.1.0"

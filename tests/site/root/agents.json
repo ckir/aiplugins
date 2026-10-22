@@ -37,7 +37,9 @@
         "example"
       ],
       "versionedSourceUrl": true,
-      "publishedNames": {},
+      "publishedNames": {
+        "gamma-skills-qwen": "gamma-skills"
+      },
       "skillsOnly": [
         "gamma-skills-qwen"
       ]

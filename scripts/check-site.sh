@@ -96,11 +96,19 @@ selftest() {
     mutate install-shape-chmod-missing install-shape \
         "($alpha.qwen.install[0].command) |= sub(\"\\nfind [^\\n]*\$\"; \"\")"
     mutate install-shape-chmod-unexpected install-shape \
-        "($gamma.qwen.install[0].command) += \"\\nfind ~/.qwen/extensions/gamma-skills-qwen/bin -type f ! -name '*.exe' -exec chmod 755 {} +\""
+        "($gamma.qwen.install[0].command) += \"\\nfind ~/.qwen/extensions/gamma-skills/bin -type f ! -name '*.exe' -exec chmod 755 {} +\""
     mutate install-shape-path-missing install-shape \
         "($alpha.antigravity.install[0].command) |= sub(\"\\nexport PATH[^\\n]*\$\"; \"\")"
     mutate readme-scheme url-prefix "(${alpha}[\"claude-code\"].readme) = \"javascript:alert(1)\""
-    [ "$case_n" -eq 25 ] || { echo "FAIL selftest: ran $case_n cases, expected 25" >&2; exit 1; }
+    mutate install-name-qwen-linux install-shape \
+        "($gamma.qwen.install[0].command) |= "'gsub("extensions/gamma-skills"; "extensions/gamma-skills-qwen")'
+    mutate install-name-qwen-windows install-shape \
+        "($gamma.qwen.install[1].command) |= "'gsub("extensions\\\\gamma-skills\""; "extensions\\\\gamma-skills-qwen\"")'
+    mutate install-name-agy-unzip install-shape \
+        "($rug.antigravity.install[0].command) |= "'sub("-d /tmp/repo-user-guide"; "-d /tmp/repo-user-guide-agy")'
+    mutate install-name-agy-cp install-shape \
+        "($rug.antigravity.install[0].command) |= "'sub("cp -r /tmp/repo-user-guide/"; "cp -r /tmp/repo-user-guide-agy/")'
+    [ "$case_n" -eq 29 ] || { echo "FAIL selftest: ran $case_n cases, expected 29" >&2; exit 1; }
 
     # --- (c) staging and the staged-tree gate over the synthetic doc tree
     # stage-site.sh only removes an --out strictly inside the repository, so the
@@ -345,7 +353,8 @@ check_install() {
     local key=$1 agent=$2 name=$3 url=$4 so=$5 p=$6
     local chmod_line="find ~/.qwen/extensions/$name/bin -type f ! -name '*.exe' -exec chmod 755 {} +"
     local path_line="export PATH=\"\$HOME/.gemini/config/plugins/$name/bin:\$PATH\""
-    local n i label cmd saw_linux=0 saw_win=0
+    local n i label cmd saw_linux=0 saw_win=0 want
+    local zip=${url##*/}
     n=$(jqr '(.install // []) | length' <<< "$p")
     case "$agent" in
         claude-code)
@@ -367,6 +376,11 @@ check_install() {
                         saw_linux=1
                         [[ $cmd == *unzip* ]] \
                             || fail install-shape "$key" "Qwen 'Linux and macOS' entry lacks unzip; install table is in scripts/gen-site.sh"
+                        # shellcheck disable=SC2088  # the literal ~ is the install text shown to users
+                        for want in "mkdir -p ~/.qwen/extensions/$name" "unzip -q -o $zip -d ~/.qwen/extensions/$name/"; do
+                            grep -qxF -- "$want" <<< "$cmd" \
+                                || fail install-shape "$key" "Qwen 'Linux and macOS' entry lacks the line: $want (the published name is $name); install table is in scripts/gen-site.sh"
+                        done
                         if grep -qxF -- "$chmod_line" <<< "$cmd"; then
                             [ "$so" = false ] \
                                 || fail install-shape "$key" "skills-only Qwen 'Linux and macOS' entry must not have the bin chmod line; install table is in scripts/gen-site.sh"
@@ -379,6 +393,10 @@ check_install() {
                         saw_win=1
                         [[ $cmd == *Expand-Archive* ]] \
                             || fail install-shape "$key" "Qwen 'Windows (PowerShell)' entry lacks Expand-Archive; install table is in scripts/gen-site.sh"
+                        for want in "New-Item -ItemType Directory -Force -Path \"\$env:USERPROFILE\\.qwen\\extensions\\$name\"" "Expand-Archive -Path $zip -DestinationPath \"\$env:USERPROFILE\\.qwen\\extensions\\$name\" -Force"; do
+                            grep -qxF -- "$want" <<< "$cmd" \
+                                || fail install-shape "$key" "Qwen 'Windows (PowerShell)' entry lacks the line: $want (the published name is $name); install table is in scripts/gen-site.sh"
+                        done
                         ;;
                 esac
             done
@@ -402,10 +420,18 @@ check_install() {
                     label_is "$key" "$p" "$i" "Copy the skill"
                     { [[ $cmd == *"cp -r"* ]] && [[ $cmd != *"agy plugin install"* ]]; } \
                         || fail install-shape "$key" "the repo-user-guide-agy override needs cp -r and no agy plugin install; install table is in scripts/gen-site.sh"
+                    for want in "unzip -q -o /tmp/$zip -d /tmp/$name" "cp -r /tmp/$name/skills/repo-user-guide/. ~/.gemini/config/skills/repo-user-guide/"; do
+                        grep -qxF -- "$want" <<< "$cmd" \
+                            || fail install-shape "$key" "the repo-user-guide-agy override lacks the line: $want (the published name is $name); install table is in scripts/gen-site.sh"
+                    done
                 else
                     label_is "$key" "$p" "$i" "Install"
                     [[ $cmd == *"agy plugin install"* ]] \
                         || fail install-shape "$key" "Antigravity command lacks agy plugin install; install table is in scripts/gen-site.sh"
+                    for want in "unzip -q -o /tmp/$zip -d /tmp/$name" "agy plugin install /tmp/$name"; do
+                        grep -qxF -- "$want" <<< "$cmd" \
+                            || fail install-shape "$key" "Antigravity command lacks the line: $want (the published name is $name); install table is in scripts/gen-site.sh"
+                    done
                     if grep -qxF -- "$path_line" <<< "$cmd"; then
                         [ "$so" = false ] \
                             || fail install-shape "$key" "skills-only Antigravity command must not have the PATH line; install table is in scripts/gen-site.sh"
