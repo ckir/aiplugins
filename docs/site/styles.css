@@ -147,7 +147,7 @@ code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospac
 .error { color: var(--warn-text); background: var(--warn-bg); padding: 8px; border-radius: 6px; font-size: 0.9rem; }
 .why dt { font-weight: 600; margin-top: 8px; }
 .why dd { margin: 0; color: var(--muted); }
-footer { padding: 24px 16px 40px; }
+footer.wrap { padding: 24px 16px 40px; }
 footer nav { display: flex; flex-wrap: wrap; gap: 8px 20px; }
 .visually-hidden {
   position: absolute !important;
