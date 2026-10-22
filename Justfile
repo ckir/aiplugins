@@ -284,10 +284,16 @@ emit-devtools-skills:
     for skill_dir in "$src"/*/; do
         skill=$(basename "$skill_dir")
         cp -r "$src/$skill" "$oc/aiplugins-devtools-$skill"
-        # (temp file plus mv, not `sed -i`: GNU and BSD sed disagree on its argument)
+        # Only the frontmatter line changes: a `name: <skill>` line in the body
+        # (an example, say) must stay as written. (temp file plus mv, not
+        # `sed -i`: GNU and BSD sed disagree on its argument)
         skill_md="$oc/aiplugins-devtools-$skill/SKILL.md"
-        sed "s/^name: $skill\$/name: aiplugins-devtools-$skill/" \
-            "$skill_md" > "$skill_md.tmp"
+        awk -v skill="$skill" '
+            NR == 1 { fm = 1; print; next }
+            fm && $0 == "---" { fm = 0 }
+            fm && $0 == "name: " skill { print "name: aiplugins-devtools-" skill; next }
+            { print }
+        ' "$skill_md" > "$skill_md.tmp"
         mv "$skill_md.tmp" "$skill_md"
     done
     # opencode alone lists skills nowhere in its `/` menu, so each slash command
@@ -304,6 +310,7 @@ footprint-budgets:
 # Check the canonical aiplugins-devtools skill source (content, attribution)
 devtools-skills:
     bash scripts/check-devtools-skills.sh
+    bash scripts/check-devtools-skills.sh --mutation-test
 
 # Build every skills-only plugin bundle and check zip names, manifests and skills
 skills-bundles:

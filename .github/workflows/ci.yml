@@ -135,6 +135,21 @@ jobs:
       - name: Check devtools skills
         run: bash scripts/check-devtools-skills.sh
 
+      # The gate must fail on each seeded defect, or an edit to it could turn a
+      # failure branch into a no-op and leave it green.
+      - name: Check devtools skills gate against seeded defects
+        run: bash scripts/check-devtools-skills.sh --mutation-test
+
+      # The gate only compares the committed copies; this runs the emitter that
+      # writes them and requires it to change nothing in a clean checkout.
+      - name: Install just
+        uses: taiki-e/install-action@just
+
+      - name: Check the devtools emit recipe reproduces the committed copies
+        run: |
+          just emit-devtools-skills
+          test -z "$(git status --porcelain)" || { git status --short; git diff --stat; exit 1; }
+
       - name: Check skills bundles
         run: bash scripts/check-skills-bundles.sh
 
