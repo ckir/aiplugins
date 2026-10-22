@@ -1,4 +1,4 @@
-name: Deploy Rust Docs to GitHub Pages
+name: Deploy the site and Rust docs to GitHub Pages
 
 on:
   push:
@@ -36,11 +36,8 @@ jobs:
         # --document-private-items includes internal documentation
         run: cargo doc --workspace --no-deps --document-private-items
 
-      - name: Create index.html redirect
-        # Cargo puts docs in target/doc, but without a root index.html.
-        # This redirects the root GitHub Pages URL to your main crate's docs.
-        run: |
-          echo '<meta http-equiv="refresh" content="0; url=rtk_mcp_qwen/index.html">' > target/doc/index.html
+      - name: Stage the site (storefront and rustdoc)
+        run: bash scripts/stage-site.sh
 
       - name: Setup Pages
         uses: actions/configure-pages@v6
@@ -49,8 +46,8 @@ jobs:
         uses: actions/upload-pages-artifact@v5
         with:
           retention-days: 1
-          # Upload entire doc directory
-          path: 'target/doc'
+          # Upload the staged site: storefront at the root, rustdoc beside it
+          path: 'target/site'
           
       - name: Deploy to GitHub Pages
         id: deployment
