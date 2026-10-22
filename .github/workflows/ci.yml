@@ -168,6 +168,33 @@ jobs:
       - name: Check plugin bin dispatcher
         run: bash scripts/check-bundle-dispatch.sh
 
+      # Guards the Pages catalog generator, its invariants and the checker's
+      # own rejection of seeded defects.
+      - name: Check the Pages catalog and staging logic
+        run: just site-check
+
+  # Stages the Pages tree on pull requests so a staging failure is seen before
+  # the merge. On push to main docs.yml already stages, so this skips there.
+  site-stage:
+    name: Site staging
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build documentation
+        run: cargo doc --workspace --no-deps --document-private-items
+
+      - name: Stage the site
+        run: bash scripts/stage-site.sh
+
   # Fork 7a: one job, one OS. A footprint is a property of the schema, not of the
   # platform, so a matrix would triple the cost to answer the same question — and
   # it would make "the footprint" an OS-indexed value.

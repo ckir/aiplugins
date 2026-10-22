@@ -328,6 +328,16 @@ site-check:
     bash scripts/check-site.sh target/site-check/catalog.json
     bash scripts/check-site.sh --selftest
 
+# Stage the site and serve it under /aiplugins/ exactly as Pages does. A
+# preview aid, not a gate.
+site-preview:
+    bash scripts/stage-site.sh
+    rm -rf target/preview
+    mkdir -p target/preview
+    cp -R target/site target/preview/aiplugins
+    # Use `python` where `python3` is absent. The page is then at http://localhost:8000/aiplugins/
+    python3 -m http.server --directory target/preview 8000
+
 # Run all pre-flight checks (what CI and lefthook run; see ci.yml — `links`
 # is hook-only and `gen-* --check` + opencode suites run in CI but not here)
 check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace agy-marketplace dispatch smoke footprint opencode-wiring agy-wiring agy-validate footprint-budgets devtools-skills skills-bundles skills-release-wiring site-check
