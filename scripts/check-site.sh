@@ -45,7 +45,7 @@ selftest() {
     mutate() {
         local name=$1 id=$2 prog=$3 hint=${4:-} rc=0 out
         case_n=$((case_n + 1))
-        jq "$prog" tests/site/expected/catalog.json > "$tmp/case.json" \
+        jq "$prog" tests/site/expected/catalog.json | tr -d '\r' > "$tmp/case.json" \
             || { echo "FAIL $name: mutation program failed" >&2; exit 1; }
         if cmp -s "$tmp/case.json" tests/site/expected/catalog.json; then
             echo "FAIL $name: mutation changed nothing" >&2
