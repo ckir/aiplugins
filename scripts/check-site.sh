@@ -125,7 +125,9 @@ selftest() {
         "($rug.antigravity.install[0].command) |= "'sub("\nmkdir -p ~/.gemini/config/skills/repo-user-guide"; "")'
     mutate family-set-suffix-hint family-set \
         "(.families[] | select(.key == \"gamma-skills\") | .plugins.opencode) = ($alpha.opencode) | del($alpha.opencode)" 'family_of in scripts/gen-site.sh'
-    [ "$case_n" -eq 36 ] || { echo "FAIL selftest: ran $case_n cases, expected 36" >&2; exit 1; }
+    mutate install-prompt-opencode install-shape \
+        "($alpha.opencode.install[0].command) = \"https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/plugins/alpha-mcp-opencode/INSTALL.md\""
+    [ "$case_n" -eq 37 ] || { echo "FAIL selftest: ran $case_n cases, expected 37" >&2; exit 1; }
 
     # --- (c) staging and the staged-tree gate over the synthetic doc tree
     # stage-site.sh only removes an --out strictly inside the repository, so the
@@ -425,8 +427,9 @@ check_install() {
         opencode)
             for ((i = 0; i < n; i++)); do
                 cmd=$(jqr --argjson i "$i" '.install[$i].command // ""' <<< "$p")
-                [[ $cmd == *"$oc_raw/opencode/plugins/$key/INSTALL.md"* ]] \
-                    || fail install-shape "$key" "OpenCode command lacks $oc_raw/opencode/plugins/$key/INSTALL.md; install table is in scripts/gen-site.sh"
+                want="Fetch and follow the installation instructions at $oc_raw/opencode/plugins/$key/INSTALL.md, and ask me whether to install project-local or global first."
+                [ "$cmd" = "$want" ] \
+                    || fail install-shape "$key" "OpenCode command must be exactly: $want; install table is in scripts/gen-site.sh"
                 label_is "$key" "$p" "$i" "Ask your agent"
             done
             ;;
