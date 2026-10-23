@@ -109,7 +109,17 @@ selftest() {
         "($rug.antigravity.install[0].command) |= "'sub("-d /tmp/repo-user-guide"; "-d /tmp/repo-user-guide-agy")'
     mutate install-name-agy-cp install-shape \
         "($rug.antigravity.install[0].command) |= "'sub("cp -r /tmp/repo-user-guide/"; "cp -r /tmp/repo-user-guide-agy/")'
-    [ "$case_n" -eq 30 ] || { echo "FAIL selftest: ran $case_n cases, expected 30" >&2; exit 1; }
+    mutate install-download-qwen-linux install-shape \
+        "($alpha.qwen.install[0].command) |= "'sub("curl -fsSL -o [^ \n]+"; "curl -fsSL -o wrong.zip")'
+    mutate install-download-qwen-windows install-shape \
+        "($alpha.qwen.install[1].command) |= "'sub("-OutFile [^ \n]+"; "-OutFile wrong.zip")'
+    mutate install-download-agy install-shape \
+        "($alpha.antigravity.install[0].command) |= "'sub("curl -fsSL -o /tmp/[^ \n]+"; "curl -fsSL -o /tmp/wrong.zip")'
+    mutate install-download-agy-no-fsSL install-shape \
+        "($alpha.antigravity.install[0].command) |= "'sub("curl -fsSL"; "curl")'
+    mutate install-rug-mkdir-deleted install-shape \
+        "($rug.antigravity.install[0].command) |= "'sub("\nmkdir -p ~/.gemini/config/skills/repo-user-guide"; "")'
+    [ "$case_n" -eq 35 ] || { echo "FAIL selftest: ran $case_n cases, expected 35" >&2; exit 1; }
 
     # --- (c) staging and the staged-tree gate over the synthetic doc tree
     # stage-site.sh only removes an --out strictly inside the repository, so the
@@ -380,7 +390,7 @@ check_install() {
                         [[ $cmd == *unzip* ]] \
                             || fail install-shape "$key" "Qwen 'Linux and macOS' entry lacks unzip; install table is in scripts/gen-site.sh"
                         # shellcheck disable=SC2088  # the literal ~ is the install text shown to users
-                        for want in "mkdir -p ~/.qwen/extensions/$name" "unzip -q -o $zip -d ~/.qwen/extensions/$name/"; do
+                        for want in "curl -fsSL -o $zip $url" "mkdir -p ~/.qwen/extensions/$name" "unzip -q -o $zip -d ~/.qwen/extensions/$name/"; do
                             grep -qxF -- "$want" <<< "$cmd" \
                                 || fail install-shape "$key" "Qwen 'Linux and macOS' entry lacks the line: $want (the published name is $name); install table is in scripts/gen-site.sh"
                         done
@@ -396,7 +406,7 @@ check_install() {
                         saw_win=1
                         [[ $cmd == *Expand-Archive* ]] \
                             || fail install-shape "$key" "Qwen 'Windows (PowerShell)' entry lacks Expand-Archive; install table is in scripts/gen-site.sh"
-                        for want in "New-Item -ItemType Directory -Force -Path \"\$env:USERPROFILE\\.qwen\\extensions\\$name\"" "Expand-Archive -Path $zip -DestinationPath \"\$env:USERPROFILE\\.qwen\\extensions\\$name\" -Force"; do
+                        for want in "Invoke-WebRequest -Uri $url -OutFile $zip" "New-Item -ItemType Directory -Force -Path \"\$env:USERPROFILE\\.qwen\\extensions\\$name\"" "Expand-Archive -Path $zip -DestinationPath \"\$env:USERPROFILE\\.qwen\\extensions\\$name\" -Force"; do
                             grep -qxF -- "$want" <<< "$cmd" \
                                 || fail install-shape "$key" "Qwen 'Windows (PowerShell)' entry lacks the line: $want (the published name is $name); install table is in scripts/gen-site.sh"
                         done
@@ -417,13 +427,11 @@ check_install() {
         antigravity)
             for ((i = 0; i < n; i++)); do
                 cmd=$(jqr --argjson i "$i" '.install[$i].command // ""' <<< "$p")
-                [[ $cmd == *"$url"* ]] \
-                    || fail install-shape "$key" "Antigravity command lacks the marketplace source.url; install table is in scripts/gen-site.sh"
                 if [ "$key" = repo-user-guide-agy ]; then
                     label_is "$key" "$p" "$i" "Copy the skill"
                     { [[ $cmd == *"cp -r"* ]] && [[ $cmd != *"agy plugin install"* ]]; } \
                         || fail install-shape "$key" "the repo-user-guide-agy override needs cp -r and no agy plugin install; install table is in scripts/gen-site.sh"
-                    for want in "unzip -q -o /tmp/$zip -d /tmp/$name" "cp -r /tmp/$name/skills/repo-user-guide/. ~/.gemini/config/skills/repo-user-guide/"; do
+                    for want in "curl -fsSL -o /tmp/$zip $url" "unzip -q -o /tmp/$zip -d /tmp/$name" "mkdir -p ~/.gemini/config/skills/repo-user-guide" "cp -r /tmp/$name/skills/repo-user-guide/. ~/.gemini/config/skills/repo-user-guide/"; do
                         grep -qxF -- "$want" <<< "$cmd" \
                             || fail install-shape "$key" "the repo-user-guide-agy override lacks the line: $want (the published name is $name); install table is in scripts/gen-site.sh"
                     done
@@ -431,7 +439,7 @@ check_install() {
                     label_is "$key" "$p" "$i" "Install"
                     [[ $cmd == *"agy plugin install"* ]] \
                         || fail install-shape "$key" "Antigravity command lacks agy plugin install; install table is in scripts/gen-site.sh"
-                    for want in "unzip -q -o /tmp/$zip -d /tmp/$name" "agy plugin install /tmp/$name"; do
+                    for want in "curl -fsSL -o /tmp/$zip $url" "unzip -q -o /tmp/$zip -d /tmp/$name" "agy plugin install /tmp/$name"; do
                         grep -qxF -- "$want" <<< "$cmd" \
                             || fail install-shape "$key" "Antigravity command lacks the line: $want (the published name is $name); install table is in scripts/gen-site.sh"
                     done
