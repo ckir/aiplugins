@@ -41,9 +41,9 @@ selftest() {
     echo "ok fixture-accepted"
 
     # --- (b) one mutated copy of the oracle per case, fed straight to the checker
-    # mutate NAME ID JQ-PROGRAM
+    # mutate NAME ID JQ-PROGRAM [EXPECTED-TEXT]
     mutate() {
-        local name=$1 id=$2 prog=$3 rc=0 out
+        local name=$1 id=$2 prog=$3 hint=${4:-} rc=0 out
         case_n=$((case_n + 1))
         jq "$prog" tests/site/expected/catalog.json > "$tmp/case.json" \
             || { echo "FAIL $name: mutation program failed" >&2; exit 1; }
@@ -63,6 +63,10 @@ selftest() {
                 exit 1
                 ;;
         esac
+        if [ -n "$hint" ] && [[ $out != *"$hint"* ]]; then
+            echo "FAIL $name: output lacks '$hint': $out" >&2
+            exit 1
+        fi
         echo "ok $name"
     }
 
@@ -119,7 +123,9 @@ selftest() {
         "($alpha.antigravity.install[0].command) |= "'sub("curl -fsSL"; "curl")'
     mutate install-rug-mkdir-deleted install-shape \
         "($rug.antigravity.install[0].command) |= "'sub("\nmkdir -p ~/.gemini/config/skills/repo-user-guide"; "")'
-    [ "$case_n" -eq 35 ] || { echo "FAIL selftest: ran $case_n cases, expected 35" >&2; exit 1; }
+    mutate family-set-suffix-hint family-set \
+        "(.families[] | select(.key == \"gamma-skills\") | .plugins.opencode) = ($alpha.opencode) | del($alpha.opencode)" 'family_of in scripts/gen-site.sh'
+    [ "$case_n" -eq 36 ] || { echo "FAIL selftest: ran $case_n cases, expected 36" >&2; exit 1; }
 
     # --- (c) staging and the staged-tree gate over the synthetic doc tree
     # stage-site.sh only removes an --out strictly inside the repository, so the
@@ -480,7 +486,7 @@ while IFS= read -r row; do
     # family-set: dirKey minus its agent suffix is the enclosing family key.
     stripped=$(sed -E 's/-(cc|qwen|opencode|agy)$//' <<< "$key")
     [ "$stripped" = "$family" ] \
-        || fail family-set "$key" "dirKey minus its agent suffix is '$stripped' but it sits in family '$family'; families are listed in docs/site/families.txt"
+        || fail family-set "$key" "dirKey minus its agent suffix is '$stripped' but it sits in family '$family'; families are listed in docs/site/families.txt; if this plugin belongs to a NEW agent suffix, add the suffix to family_of in scripts/gen-site.sh and to the suffix list in this check in scripts/check-site.sh"
 
     # name
     name=$(jqr '.name // ""' <<< "$p")
