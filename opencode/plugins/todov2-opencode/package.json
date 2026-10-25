@@ -35,7 +35,7 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@opencode/plugin": "2.0.32"
+    "@opencode/plugin": "2.1.2"
   },
   "peerDependencies": {
     "@opentui/core": ">=0.5.8",
