@@ -127,7 +127,17 @@ selftest() {
         "(.families[] | select(.key == \"gamma-skills\") | .plugins.opencode) = ($alpha.opencode) | del($alpha.opencode)" 'family_of in scripts/gen-site.sh'
     mutate install-prompt-opencode install-shape \
         "($alpha.opencode.install[0].command) = \"https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/plugins/alpha-mcp-opencode/INSTALL.md\""
-    [ "$case_n" -eq 37 ] || { echo "FAIL selftest: ran $case_n cases, expected 37" >&2; exit 1; }
+    # Whole-block equality: a command is the generator's exact text, so reordered
+    # lines, an appended line and a duplicated entry are all shape defects.
+    mutate install-line-order-qwen install-shape \
+        "($alpha.qwen.install[0].command) |= (split(\"\\n\") | reverse | join(\"\\n\"))"
+    mutate install-line-order-rug install-shape \
+        "($rug.antigravity.install[0].command) |= (split(\"\\n\") | reverse | join(\"\\n\"))"
+    mutate install-extra-line-agy install-shape \
+        "($alpha.antigravity.install[0].command) += \"\\necho done\""
+    mutate install-dup-entry-opencode install-count "($alpha.opencode.install) |= (. + [.[0]])"
+    mutate install-dup-entry-antigravity install-count "($alpha.antigravity.install) |= (. + [.[0]])"
+    [ "$case_n" -eq 42 ] || { echo "FAIL selftest: ran $case_n cases, expected 42" >&2; exit 1; }
 
     # --- (c) staging and the staged-tree gate over the synthetic doc tree
     # stage-site.sh only removes an --out strictly inside the repository, so the
@@ -361,109 +371,97 @@ agent_of() {
     done
 }
 
-# label_is KEY P INDEX WANT: the install entry's label must equal WANT.
-label_is() {
-    local got
-    got=$(jqr --argjson i "$3" '.install[$i].label // ""' <<< "$2")
-    [ "$got" = "$4" ] \
-        || fail install-shape "$1" "install entry $3 label is '$got', expected '$4'; install table is in scripts/gen-site.sh"
+# Join the arguments with newlines (no trailing newline).
+join_lines() {
+    local IFS=$'\n'
+    printf '%s' "$*"
+}
+
+# first_diff GOT WANT: name the first line of GOT that differs from WANT.
+first_diff() {
+    local -a g w
+    local i
+    mapfile -t g <<< "$1"
+    mapfile -t w <<< "$2"
+    for ((i = 0; i < ${#g[@]} || i < ${#w[@]}; i++)); do
+        if [ "$i" -ge "${#w[@]}" ]; then
+            echo "extra line $((i + 1)): '${g[i]}'"
+            return
+        fi
+        if [ "$i" -ge "${#g[@]}" ]; then
+            echo "missing line $((i + 1)): '${w[i]}'"
+            return
+        fi
+        if [ "${g[i]}" != "${w[i]}" ]; then
+            echo "line $((i + 1)) is '${g[i]}', expected '${w[i]}'"
+            return
+        fi
+    done
+    echo "the lines match but the text differs (line ending or trailing whitespace)"
 }
 
 # check_install KEY AGENT NAME URL SKILLS_ONLY P
+# Each install entry must equal the generator's text for this agent, label
+# and command, whole block: an independent restatement of the install table
+# in scripts/gen-site.sh. (A set-member check let a reordered, appended or
+# duplicated line pass; the entry count is install-count's check.)
 check_install() {
     local key=$1 agent=$2 name=$3 url=$4 so=$5 p=$6
-    local chmod_line="find ~/.qwen/extensions/$name/bin -type f ! -name '*.exe' -exec chmod 755 {} +"
-    local path_line="export PATH=\"\$HOME/.gemini/config/plugins/$name/bin:\$PATH\""
-    local n i label cmd saw_linux=0 saw_win=0 want
     local zip=${url##*/}
-    n=$(jqr '(.install // []) | length' <<< "$p")
+    local -a labels=() commands=() lines=()
+    # shellcheck disable=SC2088  # the literal ~ is the install text shown to users
+    local ext="~/.qwen/extensions/$name"
+    local win_dir="\"\$env:USERPROFILE\\.qwen\\extensions\\$name\""
     case "$agent" in
         claude-code)
-            if ! jq -e --arg a "claude plugin marketplace add ckir/aiplugins" --arg b "claude plugin install ${name}@aiplugins" \
-                '[(.install // [])[] | .command] == [$a, $b]' <<< "$p" > /dev/null; then
-                fail install-shape "$key" "Claude Code entries are not the two literal commands (claude plugin marketplace add ckir/aiplugins; claude plugin install ${name}@aiplugins); install table is in scripts/gen-site.sh"
-            fi
-            label_is "$key" "$p" 0 "Add the marketplace"
-            label_is "$key" "$p" 1 "Install"
+            labels=("Add the marketplace" "Install")
+            commands=("claude plugin marketplace add ckir/aiplugins" "claude plugin install ${name}@aiplugins")
             ;;
         qwen)
-            for ((i = 0; i < n; i++)); do
-                label=$(jqr --argjson i "$i" '.install[$i].label // ""' <<< "$p")
-                cmd=$(jqr --argjson i "$i" '.install[$i].command // ""' <<< "$p")
-                [[ $cmd == *"$url"* ]] \
-                    || fail install-shape "$key" "Qwen entry '$label' lacks the marketplace source.url; install table is in scripts/gen-site.sh"
-                case "$label" in
-                    "Linux and macOS")
-                        saw_linux=1
-                        [[ $cmd == *unzip* ]] \
-                            || fail install-shape "$key" "Qwen 'Linux and macOS' entry lacks unzip; install table is in scripts/gen-site.sh"
-                        # shellcheck disable=SC2088  # the literal ~ is the install text shown to users
-                        for want in "curl -fsSL -o $zip $url" "mkdir -p ~/.qwen/extensions/$name" "unzip -q -o $zip -d ~/.qwen/extensions/$name/"; do
-                            grep -qxF -- "$want" <<< "$cmd" \
-                                || fail install-shape "$key" "Qwen 'Linux and macOS' entry lacks the line: $want (the published name is $name); install table is in scripts/gen-site.sh"
-                        done
-                        if grep -qxF -- "$chmod_line" <<< "$cmd"; then
-                            [ "$so" = false ] \
-                                || fail install-shape "$key" "skills-only Qwen 'Linux and macOS' entry must not have the bin chmod line; install table is in scripts/gen-site.sh"
-                        else
-                            [ "$so" = true ] \
-                                || fail install-shape "$key" "Qwen 'Linux and macOS' entry lacks the line: $chmod_line; install table is in scripts/gen-site.sh"
-                        fi
-                        ;;
-                    "Windows (PowerShell)")
-                        saw_win=1
-                        [[ $cmd == *Expand-Archive* ]] \
-                            || fail install-shape "$key" "Qwen 'Windows (PowerShell)' entry lacks Expand-Archive; install table is in scripts/gen-site.sh"
-                        for want in "Invoke-WebRequest -Uri $url -OutFile $zip" "New-Item -ItemType Directory -Force -Path \"\$env:USERPROFILE\\.qwen\\extensions\\$name\"" "Expand-Archive -Path $zip -DestinationPath \"\$env:USERPROFILE\\.qwen\\extensions\\$name\" -Force"; do
-                            grep -qxF -- "$want" <<< "$cmd" \
-                                || fail install-shape "$key" "Qwen 'Windows (PowerShell)' entry lacks the line: $want (the published name is $name); install table is in scripts/gen-site.sh"
-                        done
-                        ;;
-                esac
-            done
-            { [ "$saw_linux" = 1 ] && [ "$saw_win" = 1 ]; } \
-                || fail install-shape "$key" "Qwen needs a 'Linux and macOS' and a 'Windows (PowerShell)' entry; install table is in scripts/gen-site.sh"
+            lines=("curl -fsSL -o $zip $url" "mkdir -p $ext" "unzip -q -o $zip -d $ext/")
+            [ "$so" = true ] || lines+=("find $ext/bin -type f ! -name '*.exe' -exec chmod 755 {} +")
+            labels=("Linux and macOS" "Windows (PowerShell)")
+            commands=(
+                "$(join_lines "${lines[@]}")"
+                "$(join_lines "Invoke-WebRequest -Uri $url -OutFile $zip" \
+                    "New-Item -ItemType Directory -Force -Path $win_dir" \
+                    "Expand-Archive -Path $zip -DestinationPath $win_dir -Force")"
+            )
             ;;
         opencode)
-            for ((i = 0; i < n; i++)); do
-                cmd=$(jqr --argjson i "$i" '.install[$i].command // ""' <<< "$p")
-                want="Fetch and follow the installation instructions at $oc_raw/opencode/plugins/$key/INSTALL.md, and ask me whether to install project-local or global first."
-                [ "$cmd" = "$want" ] \
-                    || fail install-shape "$key" "OpenCode command must be exactly: $want; install table is in scripts/gen-site.sh"
-                label_is "$key" "$p" "$i" "Ask your agent"
-            done
+            labels=("Ask your agent")
+            commands=("Fetch and follow the installation instructions at $oc_raw/opencode/plugins/$key/INSTALL.md, and ask me whether to install project-local or global first.")
             ;;
         antigravity)
-            for ((i = 0; i < n; i++)); do
-                cmd=$(jqr --argjson i "$i" '.install[$i].command // ""' <<< "$p")
-                if [ "$key" = repo-user-guide-agy ]; then
-                    label_is "$key" "$p" "$i" "Copy the skill"
-                    { [[ $cmd == *"cp -r"* ]] && [[ $cmd != *"agy plugin install"* ]]; } \
-                        || fail install-shape "$key" "the repo-user-guide-agy override needs cp -r and no agy plugin install; install table is in scripts/gen-site.sh"
-                    for want in "curl -fsSL -o /tmp/$zip $url" "unzip -q -o /tmp/$zip -d /tmp/$name" "mkdir -p ~/.gemini/config/skills/repo-user-guide" "cp -r /tmp/$name/skills/repo-user-guide/. ~/.gemini/config/skills/repo-user-guide/"; do
-                        grep -qxF -- "$want" <<< "$cmd" \
-                            || fail install-shape "$key" "the repo-user-guide-agy override lacks the line: $want (the published name is $name); install table is in scripts/gen-site.sh"
-                    done
-                else
-                    label_is "$key" "$p" "$i" "Install"
-                    [[ $cmd == *"agy plugin install"* ]] \
-                        || fail install-shape "$key" "Antigravity command lacks agy plugin install; install table is in scripts/gen-site.sh"
-                    for want in "curl -fsSL -o /tmp/$zip $url" "unzip -q -o /tmp/$zip -d /tmp/$name" "agy plugin install /tmp/$name"; do
-                        grep -qxF -- "$want" <<< "$cmd" \
-                            || fail install-shape "$key" "Antigravity command lacks the line: $want (the published name is $name); install table is in scripts/gen-site.sh"
-                    done
-                    if grep -qxF -- "$path_line" <<< "$cmd"; then
-                        [ "$so" = false ] \
-                            || fail install-shape "$key" "skills-only Antigravity command must not have the PATH line; install table is in scripts/gen-site.sh"
-                    else
-                        [ "$so" = true ] \
-                            || fail install-shape "$key" "Antigravity command lacks the line: $path_line; install table is in scripts/gen-site.sh"
-                    fi
-                fi
-            done
+            if [ "$key" = repo-user-guide-agy ]; then
+                labels=("Copy the skill")
+                # shellcheck disable=SC2088  # the literal ~ is the install text shown to users
+                commands=("$(join_lines "curl -fsSL -o /tmp/$zip $url" \
+                    "unzip -q -o /tmp/$zip -d /tmp/$name" \
+                    "mkdir -p ~/.gemini/config/skills/repo-user-guide" \
+                    "cp -r /tmp/$name/skills/repo-user-guide/. ~/.gemini/config/skills/repo-user-guide/")")
+            else
+                lines=("curl -fsSL -o /tmp/$zip $url" "unzip -q -o /tmp/$zip -d /tmp/$name" "agy plugin install /tmp/$name")
+                [ "$so" = true ] || lines+=("export PATH=\"\$HOME/.gemini/config/plugins/$name/bin:\$PATH\"")
+                labels=("Install")
+                commands=("$(join_lines "${lines[@]}")")
+            fi
             ;;
-        *) fail install-shape "$key" "no install shape for agent ${agent}; add a row to the install table in scripts/gen-site.sh" ;;
+        *)
+            fail install-shape "$key" "no install shape for agent ${agent}; add a row to the install table in scripts/gen-site.sh"
+            return
+            ;;
     esac
+    local n i got_label got_cmd
+    n=$(jqr '(.install // []) | length' <<< "$p")
+    for ((i = 0; i < n && i < ${#labels[@]}; i++)); do
+        got_label=$(jqr --argjson i "$i" '.install[$i].label // ""' <<< "$p")
+        got_cmd=$(jqr --argjson i "$i" '.install[$i].command // ""' <<< "$p")
+        jq -e --argjson i "$i" --arg l "${labels[i]}" '.install[$i].label == $l' <<< "$p" > /dev/null \
+            || fail install-shape "$key" "install entry $i label is '$got_label', expected '${labels[i]}'; install table is in scripts/gen-site.sh"
+        jq -e --argjson i "$i" --arg c "${commands[i]}" '.install[$i].command == $c' <<< "$p" > /dev/null \
+            || fail install-shape "$key" "install entry $i ('${labels[i]}') is not the generator's text: $(first_diff "$got_cmd" "${commands[i]}") (the published name is $name); install table is in scripts/gen-site.sh"
+    done
 }
 
 total=0
@@ -530,7 +528,7 @@ while IFS= read -r row; do
             [ "$n" -eq 2 ] || fail install-count "$key" "$agent needs exactly 2 install entries, found $n"
             ;;
         *)
-            [ "$n" -ge 1 ] || fail install-count "$key" "needs at least 1 install entry, found $n"
+            [ "$n" -eq 1 ] || fail install-count "$key" "$agent needs exactly 1 install entry, found $n"
             ;;
     esac
     empty=$(jqr '[(.install // [])[] | (.command // "") | select(length == 0)] | length' <<< "$p")
