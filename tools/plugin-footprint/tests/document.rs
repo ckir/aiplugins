@@ -437,6 +437,32 @@ fn the_setup_tier_is_the_sum_of_its_one_source() {
 }
 
 #[test]
+fn a_document_carries_exactly_the_documented_top_level_keys() {
+    // Pins the envelope, not one forbidden name: a version-like field added
+    // under any other key (`version`, `commit`, `packageVersion`) would
+    // re-couple the document to release bumps and fails here.
+    let value = serde_json::to_value(build(
+        "x",
+        Path::new("plug"),
+        Tree::Dev,
+        &ok_outcome(),
+        &FileSources::default(),
+    ))
+    .expect("serialises");
+    let mut keys: Vec<&str> = value
+        .as_object()
+        .expect("a document is an object")
+        .keys()
+        .map(String::as_str)
+        .collect();
+    keys.sort_unstable();
+    assert_eq!(
+        keys,
+        ["agent", "plugin", "probe", "schemaVersion", "tiers", "tree"]
+    );
+}
+
+#[test]
 fn a_document_carries_no_version_stamp() {
     let value = serde_json::to_value(build(
         "x",
