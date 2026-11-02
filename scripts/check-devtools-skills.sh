@@ -96,7 +96,7 @@ mutation_test() {
         "for f in $cmd $occ; do sed '2s/\$/ \$ARGUMENTS/; 4s/\\\$ARGUMENTS//' \$f > t.tmp && mv t.tmp \$f; done"
     case_run "skill name only in the command frontmatter" 1 "names no aiplugins-devtools-" \
         "for f in $cmd $occ; do sed '2s/\$/ aiplugins-devtools-spec-panel-review/; 4s/aiplugins-devtools-spec-panel-review/the skill/' \$f > t.tmp && mv t.tmp \$f; done"
-    case_run "no commands" 1 "no commands under" "rm $cmd $occ"
+    case_run "no commands" 1 "no commands under" "rm $commands_root/*.md $oc_plugin/commands/*.md"
     case_run "stale OpenCode command copy" 1 "stale copy:" "echo extra >> $occ"
     case_run "stale per-agent skill copy" 1 "stale copy:" "echo extra >> $cc_plugin/skills/spec-panel-review/SKILL.md"
     case_run "extra skill folder in a copy" 1 "different set of skills" "mkdir $cc_plugin/skills/extra"
