@@ -3,16 +3,16 @@ name: Release Refresh
 # Keeps version-derived files fresh on the release-please branch.
 #
 # Release-please bumps versions (plugin manifests, CHANGELOGs) but does not
-# regenerate the files this repo derives from those versions: the tag-pinned
-# source URLs in the generated marketplace manifests, and the `pluginVersion`
-# stamps in the committed footprint documents. Without a refresh, every
-# release PR fails `gen-marketplaces.sh --check` and the footprint freshness
-# gate on its first CI run — red through no fault of the release content.
+# regenerate the tag-pinned source URLs in the generated marketplace
+# manifests. Without a refresh, every release PR fails
+# `gen-marketplaces.sh --check` on its first CI run - red through no fault of
+# the release content. Footprint documents no longer carry a version stamp,
+# so they need no refresh.
 #
-# This job runs the two generators against the release branch and commits
-# the result back to it when they change anything. It converges: the push
+# This job runs the generator against the release branch and commits the
+# result back to it when it changes anything. It converges: the push
 # retriggers this workflow, regeneration finds no diff, and nothing is
-# pushed. Scoped to the release-please branch only — every other PR is
+# pushed. Scoped to the release-please branch only - every other PR is
 # skipped before any tool runs.
 #
 # The push MUST authenticate with RELEASE_PLEASE_TOKEN, not GITHUB_TOKEN:
@@ -51,53 +51,20 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install just
-        uses: taiki-e/install-action@just
-
-      # Same builds the footprint job needs: `footprint-regen` measures the
-      # plugin binaries where the manifests point, so without staging them
-      # it measures nothing.
-      - name: Build plugin binaries
-        run: |
-          just build-rtk-mcp-cc
-          just build-re-ghidra-mcp-cc
-          just build-opencode-ctl-mcp-cc
-          just build-rtk-mcp-opencode
-          just build-re-ghidra-mcp-opencode
-          just build-rtk-mcp-agy
-          just build-re-ghidra-mcp-agy
-          just build-opencode-ctl-mcp-agy
-          just build-opencode-ctl-mcp-opencode
-
-      - name: Regenerate derived files
-        run: |
-          bash scripts/gen-marketplaces.sh
-          just footprint-regen
+      - name: Regenerate marketplace manifests
+        run: bash scripts/gen-marketplaces.sh
 
       - name: Commit refresh
         run: |
-          # Only the generated paths: marketplaces, footprint documents and
-          # budgets, and the README regions footprint-regen publishes. A
-          # release branch never carries hand-written changes, but an
-          # unrestricted `git add -A` would commit them silently if it ever
-          # did — and a refresh commit must never smuggle content into a
-          # release.
+          # Only the generated marketplace manifests. A release branch never
+          # carries hand-written changes, but an unrestricted `git add -A`
+          # would commit them silently if it ever did - and a refresh commit
+          # must never smuggle content into a release.
           git add \
             .claude-plugin/marketplace.json \
             .qwen-plugin/marketplace.json \
             .agy-plugin/marketplace.json \
-            .opencode-plugin/marketplace.json \
-            docs/footprints/ \
-            README.md \
-            claude-code/plugins/*/README.md \
-            opencode/plugins/*/README.md \
-            antigravity/plugins/*/README.md
+            .opencode-plugin/marketplace.json
           if git diff --cached --quiet; then
             echo "Derived files already fresh; nothing to commit."
           else
