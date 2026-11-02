@@ -1,13 +1,16 @@
 # aiplugins-devtools-qwen
 
-A Qwen Code extension that ships two dev-tool skills:
+A Qwen Code extension that ships three dev-tool skills:
 
 - `code-review-and-quality`, a multi-axis code review (correctness, readability,
   architecture, security, performance) with security and performance checklists.
 - `spec-panel-review`, an adversarial multi-seat review of a spec or an
   implementation plan (not code), report-only.
+- `human-friendly`, rewrites a Markdown file in place so it reads naturally,
+  keeping code, links, tables, numbers and meaning intact. Supports
+  `--review-only`, `--dry-run` and `--profile natural-professional|conversational|executive`.
 
-Slash command: `/aiplugins-devtools:spec-panel-review <path>`.
+Slash commands: `/aiplugins-devtools:spec-panel-review <path>` and `/aiplugins-devtools:human-friendly <path>`.
 
 ## Installation
 
