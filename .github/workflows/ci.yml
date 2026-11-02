@@ -123,6 +123,9 @@ jobs:
       - name: Check opencode wiring
         run: bash scripts/check-opencode-wiring.sh
 
+      - name: Self-test the opencode plugin pin bump script
+        run: bash scripts/bump-opencode-plugin.sh --selftest
+
       - name: Check antigravity wiring
         run: bash scripts/check-agy-wiring.sh
 
