@@ -12,9 +12,9 @@
 > is newest) and use it for every URL below.
 
 You will install `aiplugins-devtools-opencode`: a pure skills plugin that
-ships two skills (a multi-axis code review and an adversarial spec or plan
-review) and one slash-command file. Install is a file copy of the skill folders
-and of that command file. There is no `opencode.jsonc` to merge, no binary to
+ships three skills (a multi-axis code review, an adversarial spec or plan
+review, and a Markdown rewriter) and two slash-command files. Install is a file
+copy of the skill folders and of those command files. There is no `opencode.jsonc` to merge, no binary to
 stage and no dependency to install.
 
 This document is the executable form of `README.md`. If the two ever
@@ -67,11 +67,11 @@ command file):
 
 ```bash
 mkdir -p "$DEST/skills" "$DEST/command"
-for skill in aiplugins-devtools-code-review-and-quality aiplugins-devtools-spec-panel-review; do
+for skill in aiplugins-devtools-code-review-and-quality aiplugins-devtools-spec-panel-review aiplugins-devtools-human-friendly; do
   rm -rf "$DEST/skills/$skill"
   cp -r "/tmp/aiplugins-devtools-opencode-stage/skills/$skill" "$DEST/skills/"
 done
-cp /tmp/aiplugins-devtools-opencode-stage/commands/spec-panel-review.md "$DEST/command/"
+cp /tmp/aiplugins-devtools-opencode-stage/commands/spec-panel-review.md /tmp/aiplugins-devtools-opencode-stage/commands/human-friendly.md "$DEST/command/"
 ```
 
 Do not rename the folders: OpenCode requires a skill's folder name to equal
@@ -85,12 +85,14 @@ the `name:` in its `SKILL.md` frontmatter, and each pair is
    `THIRD-PARTY-NOTICE.md` sit beside it.
 2. `$DEST/skills/aiplugins-devtools-spec-panel-review/SKILL.md` exists and is
    non-empty, and `$DEST/command/spec-panel-review.md` exists.
-3. The first lines of each `SKILL.md` contain `name:` followed by its folder
+3. `$DEST/skills/aiplugins-devtools-human-friendly/SKILL.md` exists and is
+   non-empty, and `$DEST/command/human-friendly.md` exists.
+4. The first lines of each `SKILL.md` contain `name:` followed by its folder
    name (`aiplugins-devtools-code-review-and-quality`,
-   `aiplugins-devtools-spec-panel-review`).
-4. Restart OpenCode (skills and commands load at startup), then check that both
-   skills appear in OpenCode's skill list and that `/spec-panel-review` appears
-   in its `/` menu. If either does not appear, report that to the user rather
+   `aiplugins-devtools-spec-panel-review`, `aiplugins-devtools-human-friendly`).
+5. Restart OpenCode (skills and commands load at startup), then check that all
+   three skills appear in OpenCode's skill list and that `/spec-panel-review`
+   and `/human-friendly` appear in its `/` menu. If either does not appear, report that to the user rather
    than editing OpenCode's configuration.
 
 This install procedure has not been exercised against a running OpenCode by
