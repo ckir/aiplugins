@@ -78,6 +78,15 @@ gen-marketplaces:
 opencode-wiring:
     bash scripts/check-opencode-wiring.sh
 
+# Move the @opencode/plugin pin in every OpenCode plugin and its README/INSTALL claims at once.
+# Dependabot cannot do this (it only edits package.json); see scripts/bump-opencode-plugin.sh.
+bump-opencode-plugin VERSION:
+    bash scripts/bump-opencode-plugin.sh {{VERSION}}
+
+# Self-test of the bump script against throwaway fixture trees.
+bump-opencode-plugin-test:
+    bash scripts/bump-opencode-plugin.sh --selftest
+
 # Verify antigravity/plugins/ plugin configs, ids, binary resolution, and skill copies.
 agy-wiring:
     bash scripts/check-agy-wiring.sh
@@ -322,7 +331,7 @@ skills-release-wiring:
 
 # Run all pre-flight checks (what CI and lefthook run; see ci.yml — `links`
 # is hook-only and `gen-* --check` + opencode suites run in CI but not here)
-check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace agy-marketplace dispatch smoke footprint opencode-wiring agy-wiring agy-validate footprint-budgets devtools-skills skills-bundles skills-release-wiring
+check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace agy-marketplace dispatch smoke footprint opencode-wiring bump-opencode-plugin-test agy-wiring agy-validate footprint-budgets devtools-skills skills-bundles skills-release-wiring
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
