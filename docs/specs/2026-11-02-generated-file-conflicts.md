@@ -14,9 +14,9 @@ The conflict class is therefore: **a release bump changes a generated file that 
 |---|---|
 | Each footprint document embeds the plugin version | `docs/footprints/aiplugins-devtools-cc.json` carries `"pluginVersion":"0.2.0"`; field is `plugin_version: Option<String>` at `tools/plugin-footprint/src/document.rs:55`, filled from the package manifest at `tools/plugin-footprint/src/main.rs:177` |
 | Release PRs rewrite that stamp | `.github/workflows/release-refresh.yml:7` says so; commit `05407de chore: refresh derived files on release branch` is the last change to the cc document |
-| One consumer reads the stamp | `scripts/check-site.sh:588` requires it to equal the manifest version. Test `tools/plugin-footprint/tests/version_source.rs` pins where it comes from. No other consumer found by grep over `*.rs *.sh *.yml Justfile *.md` |
-| CI requires the committed documents to be fresh | `.github/workflows/ci.yml:251-283`: runs `just footprint-regen`, fails on any README or `docs/footprints/` diff |
-| The gate reads the base branch's document as its baseline | `.github/workflows/ci.yml:285-288` (`footprint-gate origin/<base>`), spec `docs/specs/2026-09-03-plugin-footprint.md` section 6.2 |
+| One consumer reads the stamp | `scripts/check-site.sh:588` (on `feat/pages-site`, PR #118; not on `main`) requires it to equal the manifest version. Test `tools/plugin-footprint/tests/version_source.rs` pins where it comes from. No other consumer found by grep over `*.rs *.sh *.yml Justfile *.md` |
+| CI requires the committed documents to be fresh | `.github/workflows/ci.yml:226-246`: runs `just footprint-regen`, fails on any README or `docs/footprints/` diff |
+| The gate reads the base branch's document as its baseline | `.github/workflows/ci.yml:250-253` (`footprint-gate origin/<base>`), spec `docs/specs/2026-09-03-plugin-footprint.md` section 6.2 |
 | `main` requires branches to be up to date | `gh api repos/ckir/aiplugins/branches/main/protection`: `strict: true`, 7 required contexts |
 | No merge queue support exists today | no `merge_group` trigger anywhere in `.github/` |
 | Probe-ok documents carry a second version field | the spec's example document (`2026-09-03-plugin-footprint.md:523`) has `reportedVersion`; `grep -l reportedVersion docs/footprints/*.json` matches no committed document, so only `pluginVersion` needs removing today |
@@ -31,7 +31,7 @@ Non-goals: removing the committed documents (they are the ratchet baseline, so t
 
 **A. Remove version stamps from the footprint document.** A footprint is a claim about bytes, not releases. Drop `pluginVersion` (`reportedVersion` appears in no committed document), bump `schemaVersion`, drop the `check-site.sh:588` comparison (the manifest version is already checked against the marketplace elsewhere), delete the version-refresh half of `release-refresh.yml`. Release bumps then no longer touch `docs/footprints/`.
 - Sound: freshness still regenerates and diffs; the gate compares bytes only.
-- Risks to verify before building: (1) whether the gate or `ratchet` deserialises with unknown fields denied, since the merge-base document will still carry the old field during the transition PR; (2) any README footprint region that prints a version (grep of `publish.rs` found none, not exhaustively read).
+- Risks: (1) RESOLVED while planning: the gate parses baselines as `serde_json::Value` and ignores unknown keys (`tools/plugin-footprint/src/gate.rs:198-215`, `:318`), so no `schemaVersion` bump is needed; (2) any README footprint region that prints a version (grep of `publish.rs` found none, not exhaustively read).
 - Residual: a branch that genuinely changes a plugin's bytes still conflicts with another branch doing the same. That is a real conflict, not churn.
 
 **B. GitHub merge queue, drop `strict`.** Add `merge_group` to every required workflow. This removes the manual "update branch" step only. It does NOT fix this problem: the queue builds a merge commit, and a textual conflict in a footprint file ejects the PR from the queue. Worth doing for other reasons, but not a fix.
