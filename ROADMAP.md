@@ -31,3 +31,19 @@ Spec: `docs/specs/2026-10-18-opencode-ctl-mcp-design.md`. After execution comes 
 ## aiplugins-devtools: capstone and test-audit
 
 **Status:** OPEN 2026-10-19 - branch `feat/aiplugins-devtools` has all tasks done; the AGY-CAPSTONE review, then AGY-TEST-AUDIT, then the merge decision remain, to run in a fresh session (owner ruling).
+
+## devtools: pin LF on the shared skill references and notices
+
+**Status:** OPEN 2026-11-02 - `.gitattributes` pins `**/SKILL.md` and `shared/devtools/commands/*.md` but not `shared/devtools/skills/**/references/*.md` or `THIRD-PARTY-NOTICE.md`, so a Windows autocrlf checkout fails `scripts/check-devtools-skills.sh` (the `diff -r` at line 112 against the LF-pinned `opencode/**/*.md` copies). Pin every copy together (shared, cc, qwen, agy); pinning shared alone breaks the per-agent `diff -r`. CI runs on ubuntu only, so it is unseen. Verified 2026-11-02 with `git check-attr eol`.
+
+## opencode devtools INSTALL.md: copy steps hardcode skill and command names
+
+**Status:** OPEN 2026-11-02 - `opencode/plugins/aiplugins-devtools-opencode/INSTALL.md:70` lists the skills and the command by name with no drift check, so adding one to `shared/devtools` leaves the install steps incomplete while every gate stays green. Needs a gate that derives the list, or a loop over `skills/*`.
+
+## Qwen installers: no release carries the extension zip
+
+**Status:** OPEN 2026-11-02 - `scripts/install-qwen-extension.sh:37` downloads `releases/latest/download/<ext>-extension.zip`, but the repo Latest release (`aiplugins-devtools-agy-v0.3.0`) has only `aiplugins-devtools-agy-agy-plugin.zip`, so the documented one-liner 404s. `scripts/install-qwen-extension.ps1:24,34` also omits `aiplugins-devtools-qwen` from its `ValidateSet`. Per-plugin tags mean `latest` cannot work; resolve the tag per extension.
+
+## mlc scans untracked scratch and fails local link checks
+
+**Status:** OPEN 2026-11-02 - `just links` and the lefthook pre-push `mlc` (Justfile:51, lefthook.yml:22) do not ignore the git-ignored `.clavity/`, so `.clavity/scratch/opencode-ctl-plan-panel/round11-agy.md` and `round18-agy.md` (66 `file://` hits in round11 alone) fail the check locally. Add `./.clavity` to the `--ignore-path` list in both places.
