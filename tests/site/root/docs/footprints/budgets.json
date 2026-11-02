@@ -1,0 +1,28 @@
+{
+  "alpha-mcp-agy": {
+    "deltaBytes": 321,
+    "headroomBytes": 1234,
+    "residentBytes": 1333
+  },
+  "alpha-mcp-cc": {
+    "deltaBytes": 500,
+    "headroomBytes": 2000,
+    "residentBytes": 1111
+  },
+  "alpha-mcp-opencode": {
+    "deltaBytes": 500,
+    "headroomBytes": 2000,
+    "residentBytes": 1200,
+    "setupBytes": 1999
+  },
+  "repo-user-guide-agy": {
+    "deltaBytes": 500,
+    "headroomBytes": 2000,
+    "residentBytes": 1077
+  },
+  "repo-user-guide-cc": {
+    "deltaBytes": 500,
+    "headroomBytes": 2000,
+    "residentBytes": 1055
+  }
+}
