@@ -515,7 +515,6 @@ plugin internals.
   "plugin": "re-ghidra-mcp-cc",
   "agent": "claude-code",
   "tree": "dev",
-  "pluginVersion": "0.6.4",
   "measuredAt": "2026-09-03T12:00:00Z",
   "probe": {
     "status": "ok",
@@ -555,11 +554,14 @@ Requirements:
   other than `ok` means the tier figures are absent, not zero** — the document
   omits `tiers` entirely rather than serialising zeros that a ceiling assertion
   would happily pass.
-- `probe.binary` and `probe.reportedVersion` pin provenance. `pluginVersion`
-  comes from the manifest and `reportedVersion` from the binary itself; a
-  document where they disagree measured a stale binary. This repo already ships
-  `scripts/probe-plugin-bin.sh` to catch that exact mismatch in bundles, and the
-  footprint document inherits the same failure mode.
+- `probe.binary` pins provenance. The document once also carried `pluginVersion`
+  (from the manifest), and this spec described a `probe.reportedVersion` (from
+  the binary itself) whose disagreement with it would expose a measurement of a
+  stale binary. The stamp was removed on 2026-11-02 (see
+  `docs/specs/2026-11-02-generated-file-conflicts.md`) because it made every
+  release bump rewrite every document; no tool compared the two fields, and
+  `reportedVersion` was never emitted. `scripts/probe-plugin-bin.sh` still
+  catches a stale binary in bundles.
   **`probe.binary` is normalised and excluded from the snapshot**: recorded
   repo-relative, with forward slashes and any `.exe` suffix stripped. Unnormalised
   it differs by platform — the gate may run on Linux while the published figure
