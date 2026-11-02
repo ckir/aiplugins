@@ -1,13 +1,16 @@
 # aiplugins-devtools
 
-A Claude Code plugin that ships two dev-tool skills:
+A Claude Code plugin that ships three dev-tool skills:
 
 - `code-review-and-quality`, a multi-axis code review (correctness, readability,
   architecture, security, performance) with security and performance checklists.
 - `spec-panel-review`, an adversarial multi-seat review of a spec or an
   implementation plan (not code), report-only.
+- `human-friendly`, rewrites a Markdown file in place so it reads naturally,
+  keeping code, links, tables, numbers and meaning intact. Supports
+  `--review-only`, `--dry-run` and `--profile natural-professional|conversational|executive`.
 
-Slash command: `/aiplugins-devtools:spec-panel-review <path>`.
+Slash commands: `/aiplugins-devtools:spec-panel-review <path>` and `/aiplugins-devtools:human-friendly <path>`.
 
 Install:
 
@@ -23,12 +26,12 @@ here by `just emit-devtools-skills`.
 <!-- footprint:begin -->
 ### Context footprint
 
-Installing this plugin adds **≥ 634 bytes** to every request, for the whole session. A further **≥ 28,763 bytes** load only when one of its skills or agents is actually invoked.
+Installing this plugin adds **≥ 875 bytes** to every request, for the whole session. A further **≥ 36,812 bytes** load only when one of its skills or agents is actually invoked.
 
 | Tier | Bytes | When you pay it |
 |---|---|---|
-| Resident | ≥ 634 | Every request, for the whole session |
-| Invocation | ≥ 28,763 | Only when that skill or agent runs |
+| Resident | ≥ 875 | Every request, for the whole session |
+| Invocation | ≥ 36,812 | Only when that skill or agent runs |
 
 **Bytes, not tokens.** This is the exact serialised size of what the host loads, measured by probing the plugin's own MCP server and reading its skill and agent frontmatter. It is not a token count and does not convert to one at a fixed rate — treat it as a figure you can compare between plugins, not as a context budget.
 
