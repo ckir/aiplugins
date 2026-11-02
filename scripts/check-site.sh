@@ -458,9 +458,9 @@ check_install() {
         got_label=$(jqr --argjson i "$i" '.install[$i].label // ""' <<< "$p")
         got_cmd=$(jqr --argjson i "$i" '.install[$i].command // ""' <<< "$p")
         jq -e --argjson i "$i" --arg l "${labels[i]}" '.install[$i].label == $l' <<< "$p" > /dev/null \
-            || fail install-shape "$key" "install entry $i label is '$got_label', expected '${labels[i]}'; install table is in scripts/gen-site.sh"
+            || fail install-shape "$key" "install entry $i label is '$got_label', expected '${labels[i]}'; the install table is in scripts/gen-site.sh and check_install in scripts/check-site.sh restates it, so edit both"
         jq -e --argjson i "$i" --arg c "${commands[i]}" '.install[$i].command == $c' <<< "$p" > /dev/null \
-            || fail install-shape "$key" "install entry $i ('${labels[i]}') is not the generator's text: $(first_diff "$got_cmd" "${commands[i]}") (the published name is $name); install table is in scripts/gen-site.sh"
+            || fail install-shape "$key" "install entry $i ('${labels[i]}') is not the generator's text: $(first_diff "$got_cmd" "${commands[i]}") (the published name is $name); the install table is in scripts/gen-site.sh and check_install in scripts/check-site.sh restates it, so edit both"
     done
 }
 
