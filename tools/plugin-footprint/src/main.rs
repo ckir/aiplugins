@@ -12,7 +12,7 @@
 use plugin_footprint::canonical::canonical_json;
 use plugin_footprint::document::{build, setup_tier, Tree};
 use plugin_footprint::manifest::{
-    looks_like_a_plugin, plugin_version, read_agy_servers, read_mcp_servers, read_opencode_servers,
+    looks_like_a_plugin, read_agy_servers, read_mcp_servers, read_opencode_servers,
 };
 use plugin_footprint::probe::{probe, Limits, Outcome, Status};
 use plugin_footprint::publish::{comparison_region, per_plugin_region, splice};
@@ -170,14 +170,7 @@ fn measure(plugin_dir: &Path, out: Option<&Path>) -> ExitCode {
     }
 
     let name = plugin_name(plugin_dir);
-    let mut document = build(
-        &name,
-        plugin_dir,
-        Tree::Dev,
-        plugin_version(plugin_dir).as_deref(),
-        &merged,
-        &files,
-    );
+    let mut document = build(&name, plugin_dir, Tree::Dev, &merged, &files);
 
     // The opencode branch owns both differences from a Claude document: the
     // agent the contract names, and the Setup tier. A failed probe carries no
