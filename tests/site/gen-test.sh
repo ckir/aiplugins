@@ -68,6 +68,12 @@ fresh_root suffix
 sed 's/"alpha-mcp-cc"/"alpha-mcp-zzz"/' tests/site/root/agents.json > "$tmp/suffix/agents.json"
 expect_refusal unknown-suffix "$tmp/suffix" "agent suffix"
 
+# --- no-marketplace-entry ---------------------------------------------------
+fresh_root nomarket
+jq 'del(.plugins[] | select(.name == "alpha-mcp-cc"))' \
+    tests/site/root/.claude-plugin/marketplace.json > "$tmp/nomarket/.claude-plugin/marketplace.json"
+expect_refusal no-marketplace-entry "$tmp/nomarket" "no marketplace entry named alpha-mcp-cc"
+
 # --- crlf-input -------------------------------------------------------------
 fresh_root crlf
 cr=$(printf '\r')

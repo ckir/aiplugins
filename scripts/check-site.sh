@@ -144,8 +144,8 @@ selftest() {
     # staging runs write under the git-ignored target/ (still a mktemp -d dir).
     mkdir -p target
     stg=$(mktemp -d target/selftest-stage.XXXXXX)
-    sent_out='' sent_nt='' sent_ln='' link=''
-    trap 'rm -rf "$tmp" "$stg" "$sent_out" "$sent_nt" "$sent_ln" "$link"' EXIT
+    sent_out='' sent_nt='' sent_ln='' link='' nest=''
+    trap 'rm -rf "$tmp" "$stg" "$sent_out" "$sent_nt" "$sent_ln" "$link" "$nest"' EXIT
     local good="$stg/out" s_rc s_out
 
     # stage_case NAME DOCDIR OUTDIR: sets s_rc and s_out
@@ -227,10 +227,10 @@ selftest() {
     # --- (c) confinement: --out must be strictly inside <repo>/target/. Each case
     # points --out at a throwaway directory holding a sentinel, so even a broken
     # guard could only remove that throwaway directory.
-    # refuse_case NAME OUTDIR SENTINEL
+    # refuse_case NAME OUTDIR SENTINEL [DOCDIR]
     refuse_case() {
         local name=$1 r_rc=0 r_out
-        r_out=$(bash scripts/stage-site.sh --root tests/site/root --doc-dir tests/site/doc --out "$2" 2>&1) || r_rc=$?
+        r_out=$(bash scripts/stage-site.sh --root tests/site/root --doc-dir "${4:-tests/site/doc}" --out "$2" 2>&1) || r_rc=$?
         [ "$r_rc" -ne 0 ] || s_fail "$name" "staging into $2 exited 0: $r_out"
         [[ $r_out == *"refusing to remove"* ]] || s_fail "$name" "output lacks 'refusing to remove': $r_out"
         [ -e "$3" ] || s_fail "$name" "the sentinel $3 was removed"
@@ -251,7 +251,19 @@ selftest() {
     else
         echo "ok out-symlink-escape-refused (skipped: no symlinks)"
     fi
-    rm -rf "$stg" "$sent_out" "$sent_nt" "$sent_ln" "$link"
+    # --out inside --doc-dir, and --doc-dir inside --out: both under target/, so
+    # only the nesting guards can refuse them. A throwaway copy of the doc fixture
+    # carries the sentinel, so a broken guard could remove only that copy.
+    nest=$(mktemp -d "$(pwd -P)/target/selftest-nest.XXXXXX")
+    mkdir "$nest/doc"
+    cp -R tests/site/doc/. "$nest/doc/"
+    echo keep > "$nest/doc/sentinel"
+    refuse_case out-inside-doc-refused "$nest/doc/site" "$nest/doc/sentinel" "$nest/doc"
+    mkdir "$nest/out"
+    cp -R tests/site/doc "$nest/out/doc"
+    echo keep > "$nest/out/doc/sentinel"
+    refuse_case doc-inside-out-refused "$nest/out" "$nest/out/doc/sentinel" "$nest/out/doc"
+    rm -rf "$stg" "$sent_out" "$sent_nt" "$sent_ln" "$link" "$nest"
 }
 
 if [ "${1:-}" = "--selftest" ]; then
