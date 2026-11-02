@@ -1,0 +1,1 @@
+{"agent":"antigravity","plugin":"alpha-mcp-agy","pluginVersion":"0.1.0","probe":{"binary":"","promptCount":0,"status":"ok","toolCount":1},"schemaVersion":1,"tiers":{"invocation":{"bytes":444,"sources":[]},"resident":{"bytes":333,"sources":[]}},"tree":"dev"}
