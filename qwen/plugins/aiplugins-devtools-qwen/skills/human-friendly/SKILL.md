@@ -18,7 +18,7 @@ The first argument that is not a flag is the target path; with no path and no cl
 | `--dry-run` | Prepare and validate the rewrite, show a summary and a diff if you can; write nothing |
 | `--profile <name>` | Pick a style: `natural-professional` (default), `conversational`, `executive` |
 
-An unknown option or profile, or a conflicting pair such as `--review-only --dry-run`, gets an explanation, not a guess. The same goes for plain requests like "make this easier to read".
+An unknown option or profile, or a conflicting pair such as `--review-only --dry-run`, gets an explanation, not a guess. A plain request such as "make this easier to read" needs no flags: treat it as the default rewrite with the default profile.
 
 | Profile | Style | Suits |
 |---|---|---|
