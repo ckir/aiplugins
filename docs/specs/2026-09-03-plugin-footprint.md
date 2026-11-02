@@ -519,7 +519,6 @@ plugin internals.
   "probe": {
     "status": "ok",
     "binary": "claude-code/re-ghidra-mcp-cc/bin/re-ghidra-cc-mcp.exe",
-    "reportedVersion": "0.6.4",
     "toolCount": 19,
     "promptCount": 0
   },
@@ -926,8 +925,9 @@ has the prober substitute the manifest's `${CLAUDE_PLUGIN_ROOT}/bin/<name>`, and
 **The release job measures the release artifacts, not a fresh compile.** §4.2.1
 already says the published figure is authoritative only if it describes the
 bundle; recompiling from source at release time would measure a binary that is
-not the one being shipped, and `probe.reportedVersion` (§5) exists precisely to
-catch that class of mismatch. Deliverable B probes the assembled bundles.
+not the one being shipped, and `scripts/probe-plugin-bin.sh` catches that class of
+mismatch in bundles (an earlier draft relied on a `probe.reportedVersion` field that
+was never emitted). Deliverable B probes the assembled bundles.
 
 **Fork 8 — how a plugin becomes listable without its backend. DECIDED
 2026-09-03: option (a), implemented as deferral.** `run_serve` resolves config
