@@ -24,9 +24,9 @@
     "in_path": "mlc"
   },
   {
-    "name": "OpenCode source (tag matching the installed `opencode --version`, currently v2.0.32)",
+    "name": "OpenCode source (pinned to tag v2.0.32, the tag the spec cites; the installed `opencode --version` may be newer)",
     "why": "shared/opencode-ctl drives OpenCode's CLI and HTTP API; every statement in docs/specs/2026-10-18-opencode-ctl-mcp-design.md about OpenCode behaviour is cited as packages/<path>:<line> at that tag. Settle behavioural questions by reading the source (read-only, untrusted: grep and read from outside, never build or run inside it), not by probing the binary. Expected under ~/.cache/aiplugins/opencode-src.",
-    "install": "mkdir -p ~/.cache/aiplugins/opencode-src && git -C ~/.cache/aiplugins/opencode-src init -q && git -C ~/.cache/aiplugins/opencode-src remote add origin https://github.com/anomalyco/opencode.git && git -C ~/.cache/aiplugins/opencode-src fetch --depth 1 origin tag v$(opencode --version | grep -o '[0-9.]*$') && git -C ~/.cache/aiplugins/opencode-src checkout -q FETCH_HEAD",
+    "install": "mkdir -p ~/.cache/aiplugins/opencode-src && git -C ~/.cache/aiplugins/opencode-src init -q && git -C ~/.cache/aiplugins/opencode-src remote add origin https://github.com/anomalyco/opencode.git && git -C ~/.cache/aiplugins/opencode-src fetch --depth 1 origin tag v2.0.32 && git -C ~/.cache/aiplugins/opencode-src checkout -q FETCH_HEAD",
     "file_exists": "~/.cache/aiplugins/opencode-src/packages/core/src/session/session.ts"
   },
   {
