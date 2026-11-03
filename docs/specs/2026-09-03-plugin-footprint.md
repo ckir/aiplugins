@@ -515,12 +515,10 @@ plugin internals.
   "plugin": "re-ghidra-mcp-cc",
   "agent": "claude-code",
   "tree": "dev",
-  "pluginVersion": "0.6.4",
   "measuredAt": "2026-09-03T12:00:00Z",
   "probe": {
     "status": "ok",
     "binary": "claude-code/re-ghidra-mcp-cc/bin/re-ghidra-cc-mcp.exe",
-    "reportedVersion": "0.6.4",
     "toolCount": 19,
     "promptCount": 0
   },
@@ -555,11 +553,14 @@ Requirements:
   other than `ok` means the tier figures are absent, not zero** — the document
   omits `tiers` entirely rather than serialising zeros that a ceiling assertion
   would happily pass.
-- `probe.binary` and `probe.reportedVersion` pin provenance. `pluginVersion`
-  comes from the manifest and `reportedVersion` from the binary itself; a
-  document where they disagree measured a stale binary. This repo already ships
-  `scripts/probe-plugin-bin.sh` to catch that exact mismatch in bundles, and the
-  footprint document inherits the same failure mode.
+- `probe.binary` pins provenance. The document once also carried `pluginVersion`
+  (from the manifest), and this spec described a `probe.reportedVersion` (from
+  the binary itself) whose disagreement with it would expose a measurement of a
+  stale binary. The stamp was removed on 2026-11-02 (see
+  `docs/specs/2026-11-02-generated-file-conflicts.md`) because it made every
+  release bump rewrite every document; no tool compared the two fields, and
+  `reportedVersion` was never emitted. `scripts/probe-plugin-bin.sh` still
+  catches a stale binary in bundles.
   **`probe.binary` is normalised and excluded from the snapshot**: recorded
   repo-relative, with forward slashes and any `.exe` suffix stripped. Unnormalised
   it differs by platform — the gate may run on Linux while the published figure
@@ -924,8 +925,9 @@ has the prober substitute the manifest's `${CLAUDE_PLUGIN_ROOT}/bin/<name>`, and
 **The release job measures the release artifacts, not a fresh compile.** §4.2.1
 already says the published figure is authoritative only if it describes the
 bundle; recompiling from source at release time would measure a binary that is
-not the one being shipped, and `probe.reportedVersion` (§5) exists precisely to
-catch that class of mismatch. Deliverable B probes the assembled bundles.
+not the one being shipped, and `scripts/probe-plugin-bin.sh` catches that class of
+mismatch in bundles (an earlier draft relied on a `probe.reportedVersion` field that
+was never emitted). Deliverable B probes the assembled bundles.
 
 **Fork 8 — how a plugin becomes listable without its backend. DECIDED
 2026-09-03: option (a), implemented as deferral.** `run_serve` resolves config

@@ -508,7 +508,7 @@ while IFS= read -r row; do
         fail name "$key" "no marketplace entry named '$expname' in $(registry_field "$agent" marketplace)"
     fi
 
-    # footprint-null, tier-totals, version (pluginVersion), budget
+    # footprint-null, tier-totals, budget
     fp=$(jqc '.footprint' <<< "$p")
     fp_type=$(jqr 'type' <<< "$fp")
     nofp=true
@@ -583,10 +583,6 @@ while IFS= read -r row; do
         [ "$readme" = "$home" ] || fail readme "$key" "readme '$readme' differs from the marketplace homepage '$home'"
     else
         fail readme "$key" "no marketplace entry '$expname' to compare the readme against"
-    fi
-    if [ -f "$fpfile" ]; then
-        pv=$(jqr '.pluginVersion // ""' "$fpfile")
-        [ "$version" = "$pv" ] || fail version "$key" "version '$version' differs from pluginVersion '$pv' in docs/footprints/$key.json"
     fi
 
     # skills-only

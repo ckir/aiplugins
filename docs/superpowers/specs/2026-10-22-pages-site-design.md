@@ -140,7 +140,7 @@ Actions (a read-only `gh api repos/ckir/aiplugins/pages`), and a re-run of the
 marketplace file (`.claude-plugin/marketplace.json`, `.qwen-plugin/marketplace.json`,
 `.opencode-plugin/marketplace.json`, `.agy-plugin/marketplace.json`). Marketplace
 files: `.plugins[]` with `name`, `description`, `homepage` and `source.url`.
-Footprint files `docs/footprints/<dirKey>.json`: `pluginVersion` and
+Footprint files `docs/footprints/<dirKey>.json`:
 `tiers.{resident,invocation,setup}.bytes`. `budgets.json`:
 `<dirKey>.{residentBytes,setupBytes}`. A plugin "ships binaries" when its key is not
 in its own agent's `skillsOnly` list.
@@ -346,9 +346,10 @@ false:
 - `catalog.json`'s `agents` list equals the registry's agents in the UI order
   claude-code, opencode, antigravity, qwen, with the labels `Claude Code`,
   `OpenCode`, `Antigravity` and `Qwen` (the `agent-set` invariant).
-- Each `version` matches `^[0-9]+\.[0-9]+\.[0-9]+$`, equals the tag in its entry's
-  `source.url`, and equals `pluginVersion` in the plugin's footprint file whenever
-  one exists (measured equal for all 16 today).
+- Each `version` matches `^[0-9]+\.[0-9]+\.[0-9]+$` and equals the tag in its entry's
+  `source.url`. (This check also compared it with `pluginVersion` in the footprint
+  file until 2026-11-02, when that stamp was removed; see
+  `docs/specs/2026-11-02-generated-file-conflicts.md`.)
 - `readme` equals the entry's `homepage`, and every URL in `readme` and inside
   `install[].command` starts with `https://github.com/ckir/aiplugins/` or
   `https://raw.githubusercontent.com/ckir/aiplugins/` (the OpenCode `INSTALL.md`
