@@ -37,13 +37,13 @@ All citations below were read against `origin/main` at 1c32d39's parent on 2026-
 - Modify: `tools/plugin-footprint/src/main.rs` (import at `:15`, call at `:173-180`)
 - Modify: `tools/plugin-footprint/src/manifest.rs` (delete `plugin_version`, `:279-301`, with its doc comment)
 - Delete: `tools/plugin-footprint/tests/version_source.rs` (it tests only `plugin_version`)
-- Modify: `tools/plugin-footprint/tests/document.rs` (every `build(` call, 15 sites)
+- Modify: `tools/plugin-footprint/tests/document.rs` (every `build(` call, 14 sites)
 - Modify: `tools/plugin-footprint/tests/gate.rs` (one new test)
 
 **Interfaces:**
 - Produces: `pub fn build(plugin: &str, plugin_dir: &Path, tree: Tree, outcome: &Outcome, files: &FileSources) -> Document`. The `plugin_version: Option<&str>` parameter is gone. `Document` has no `plugin_version` field.
 
-**Step 0 (state check):** open the files above; confirm `build` currently takes `plugin_version: Option<&str>` as its fourth parameter, that `plugin_version` in `manifest.rs` has no other caller (`grep -rn plugin_version tools/` shows only `main.rs`, `document.rs`, `manifest.rs`, `tests/version_source.rs`), and that `tests/document.rs` has 15 `build(` calls. If any differs, STOP and report `STATE_MISMATCH: <what>`.
+**Step 0 (state check):** open the files above; confirm `build` currently takes `plugin_version: Option<&str>` as its fourth parameter, that `plugin_version` in `manifest.rs` has no other caller (`grep -rn plugin_version tools/` shows only `main.rs`, `document.rs`, `manifest.rs`, `tests/version_source.rs`), and that `tests/document.rs` has 14 `build(` calls. If any differs, STOP and report `STATE_MISMATCH: <what>`.
 
 - [ ] **Step 1: Write the failing tests.**
   - In `tests/document.rs`, add `a_document_carries_no_version_stamp`: build with the new five-argument signature using `ok_outcome()` and `FileSources::default()`, serialise with `serde_json::to_value`, assert `value.get("pluginVersion").is_none()`.
@@ -80,14 +80,22 @@ All citations below were read against `origin/main` at 1c32d39's parent on 2026-
 - [ ] **Step 3: Commit.** `git add .github/workflows/release-refresh.yml && git commit -m "ci(release-refresh): stop regenerating footprints on the release branch"`.
 - [ ] **Step 4: After merge (owner-visible, not part of the PR):** open the next release-please PR and confirm its CI is green with no `chore: refresh derived files` commit touching `docs/footprints/`. If the freshness check fails there, restore the footprint step and report.
 
-### Task 4: GATED on PR #118 merging: drop the stamp check from `check-site.sh`
+### Task 4: Drop the stamp check from `check-site.sh` (unblocked: #118 merged as dbfa5bd)
 
-`scripts/check-site.sh` and `tests/site/` are not on `main` yet; they live on `feat/pages-site` (PR #118). Per plan-versus-spec discipline this task has no line-level steps. When #118 is merged, re-read the file and write the steps then. Intent and contracts only:
+**Files:**
+- Modify: `scripts/check-site.sh` (comment at `:511`; the block at `:587-590`)
+- Modify: the five fixtures `tests/site/root/docs/footprints/{alpha-mcp-agy,alpha-mcp-cc,alpha-mcp-opencode,repo-user-guide-agy,repo-user-guide-cc}.json`
 
-- Remove the block that reads `.pluginVersion` from `$fpfile` and compares it to `$version` (at `feat/pages-site@855376a` it is the `pv=$(jqr '.pluginVersion // ""' "$fpfile")` lines, near `:588`), and the `version (pluginVersion)` mention in the comment near `:511`. The `-v<tag>` comparison against the marketplace `source.url` stays: it is what ties the manifest version to the release.
-- Strip `pluginVersion` from the five fixtures under `tests/site/root/docs/footprints/` so they match the new document shape.
-- Keep the site gate's own test or mutation harness green; find it by reading `scripts/check-site.sh` and `tests/site/` at that time.
-- If #118 has not merged before Tasks 1-3 are ready, ship 1-3 and rebase #118 onto them; its check would then fail on every footprint file, so #118 must carry this task itself.
+**Interfaces:**
+- Consumes: Task 2's new document shape (no `pluginVersion`).
+
+**Step 0 (state check):** `sed -n 583,591p scripts/check-site.sh` must show the `if [ -f "$fpfile" ]; then` block reading `.pluginVersion` and comparing it to `$version`; `grep -c pluginVersion tests/site/root/docs/footprints/*.json` must list exactly those five files. Otherwise STOP with `STATE_MISMATCH: <what>`.
+
+- [ ] **Step 1: Baseline.** `just site-check` exits 0 and the selftest line reads 42 cases (`check-site.sh:140` pins `case_n` to 42).
+- [ ] **Step 2: Edit.** Delete the four lines `if [ -f "$fpfile" ]; then` through its `fi` (:587-590). Keep the `-v<tag>` comparison above it. Change the comment at `:511` to `# footprint-null, tier-totals, budget`. Check `$fpfile` is still used elsewhere in the function (`grep -n fpfile scripts/check-site.sh`); if it is now unused, delete its assignment too and say so.
+- [ ] **Step 3: Fixtures.** For each of the five fixtures remove the `"pluginVersion":"..."` member, keeping the file otherwise byte-identical and on one line (`jq -cS 'del(.pluginVersion)'` reproduces the committed key order; compare `jq -cS .` of the old file first).
+- [ ] **Step 4: Verify.** `just site-check` exits 0 with the selftest still at 42 cases and the `mutate version` case still refusing (the retained tag check catches it). `grep -rn pluginVersion scripts tests` finds nothing.
+- [ ] **Step 5: Commit.** `git add scripts/check-site.sh tests/site && git commit -m "ci(site): stop comparing the removed pluginVersion stamp"`.
 
 ### Task 5: Record the change in the footprint spec
 
@@ -99,7 +107,7 @@ All citations below were read against `origin/main` at 1c32d39's parent on 2026-
 
 ## Dispatch notes
 
-- Task 1 is Sonnet work (a signature change with tests written first). The 15 mechanical call-site edits in `tests/document.rs` may go to Haiku. Tasks 2-3 are run-and-report plus a bounded workflow edit: Sonnet. Task 4 waits; Task 5 is Haiku.
+- Task 1 is Sonnet work (a signature change with tests written first). The 14 mechanical call-site edits in `tests/document.rs` may go to Haiku. Tasks 2-3 are run-and-report plus a bounded workflow edit: Sonnet. Task 4 is Haiku-sized (two bounded edits) but run it as Sonnet because the oracle is `just site-check`; Task 5 is Haiku.
 - Every implementer dispatch needs the standing clauses: Step 0 state check, shape-divergence stop, named oracle (above), complete enumerations, the exact commands above, "tests are already written, implement until they pass", the `## Anomalies noticed` clause and the `FILES` clause listing only the paths under that task.
 - After Task 5: AGY-CAPSTONE on the committed range, then AGY-TEST-AUDIT, unless the owner waives (the waiver so far covered drafting the spec only).
 
