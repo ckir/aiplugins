@@ -47,3 +47,11 @@ Spec: `docs/specs/2026-10-18-opencode-ctl-mcp-design.md`. After execution comes 
 ## mlc scans untracked scratch and fails local link checks
 
 **Status:** OPEN 2026-11-02 - `just links` and the lefthook pre-push `mlc` (Justfile:51, lefthook.yml:22) do not ignore the git-ignored `.clavity/`, so `.clavity/scratch/opencode-ctl-plan-panel/round11-agy.md` and `round18-agy.md` (66 `file://` hits in round11 alone) fail the check locally. Add `./.clavity` to the `--ignore-path` list in both places.
+
+## release-refresh: pass github.head_ref through env, not inline
+
+**Status:** OPEN 2026-11-03 - `.github/workflows/release-refresh.yml:58` runs `git push origin HEAD:${{ github.head_ref }}` inline, which actionlint flags as potentially untrusted input. The job `if:` guard pins `head_ref` to `release-please--branches--main`, so it is likely unexploitable today, but the flagged pattern is one guard edit away from real. Pass it through an `env:` variable and quote it.
+
+## release-please: a release PR goes stale behind main and is not rebuilt
+
+**Status:** OPEN 2026-11-03 - release-please re-pushes its branch only when the PR body changes (v17.6.0 `src/manifest.ts:1094-1100`), so a release PR stays based on an old main and merges conflict with feature branches that touched the same generated files; a conflicted PR gets no `pull_request` workflows, so `release-refresh` cannot repair it. Measured on #129 (2026-11-02): fixed by `gh pr update-branch`, which needs the owner's say-so before a release merge. The footprint stamp removal (#133) removed the main conflict source; the merge-flow spec `docs/specs/2026-11-02-merge-flow.md` (M2/M3) covers the rest. Decide whether the leftover cases warrant automation there.
