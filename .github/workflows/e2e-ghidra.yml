@@ -23,6 +23,11 @@ on:
     # to catch a Ghidra release or a runner-image change breaking the boot path.
     - cron: "0 4 * * 1"
 
+# Least privilege by default: every job here only reads the repository. A job that
+# needs more (none today) must say so itself, as site-stage does for its own scope.
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   GHIDRA_VERSION: "12.1.2"
