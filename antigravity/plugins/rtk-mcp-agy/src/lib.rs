@@ -17,12 +17,35 @@
 use serde::Serialize;
 use serde_json::{json, Value};
 
+// The two names below are macros rather than plain `const`s only so that
+// `concat!` can join them at compile time; `concat!` accepts literals, not consts.
+/// The server key registered in `mcp_config.json`.
+macro_rules! server_name {
+    () => {
+        "rtkmcp"
+    };
+}
+/// The plugin ID in `plugin.json`, and the plugin's directory name in Antigravity.
+macro_rules! plugin_name {
+    () => {
+        "rtk-mcp-agy"
+    };
+}
+
 /// The server name an MCP client sees, and the key `mcp_config.json` registers.
-pub const SERVER_NAME: &str = "rtkmcp";
+pub const SERVER_NAME: &str = server_name!();
 /// The plugin directory / ID in Antigravity.
-pub const PLUGIN_NAME: &str = "rtk-mcp-agy";
+pub const PLUGIN_NAME: &str = plugin_name!();
 /// The namespaced server name Antigravity assigns to this plugin's MCP server.
-pub const AGY_SERVER_NAME: &str = "rtk-mcp-agy_rtkmcp";
+///
+/// Antigravity exposes a plugin's MCP server as `<plugin>_<server>`. Measured
+/// 2026-11-03 on a live Antigravity session: the server appears in its
+/// `<mcp_servers>` list as `rtk-mcp-agy_rtkmcp`, and the tool manifest lands on
+/// disk at `~/.gemini/antigravity-cli/mcp/rtk-mcp-agy_rtkmcp/rtk_run.json`.
+/// The e2e test `preinvocation_names_the_registered_server_and_tool` rebuilds
+/// this name from `plugin.json` and `mcp_config.json`, so it cannot drift here
+/// without a test going red.
+pub const AGY_SERVER_NAME: &str = concat!(plugin_name!(), "_", server_name!());
 /// Run an rtk-optimized command.
 pub const TOOL_NAME: &str = "rtk_run";
 /// Report rtk token savings.
