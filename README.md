@@ -2,6 +2,8 @@
 
 Welcome to the **AI Plugins Marketplace**, a monorepo designed to host, manage, and distribute plugins for various autonomous AI agents.
 
+Browse the plugin catalog: <https://ckir.github.io/aiplugins/>
+
 ## Supported Agents (Initial)
 
 Initially, this marketplace provides and supports plugins for the following agents:

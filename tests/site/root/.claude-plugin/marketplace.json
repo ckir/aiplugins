@@ -1,0 +1,46 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "fixture-claude-code",
+  "owner": {
+    "name": "Fixture Owner"
+  },
+  "metadata": {
+    "description": "Fixture claude-code"
+  },
+  "plugins": [
+    {
+      "name": "alpha-mcp-cc",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/alpha-mcp-cc-v0.1.0/alpha-mcp-cc-plugin.zip"
+      },
+      "description": "Fixture plugin alpha-mcp-cc",
+      "author": {
+        "name": "Fixture Owner"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/claude-code/plugins/alpha-mcp-cc",
+      "license": "MIT",
+      "category": "development",
+      "keywords": [
+        "fixture"
+      ]
+    },
+    {
+      "name": "repo-user-guide",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/repo-user-guide-cc-v0.1.0/repo-user-guide-cc-plugin.zip"
+      },
+      "description": "Fixture plugin repo-user-guide-cc",
+      "author": {
+        "name": "Fixture Owner"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/claude-code/plugins/repo-user-guide-cc",
+      "license": "MIT",
+      "category": "development",
+      "keywords": [
+        "fixture"
+      ]
+    }
+  ]
+}

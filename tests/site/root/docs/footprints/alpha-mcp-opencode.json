@@ -1,0 +1,1 @@
+{"agent":"opencode","plugin":"alpha-mcp-opencode","pluginVersion":"0.2.3","probe":{"binary":"","promptCount":0,"status":"no_server","toolCount":0},"schemaVersion":1,"tiers":{"invocation":{"bytes":0,"sources":[]},"resident":{"bytes":0,"sources":[]},"setup":{"bytes":999,"sources":[{"bytes":999,"id":"alpha-mcp-opencode","kind":"plugin_source"}]}},"tree":"dev"}

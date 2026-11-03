@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/ckir/aiplugins/compare/aiplugins-devtools-qwen-v0.2.0...aiplugins-devtools-qwen-v0.3.0) (2026-11-02)
+
+
+### Features
+
+* **devtools:** add the human-friendly Markdown rewriter skill ([f1246f1](https://github.com/ckir/aiplugins/commit/f1246f1ae414b5cb762924fa8dd4f7f035898397))
+* **devtools:** add the human-friendly skill and its OpenCode command ([71faa85](https://github.com/ckir/aiplugins/commit/71faa85ee670a0b31c872aeb6599d332e5a1bd06))
+
+
+### Bug Fixes
+
+* **devtools:** make plain requests run the default rewrite in human-friendly ([363cd31](https://github.com/ckir/aiplugins/commit/363cd3107226ec6edd1d95fc7cda6dcc5da6b4a7))
+
 ## [0.2.0](https://github.com/ckir/aiplugins/compare/aiplugins-devtools-qwen-v0.1.0...aiplugins-devtools-qwen-v0.2.0) (2026-10-22)
 
 
