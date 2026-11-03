@@ -56,7 +56,7 @@ When Antigravity starts its execution loop, the `PreInvocation` hook fires and o
 {
   "injectSteps": [
     {
-      "ephemeralMessage": "CRITICAL: Do NOT use the native `run_command` tool. You MUST use the `mcp_rtkmcp_rtk_run` tool for all shell commands to ensure token-optimized execution."
+      "ephemeralMessage": "CRITICAL: Do NOT use the native `run_command` tool. You MUST use the `call_mcp_tool` with ServerName='rtk-mcp-agy_rtkmcp' and ToolName='rtk_run' for all shell commands to ensure token-optimized execution."
     }
   ]
 }

@@ -457,9 +457,11 @@ fn preinvocation_emits_a_single_ephemeral_message() {
 #[test]
 fn preinvocation_names_the_registered_server_and_tool() {
     // This is a cross-file contract with no compiler behind it: the message
-    // tells the model to call ServerName='rtkmcp' / ToolName='rtk_run', and
-    // those names must match mcp_config.json and tools/list respectively.
-    // Rename either side alone and the hook silently points at nothing.
+    // tells the model to call ServerName='<plugin>_<server>' / ToolName='rtk_run'.
+    // Antigravity namespaces a plugin's MCP server as `<plugin.json name>_<mcp_config.json key>`
+    // (measured 2026-11-03 on a live session), so the expected name is rebuilt
+    // here from those two files, and the tool name from tools/list. Rename any
+    // side alone and the hook silently points at nothing.
     let out = Command::new(env!("CARGO_BIN_EXE_rtk-hook-preinvocation"))
         .output()
         .expect("run hook");
@@ -481,7 +483,13 @@ fn preinvocation_names_the_registered_server_and_tool() {
         .next()
         .expect("one registered server")
         .clone();
-    let namespaced = format!("rtk-mcp-agy_{registered}");
+    let plugin: Value = serde_json::from_str(
+        &std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/plugin.json"))
+            .expect("read plugin.json"),
+    )
+    .expect("valid plugin.json");
+    let plugin_name = plugin["name"].as_str().expect("plugin.json name");
+    let namespaced = format!("{plugin_name}_{registered}");
 
     assert!(
         message.contains(&format!("ServerName='{namespaced}'")),
