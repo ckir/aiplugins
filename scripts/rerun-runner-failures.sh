@@ -22,7 +22,16 @@ MARKER='not acquired by Runner'
 
 # decide RUN_ID: print "rerun" and re-run the failed jobs, or print "leave" why.
 decide() {
-    local run=$1 repo=${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is not set} ids id msgs total=0 acq=0
+    local run=$1 repo=${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is not set} ids id msgs attempt total=0 acq=0
+    # The workflow only fires for attempt 1, but the jobs endpoint below answers
+    # for the LATEST attempt. If anyone re-ran the run between the event and now,
+    # that is not the attempt that triggered us, and re-running again would be a
+    # second retry. Re-read the attempt and leave a run that has moved on.
+    attempt=$(gh api "repos/$repo/actions/runs/$run" | jq -r '.run_attempt')
+    if [ "$attempt" != "1" ]; then
+        echo "leave: run $run is already on attempt $attempt; only attempt 1 is retried"
+        return 0
+    fi
     ids=$(gh api "repos/$repo/actions/runs/$run/jobs?per_page=100" |
         jq -r '.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled") | .id')
     for id in $ids; do
@@ -52,12 +61,13 @@ selftest() {
     }
 
     # A stub `gh` that serves canned JSON for the two read endpoints and records
-    # every `run rerun` call. Scenario files in $tmp/case: jobs.json,
+    # every `run rerun` call. Scenario files in $tmp/case: run.json, jobs.json,
     # annotations-<id>.json (a missing one makes the stub fail like a 500).
     mkdir -p "$tmp/bin" "$tmp/case"
     cat > "$tmp/bin/gh" <<'STUB'
 #!/usr/bin/env bash
 case "$*" in
+    "api repos/o/r/actions/runs/7") cat "$CASE/run.json" || exit 1 ;;
     "api repos/o/r/actions/runs/7/jobs"*) cat "$CASE/jobs.json" ;;
     "api repos/o/r/check-runs/"*"/annotations"*)
         id=${2#repos/o/r/check-runs/}; id=${id%%/*}
@@ -74,6 +84,7 @@ STUB
         shift 3
         rm -rf "${tmp:?}/case"; mkdir -p "$tmp/case"
         printf '%s' "$jobs" > "$tmp/case/jobs.json"
+        printf '{"run_attempt":%s}' "${ATTEMPT:-1}" > "$tmp/case/run.json"
         for pair in "$@"; do
             printf '[{"message":"%s"}]' "${pair#*=}" > "$tmp/case/annotations-${pair%%=*}.json"
         done
@@ -98,6 +109,7 @@ STUB
     scenario "two acquisition failures are re-run together" rerun \
         '{"jobs":[{"id":101,"conclusion":"cancelled"},{"id":103,"conclusion":"cancelled"}]}' "101=$acq" "103=$acq"
     scenario "a run with nothing failed is left alone" leave '{"jobs":[{"id":101,"conclusion":"success"}]}'
+    ATTEMPT=2 scenario "a run already re-run by someone else is not retried a second time" leave "$cancelled" "101=$acq"
     scenario "an unreadable annotation list re-runs nothing and fails loudly" error "$cancelled"
     echo "all rerun-runner-failures self-tests passed"
 }
