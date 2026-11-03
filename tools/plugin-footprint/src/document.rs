@@ -51,8 +51,6 @@ pub struct Document {
     /// contract is already multi-agent when Qwen arrives.
     pub agent: &'static str,
     pub tree: Tree,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub plugin_version: Option<String>,
     pub probe: ProbeReport,
     /// Absent unless the probe succeeded.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -135,7 +133,6 @@ pub fn build(
     plugin: &str,
     plugin_dir: &Path,
     tree: Tree,
-    plugin_version: Option<&str>,
     outcome: &Outcome,
     files: &FileSources,
 ) -> Document {
@@ -163,7 +160,6 @@ pub fn build(
         plugin: plugin.to_string(),
         agent: "claude-code",
         tree,
-        plugin_version: plugin_version.map(str::to_string),
         probe: ProbeReport {
             status,
             detail,
