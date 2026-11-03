@@ -11,12 +11,12 @@ Because Antigravity's `PreToolUse` hook schema lacks a way to modify tool argume
 <!-- footprint:begin -->
 ### Context footprint
 
-Installing this plugin adds **≥ 2,988 bytes** to every request, for the whole session. A further **≥ 1,806 bytes** load only when one of its skills or agents is actually invoked.
+Installing this plugin adds **≥ 2,988 bytes** to every request, for the whole session. A further **≥ 1,830 bytes** load only when one of its skills or agents is actually invoked.
 
 | Tier | Bytes | When you pay it |
 |---|---|---|
 | Resident | ≥ 2,988 | Every request, for the whole session |
-| Invocation | ≥ 1,806 | Only when that skill or agent runs |
+| Invocation | ≥ 1,830 | Only when that skill or agent runs |
 
 **Bytes, not tokens.** This is the exact serialised size of what the host loads, measured by probing the plugin's own MCP server and reading its skill and agent frontmatter. It is not a token count and does not convert to one at a fixed rate — treat it as a figure you can compare between plugins, not as a context budget.
 
