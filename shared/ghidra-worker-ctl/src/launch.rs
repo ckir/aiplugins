@@ -43,6 +43,9 @@ impl WorkerProcess {
         #[cfg(unix)]
         let mut guard = JobObject::new()?;
 
+        #[cfg(not(any(windows, unix)))]
+        let mut guard = JobObject::new()?;
+
         // On Unix, configure the command to create a new process group before spawning.
         #[cfg(unix)]
         guard.configure_command(&mut cmd);
@@ -59,6 +62,9 @@ impl WorkerProcess {
         // On Unix, record the child PID for process group cleanup on drop.
         #[cfg(unix)]
         guard.assign(&child);
+
+        #[cfg(not(any(windows, unix)))]
+        let _ = guard.assign(&child);
 
         let mut drains = Vec::new();
         if let Some(out) = child.stdout.take() {

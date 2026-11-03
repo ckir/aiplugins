@@ -95,9 +95,6 @@ allow = [
     "PolyForm-Noncommercial-1.0.0",
     "Unicode-3.0",
     "Unlicense",
-    "BSD-2-Clause",
-    "BSD-3-Clause",
-    "ISC",
     "Zlib",
 ]
 # The confidence threshold for detecting a license from license text.

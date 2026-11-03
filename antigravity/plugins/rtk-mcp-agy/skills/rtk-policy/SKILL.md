@@ -6,7 +6,7 @@ description: Explains how rtk (Rust Token Killer) rewrites shell commands in Ant
 # Working with rtk in Antigravity
 
 `rtk` (Rust Token Killer) rewrites shell commands into token-cheaper equivalents.
-In Antigravity, the `PreInvocation` hook directs shell operations to `rtk_run` on the `rtkmcp` server.
+In Antigravity, the `PreInvocation` hook directs shell operations to `rtk_run` on the `rtk-mcp-agy_rtkmcp` server.
 
 ## The one rule that matters
 

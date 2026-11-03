@@ -125,9 +125,9 @@ done
 # (`RTK_CC_DISABLE`, `/rtk-mcp-cc:gain`, `${CLAUDE_PLUGIN_ROOT}`, `pwsh`-only
 # commands) that are wrong on the OpenCode host — so the opencode variants are
 # deliberately host-ported docs now, not copies, and must NOT be cmp'd.
+# shellcheck disable=SC2043
 for pair in \
-    "claude-code/plugins/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md:opencode/plugins/re-ghidra-mcp-opencode/skills/ghidra-re-driver/SKILL.md" \
-; do
+    "claude-code/plugins/re-ghidra-mcp-cc/skills/ghidra-re-driver/SKILL.md:opencode/plugins/re-ghidra-mcp-opencode/skills/ghidra-re-driver/SKILL.md"; do
     src=${pair%%:*}; dst=${pair#*:}
     checked=$((checked + 1))
     if [ ! -f "$dst" ]; then

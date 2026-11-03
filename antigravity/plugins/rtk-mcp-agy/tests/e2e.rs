@@ -481,10 +481,11 @@ fn preinvocation_names_the_registered_server_and_tool() {
         .next()
         .expect("one registered server")
         .clone();
+    let namespaced = format!("rtk-mcp-agy_{registered}");
 
     assert!(
-        message.contains(&format!("ServerName='{registered}'")),
-        "hook must name the registered server {registered:?}: {message}"
+        message.contains(&format!("ServerName='{namespaced}'")),
+        "hook must name the namespaced server {namespaced:?}: {message}"
     );
 
     let tool = request(json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" }))["result"]

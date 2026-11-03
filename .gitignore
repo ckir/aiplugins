@@ -25,6 +25,9 @@ target
 # Git-ignored working state, never committed — git history is the record.
 .superpowers/
 
+# Clavity session scratch and pairing endpoints.
+.clavity/
+
 # Node modules installed by bun/npm. The pre-commit typos hook globs `*`,
 # and an unignored node_modules/ makes every commit scan third-party code
 # (measured: 173s failure on untracked deps). Per-plugin installs land in

@@ -18,7 +18,7 @@ Show what rtk has saved, and what it is still leaving on the table.
 
 ## Steps
 
-1. **Summary.** Call the `rtk_gain` tool from this plugin's `rtkmcp` MCP server. Pass `history: true` when the user asked for it, and `project_only: true` unless they asked for `all`.
+1. **Summary.** Call the `rtk_gain` tool from this plugin's `rtk-mcp-agy_rtkmcp` MCP server. Pass `history: true` when the user asked for it, and `project_only: true` unless they asked for `all`.
    If that tool is unavailable, fall back to running `rtk gain` through the shell.
 
 2. **Missed savings.** Only when the user asked for `discover`, call `rtk_discover`. Pass `all_projects: true` for `all`.
