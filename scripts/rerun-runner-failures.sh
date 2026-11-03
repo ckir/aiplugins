@@ -66,13 +66,14 @@ selftest() {
     mkdir -p "$tmp/bin" "$tmp/case"
     cat > "$tmp/bin/gh" <<'STUB'
 #!/usr/bin/env bash
+echo "$*" >> "$CASE/calls"
 case "$*" in
     "api repos/o/r/actions/runs/7") cat "$CASE/run.json" || exit 1 ;;
-    "api repos/o/r/actions/runs/7/jobs"*) cat "$CASE/jobs.json" ;;
-    "api repos/o/r/check-runs/"*"/annotations"*)
+    "api repos/o/r/actions/runs/7/jobs?per_page=100") cat "$CASE/jobs.json" ;;
+    "api repos/o/r/check-runs/"*"/annotations?per_page=100")
         id=${2#repos/o/r/check-runs/}; id=${id%%/*}
         cat "$CASE/annotations-$id.json" || exit 1 ;;
-    "run rerun "*) echo "$*" >> "$CASE/reruns" ;;
+    "run rerun "*) echo "$*" >> "$CASE/reruns"; [ ! -f "$CASE/rerun-fails" ] || exit 1 ;;
     *) echo "stub gh: unexpected call: $*" >&2; exit 2 ;;
 esac
 STUB
@@ -86,14 +87,22 @@ STUB
         printf '%s' "$jobs" > "$tmp/case/jobs.json"
         printf '{"run_attempt":%s}' "${ATTEMPT:-1}" > "$tmp/case/run.json"
         for pair in "$@"; do
-            printf '[{"message":"%s"}]' "${pair#*=}" > "$tmp/case/annotations-${pair%%=*}.json"
+            local body=${pair#*=} json="" m
+            while [ -n "$body" ]; do
+                m=${body%%||*}
+                json="${json:+$json,}{\"message\":\"$m\"}"
+                if [ "$m" = "$body" ]; then body=""; else body=${body#*||}; fi
+            done
+            printf '[%s]' "$json" > "$tmp/case/annotations-${pair%%=*}.json"
         done
+        [ -z "${RERUN_FAILS:-}" ] || : > "$tmp/case/rerun-fails"
         out=$(PATH="$tmp/bin:$PATH" CASE="$tmp/case" GITHUB_REPOSITORY=o/r bash "$me" 7 2>&1) || rc=$?
         ok=1
         case $expect in
             rerun) if [ "$rc" -eq 0 ] && [ "$(cat "$tmp/case/reruns" 2>/dev/null)" = "run rerun 7 --failed --repo o/r" ]; then ok=0; fi ;;
             leave) if [ "$rc" -eq 0 ] && [ ! -f "$tmp/case/reruns" ]; then ok=0; fi ;;
             error) if [ "$rc" -ne 0 ] && [ ! -f "$tmp/case/reruns" ]; then ok=0; fi ;;
+            rerun-fails) if [ "$rc" -ne 0 ] && [ "$(cat "$tmp/case/reruns" 2>/dev/null)" = "run rerun 7 --failed --repo o/r" ]; then ok=0; fi ;;
         esac
         check "$name" "$ok" "expected $expect; got rc=$rc reruns=$(cat "$tmp/case/reruns" 2>/dev/null) out=$out"
     }
@@ -111,6 +120,27 @@ STUB
     scenario "a run with nothing failed is left alone" leave '{"jobs":[{"id":101,"conclusion":"success"}]}'
     ATTEMPT=2 scenario "a run already re-run by someone else is not retried a second time" leave "$cancelled" "101=$acq"
     scenario "an unreadable annotation list re-runs nothing and fails loudly" error "$cancelled"
+
+    # Real jobs carry a failure annotation plus capacity notices, in any order.
+    local notice='Due to capacity constraints, jobs targeting macOS arm64 runners may experience longer queue times'
+    scenario "a notice annotation before the acquisition message still counts" rerun "$cancelled" "101=$notice||$acq"
+    scenario "the acquisition message on the last of three annotations still counts" rerun "$cancelled" "101=$notice||$notice||$acq"
+    scenario "capacity notices alone are not an acquisition failure" leave "$cancelled" "101=$notice||$notice"
+    RERUN_FAILS=1 scenario "a failing gh run rerun makes the script fail, not report success" rerun-fails "$cancelled" "101=$acq"
+
+    # The run id comes from an event payload and goes straight into API paths.
+    argcase() { # argcase NAME ARGS... : must exit 2 and make no gh call at all
+        local name=$1 rc=0
+        shift
+        rm -rf "${tmp:?}/case"; mkdir -p "$tmp/case"
+        PATH="$tmp/bin:$PATH" CASE="$tmp/case" GITHUB_REPOSITORY=o/r bash "$me" "$@" > /dev/null 2>&1 || rc=$?
+        if [ "$rc" -eq 2 ] && [ ! -f "$tmp/case/calls" ]; then rc=0; else rc=1; fi
+        check "$name" "$rc" "expected exit 2 and no gh call for args: $*; calls: $(cat "$tmp/case/calls" 2>/dev/null)"
+    }
+    argcase "a non-numeric run id is refused before any API call" abc
+    argcase "a run id carrying a path or shell fragment is refused" '7/../8'
+    argcase "an empty run id is refused" ''
+    argcase "no run id at all prints usage" 
     echo "all rerun-runner-failures self-tests passed"
 }
 
@@ -119,5 +149,5 @@ if [ "${1:-}" = "--selftest" ]; then
     exit $?
 fi
 [ $# -eq 1 ] || { echo "usage: $0 RUN_ID | --selftest" >&2; exit 2; }
-case $1 in *[!0-9]*) echo "rerun-runner-failures: run id must be numeric" >&2; exit 2 ;; esac
+case $1 in ""|*[!0-9]*) echo "rerun-runner-failures: run id must be numeric" >&2; exit 2 ;; esac
 decide "$1"
