@@ -392,9 +392,35 @@ public class GhidraMcpWorker extends GhidraScript {
     // Filter match (spec §7; M1b Task-1 decision B): substring-contains by DEFAULT (linear, no
     // backtracking). Opt in to regex with regex=true -> java.util.regex, but cap the pattern length as a
     // ReDoS guard and reject an uncompilable pattern with INVALID_PARAMS. A null/empty pattern matches
-    // everything. Any residual catastrophic backtracking is bounded by the host's rpc-deadline + the
-    // poison/transparent-respawn engine (operator==attacker ⇒ self-DoS). RE2J/vendoring deferred.
+    // everything. Backtracking is bounded by a work budget (MAX_FILTER_REGEX_WORK, below) so a
+    // pathological pattern fails fast with INVALID_PARAMS instead of burning the host's whole
+    // rpc-deadline; the deadline + poison/transparent-respawn engine stay as the backstop. RE2J/vendoring
+    // deferred.
     private static final int MAX_FILTER_PATTERN_LEN = 200;
+    // Upper bound on character reads for ONE regex match attempt. A backtracking matcher re-reads the
+    // same characters, so reads are its work. Symbol/function names are short, so a legitimate pattern
+    // needs a few thousand reads at most; a catastrophic one (e.g. "(a+)+$" on a long "aaa...b") passes
+    // this in milliseconds.
+    private static final long MAX_FILTER_REGEX_WORK = 2_000_000L;
+
+    private static final class RegexBudgetExceeded extends RuntimeException {
+        RegexBudgetExceeded() { super(null, null, false, false); } // control flow only: no stack trace
+    }
+
+    // A read-counting view of the text being matched. java.util.regex reads its input only through
+    // this interface, so counting charAt calls bounds the work without changing what matches.
+    private static final class BudgetedCharSequence implements CharSequence {
+        private final CharSequence inner;
+        private long remaining;
+        BudgetedCharSequence(CharSequence inner, long budget) { this.inner = inner; this.remaining = budget; }
+        @Override public int length() { return inner.length(); }
+        @Override public char charAt(int index) {
+            if (--remaining < 0) throw new RegexBudgetExceeded();
+            return inner.charAt(index);
+        }
+        @Override public CharSequence subSequence(int start, int end) { return inner.subSequence(start, end); }
+        @Override public String toString() { return inner.toString(); }
+    }
     private final java.util.Map<String, java.util.regex.Pattern> filterCache = new java.util.HashMap<>();
     private boolean matchesFilter(String pattern, boolean regex, String text) {
         if (pattern == null || pattern.isEmpty()) return true;
@@ -410,7 +436,12 @@ public class GhidraMcpWorker extends GhidraScript {
             }
             filterCache.put(pattern, p);
         }
-        return p.matcher(hay).find();
+        try {
+            return p.matcher(new BudgetedCharSequence(hay, MAX_FILTER_REGEX_WORK)).find();
+        } catch (RegexBudgetExceeded tooCostly) {
+            throw new WorkerError("INVALID_PARAMS",
+                "filter regex is too expensive to evaluate (catastrophic backtracking?); simplify the pattern or use a substring filter");
+        }
     }
 
     // Read {offset>=0, limit>=0} with defaults, for the limit+1 has_more pagination contract (spec §3.0):

@@ -59,6 +59,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.event.workflow_run.head_branch }}
+          persist-credentials: false
 
       # Only tags cut after this workflow landed carry the bundling script, and
       # "No such file or directory" three steps later is a poor way to learn it.
@@ -77,20 +78,28 @@ jobs:
           name="${TAG%-v*}"
           jq -e --arg n "$name" '.plugins[] | select(.name == $n)' .agy-plugin/marketplace.json > /dev/null \
             || { echo "$name from tag $TAG is not in .agy-plugin/marketplace.json"; exit 1; }
+          # The name becomes shell input in later steps. A tag is attacker-shaped data,
+          # so accept only what a package name can be, before it reaches GITHUB_OUTPUT.
+          [[ "$name" =~ ^[a-z0-9][a-z0-9._-]*$ ]] \
+            || { echo "refusing tag-derived name with unexpected characters"; exit 1; }
           echo "names=$name" >> "$GITHUB_OUTPUT"
 
       - name: Download per-target archives from the release
+        env:
+          NAMES: ${{ steps.plugins.outputs.names }}
         run: |
           mkdir -p assets
-          for name in ${{ steps.plugins.outputs.names }}; do
+          for name in $NAMES; do
             gh release download "$TAG" -D assets \
               -p "$name-*.tar.xz" -p "$name-*.zip" --clobber
           done
           ls -la assets
 
       - name: Assemble plugin bundles
+        env:
+          NAMES: ${{ steps.plugins.outputs.names }}
         run: |
-          for name in ${{ steps.plugins.outputs.names }}; do
+          for name in $NAMES; do
             bash scripts/bundle-agy-plugin.sh "$name" assets bundles
           done
 
@@ -117,6 +126,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.event.workflow_run.head_branch }}
+          persist-credentials: false
 
       - name: Download the published bundles
         shell: bash
