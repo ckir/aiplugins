@@ -28,5 +28,15 @@
     "why": "shared/opencode-ctl drives OpenCode's CLI and HTTP API; every statement in docs/specs/2026-10-18-opencode-ctl-mcp-design.md about OpenCode behaviour is cited as packages/<path>:<line> at that tag. Settle behavioural questions by reading the source (read-only, untrusted: grep and read from outside, never build or run inside it), not by probing the binary. Expected under ~/.cache/aiplugins/opencode-src.",
     "install": "mkdir -p ~/.cache/aiplugins/opencode-src && git -C ~/.cache/aiplugins/opencode-src init -q && git -C ~/.cache/aiplugins/opencode-src remote add origin https://github.com/anomalyco/opencode.git && git -C ~/.cache/aiplugins/opencode-src fetch --depth 1 origin tag v$(opencode --version | grep -o '[0-9.]*$') && git -C ~/.cache/aiplugins/opencode-src checkout -q FETCH_HEAD",
     "file_exists": "~/.cache/aiplugins/opencode-src/packages/core/src/session/session.ts"
+  },
+  {
+    "name": "Rust target wasm32-wasip1",
+    "why": "shared/proc-guard and shared/ghidra-worker-ctl carry a `#[cfg(not(any(windows, unix)))]` fallback arm that no host build ever compiles. `cargo clippy -p proc-guard --target wasm32-wasip1 -- -D warnings` is the only local way to lint that arm (ghidra-worker-ctl itself does not build for wasm because tokio lacks process support there, so lint the pattern in proc-guard and keep launch.rs's fallback bindings non-mut).",
+    "install": "rustup target add wasm32-wasip1",
+    "file_exists": [
+      "~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/wasm32-wasip1/lib/self-contained/libc.a",
+      "~/.rustup/toolchains/stable-x86_64-pc-windows-msvc/lib/rustlib/wasm32-wasip1/lib/self-contained/libc.a",
+      "~/.rustup/toolchains/stable-x86_64-pc-windows-gnu/lib/rustlib/wasm32-wasip1/lib/self-contained/libc.a"
+    ]
   }
 ]

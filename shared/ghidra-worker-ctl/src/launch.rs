@@ -2,6 +2,8 @@
 //! dedicated threads into the host's STDERR so ~16 KB of Ghidra log spam per run never contaminates
 //! host stdout (reserved for MCP JSON-RPC, M1). The child is wrapped in a kill-guard (Windows Job
 //! Object or Unix process group) so the whole host->shell->java.exe tree dies with the host.
+//! On targets that are neither (e.g. WASM) the guard is a no-op and that guarantee does not hold:
+//! only the direct child is killed when `WorkerProcess` is dropped.
 
 use crate::job_object::JobObject;
 use std::io::{self, BufRead, BufReader};
@@ -43,8 +45,10 @@ impl WorkerProcess {
         #[cfg(unix)]
         let mut guard = JobObject::new()?;
 
+        // Neither Windows nor Unix (e.g. WASM): proc-guard's JobObject is a no-op whose
+        // methods take `&self`, so this binding must not be `mut` or `-D warnings` fails.
         #[cfg(not(any(windows, unix)))]
-        let mut guard = JobObject::new()?;
+        let guard = JobObject::new()?;
 
         // On Unix, configure the command to create a new process group before spawning.
         #[cfg(unix)]
@@ -63,6 +67,7 @@ impl WorkerProcess {
         #[cfg(unix)]
         guard.assign(&child);
 
+        // On other targets the guard cannot track the child; `assign` always returns Ok.
         #[cfg(not(any(windows, unix)))]
         let _ = guard.assign(&child);
 

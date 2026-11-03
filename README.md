@@ -71,7 +71,7 @@ verification) and asks whether to install project-local or global first:
 | `repo-user-guide-agy` | ≥ 468 | ≥ 11,474 |
 | `repo-user-guide-cc` | ≥ 468 | ≥ 11,474 |
 | `repo-user-guide-opencode` | ≥ 468 | ≥ 11,474 |
-| `rtk-mcp-agy` | ≥ 2,988 | ≥ 1,806 |
+| `rtk-mcp-agy` | ≥ 2,988 | ≥ 1,830 |
 | `rtk-mcp-cc` | ≥ 3,690 | ≥ 6,091 |
 | `rtk-mcp-opencode` | ≥ 3,696 | ≥ 6,129 |
 | `todov2-opencode` | ≥ 0 | ≥ 0 |
