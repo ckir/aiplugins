@@ -19,6 +19,10 @@ use serde_json::{json, Value};
 
 /// The server name an MCP client sees, and the key `mcp_config.json` registers.
 pub const SERVER_NAME: &str = "rtkmcp";
+/// The plugin directory / ID in Antigravity.
+pub const PLUGIN_NAME: &str = "rtk-mcp-agy";
+/// The namespaced server name Antigravity assigns to this plugin's MCP server.
+pub const AGY_SERVER_NAME: &str = "rtk-mcp-agy_rtkmcp";
 /// Run an rtk-optimized command.
 pub const TOOL_NAME: &str = "rtk_run";
 /// Report rtk token savings.
@@ -524,7 +528,7 @@ pub fn preinvocation_payload() -> PreInvocationOutput {
         inject_steps: vec![json!({
             "ephemeralMessage": format!(
                 "CRITICAL: Do NOT use the native `run_command` tool. You MUST use the \
-                 `call_mcp_tool` with ServerName='{SERVER_NAME}' and ToolName='{TOOL_NAME}' \
+                 `call_mcp_tool` with ServerName='{AGY_SERVER_NAME}' and ToolName='{TOOL_NAME}' \
                  for all shell commands to ensure token-optimized execution."
             )
         })],
@@ -1259,7 +1263,7 @@ mod tests {
         // so this cannot drift — which is the point of asserting it.
         let message = injected_message();
         assert!(
-            message.contains(&format!("ServerName='{SERVER_NAME}'")),
+            message.contains(&format!("ServerName='{AGY_SERVER_NAME}'")),
             "got: {message}"
         );
         assert!(

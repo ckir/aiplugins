@@ -35,8 +35,6 @@ fi
 plugindir=$(cd "$1" && pwd)
 outdir=$2
 
-repo=$(cd "$(dirname "$0")/.." && pwd)
-
 for tool in jq tar unzip zip zipinfo; do
     command -v "$tool" >/dev/null 2>&1 || {
         echo "ERROR: $tool is required and not on PATH." >&2
