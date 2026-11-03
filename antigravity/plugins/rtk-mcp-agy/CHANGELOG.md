@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.9.1](https://github.com/ckir/aiplugins/compare/rtk-mcp-agy-v0.9.0...rtk-mcp-agy-v0.9.1) (2026-11-03)
+
+
+### Bug Fixes
+
+* address review of cc397ed (fallback mut, derived agy server name, stale doc) ([097f82e](https://github.com/ckir/aiplugins/commit/097f82ef1f7839734e83a267278ade0d9abfbbff))
+* resolve code review findings (agy hook naming, launch fallback, checks) ([555d0c2](https://github.com/ckir/aiplugins/commit/555d0c21fc50b5303a0c9e5b7d98461ad0c87c32))
+* resolve code review findings across agy hook, launch fallback, and checks ([b4bc818](https://github.com/ckir/aiplugins/commit/b4bc818262b2f7c1772208fb4470c748bd0338c6))
+* resolve code review findings across agy hook, launch fallback, and checks ([cc397ed](https://github.com/ckir/aiplugins/commit/cc397edd6dd2ec7f28e7200a1040df07617ee841))
+
 ## [0.9.0](https://github.com/ckir/aiplugins/compare/rtk-mcp-agy-v0.8.0...rtk-mcp-agy-v0.9.0) (2026-10-22)
 
 

@@ -8,7 +8,7 @@
   "opencode/plugins/rtk-mcp-opencode": "0.10.0",
   "opencode/plugins/re-ghidra-mcp-opencode": "0.10.0",
   "opencode/plugins/todov2-opencode": "0.6.0",
-  "antigravity/plugins/rtk-mcp-agy": "0.9.0",
+  "antigravity/plugins/rtk-mcp-agy": "0.9.1",
   "antigravity/plugins/re-ghidra-mcp-agy": "0.11.0",
   "antigravity/plugins/opencode-ctl-mcp-agy": "0.2.0",
   "opencode/plugins/opencode-ctl-mcp-opencode": "0.2.0",
