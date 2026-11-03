@@ -1482,7 +1482,10 @@ async fn wait_argv_order_desc_only_cursorless() {
     let rig = rig.env("MOCK_OPENCODE_NOW_MS", &chrono_free_now().to_string());
     let e = engine(&rig);
     let waited = e.session_wait(wait_args()).await;
-    assert!(waited.is_ok(), "session_wait must succeed: {waited:?}");
+    // Print the error only: Debug on the whole result would also dump the Ok payload.
+    if let Err(e) = &waited {
+        panic!("session_wait must succeed: {e}");
+    }
     let reads: Vec<Vec<String>> = rig
         .argvs()
         .into_iter()
@@ -1571,7 +1574,10 @@ async fn anchor_argv_type_user_limit_1() {
     let rig = Rig::new().env("MOCK_OPENCODE_NOW_MS", &chrono_free_now().to_string());
     let e = engine(&rig);
     let waited = e.session_wait(wait_args()).await;
-    assert!(waited.is_ok(), "session_wait must succeed: {waited:?}");
+    // Print the error only: Debug on the whole result would also dump the Ok payload.
+    if let Err(e) = &waited {
+        panic!("session_wait must succeed: {e}");
+    }
     let anchor = rig
         .argvs()
         .into_iter()
