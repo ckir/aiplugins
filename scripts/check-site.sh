@@ -1,0 +1,603 @@
+#!/usr/bin/env bash
+#
+# Check the storefront catalog (catalog.json) against the repository inputs.
+#
+#   bash scripts/check-site.sh [--root DIR] CATALOG
+#   bash scripts/check-site.sh --selftest
+#
+# --root DIR  repository root to read (default "."; relative paths resolve
+#             against the repository root, so fixtures can stand in for it).
+#             Read under it: agents.json, each agent's marketplace file,
+#             docs/footprints/*.json (with budgets.json) and
+#             docs/site/families.txt.
+# --selftest  run tests/site/gen-test.sh, require the generator's fixture
+#             catalog to pass, then require mutated copies of the oracle
+#             catalog (one or more per invariant id) to fail with their
+#             `FAIL <id>` line.
+#
+# Every failure is one line `FAIL <id>: <plugin>: <detail>` (<plugin> is the
+# dirKey, or `-` when catalog-wide). All checks run, so one defect shows up
+# next to any others. This script never calls gen-marketplaces.sh; the
+# `just site-check` recipe does.
+# shellcheck disable=SC2016  # every single-quoted string here is a jq program, not shell
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+selftest() {
+    local case_n=0 rc out
+    # (global: the EXIT trap runs after this function's locals are gone)
+    tmp=$(mktemp -d)
+    trap 'rm -rf "$tmp"' EXIT
+
+    # --- (a) the generator's own cases, then its fixture catalog is accepted
+    bash tests/site/gen-test.sh
+    bash scripts/gen-site.sh --root tests/site/root "$tmp/gen.json"
+    rc=0
+    out=$(bash scripts/check-site.sh --root tests/site/root "$tmp/gen.json" 2>&1) || rc=$?
+    if [ "$rc" -ne 0 ]; then
+        echo "FAIL fixture-accepted: checker rejected the generated fixture catalog (exit $rc): $out" >&2
+        exit 1
+    fi
+    echo "ok fixture-accepted"
+
+    # --- (b) one mutated copy of the oracle per case, fed straight to the checker
+    # mutate NAME ID JQ-PROGRAM [EXPECTED-TEXT]
+    mutate() {
+        local name=$1 id=$2 prog=$3 hint=${4:-} rc=0 out
+        case_n=$((case_n + 1))
+        jq "$prog" tests/site/expected/catalog.json | tr -d '\r' > "$tmp/case.json" \
+            || { echo "FAIL $name: mutation program failed" >&2; exit 1; }
+        if cmp -s "$tmp/case.json" tests/site/expected/catalog.json; then
+            echo "FAIL $name: mutation changed nothing" >&2
+            exit 1
+        fi
+        out=$(bash scripts/check-site.sh --root tests/site/root "$tmp/case.json" 2>&1) || rc=$?
+        if [ "$rc" -ne 1 ]; then
+            echo "FAIL $name: expected exit 1, got $rc: $out" >&2
+            exit 1
+        fi
+        case "$out" in
+            *"FAIL $id"*) ;;
+            *)
+                echo "FAIL $name: output lacks 'FAIL $id': $out" >&2
+                exit 1
+                ;;
+        esac
+        if [ -n "$hint" ] && [[ $out != *"$hint"* ]]; then
+            echo "FAIL $name: output lacks '$hint': $out" >&2
+            exit 1
+        fi
+        echo "ok $name"
+    }
+
+    local alpha='.families[] | select(.key == "alpha-mcp") | .plugins'
+    local rug='.families[] | select(.key == "repo-user-guide") | .plugins'
+    mutate plugin-set-delete plugin-set "del(${alpha}[\"claude-code\"])"
+    mutate plugin-set-duplicate plugin-set \
+        "(${alpha}[\"claude-code\"]) as \$p | (.families[] | select(.key == \"gamma-skills\") | .plugins[\"claude-code\"]) = \$p"
+    mutate tier-totals tier-totals "(${alpha}[\"claude-code\"].footprint.resident) += 1"
+    mutate footprint-null footprint-null \
+        "($alpha.qwen.footprint) = {\"resident\":1,\"invocation\":1,\"setup\":null,\"budget\":{}}"
+    mutate name name "(${rug}[\"claude-code\"].name) = \"repo-user-guide-cc\""
+    mutate install-shape install-shape "($alpha.qwen.install[0].command) = \"agy plugin install /tmp/x\""
+    mutate install-count install-count "del(${alpha}[\"claude-code\"].install[1])"
+    mutate null-fields null-fields "(${alpha}[\"claude-code\"].description) = \"\""
+    mutate url-prefix url-prefix "($alpha.antigravity.install[0].command) = \"curl https://example.com/x\""
+    mutate version version "(${alpha}[\"claude-code\"].version) = \"v0.1.0\""
+    mutate readme readme \
+        "(${alpha}[\"claude-code\"].readme) = \"https://github.com/ckir/aiplugins/tree/main/other\""
+    mutate budget budget "($alpha.antigravity.footprint.budget.deltaBytes) = 500"
+    mutate skills-only skills-only "(${rug}[\"claude-code\"].skillsOnly) = false"
+    mutate family-set family-set "(.families[] | select(.key == \"alpha-mcp\") | .key) = \"alpha-mcpx\""
+    mutate install-label-claude-code install-shape "(${alpha}[\"claude-code\"].install[0].label) = \"Foo\""
+    mutate install-label-opencode install-shape "(${alpha}.opencode.install[0].label) = \"Foo\""
+    mutate install-label-antigravity install-shape "(${alpha}.antigravity.install[0].label) = \"Foo\""
+    mutate install-label-agy-override install-shape "(${rug}.antigravity.install[0].label) = \"Foo\""
+    local gamma='.families[] | select(.key == "gamma-skills") | .plugins'
+    mutate family-set-order family-set '.families |= reverse'
+    mutate agent-set-missing agent-set 'del(.agents[] | select(.id == "qwen"))'
+    mutate agent-set-label agent-set '(.agents[] | select(.id == "qwen") | .label) = "Gwen"'
+    mutate agent-set-order agent-set '.agents |= reverse'
+    mutate install-shape-chmod-missing install-shape \
+        "($alpha.qwen.install[0].command) |= sub(\"\\nfind [^\\n]*\$\"; \"\")"
+    mutate install-shape-chmod-unexpected install-shape \
+        "($gamma.qwen.install[0].command) += \"\\nfind ~/.qwen/extensions/gamma-skills/bin -type f ! -name '*.exe' -exec chmod 755 {} +\""
+    mutate install-shape-path-missing install-shape \
+        "($alpha.antigravity.install[0].command) |= sub(\"\\nexport PATH[^\\n]*\$\"; \"\")"
+    mutate readme-scheme url-prefix "(${alpha}[\"claude-code\"].readme) = \"javascript:alert(1)\""
+    mutate install-name-qwen-linux install-shape \
+        "($gamma.qwen.install[0].command) |= "'gsub("extensions/gamma-skills"; "extensions/gamma-skills-qwen")'
+    mutate install-name-qwen-windows install-shape \
+        "($gamma.qwen.install[1].command) |= "'gsub("extensions\\\\gamma-skills\""; "extensions\\\\gamma-skills-qwen\"")'
+    mutate install-name-agy-unzip install-shape \
+        "($rug.antigravity.install[0].command) |= "'sub("-d /tmp/repo-user-guide"; "-d /tmp/repo-user-guide-agy")'
+    mutate install-name-agy-cp install-shape \
+        "($rug.antigravity.install[0].command) |= "'sub("cp -r /tmp/repo-user-guide/"; "cp -r /tmp/repo-user-guide-agy/")'
+    mutate install-download-qwen-linux install-shape \
+        "($alpha.qwen.install[0].command) |= "'sub("curl -fsSL -o [^ \n]+"; "curl -fsSL -o wrong.zip")'
+    mutate install-download-qwen-windows install-shape \
+        "($alpha.qwen.install[1].command) |= "'sub("-OutFile [^ \n]+"; "-OutFile wrong.zip")'
+    mutate install-download-agy install-shape \
+        "($alpha.antigravity.install[0].command) |= "'sub("curl -fsSL -o /tmp/[^ \n]+"; "curl -fsSL -o /tmp/wrong.zip")'
+    mutate install-download-agy-no-fsSL install-shape \
+        "($alpha.antigravity.install[0].command) |= "'sub("curl -fsSL"; "curl")'
+    mutate install-rug-mkdir-deleted install-shape \
+        "($rug.antigravity.install[0].command) |= "'sub("\nmkdir -p ~/.gemini/config/skills/repo-user-guide"; "")'
+    mutate family-set-suffix-hint family-set \
+        "(.families[] | select(.key == \"gamma-skills\") | .plugins.opencode) = ($alpha.opencode) | del($alpha.opencode)" 'family_of in scripts/gen-site.sh'
+    mutate install-prompt-opencode install-shape \
+        "($alpha.opencode.install[0].command) = \"https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/plugins/alpha-mcp-opencode/INSTALL.md\""
+    # Whole-block equality: a command is the generator's exact text, so reordered
+    # lines, an appended line and a duplicated entry are all shape defects.
+    mutate install-line-order-qwen install-shape \
+        "($alpha.qwen.install[0].command) |= (split(\"\\n\") | reverse | join(\"\\n\"))"
+    mutate install-line-order-rug install-shape \
+        "($rug.antigravity.install[0].command) |= (split(\"\\n\") | reverse | join(\"\\n\"))"
+    mutate install-extra-line-agy install-shape \
+        "($alpha.antigravity.install[0].command) += \"\\necho done\""
+    mutate install-dup-entry-opencode install-count "($alpha.opencode.install) |= (. + [.[0]])"
+    mutate install-dup-entry-antigravity install-count "($alpha.antigravity.install) |= (. + [.[0]])"
+    [ "$case_n" -eq 42 ] || { echo "FAIL selftest: ran $case_n cases, expected 42" >&2; exit 1; }
+
+    # --- (c) staging and the staged-tree gate over the synthetic doc tree
+    # stage-site.sh only removes an --out strictly inside the repository, so the
+    # staging runs write under the git-ignored target/ (still a mktemp -d dir).
+    mkdir -p target
+    stg=$(mktemp -d target/selftest-stage.XXXXXX)
+    sent_out='' sent_nt='' sent_ln='' link='' nest=''
+    trap 'rm -rf "$tmp" "$stg" "$sent_out" "$sent_nt" "$sent_ln" "$link" "$nest"' EXIT
+    local good="$stg/out" s_rc s_out
+
+    # stage_case NAME DOCDIR OUTDIR: sets s_rc and s_out
+    stage_case() {
+        s_rc=0
+        s_out=$(bash scripts/stage-site.sh --root tests/site/root --doc-dir "$2" --out "$3" 2>&1) || s_rc=$?
+    }
+    # require NAME CONDITION-DESCRIPTION: fail the selftest unless the preceding test passed
+    s_fail() {
+        echo "FAIL $1: $2" >&2
+        exit 1
+    }
+
+    stage_case stages-and-gates tests/site/doc "$good"
+    [ "$s_rc" -eq 0 ] || s_fail stages-and-gates "expected exit 0, got $s_rc: $s_out"
+    echo "ok stages-and-gates"
+
+    if grep -qF '../alpha_crate/index.html' "$good/api/index.html" \
+        && grep -qF '../rtk_mcp_cc/index.html' "$good/api/index.html" \
+        && ! grep -qF 'mock_rtk' "$good/api/index.html" \
+        && [ -f "$good/mock_rtk/index.html" ]; then
+        echo "ok deny-filter"
+    else
+        s_fail deny-filter "api/index.html must list alpha_crate and rtk_mcp_cc, omit mock_rtk, and mock_rtk/index.html must still be staged"
+    fi
+
+    if grep -qF 'Fixture plugin A &amp; B' "$good/index.html" \
+        && ! grep -qF 'Fixture plugin A & B' "$good/index.html"; then
+        echo "ok escapes-ampersand"
+    else
+        s_fail escapes-ampersand "staged index.html lacks 'A &amp; B' or still has the raw ampersand"
+    fi
+
+    if grep -qF 'A &amp; B &lt;c&gt; &quot;d&quot;' "$good/index.html" \
+        && ! grep -qF '<c>' "$good/index.html"; then
+        echo "ok escapes-angle-quote"
+    else
+        s_fail escapes-angle-quote "staged index.html lacks 'A &amp; B &lt;c&gt; &quot;d&quot;' or still has a raw <c>"
+    fi
+
+    cp -R tests/site/doc "$stg/doc-collide"
+    echo '<!doctype html><title>stale</title>' > "$stg/doc-collide/index.html"
+    stage_case collision-refused "$stg/doc-collide" "$stg/out-collide"
+    if [ "$s_rc" -ne 0 ] && [[ $s_out == *"cargo clean --doc"* ]]; then
+        echo "ok collision-refused"
+    else
+        s_fail collision-refused "expected non-zero exit with 'cargo clean --doc', got exit $s_rc: $s_out"
+    fi
+
+    mkdir -p "$stg/doc-empty/static.files"
+    echo 'a{}' > "$stg/doc-empty/static.files/a.css"
+    stage_case gate-catches-empty-set "$stg/doc-empty" "$stg/out-empty"
+    [ "$s_rc" -ne 0 ] || s_fail gate-catches-empty-set "staging a tree with no crate directory exited 0: $s_out"
+    echo "ok gate-catches-empty-set"
+
+    # gate_case NAME MUTATION-COMMAND...: mutate a fresh copy of the good output
+    # (cwd is the copy during the mutation) and require --gate-only to reject it.
+    gate_case() {
+        local name=$1 copy="$stg/gate-$1" g_rc=0 g_out
+        shift
+        cp -R "$good" "$copy"
+        (cd "$copy" && "$@") || s_fail "$name" "mutation command failed"
+        g_out=$(bash scripts/stage-site.sh --gate-only --out "$copy" 2>&1) || g_rc=$?
+        [ "$g_rc" -ne 0 ] || s_fail "$name" "gate accepted the mutated tree: $g_out"
+        echo "ok $name"
+    }
+    # The unmutated copy must pass, so a rejection cannot come from a broken harness.
+    cp -R "$good" "$stg/gate-control"
+    s_out=$(bash scripts/stage-site.sh --gate-only --out "$stg/gate-control" 2>&1) \
+        || s_fail gate-control "the unmutated staged copy was rejected: $s_out"
+    gate_case gate-rejects-missing-styles rm styles.css
+    gate_case gate-rejects-placeholder-left bash -c 'echo "<!-- NOSCRIPT -->" >> index.html'
+    gate_case gate-rejects-denied-crate-listed bash -c 'echo "<a href=\"../mock_rtk/index.html\">mock_rtk</a>" >> api/index.html'
+    gate_case gate-rejects-root-absolute-href bash -c 'echo "<a href=\"/x\">x</a>" >> index.html'
+    gate_case gate-rejects-innerhtml-in-app bash -c 'echo "x.innerHTML = 1;" >> app.js'
+    gate_case gate-rejects-fetch-absolute bash -c 'echo "fetch('"'"'/x'"'"');" >> app.js'
+    gate_case gate-rejects-css-url-quoted bash -c 'echo "a{background:url(\"/x\")}" >> styles.css'
+    gate_case gate-rejects-footer-link-missing bash -c 'sed "s|href=\"api/index.html\"|href=\"api/\"|" index.html > index.html.new && mv index.html.new index.html'
+    # --- (c) confinement: --out must be strictly inside <repo>/target/. Each case
+    # points --out at a throwaway directory holding a sentinel, so even a broken
+    # guard could only remove that throwaway directory.
+    # refuse_case NAME OUTDIR SENTINEL [DOCDIR]
+    refuse_case() {
+        local name=$1 r_rc=0 r_out
+        r_out=$(bash scripts/stage-site.sh --root tests/site/root --doc-dir "${4:-tests/site/doc}" --out "$2" 2>&1) || r_rc=$?
+        [ "$r_rc" -ne 0 ] || s_fail "$name" "staging into $2 exited 0: $r_out"
+        [[ $r_out == *"refusing to remove"* ]] || s_fail "$name" "output lacks 'refusing to remove': $r_out"
+        [ -e "$3" ] || s_fail "$name" "the sentinel $3 was removed"
+        echo "ok $name"
+    }
+    # (globals: the EXIT trap runs after this function's locals are gone)
+    sent_out=$(mktemp -d)
+    echo keep > "$sent_out/sentinel"
+    refuse_case out-outside-repo-refused "$sent_out" "$sent_out/sentinel"
+    sent_nt=$(mktemp -d "$(pwd -P)/selftest-notarget.XXXXXX")
+    echo keep > "$sent_nt/sentinel"
+    refuse_case out-in-repo-not-target-refused "$sent_nt" "$sent_nt/sentinel"
+    sent_ln=$(mktemp -d)
+    echo keep > "$sent_ln/sentinel"
+    link=$(mktemp -u "$(pwd -P)/target/selftest-link.XXXXXX")
+    if ln -s "$sent_ln" "$link" 2> /dev/null && [ -L "$link" ]; then
+        refuse_case out-symlink-escape-refused "$link" "$sent_ln/sentinel"
+    else
+        echo "ok out-symlink-escape-refused (skipped: no symlinks)"
+    fi
+    # --out inside --doc-dir, and --doc-dir inside --out: both under target/, so
+    # only the nesting guards can refuse them. A throwaway copy of the doc fixture
+    # carries the sentinel, so a broken guard could remove only that copy.
+    nest=$(mktemp -d "$(pwd -P)/target/selftest-nest.XXXXXX")
+    mkdir "$nest/doc"
+    cp -R tests/site/doc/. "$nest/doc/"
+    echo keep > "$nest/doc/sentinel"
+    refuse_case out-inside-doc-refused "$nest/doc/site" "$nest/doc/sentinel" "$nest/doc"
+    mkdir "$nest/out"
+    cp -R tests/site/doc "$nest/out/doc"
+    echo keep > "$nest/out/doc/sentinel"
+    refuse_case doc-inside-out-refused "$nest/out" "$nest/out/doc/sentinel" "$nest/out/doc"
+    rm -rf "$stg" "$sent_out" "$sent_nt" "$sent_ln" "$link" "$nest"
+}
+
+if [ "${1:-}" = "--selftest" ]; then
+    [ $# -eq 1 ] || { echo "check-site: --selftest takes no other argument" >&2; exit 1; }
+    selftest
+    exit 0
+fi
+
+root=.
+catalog=
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --root)
+            [ $# -ge 2 ] || { echo "check-site: --root needs a directory" >&2; exit 1; }
+            root=$2
+            shift 2
+            ;;
+        *)
+            [ -z "$catalog" ] || { echo "check-site: unexpected argument: $1" >&2; exit 1; }
+            catalog=$1
+            shift
+            ;;
+    esac
+done
+[ -n "$catalog" ] || { echo "usage: check-site.sh [--root DIR] CATALOG | --selftest" >&2; exit 1; }
+[ -f "$catalog" ] || { echo "check-site: no such catalog: $catalog" >&2; exit 1; }
+jq -e . "$catalog" > /dev/null 2>&1 || { echo "check-site: not valid JSON: $catalog" >&2; exit 1; }
+
+REGISTRY="$root/agents.json"
+export REGISTRY
+set --
+# shellcheck disable=SC1091  # sourced relative to the repository root after cd
+source scripts/lib/registry.sh
+
+# The jq on a Windows PATH emits CRLF; a stray carriage return would corrupt
+# every value captured below.
+jqr() {
+    jq -r "$@" | tr -d '\r'
+}
+jqc() {
+    jq -c "$@" | tr -d '\r'
+}
+
+failures=0
+# fail ID PLUGIN DETAIL
+fail() {
+    printf 'FAIL %s: %s: %s\n' "$1" "$2" "$3"
+    failures=$((failures + 1))
+}
+
+footprints="$root/docs/footprints"
+oc_raw=https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main
+
+# --- catalog-wide: agent-set, plugin-set, family-set, stray nulls and empty strings
+# agent-set: .agents is the registry's agents in the fixed UI order with the
+# fixed labels (the order is set by the spec, not by agents.json).
+want_agents=
+for pair in claude-code:'Claude Code' opencode:OpenCode antigravity:Antigravity qwen:Qwen; do
+    id=${pair%%:*}
+    if jqr --arg id "$id" '[.agents[].id] | index($id) | tostring' "$REGISTRY" | grep -qxv null; then
+        want_agents="${want_agents}${id}|${pair#*:}"$'\n'
+    fi
+done
+for id in $(jqr '.agents[].id' "$REGISTRY"); do
+    case "$id" in
+        claude-code | opencode | antigravity | qwen) ;;
+        *) fail agent-set - "registry agent '$id' has no fixed UI position or label; add it to the agents array in scripts/gen-site.sh and to the filter chips in docs/site/index.html, then to this check" ;;
+    esac
+done
+have_agents=$(jqr '(.agents // [])[] | "\(.id // "")|\(.label // "")"' "$catalog")
+if [ "$want_agents" != "${have_agents:+$have_agents$'\n'}" ]; then
+    fail agent-set - "catalog agents [$(tr '\n' ' ' <<< "$have_agents")] differ from the expected [$(tr '\n' ' ' <<< "$want_agents")] (registry agents in UI order with fixed labels); fix the agents array in scripts/gen-site.sh and the filter chips in docs/site/index.html"
+fi
+
+expected_keys=$(
+    for agent in $(jqr '.agents[].id' "$REGISTRY"); do
+        registry_plugins "$agent"
+    done | LC_ALL=C sort
+)
+actual_keys=$(jqr '[.families[]?.plugins[]?.dirKey // ""] | .[]' "$catalog" | LC_ALL=C sort)
+while IFS= read -r key; do
+    [ -n "$key" ] || continue
+    n=$(grep -cxF -- "$key" <<< "$actual_keys" || true)
+    [ "$n" -eq 1 ] || fail plugin-set - "$key appears $n times in the catalog (expected once, per agents.json)"
+done <<< "$expected_keys"
+while IFS= read -r key; do
+    grep -qxF -- "$key" <<< "$expected_keys" \
+        || fail plugin-set - "catalog plugin '$key' is not in agents.json"
+done <<< "$actual_keys"
+
+families_file="$root/docs/site/families.txt"
+if [ -f "$families_file" ]; then
+    want_families=$(tr -d '\r' < "$families_file" | grep -v '^$' | LC_ALL=C sort || true)
+else
+    want_families=
+    fail family-set - "$families_file is missing"
+fi
+have_families=$(jqr '[.families[]?.key // ""] | .[]' "$catalog")
+if [ "$want_families" != "$have_families" ]; then
+    fail family-set - "catalog family keys [$(tr '\n' ' ' <<< "$have_families")] differ from docs/site/families.txt [$(tr '\n' ' ' <<< "$want_families")]; the catalog's families must be sorted by key"
+fi
+
+rest_nulls=$(jqr '[del(.families[]?.plugins) | paths(. == null)] | length' "$catalog")
+[ "$rest_nulls" -eq 0 ] || fail null-fields - "null outside the plugin entries"
+rest_bad=$(jqr '[del(.families[]?.plugins) | .. | strings | select(length == 0 or test("undefined|NaN"))] | length' "$catalog")
+[ "$rest_bad" -eq 0 ] || fail null-fields - "empty string, undefined or NaN outside the plugin entries"
+
+# --- per plugin --------------------------------------------------------------
+# agent_of KEY: the agent id whose plugin list holds KEY (empty if none).
+agent_of() {
+    local a
+    for a in $(jqr '.agents[].id' "$REGISTRY"); do
+        if registry_plugins "$a" | grep -qxF -- "$1"; then
+            echo "$a"
+            return
+        fi
+    done
+}
+
+# Join the arguments with newlines (no trailing newline).
+join_lines() {
+    local IFS=$'\n'
+    printf '%s' "$*"
+}
+
+# first_diff GOT WANT: name the first line of GOT that differs from WANT.
+first_diff() {
+    local -a g w
+    local i
+    mapfile -t g <<< "$1"
+    mapfile -t w <<< "$2"
+    for ((i = 0; i < ${#g[@]} || i < ${#w[@]}; i++)); do
+        if [ "$i" -ge "${#w[@]}" ]; then
+            echo "extra line $((i + 1)): '${g[i]}'"
+            return
+        fi
+        if [ "$i" -ge "${#g[@]}" ]; then
+            echo "missing line $((i + 1)): '${w[i]}'"
+            return
+        fi
+        if [ "${g[i]}" != "${w[i]}" ]; then
+            echo "line $((i + 1)) is '${g[i]}', expected '${w[i]}'"
+            return
+        fi
+    done
+    echo "the lines match but the text differs (line ending or trailing whitespace)"
+}
+
+# check_install KEY AGENT NAME URL SKILLS_ONLY P
+# Each install entry must equal the generator's text for this agent, label
+# and command, whole block: an independent restatement of the install table
+# in scripts/gen-site.sh. (A set-member check let a reordered, appended or
+# duplicated line pass; the entry count is install-count's check.)
+check_install() {
+    local key=$1 agent=$2 name=$3 url=$4 so=$5 p=$6
+    local zip=${url##*/}
+    local -a labels=() commands=() lines=()
+    # shellcheck disable=SC2088  # the literal ~ is the install text shown to users
+    local ext="~/.qwen/extensions/$name"
+    local win_dir="\"\$env:USERPROFILE\\.qwen\\extensions\\$name\""
+    case "$agent" in
+        claude-code)
+            labels=("Add the marketplace" "Install")
+            commands=("claude plugin marketplace add ckir/aiplugins" "claude plugin install ${name}@aiplugins")
+            ;;
+        qwen)
+            lines=("curl -fsSL -o $zip $url" "mkdir -p $ext" "unzip -q -o $zip -d $ext/")
+            [ "$so" = true ] || lines+=("find $ext/bin -type f ! -name '*.exe' -exec chmod 755 {} +")
+            labels=("Linux and macOS" "Windows (PowerShell)")
+            commands=(
+                "$(join_lines "${lines[@]}")"
+                "$(join_lines "Invoke-WebRequest -Uri $url -OutFile $zip" \
+                    "New-Item -ItemType Directory -Force -Path $win_dir" \
+                    "Expand-Archive -Path $zip -DestinationPath $win_dir -Force")"
+            )
+            ;;
+        opencode)
+            labels=("Ask your agent")
+            commands=("Fetch and follow the installation instructions at $oc_raw/opencode/plugins/$key/INSTALL.md, and ask me whether to install project-local or global first.")
+            ;;
+        antigravity)
+            if [ "$key" = repo-user-guide-agy ]; then
+                labels=("Copy the skill")
+                # shellcheck disable=SC2088  # the literal ~ is the install text shown to users
+                commands=("$(join_lines "curl -fsSL -o /tmp/$zip $url" \
+                    "unzip -q -o /tmp/$zip -d /tmp/$name" \
+                    "mkdir -p ~/.gemini/config/skills/repo-user-guide" \
+                    "cp -r /tmp/$name/skills/repo-user-guide/. ~/.gemini/config/skills/repo-user-guide/")")
+            else
+                lines=("curl -fsSL -o /tmp/$zip $url" "unzip -q -o /tmp/$zip -d /tmp/$name" "agy plugin install /tmp/$name")
+                [ "$so" = true ] || lines+=("export PATH=\"\$HOME/.gemini/config/plugins/$name/bin:\$PATH\"")
+                labels=("Install")
+                commands=("$(join_lines "${lines[@]}")")
+            fi
+            ;;
+        *)
+            fail install-shape "$key" "no install shape for agent ${agent}; add a row to the install table in scripts/gen-site.sh"
+            return
+            ;;
+    esac
+    local n i got_label got_cmd
+    n=$(jqr '(.install // []) | length' <<< "$p")
+    for ((i = 0; i < n && i < ${#labels[@]}; i++)); do
+        got_label=$(jqr --argjson i "$i" '.install[$i].label // ""' <<< "$p")
+        got_cmd=$(jqr --argjson i "$i" '.install[$i].command // ""' <<< "$p")
+        jq -e --argjson i "$i" --arg l "${labels[i]}" '.install[$i].label == $l' <<< "$p" > /dev/null \
+            || fail install-shape "$key" "install entry $i label is '$got_label', expected '${labels[i]}'; the install table is in scripts/gen-site.sh and check_install in scripts/check-site.sh restates it, so edit both"
+        jq -e --argjson i "$i" --arg c "${commands[i]}" '.install[$i].command == $c' <<< "$p" > /dev/null \
+            || fail install-shape "$key" "install entry $i ('${labels[i]}') is not the generator's text: $(first_diff "$got_cmd" "${commands[i]}") (the published name is $name); the install table is in scripts/gen-site.sh and check_install in scripts/check-site.sh restates it, so edit both"
+    done
+}
+
+total=0
+while IFS= read -r row; do
+    [ -n "$row" ] || continue
+    total=$((total + 1))
+    agent=$(jqr '.agent' <<< "$row")
+    family=$(jqr '.family' <<< "$row")
+    p=$(jqc '.p' <<< "$row")
+    key=$(jqr '.dirKey // ""' <<< "$p")
+    [ -n "$key" ] || key="?"
+
+    # Unknown plugin, or filed under the wrong agent: nothing else can be looked up.
+    if [ "$(agent_of "$key")" != "$agent" ]; then
+        fail plugin-set "$key" "plugin is not an entry of agent '$agent' in agents.json"
+        continue
+    fi
+    expname=$(registry_published_name "$agent" "$key")
+    marketplace="$root/$(registry_field "$agent" marketplace)"
+    item=$(jqc --arg n "$expname" '[.plugins[] | select(.name == $n)][0] // empty' "$marketplace")
+    fpfile="$footprints/$key.json"
+
+    # family-set: dirKey minus its agent suffix is the enclosing family key.
+    stripped=$(sed -E 's/-(cc|qwen|opencode|agy)$//' <<< "$key")
+    [ "$stripped" = "$family" ] \
+        || fail family-set "$key" "dirKey minus its agent suffix is '$stripped' but it sits in family '$family'; families are listed in docs/site/families.txt; if this plugin belongs to a NEW agent suffix, add the suffix to family_of in scripts/gen-site.sh and to the suffix list in this check in scripts/check-site.sh"
+
+    # name
+    name=$(jqr '.name // ""' <<< "$p")
+    [ "$name" = "$expname" ] || fail name "$key" "name '$name' should be '$expname' (publishedNames or the dirKey)"
+    if [ -z "$item" ]; then
+        fail name "$key" "no marketplace entry named '$expname' in $(registry_field "$agent" marketplace)"
+    fi
+
+    # footprint-null, tier-totals, budget
+    fp=$(jqc '.footprint' <<< "$p")
+    fp_type=$(jqr 'type' <<< "$fp")
+    nofp=true
+    nosetup=false
+    if [ -f "$fpfile" ]; then
+        nofp=false
+        [ "$fp_type" = object ] || fail footprint-null "$key" "footprint is $fp_type but docs/footprints/$key.json exists"
+        if ! jq -e '.tiers.setup' "$fpfile" > /dev/null 2>&1; then nosetup=true; fi
+        if [ "$fp_type" = object ]; then
+                if ! jq -e -n --slurpfile f "$fpfile" --argjson c "$fp" '
+                $f[0].tiers as $t
+                | {resident: $t.resident.bytes, invocation: $t.invocation.bytes, setup: ($t.setup.bytes // null)}
+                  == {resident: $c.resident, invocation: $c.invocation, setup: $c.setup}' > /dev/null; then
+                fail tier-totals "$key" "footprint resident/invocation/setup differ from the tiers in docs/footprints/$key.json"
+            fi
+                if ! jq -e -n --slurpfile b "$footprints/budgets.json" --argjson c "$fp" --arg k "$key" \
+                '$c.budget == $b[0][$k]' > /dev/null; then
+                fail budget "$key" "footprint.budget differs from docs/footprints/budgets.json[$key]"
+            fi
+        fi
+    else
+        [ "$fp_type" = null ] || fail footprint-null "$key" "footprint is $fp_type but docs/footprints/$key.json does not exist"
+    fi
+
+    # install-count
+    n=$(jqr '(.install // []) | length' <<< "$p")
+    case "$agent" in
+        claude-code | qwen)
+            [ "$n" -eq 2 ] || fail install-count "$key" "$agent needs exactly 2 install entries, found $n"
+            ;;
+        *)
+            [ "$n" -eq 1 ] || fail install-count "$key" "$agent needs exactly 1 install entry, found $n"
+            ;;
+    esac
+    empty=$(jqr '[(.install // [])[] | (.command // "") | select(length == 0)] | length' <<< "$p")
+    [ "$empty" -eq 0 ] || fail install-count "$key" "$empty install command(s) are empty"
+
+    # null-fields
+    stray=$(jqr --argjson nofp "$nofp" --argjson nosetup "$nosetup" '
+        [paths(. == null) | map(tostring) | join(".")]
+        - [if $nofp then "footprint" else empty end, if $nosetup then "footprint.setup" else empty end]
+        | .[]' <<< "$p" | tr '\n' ' ')
+    [ -z "$stray" ] || fail null-fields "$key" "unexpected null at: $stray"
+    badstr=$(jqr '[.. | strings | select(length == 0 or test("undefined|NaN"))] | length' <<< "$p")
+    [ "$badstr" -eq 0 ] || fail null-fields "$key" "$badstr string(s) are empty or contain undefined/NaN"
+
+    # url-prefix
+    readme_val=$(jqr '.readme // ""' <<< "$p")
+    case "$readme_val" in
+        https://github.com/ckir/aiplugins/* | https://raw.githubusercontent.com/ckir/aiplugins/*) ;;
+        *) fail url-prefix "$key" "readme '$readme_val' does not start with https://github.com/ckir/aiplugins/ or https://raw.githubusercontent.com/ckir/aiplugins/" ;;
+    esac
+    while IFS= read -r url; do
+        [ -n "$url" ] || continue
+        case "$url" in
+            https://github.com/ckir/aiplugins/* | https://raw.githubusercontent.com/ckir/aiplugins/*) ;;
+            *) fail url-prefix "$key" "URL outside https://github.com/ckir/aiplugins/ and https://raw.githubusercontent.com/ckir/aiplugins/: $url" ;;
+        esac
+    done < <(jqr '[.readme?, ((.install // [])[]? | .command?)] | .[] | strings' <<< "$p" | grep -oE 'https?://[^][:space:]"<>]+' || true)
+
+    # version
+    version=$(jqr '.version // ""' <<< "$p")
+    [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail version "$key" "version '$version' is not bare semver"
+    url=
+    if [ -n "$item" ]; then
+        url=$(jqr '.source.url // ""' <<< "$item")
+        tag=
+        if [[ $url =~ -v([0-9]+\.[0-9]+\.[0-9]+)/ ]]; then tag=${BASH_REMATCH[1]}; fi
+        [ "$version" = "$tag" ] || fail version "$key" "version '$version' differs from the -v tag '$tag' in the marketplace source.url"
+        readme=$(jqr '.readme // ""' <<< "$p")
+        home=$(jqr '.homepage // ""' <<< "$item")
+        [ "$readme" = "$home" ] || fail readme "$key" "readme '$readme' differs from the marketplace homepage '$home'"
+    else
+        fail readme "$key" "no marketplace entry '$expname' to compare the readme against"
+    fi
+
+    # skills-only
+    so=false
+    if registry_is_skills_only "$agent" "$key"; then so=true; fi
+    [ "$(jqr '.skillsOnly' <<< "$p")" = "$so" ] \
+        || fail skills-only "$key" "skillsOnly should be $so (membership in the skillsOnly list of $agent in agents.json)"
+
+    # install-shape (against the inputs, not the generator)
+    if [ -n "$item" ]; then
+        check_install "$key" "$agent" "$expname" "$url" "$so" "$p"
+    fi
+done < <(jqc '.families[]? | .key as $f | (.plugins // {}) | to_entries[] | {family: $f, agent: .key, p: .value}' "$catalog" | tr -d '\r')
+
+if [ "$failures" -gt 0 ]; then
+    exit 1
+fi
+echo "check-site: ok ($total plugins)"

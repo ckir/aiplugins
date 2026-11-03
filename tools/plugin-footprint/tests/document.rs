@@ -42,7 +42,6 @@ fn a_successful_probe_itemises_every_source_it_measured() {
         "x",
         Path::new("plug"),
         Tree::Dev,
-        Some("0.6.4"),
         &ok_outcome(),
         &FileSources::default(),
     );
@@ -75,7 +74,6 @@ fn tier_bytes_are_the_sum_of_the_sources() {
         "x",
         Path::new("plug"),
         Tree::Dev,
-        Some("0.6.4"),
         &ok_outcome(),
         &FileSources::default(),
     );
@@ -103,7 +101,6 @@ fn a_failed_probe_omits_the_tiers_entirely_rather_than_reporting_zero() {
         "x",
         Path::new("plug"),
         Tree::Dev,
-        None,
         &failed,
         &FileSources::default(),
     ))
@@ -136,7 +133,6 @@ fn a_timed_out_probe_is_distinguishable_from_a_failed_one() {
         "x",
         Path::new("plug"),
         Tree::Dev,
-        None,
         &timed_out,
         &FileSources::default(),
     ))
@@ -155,7 +151,6 @@ fn tokens_are_absent_until_an_oracle_has_produced_them() {
         "x",
         Path::new("plug"),
         Tree::Dev,
-        None,
         &ok_outcome(),
         &FileSources::default(),
     ))
@@ -194,7 +189,6 @@ fn the_binary_path_is_recorded_normalised_and_platform_independent() {
         "x",
         &plugin_dir,
         Tree::Dev,
-        None,
         &probed,
         &FileSources::default(),
     ))
@@ -212,7 +206,6 @@ fn the_document_serialises_in_the_pinned_canonical_form() {
         "x",
         Path::new("plug"),
         Tree::Dev,
-        Some("0.6.4"),
         &ok_outcome(),
         &FileSources::default(),
     );
@@ -251,7 +244,6 @@ fn a_binary_outside_the_plugin_degrades_to_a_name_not_a_machine_path() {
         "x",
         Path::new("plug"),
         Tree::Dev,
-        None,
         &elsewhere,
         &FileSources::default(),
     ))
@@ -275,7 +267,6 @@ fn a_command_that_is_the_plugin_root_is_not_recorded_as_an_empty_path() {
         "x",
         &plugin_dir,
         Tree::Dev,
-        None,
         &probed,
         &FileSources::default(),
     ))
@@ -302,7 +293,6 @@ fn a_backslash_in_a_unix_filename_is_not_turned_into_a_directory() {
         "x",
         &plugin_dir,
         Tree::Dev,
-        None,
         &probed,
         &FileSources::default(),
     ))
@@ -332,7 +322,6 @@ fn file_backed_sources_join_the_resident_tier() {
         "x",
         Path::new("plug"),
         Tree::Dev,
-        Some("0.6.4"),
         &ok_outcome(),
         &some_files(),
     );
@@ -358,7 +347,6 @@ fn the_invocation_tier_carries_the_bodies() {
         "x",
         Path::new("plug"),
         Tree::Dev,
-        None,
         &ok_outcome(),
         &some_files(),
     );
@@ -386,7 +374,6 @@ fn a_failed_probe_still_omits_every_tier_even_with_file_sources_present() {
         "x",
         Path::new("plug"),
         Tree::Dev,
-        None,
         &failed,
         &some_files(),
     ))
@@ -409,7 +396,6 @@ fn a_document_without_a_plugin_source_carries_no_setup_key_at_all() {
         "x",
         Path::new("plug"),
         Tree::Dev,
-        None,
         &ok_outcome(),
         &some_files(),
     ))
@@ -448,4 +434,43 @@ fn the_setup_tier_is_the_sum_of_its_one_source() {
         "no oracle has run: {}",
         value
     );
+}
+
+#[test]
+fn a_document_carries_exactly_the_documented_top_level_keys() {
+    // Pins the envelope, not one forbidden name: a version-like field added
+    // under any other key (`version`, `commit`, `packageVersion`) would
+    // re-couple the document to release bumps and fails here.
+    let value = serde_json::to_value(build(
+        "x",
+        Path::new("plug"),
+        Tree::Dev,
+        &ok_outcome(),
+        &FileSources::default(),
+    ))
+    .expect("serialises");
+    let mut keys: Vec<&str> = value
+        .as_object()
+        .expect("a document is an object")
+        .keys()
+        .map(String::as_str)
+        .collect();
+    keys.sort_unstable();
+    assert_eq!(
+        keys,
+        ["agent", "plugin", "probe", "schemaVersion", "tiers", "tree"]
+    );
+}
+
+#[test]
+fn a_document_carries_no_version_stamp() {
+    let value = serde_json::to_value(build(
+        "x",
+        Path::new("plug"),
+        Tree::Dev,
+        &ok_outcome(),
+        &FileSources::default(),
+    ))
+    .expect("serialises");
+    assert!(value.get("pluginVersion").is_none());
 }

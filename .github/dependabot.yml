@@ -25,6 +25,11 @@ updates:
     directory: "/opencode/plugins/re-ghidra-mcp-opencode"
     schedule:
       interval: "weekly"
+    # The wiring gate pins @opencode/plugin to the OpenCode version we test
+    # against and requires every README and INSTALL.md to say the same, so only
+    # a person moves it, in one change across all four plugins.
+    ignore:
+      - dependency-name: "@opencode/plugin"
     groups:
       npm-re-ghidra:
         patterns:
@@ -34,6 +39,11 @@ updates:
     directory: "/opencode/plugins/rtk-mcp-opencode"
     schedule:
       interval: "weekly"
+    # The wiring gate pins @opencode/plugin to the OpenCode version we test
+    # against and requires every README and INSTALL.md to say the same, so only
+    # a person moves it, in one change across all four plugins.
+    ignore:
+      - dependency-name: "@opencode/plugin"
     groups:
       npm-rtk:
         patterns:
@@ -43,6 +53,11 @@ updates:
     directory: "/opencode/plugins/opencode-ctl-mcp-opencode"
     schedule:
       interval: "weekly"
+    # The wiring gate pins @opencode/plugin to the OpenCode version we test
+    # against and requires every README and INSTALL.md to say the same, so only
+    # a person moves it, in one change across all four plugins.
+    ignore:
+      - dependency-name: "@opencode/plugin"
     groups:
       npm-opencode-ctl:
         patterns:
@@ -52,6 +67,11 @@ updates:
     directory: "/opencode/plugins/todov2-opencode"
     schedule:
       interval: "weekly"
+    # The wiring gate pins @opencode/plugin to the OpenCode version we test
+    # against and requires every README and INSTALL.md to say the same, so only
+    # a person moves it, in one change across all four plugins.
+    ignore:
+      - dependency-name: "@opencode/plugin"
     groups:
       npm-todov2:
         patterns:

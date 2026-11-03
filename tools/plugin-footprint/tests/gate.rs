@@ -510,3 +510,11 @@ fn a_baseline_from_before_the_setup_tier_does_not_bill_the_whole_module_as_growt
         Verdict::Pass
     );
 }
+
+#[test]
+fn a_baseline_that_still_carries_a_plugin_version_is_comparable() {
+    let mut baseline = doc("ok", 19, 18_000);
+    baseline["pluginVersion"] = json!("0.1.0");
+    let measured = doc("ok", 19, 18_000);
+    assert_eq!(check(&measured, Some(&baseline), &budget()), Verdict::Pass);
+}

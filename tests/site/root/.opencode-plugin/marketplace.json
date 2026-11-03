@@ -1,0 +1,29 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "fixture-opencode",
+  "owner": {
+    "name": "Fixture Owner"
+  },
+  "metadata": {
+    "description": "Fixture opencode"
+  },
+  "plugins": [
+    {
+      "name": "alpha-mcp-opencode",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/alpha-mcp-opencode-v0.2.3/alpha-mcp-opencode-opencode.zip"
+      },
+      "description": "Fixture plugin alpha-mcp-opencode",
+      "author": {
+        "name": "Fixture Owner"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/opencode/plugins/alpha-mcp-opencode",
+      "license": "MIT",
+      "category": "development",
+      "keywords": [
+        "fixture"
+      ]
+    }
+  ]
+}
