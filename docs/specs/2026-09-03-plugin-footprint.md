@@ -515,7 +515,6 @@ plugin internals.
   "plugin": "re-ghidra-mcp-cc",
   "agent": "claude-code",
   "tree": "dev",
-  "measuredAt": "2026-09-03T12:00:00Z",
   "probe": {
     "status": "ok",
     "binary": "claude-code/re-ghidra-mcp-cc/bin/re-ghidra-cc-mcp.exe",
