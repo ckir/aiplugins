@@ -1,6 +1,6 @@
 # Merge flow: stop PRs queueing behind each other
 
-Status: DRAFT 2026-11-02. Author: Claude, solo (the owner waived AGY-FIRST for this draft). Owner decides the forks in section 5.
+Status: DECIDED 2026-11-03. Drafted solo on 2026-11-02 (the owner waived AGY-FIRST for the draft); the forks were then consulted with agy (AGY-FIRST, 2026-11-03) and the owner ruled in section 5. Built: M2 and the `concurrency` block. Not built: M1 (unavailable), M3 (not pursued), M4 (dropped).
 
 ## 1. Problem
 
@@ -15,7 +15,9 @@ On 2026-11-02 four PRs (#118, #126, #127, #128) had to land. Every merge left th
 | macOS cancellations were runner capacity, not our config | run 41495365746 attempt 1: `Test (macos-latest)` ran 17:53-18:18 and was cancelled; check-run annotation: "The job was not acquired by Runner of type hosted even after multiple attempts", plus the notice "Due to capacity constraints, jobs targeting macOS arm64 runners may experience longer queue times" |
 | `ci.yml` has no `concurrency` block and no `timeout-minutes` | `grep -n 'concurrency\|timeout-minutes' .github/workflows/ci.yml` finds nothing; matrices use `fail-fast: false` (`:48,:70,:267,:298`) |
 | The two ledgers are hardcoded in the clavity plugin, which gates on them | `agy-capstone/SKILL.md:393`, `agy-test-audit/SKILL.md:30,380`, hooks `agy-ledger-lib.sh` and `agy-test-audit-reminder.sh:117` read and append `docs/agy-capstone-ledger.md` and `docs/agy-test-audit-ledger.md` by exact path and sha |
-| The `check:` recipe is a single dependency line | `Justfile:342` on `feat/pages-site` after the rebase (line 334 on `main`); #118 and `main` each edited it |
+| The `check:` recipe is a single dependency line | `Justfile:356` on `main` at 3c57661; #118 and `main` each edited it |
+| The repository is owned by a User account | `gh api repos/ckir/aiplugins --jq .owner.type` prints `User`; GitHub's "Managing a merge queue" page: "Pull request merge queues are available in any public repository owned by an organization, or in private repositories owned by organizations using GitHub Enterprise Cloud" |
+| Auto-merge is on and merged branches are deleted | `gh api repos/ckir/aiplugins --jq '{auto:.allow_auto_merge,del:.delete_branch_on_merge}'` prints `true`, `true` |
 | The repo merges with merge commits | `git log --merges origin/main` shows "Merge pull request #N" |
 
 ## 3. Goals and non-goals
@@ -26,26 +28,28 @@ Non-goals: moving the ledgers (the plugin owns their path, so a per-entry layout
 
 ## 4. Design
 
-**M1. Merge queue on `main`.** Configure it as a repository ruleset (Settings, Rules; the classic branch-protection API has no merge-queue field, so this is an owner action I cannot script). Add `merge_group:` to the `on:` block of `ci.yml`, the only workflow that supplies required contexts. Method: merge commit, matching history. With the queue on, "require branches to be up to date" is dropped: the queue builds each entry on top of the queue ahead of it. Cost: each entry still runs the full required set once; concurrent entries share nothing.
+**M1. Merge queue on `main`. UNAVAILABLE: not buildable on a User-owned repository (see the measured facts); the options that remain are listed in section 5.** Configure it as a repository ruleset (Settings, Rules; the classic branch-protection API has no merge-queue field, so this is an owner action I cannot script). Add `merge_group:` to the `on:` block of `ci.yml`, the only workflow that supplies required contexts. Method: merge commit, matching history. With the queue on, "require branches to be up to date" is dropped: the queue builds each entry on top of the queue ahead of it. Cost: each entry still runs the full required set once; concurrent entries share nothing.
 - Limits: a textual conflict ejects the entry, so M1 does not cure conflicts, only the update-and-wait loop. `release-refresh.yml` and `release.yml` trigger on `pull_request` and are not required, so they need no `merge_group` trigger.
 
-**M2. Bounded automatic rerun of runner-acquisition failures.** A `workflow_run` workflow on `CI` (completed, conclusion failure or cancelled) that, for run attempt 1 only, reruns failed jobs when a failed job's annotation contains "not acquired by Runner". Permissions `actions: write` only. One retry; a second failure stays red for a human. This removes the 25-28 minute stall plus manual rerun seen on #127 and #128.
+**M2. Bounded automatic rerun of runner-acquisition failures. BUILT.** `.github/workflows/ci-rerun-runner-failures.yml` is a `workflow_run` workflow on `CI` (completed, conclusion failure or cancelled, run attempt 1 only) that calls `scripts/rerun-runner-failures.sh`. The script re-runs the failed jobs only when EVERY failed or cancelled job in the run carries the annotation "not acquired by Runner"; one real red job means nothing is re-run, so a flaky test cannot be retried to green by this. Permissions `actions: write`, `checks: read`, `contents: read`. One retry; a second failure stays red for a human. The script also re-reads the run's `run_attempt` and leaves a run that is no longer on attempt 1, because the jobs endpoint answers for the latest attempt and a manual re-run between the event and the script would otherwise be retried a second time (found in the capstone, round 1). It runs from the default branch, checks out only that branch, and takes only the numeric run id from the event, through `env`. This removes the 25-28 minute stall plus manual rerun seen on #127 and #128. Companion change in `ci.yml`: a `concurrency` group per pull request with `cancel-in-progress: true`, so a superseded push stops holding runners; non-PR runs get a group of their own (`github.run_id`), so a run on `main` is never cancelled. `timeout-minutes` was NOT added: it counts from job start, and the failure here is a job that never started (reasoned, not measured).
 
-**M3. Union-merge the ledgers.** Add `docs/agy-capstone-ledger.md merge=union` and `docs/agy-test-audit-ledger.md merge=union` to `.gitattributes`. Both files are append-only tables, so keeping both sides is always correct, and `union` is built into git (no per-clone config) so local rebases honour it. UNVERIFIED: whether GitHub's server-side merge and `update-branch` honour it; test with a throwaway pair of PRs before relying on it.
+**M3. Union-merge the ledgers. NOT PURSUED (owner ruling 2026-11-03).** Add `docs/agy-capstone-ledger.md merge=union` and `docs/agy-test-audit-ledger.md merge=union` to `.gitattributes`. Both files are append-only tables, so keeping both sides is always correct, and `union` is built into git (no per-clone config) so local rebases honour it. UNVERIFIED: whether GitHub's server-side merge and `update-branch` honour it; test with a throwaway pair of PRs before relying on it.
 
-**M4. One entry per line in `check`.** Replace the long dependency line at `Justfile:342` with a recipe body of one `just <name>` per line, so two branches adding different gates stop editing the same line. Cost: gates then run sequentially and `just` no longer dedupes them; confirm no gate is also a dependency of another recipe before changing.
+**M4. One entry per line in `check`. DROPPED (owner ruling 2026-11-03; agy and the author both recommended skipping).** Replace the long dependency line at `Justfile:356` with a recipe body of one `just <name>` per line, so two branches adding different gates stop editing the same line. Cost: gates then run sequentially and `just` no longer dedupes them; confirm no gate is also a dependency of another recipe before changing.
 
-## 5. Forks for the owner
+## 5. Decisions
 
-1. Enable the merge queue (M1)? Recommended yes. It is a settings change only you can make; I will supply the exact ruleset values.
-2. Build M2, or accept manual reruns? Recommended build; roughly 30 lines of workflow. Alternative: none, GitHub's macOS capacity is outside our control.
-3. Try M3 on a throwaway PR pair first, then keep or drop it?
-4. M4 (a `Justfile` change that serialises gates): yes, or skip as low value?
+| Fork | Ruling (2026-11-03) |
+|---|---|
+| 1. Merge queue (M1) | Skipped. Not available on a User-owned repository. Alternatives named in the consult and NOT built: transfer the repository to a free organization (moves the Pages URL `ckir.github.io/aiplugins` and every `ckir/aiplugins` URL in the marketplaces and installers, relying on GitHub redirects); a workflow that updates the next auto-merge PR after each merge (would need `RELEASE_PLEASE_TOKEN`, since pushes made with the default token start no CI; unmeasured); a staging branch (breaks the merge-commit history and per-PR required checks); job-level path filters (a workflow-level filter would leave the required contexts pending on filtered PRs). |
+| 2. Auto-rerun (M2) | Build, plus the `concurrency` block. Built in this change. |
+| 3. `merge=union` trial (M3) | Skipped. |
+| 4. One gate per line (M4) | Dropped. |
 
-## 6. Verification plan (for the build)
+Open consequence of skipping 1: merging N green PRs still costs one update and one CI run per PR. M2 removes the manual rerun, not the update-and-wait loop.
 
-1. M1: after enabling, open two trivial PRs, queue both, confirm both merge with one CI run each and no update step; confirm a `merge_group` run appears for `ci.yml` with all 7 contexts reporting.
-2. M2: not reproducible on demand. Verify by reading the workflow against a saved cancelled run (41495365746 attempt 1 annotation text) with `act` or a dry-run step that only echoes the decision; then watch the next real occurrence.
-3. M3: two PRs each appending a different row to the same ledger; merge one, then run `gh pr update-branch` on the other. Pass: no conflict and both rows present. Fail: drop M3.
-4. M4: `just --dry-run check` lists the same gates before and after.
-5. Capstone and test audit per the usual gates before declaring complete.
+## 6. Verification
+
+1. M2 decision logic: `bash scripts/rerun-runner-failures.sh --selftest` (also `just rerun-runner-failures-test`, in `check`, and a step in `ci.yml`) runs fifteen checks: eleven scenarios against a stubbed `gh` that accepts only the exact `?per_page=100` URLs and four argument-handling cases. Logic mutants of the script each turn their named check red: any-failed instead of all-failed, a wrong marker, dropping `cancelled` from the job filter, swallowing the annotation fetch error, re-running an empty run, dropping or inverting the attempt guard, reading only the first annotation, dropping `per_page` from either call, dropping the run-id validation or letting an empty id through, and swallowing a failing `gh run rerun`. The empty-id case found a real defect (an empty run id reached the API as `actions/runs/`), fixed in the same change. Against the real API, run 41495365746 (now on attempt 2) prints `leave` and re-runs nothing.
+2. M2 wiring: `actionlint` is clean on the new workflow. The `workflow_run` trigger cannot be exercised before it is on the default branch; confirm on the next real "not acquired by Runner" cancellation, or by watching the first `CI rerun on runner acquisition failure` run after merge (expected: `leave` for a run that failed for a real reason).
+3. `concurrency`: push twice in quick succession to a throwaway PR branch and confirm the first run is cancelled and the second completes; confirm a push to `main` is not cancelled by a following push.

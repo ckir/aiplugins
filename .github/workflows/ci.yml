@@ -7,6 +7,13 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+# A new push to a pull request supersedes the run in flight, so it stops holding
+# runners (the macOS pool is the scarce one). Anything that is not a pull request
+# gets a group of its own, so a run on main is never cancelled by another.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -125,6 +132,9 @@ jobs:
 
       - name: Self-test the opencode plugin pin bump script
         run: bash scripts/bump-opencode-plugin.sh --selftest
+
+      - name: Self-test the runner-failure re-run decision
+        run: bash scripts/rerun-runner-failures.sh --selftest
 
       - name: Check antigravity wiring
         run: bash scripts/check-agy-wiring.sh
