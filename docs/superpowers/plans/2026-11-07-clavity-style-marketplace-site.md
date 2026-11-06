@@ -30,7 +30,7 @@
   - `docs/site/aiplugins.svg`: Vector icon showing 4 interconnected agent nodes.
   - `docs/site/styles.css`: Complete CSS styling covering navigation, hero, terminal demo, stage chips, value cards, footprint meters, dark/light theme variables, and copy status.
 
-- [ ] **Step 1: Create the SVG brand emblem**
+- [x] **Step 1: Create the SVG brand emblem**
 
 Create `docs/site/aiplugins.svg` with a 4-node agent constellation and cyber plug icon.
 
@@ -66,19 +66,19 @@ Create `docs/site/aiplugins.svg` with a 4-node agent constellation and cyber plu
 </svg>
 ```
 
-- [ ] **Step 2: Update styles.css with Clavity-inspired design system**
+- [x] **Step 2: Update styles.css with Clavity-inspired design system**
 
 Implement `docs/site/styles.css` with:
 - Variables: `--bg: #020713`, `--bg-deep: #001333`, `--bg-mid: #052b70`, `--driver: #ff4b18`, `--peer: #00cfff`, `--opencode: #22c55e`, `--qwen: #a855f7`, `--text: #eaf2ff`, `--muted: #9db3d6`, `--panel: rgba(5, 43, 112, 0.35)`.
 - Global responsive rules, sticky navbar, hero section, stage flowchips, dual-pane terminal mockup, value cards, footprint gauges, and light theme overrides.
 - Zero root-absolute references (`url("/"`).
 
-- [ ] **Step 3: Verify CSS syntax and absence of root-absolute references**
+- [x] **Step 3: Verify CSS syntax and absence of root-absolute references**
 
 Run: `grep -E 'url\(["'\''"]?/' docs/site/styles.css || true`
 Expected: Empty output (no matches).
 
-- [ ] **Step 4: Commit Task 1 changes**
+- [x] **Step 4: Commit Task 1 changes**
 
 ```bash
 git add docs/site/aiplugins.svg docs/site/styles.css
@@ -96,7 +96,7 @@ git commit -m "feat(site): add svg brand identity and clavity cyber theme styles
 - Consumes: `docs/site/styles.css`, `docs/site/aiplugins.svg`.
 - Produces: Semantic HTML5 markup containing all page sections, keeping `<!-- NOSCRIPT -->` and `href="api/index.html"`.
 
-- [ ] **Step 1: Update docs/site/index.html**
+- [x] **Step 1: Update docs/site/index.html**
 
 Incorporate:
 1. Meta tags: dark color scheme, responsive viewport, description, favicon link to `./aiplugins.svg`.
@@ -112,7 +112,7 @@ Incorporate:
 11. Footer with emblem, project links, and trademark disclaimers.
 12. ARIA live region (`#live`) for copy status announcements.
 
-- [ ] **Step 2: Verify invariants in index.html**
+- [x] **Step 2: Verify invariants in index.html**
 
 Run:
 ```bash
@@ -122,7 +122,7 @@ grep -E '(href|src)=["'\''"]/' docs/site/index.html || echo "No root-absolute li
 ```
 Expected: All three print `ok`.
 
-- [ ] **Step 3: Commit Task 2 changes**
+- [x] **Step 3: Commit Task 2 changes**
 
 ```bash
 git add docs/site/index.html
@@ -140,7 +140,7 @@ git commit -m "feat(site): update index.html with clavity layout, hero, terminal
 - Consumes: `catalog.json` (via `./catalog.json`).
 - Produces: Safe DOM generation for search filtering, agent tabs, footprint bars, copy actions, and theme toggling.
 
-- [ ] **Step 1: Update docs/site/app.js**
+- [x] **Step 1: Update docs/site/app.js**
 
 Implement:
 1. `el(tag, cls, text)` helper function.
@@ -152,7 +152,7 @@ Implement:
 7. Dark and Light theme toggle persisting to `localStorage`.
 8. Complete prohibition of `innerHTML`, `outerHTML`, `insertAdjacentHTML`, and `document.write`.
 
-- [ ] **Step 2: Verify DOM safety invariants**
+- [x] **Step 2: Verify DOM safety invariants**
 
 Run:
 ```bash
@@ -161,7 +161,7 @@ grep -E 'fetch\(["'\''`]?/' docs/site/app.js || echo "No root-absolute fetch ok"
 ```
 Expected: All print `ok`.
 
-- [ ] **Step 3: Commit Task 3 changes**
+- [x] **Step 3: Commit Task 3 changes**
 
 ```bash
 git add docs/site/app.js
@@ -175,24 +175,24 @@ git commit -m "feat(site): implement search filtering, safe DOM rendering, and i
 **Files:**
 - Test against: `scripts/stage-site.sh`, `scripts/check-site.sh`, `scripts/gen-site.sh`.
 
-- [ ] **Step 1: Run site-check verification**
+- [x] **Step 1: Run site-check verification**
 
 Run: `just site-check`
 Expected: Exit code 0, all marketplace and catalog invariant tests pass.
 
-- [ ] **Step 2: Run site staging gate**
+- [x] **Step 2: Run site staging gate**
 
 Run: `bash scripts/stage-site.sh`
 Expected: Exit code 0, prints `stage-site: gate ok (N crates listed)`.
 
-- [ ] **Step 3: Inspect staged files in target/site**
+- [x] **Step 3: Inspect staged files in target/site**
 
 Verify `target/site/index.html` has:
 - Staged noscript list without `<!-- NOSCRIPT -->`.
 - Staged CSS and JS files non-empty.
 - Correct relative links.
 
-- [ ] **Step 4: Final commit and cleanup**
+- [x] **Step 4: Final commit and cleanup**
 
 ```bash
 git status

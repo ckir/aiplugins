@@ -205,6 +205,9 @@ bash scripts/check-site.sh --root "$root" "$out_abs/catalog.json" || die "check-
 for f in index.html styles.css app.js; do
     cp "docs/site/$f" "$out_abs/$f" || die "cannot copy docs/site/$f"
 done
+if [ -f "docs/site/aiplugins.svg" ]; then
+    cp "docs/site/aiplugins.svg" "$out_abs/aiplugins.svg" || die "cannot copy docs/site/aiplugins.svg"
+fi
 
 blk=$(mktemp)
 trap 'rm -f "$blk"' EXIT
