@@ -1,5 +1,5 @@
 // Storefront page script. ES module, no dependencies.
-// The DOM is built with createElement/textContent/setAttribute/append only.
+// The DOM is built with createElement/textContent/setAttribute/append/replaceChildren only.
 
 /**
  * @typedef {{label: string, command: string}} Install
@@ -15,7 +15,13 @@
 let agents = [];
 let cardCounter = 0;
 
-/** @param {string} tag @param {string} [cls] @param {string} [text] @returns {HTMLElement} */
+/**
+ * Helper to create DOM elements safely without HTML parsing.
+ * @param {string} tag
+ * @param {string} [cls]
+ * @param {string} [text]
+ * @returns {HTMLElement}
+ */
 function el(tag, cls, text) {
   const node = document.createElement(tag);
   if (cls) node.setAttribute('class', cls);
@@ -23,12 +29,19 @@ function el(tag, cls, text) {
   return node;
 }
 
-/** @param {number} n @returns {string} */
+/**
+ * Format byte count with comma thousands separators.
+ * @param {number} n
+ * @returns {string}
+ */
 function formatBytes(n) {
   return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' B';
 }
 
-/** @returns {Promise<Catalog>} */
+/**
+ * Fetch and parse catalog.json using a strictly relative URL.
+ * @returns {Promise<Catalog>}
+ */
 async function loadCatalog() {
   let res;
   try {
@@ -47,10 +60,10 @@ async function loadCatalog() {
 }
 
 /**
- * Copy text and announce the result in the live region. Never throws and
- * always resolves.
+ * Copy text and announce the result in the ARIA live region.
+ * Never throws and always resolves.
  * @param {string} text
- * @returns {Promise<boolean>} true when a copy succeeded, false otherwise
+ * @returns {Promise<boolean>} true when copy succeeded, false otherwise
  */
 async function copyText(text) {
   let done = false;
@@ -88,7 +101,6 @@ async function copyText(text) {
   }
   const live = document.getElementById('live');
   if (live) {
-    // Clear first and set later, so a repeated identical message is announced again.
     live.textContent = '';
     setTimeout(() => {
       live.textContent = done ? 'Copied' : 'Copy failed. Select the text and copy it manually.';
@@ -98,8 +110,10 @@ async function copyText(text) {
 }
 
 /**
- * Make a button copy text and show the outcome on itself for about two seconds.
- * @param {HTMLElement} btn @param {string} text @returns {void}
+ * Wire a copy button with temporary status feedback.
+ * @param {HTMLElement} btn
+ * @param {string} text
+ * @returns {void}
  */
 function wireCopy(btn, text) {
   let timer = null;
@@ -115,7 +129,12 @@ function wireCopy(btn, text) {
   });
 }
 
-/** @param {string} text @param {string} what @returns {HTMLElement} */
+/**
+ * Create a standardized copy button element.
+ * @param {string} text
+ * @param {string} what
+ * @returns {HTMLElement}
+ */
 function copyButton(text, what) {
   const b = el('button', 'btn copy', 'Copy');
   b.setAttribute('type', 'button');
@@ -125,8 +144,13 @@ function copyButton(text, what) {
 }
 
 /**
- * @param {string} cls @param {string} label @param {number} value
- * @param {number|undefined} budget @param {string} budgetName @returns {HTMLElement}
+ * Render a single footprint figure line with optional budget comparison bar.
+ * @param {string} cls
+ * @param {string} label
+ * @param {number} value
+ * @param {number|undefined} budget
+ * @param {string} budgetName
+ * @returns {HTMLElement}
  */
 function figure(cls, label, value, budget, budgetName) {
   const fig = el('div', 'fig ' + cls);
@@ -146,7 +170,11 @@ function figure(cls, label, value, budget, budgetName) {
   return fig;
 }
 
-/** @param {Footprint|null} fp @returns {HTMLElement} */
+/**
+ * Render footprint breakdown or not-measured badge.
+ * @param {Footprint|null} fp
+ * @returns {HTMLElement}
+ */
 function renderFootprint(fp) {
   const box = el('div', 'footprint');
   if (!fp) {
@@ -163,7 +191,11 @@ function renderFootprint(fp) {
   return box;
 }
 
-/** @param {Plugin} plugin @returns {HTMLElement} */
+/**
+ * Render tabpanel body content for a specific plugin.
+ * @param {Plugin} plugin
+ * @returns {HTMLElement}
+ */
 function renderPanelBody(plugin) {
   const body = el('div', 'panel-body');
   body.append(el('p', 'desc', plugin.description || ''));
@@ -190,7 +222,12 @@ function renderPanelBody(plugin) {
   return body;
 }
 
-/** @param {Family} family @param {string} agentId @returns {HTMLElement} */
+/**
+ * Render an interactive card for a plugin family.
+ * @param {Family} family
+ * @param {string} agentId
+ * @returns {HTMLElement}
+ */
 function renderCard(family, agentId) {
   const uid = 'c' + (cardCounter++);
   const card = el('article', 'card');
@@ -263,14 +300,23 @@ function renderCard(family, agentId) {
   return card;
 }
 
-/** @param {Catalog} catalog @param {string} filter */
-function renderCatalog(catalog, filter) {
+/**
+ * Filter catalog and render cards matching the current search query and agent filter.
+ * @param {Catalog} catalog
+ * @param {string} filter
+ * @param {string} query
+ */
+function renderCatalog(catalog, filter, query) {
   agents = catalog.agents || [];
-  const container = document.getElementById('catalog');
+  const container = document.getElementById('catalog-grid') || document.getElementById('catalog');
   if (!container) return;
   const cards = [];
+  const q = query ? query.toLowerCase().trim() : '';
+
   for (const family of catalog.families || []) {
     const plugins = family.plugins || {};
+
+    // 1. Check agent filter match
     let agentId = null;
     if (filter === 'all') {
       const first = agents.find((a) => plugins[a.id]);
@@ -278,13 +324,45 @@ function renderCatalog(catalog, filter) {
     } else if (plugins[filter]) {
       agentId = filter;
     }
-    if (agentId !== null) cards.push(renderCard(family, agentId));
+
+    if (agentId === null) continue;
+
+    // 2. Check search query match
+    if (q) {
+      let matches = family.key.toLowerCase().includes(q);
+      if (!matches) {
+        for (const pid of Object.keys(plugins)) {
+          const p = plugins[pid];
+          if (
+            (p.name && p.name.toLowerCase().includes(q)) ||
+            (p.description && p.description.toLowerCase().includes(q)) ||
+            (p.dirKey && p.dirKey.toLowerCase().includes(q))
+          ) {
+            matches = true;
+            // If the matching plugin is enabled and agent filter is 'all', focus it
+            if (filter === 'all' && plugins[pid]) {
+              agentId = pid;
+            }
+            break;
+          }
+        }
+      }
+      if (!matches) continue;
+    }
+
+    cards.push(renderCard(family, agentId));
   }
+
   container.replaceChildren(...cards);
-  if (cards.length === 0) container.append(el('p', 'empty', 'No plugins match this filter.'));
+  if (cards.length === 0) {
+    container.append(el('p', 'empty', 'No plugins match your filter or search query.'));
+  }
 }
 
-/** @returns {void} */
+/**
+ * Initialize theme switcher with localStorage persistence and system theme fallback.
+ * @returns {void}
+ */
 function initTheme() {
   const root = document.documentElement;
   try {
@@ -308,29 +386,63 @@ function initTheme() {
     try {
       localStorage.setItem('theme', next);
     } catch (e) {
-      /* the choice just is not remembered */
+      /* choice not remembered */
     }
   });
 }
 
-function main() {
-  initTheme();
+/**
+ * Initialize global copy buttons (e.g., in install and hero sections).
+ * @returns {void}
+ */
+function initCopyButtons() {
+  const copyBtns = document.querySelectorAll('button[data-copy]');
+  for (const btn of copyBtns) {
+    const text = btn.getAttribute('data-copy');
+    if (text) {
+      wireCopy(btn, text);
+    }
+  }
   const heroCopy = document.getElementById('hero-copy');
   if (heroCopy) {
     wireCopy(heroCopy, 'claude plugin marketplace add ckir/aiplugins');
   }
-  const container = document.getElementById('catalog');
+}
+
+function main() {
+  initTheme();
+  initCopyButtons();
+
+  const container = document.getElementById('catalog-grid') || document.getElementById('catalog');
+  const searchInput = document.getElementById('search-input');
+
   loadCatalog().then((catalog) => {
-    let filter = 'all';
+    let activeFilter = 'all';
+    let searchQuery = '';
+
+    function update() {
+      renderCatalog(catalog, activeFilter, searchQuery);
+    }
+
     const chips = Array.from(document.querySelectorAll('.chip'));
     for (const chip of chips) {
       chip.addEventListener('click', () => {
-        filter = chip.getAttribute('data-filter') || 'all';
-        for (const c of chips) c.setAttribute('aria-pressed', c === chip ? 'true' : 'false');
-        renderCatalog(catalog, filter);
+        activeFilter = chip.getAttribute('data-filter') || 'all';
+        for (const c of chips) {
+          c.setAttribute('aria-pressed', c === chip ? 'true' : 'false');
+        }
+        update();
       });
     }
-    renderCatalog(catalog, filter);
+
+    if (searchInput) {
+      searchInput.addEventListener('input', () => {
+        searchQuery = searchInput.value;
+        update();
+      });
+    }
+
+    update();
   }).catch((err) => {
     if (container) {
       container.replaceChildren(el('p', 'error', err && err.message ? err.message : String(err)));
