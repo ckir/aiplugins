@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" fill="none">
+  <defs>
+    <linearGradient id="cyber-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00cfff" />
+      <stop offset="50%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#ff4b18" />
+    </linearGradient>
+    <filter id="neon-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  <circle cx="60" cy="60" r="54" stroke="url(#cyber-grad)" stroke-width="2.5" fill="#020713" opacity="0.9" />
+  <circle cx="60" cy="60" r="44" stroke="#052b70" stroke-width="1.5" stroke-dasharray="4 4" />
+  <!-- Interconnecting Circuit Lines -->
+  <path d="M 60 22 L 60 48 M 60 72 L 60 98 M 22 60 L 48 60 M 72 60 L 98 60" stroke="#00cfff" stroke-width="2" stroke-linecap="round" opacity="0.8" />
+  <path d="M 32 32 L 48 48 M 88 88 L 72 72 M 88 32 L 72 48 M 32 88 L 48 72" stroke="#ff4b18" stroke-width="1.5" stroke-linecap="round" opacity="0.7" />
+  <!-- Central Hub / Plug Motif -->
+  <rect x="48" y="48" width="24" height="24" rx="6" fill="#001333" stroke="url(#cyber-grad)" stroke-width="2" filter="url(#neon-glow)" />
+  <circle cx="60" cy="60" r="4" fill="#00cfff" />
+  <!-- Agent Nodes: Claude, Antigravity, OpenCode, Qwen -->
+  <circle cx="60" cy="22" r="5" fill="#ff4b18" filter="url(#neon-glow)" />
+  <circle cx="98" cy="60" r="5" fill="#00cfff" filter="url(#neon-glow)" />
+  <circle cx="60" cy="98" r="5" fill="#22c55e" filter="url(#neon-glow)" />
+  <circle cx="22" cy="60" r="5" fill="#a855f7" filter="url(#neon-glow)" />
+</svg>
