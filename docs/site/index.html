@@ -3,63 +3,283 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI Plugins Marketplace</title>
-<meta name="description" content="Plugins for Claude Code, Antigravity, Qwen and OpenCode.">
+<title>AI Plugins Marketplace — Cross-Agent Monorepo &amp; Tools</title>
+<meta name="description" content="Production-ready plugins, tools, and MCP servers for Claude Code, Antigravity, OpenCode, and Qwen.">
+<link rel="icon" type="image/svg+xml" href="./aiplugins.svg">
 <link rel="stylesheet" href="styles.css">
 <script type="module" src="app.js"></script>
 </head>
 <body>
-<header class="hero">
-  <div class="wrap">
-    <div class="topbar">
-      <h1>AI Plugins Marketplace</h1>
+
+<header class="site-nav">
+  <div class="wrap nav-inner">
+    <a href="#" class="nav-brand">
+      <img src="./aiplugins.svg" alt="AI Plugins emblem" class="nav-logo" width="32" height="32">
+      <span>AI Plugins</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#demo">Demo</a></li>
+      <li><a href="#values">Values</a></li>
+      <li><a href="#how-it-works">Architecture</a></li>
+      <li><a href="#catalog">Catalog</a></li>
+      <li><a href="#install">Quick Install</a></li>
+      <li><a href="#docs">Docs</a></li>
+    </ul>
+    <div class="nav-actions">
       <button type="button" id="theme-toggle" class="btn" aria-label="Toggle dark and light theme">Theme</button>
-    </div>
-    <p class="pitch">Plugins for Claude Code, Antigravity, Qwen and OpenCode</p>
-    <div class="install-block">
-      <div class="install-label">Claude Code</div>
-      <div class="cmd-row">
-        <pre class="cmd"><code>claude plugin marketplace add ckir/aiplugins</code></pre>
-        <button type="button" class="btn copy" id="hero-copy" aria-label="Copy the Claude Code marketplace command">Copy</button>
-      </div>
-    </div>
-    <div class="chips" role="group" aria-label="Filter by agent">
-      <button type="button" class="chip" data-filter="all" aria-pressed="true">All</button>
-      <button type="button" class="chip" data-filter="claude-code" aria-pressed="false">Claude Code</button>
-      <button type="button" class="chip" data-filter="opencode" aria-pressed="false">OpenCode</button>
-      <button type="button" class="chip" data-filter="antigravity" aria-pressed="false">Antigravity</button>
-      <button type="button" class="chip" data-filter="qwen" aria-pressed="false">Qwen</button>
+      <a href="#catalog" class="nav-cta">Explore Plugins</a>
     </div>
   </div>
 </header>
-<main class="wrap">
-  <section aria-labelledby="catalog-h">
-    <h2 id="catalog-h">Catalog</h2>
-    <div id="catalog" class="grid"><p>Loading the plugin catalog…</p></div>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-tag">Cross-Agent Monorepo &amp; MCP Marketplace</div>
+    <h1>One Marketplace. Four Autonomous Agents.</h1>
+    <p class="hero-sub">Production-ready plugins, tools, and MCP servers for Claude Code, Antigravity, OpenCode, and Qwen — with zero-compile instant installs and strict context budgets.</p>
+    
+    <div class="hero-ctas">
+      <a href="#catalog" class="btn btn-primary">Explore Plugins</a>
+      <a href="#install" class="btn">Quick Install</a>
+      <a href="USER_GUIDE.pdf" class="btn">User Guide (PDF)</a>
+    </div>
+
+    <div class="flow-container">
+      <div class="flow-title">Unified Multi-Agent Pipeline</div>
+      <div class="flow-chips">
+        <div class="flow-chip"><span class="chip-num">01</span> Discover</div>
+        <span class="flow-arrow" aria-hidden="true">→</span>
+        <div class="flow-chip"><span class="chip-num">02</span> Install</div>
+        <span class="flow-arrow" aria-hidden="true">→</span>
+        <div class="flow-chip"><span class="chip-num">03</span> Bridge</div>
+        <span class="flow-arrow" aria-hidden="true">→</span>
+        <div class="flow-chip"><span class="chip-num">04</span> Optimize</div>
+        <span class="flow-arrow" aria-hidden="true">→</span>
+        <div class="flow-chip"><span class="chip-num">05</span> Delegate</div>
+        <span class="flow-arrow" aria-hidden="true">→</span>
+        <div class="flow-chip"><span class="chip-num">06</span> Review</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="demo" class="demo-section">
+  <div class="wrap">
+    <div class="terminal-window">
+      <div class="terminal-header">
+        <div class="dots">
+          <div class="dot dot-red"></div>
+          <div class="dot dot-yellow"></div>
+          <div class="dot dot-green"></div>
+        </div>
+        <div class="terminal-title">aiplugins session: claude-code (driver) ⇄ antigravity + opencode (peer workers)</div>
+        <div class="term-status"><span class="term-tag">LIVE AGENTS</span></div>
+      </div>
+      <div class="terminal-panes">
+        <div class="terminal-pane">
+          <div class="pane-badge badge-claude">Claude Code · Driver</div>
+          <div class="pane-code">
+            <div class="term-line"><span class="term-prompt">$ </span><span class="term-cmd">git status</span></div>
+            <div class="term-line term-dim">[rtk-mcp] rewrote 'git status' -> 82% token savings (1,420 -> 256 tokens)</div>
+            <div class="term-line">* main...origin/main [ahead 1]</div>
+            <div class="term-line">clean — nothing to commit</div>
+            <div class="term-line"><br></div>
+            <div class="term-line"><span class="term-prompt">$ </span><span class="term-cmd">opencode-ctl dispatch --task "decompile-core" --symbol "verify_token"</span></div>
+            <div class="term-line term-highlight">[opencode-ctl-mcp] task #402 dispatched to OpenCode worker pool</div>
+            <div class="term-line term-dim">[opencode-ctl-mcp] worker attached via shared memory bridge</div>
+          </div>
+        </div>
+        <div class="terminal-pane">
+          <div class="pane-badge badge-peer">Antigravity · OpenCode · Workers</div>
+          <div class="pane-code">
+            <div class="term-line term-dim">[shared/ghidra-mcp] headless decompile target: libauth.so:verify_token()</div>
+            <div class="term-line term-highlight">[shared/ghidra-mcp] AST emitted: 14 basic blocks, 0 unsafe derefs</div>
+            <div class="term-line"><br></div>
+            <div class="term-line"><span class="term-prompt">$ </span><span class="term-cmd">devtools-skills review --axis correctness,security,performance</span></div>
+            <div class="term-line term-dim">[aiplugins-devtools] audit pass 1: memory safety [OK]</div>
+            <div class="term-line term-dim">[aiplugins-devtools] audit pass 2: context footprint [OK: 4.2 KB &lt; 10 KB budget]</div>
+            <div class="term-line term-success">[aiplugins-devtools] VERDICT: GREEN (Ready for main branch)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="values" class="values-section">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Why AI Plugins?</h2>
+      <p>Purpose-built tooling designed to make autonomous AI coding assistants safer, faster, and dramatically cheaper.</p>
+    </div>
+    <div class="values-grid">
+      <div class="value-card">
+        <h3>Zero-Compile Instant Installs</h3>
+        <p>Prebuilt, tested native binaries for Windows (x64), Linux (x86_64, aarch64), and macOS (x86_64, Apple Silicon). Single-line install commands configure tools and hooks immediately without compiler toolchains.</p>
+      </div>
+      <div class="value-card">
+        <h3>Context Footprint Transparency</h3>
+        <p>Every plugin measures exact Resident vs Invocation vs Setup bytes before install. Enforced context budget gates ensure your LLM prompt windows remain clean, token-efficient, and fast.</p>
+      </div>
+      <div class="value-card">
+        <h3>Cross-Agent Unified Rust Core</h3>
+        <p>Shared memory-safe Rust crates in <code>shared/</code> power native adapters across Claude Code, Google Antigravity, OpenCode, and Qwen, eliminating divergent plugin behaviors.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how-it-works" class="how-section">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Architecture &amp; Multi-Agent Design</h2>
+      <p>How the monorepo delivers unified capabilities to four distinct agent ecosystems.</p>
+    </div>
+    <div class="how-grid">
+      <div class="how-step">
+        <div class="step-num">Layer 01</div>
+        <h4>Universal Core Engines</h4>
+        <p>High-performance Rust libraries for token reduction (RTK), binary analysis (Ghidra headless), task dispatch, and QA audit.</p>
+      </div>
+      <div class="how-step">
+        <div class="step-num">Layer 02</div>
+        <h4>Cross-Agent Manifests</h4>
+        <p>Declarative marketplace specs generate platform-native configs for Claude plugins, Antigravity skills, OpenCode modules, and Qwen extensions.</p>
+      </div>
+      <div class="how-step">
+        <div class="step-num">Layer 03</div>
+        <h4>Safe MCP &amp; CLI Bridges</h4>
+        <p>Standard Model Context Protocol servers run with strict schema budgets, delivering predictable tooling to every connected agent.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="catalog" class="catalog-section" aria-labelledby="catalog-h">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 id="catalog-h">Interactive Plugin Catalog</h2>
+      <p>Explore tools, skills, and MCP servers across Claude Code, Antigravity, OpenCode, and Qwen.</p>
+    </div>
+    <div class="catalog-controls">
+      <div class="search-wrap">
+        <input type="search" id="search-input" class="search-input" placeholder="Search by name, description, or keyword…" aria-label="Search plugins">
+      </div>
+      <div class="chips" role="group" aria-label="Filter by agent">
+        <button type="button" class="chip" data-filter="all" aria-pressed="true">All</button>
+        <button type="button" class="chip" data-filter="claude-code" aria-pressed="false">Claude Code</button>
+        <button type="button" class="chip" data-filter="opencode" aria-pressed="false">OpenCode</button>
+        <button type="button" class="chip" data-filter="antigravity" aria-pressed="false">Antigravity</button>
+        <button type="button" class="chip" data-filter="qwen" aria-pressed="false">Qwen</button>
+      </div>
+    </div>
+    <div id="catalog-grid" class="grid"><p>Loading the plugin catalog…</p></div>
 <!-- NOSCRIPT -->
-  </section>
-  <section class="why" aria-labelledby="why-h">
-    <h2 id="why-h">Why it matters</h2>
+  </div>
+</section>
+
+<section id="footprints" class="why" aria-labelledby="why-h">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 id="why-h">Understanding Context Footprints</h2>
+      <p>Every byte of schema loaded by an agent consumes precious LLM context window memory.</p>
+    </div>
     <dl>
-      <dt>Resident</dt>
-      <dd>What the host holds in every request, for the whole session: the MCP tool schemas plus the frontmatter it reads to decide what each skill and agent is for.</dd>
-      <dt>Invocation</dt>
-      <dd>Loads only when one of them actually runs.</dd>
-      <dt>Setup (OpenCode only)</dt>
-      <dd>An OpenCode plugin also loads its setup module in-process with the host on every request, a third tier on top of the two above.</dd>
+      <div>
+        <dt>Resident</dt>
+        <dd>What the host holds in every request, for the whole session: MCP tool schemas plus frontmatter loaded to decide what each skill and agent is for.</dd>
+      </div>
+      <div>
+        <dt>Invocation</dt>
+        <dd>Loads only when a tool or skill is actively executed by the agent during a workflow step.</dd>
+      </div>
+      <div>
+        <dt>Setup (OpenCode only)</dt>
+        <dd>An OpenCode plugin also loads its setup module in-process with the host on every request, as a third tier on top of the two above.</dd>
+      </div>
     </dl>
-    <p>These are bytes, not tokens: the exact serialised size of what the host loads. Compare them between plugins; they are not a context budget.</p>
-  </section>
-</main>
-<footer class="wrap">
-  <nav aria-label="Project links">
-    <a href="api/index.html">API docs</a>
-    <a href="USER_GUIDE.pdf">User Guide</a>
-    <a href="https://github.com/ckir/aiplugins">GitHub</a>
-    <a href="https://github.com/ckir/aiplugins/blob/main/CHANGELOG.md">Changelog</a>
-    <a href="https://github.com/ckir/aiplugins/blob/main/LICENSE">License</a>
-  </nav>
+    <p class="note">These are bytes, not tokens: the exact serialised size of what the host loads. Compare them between plugins; they are not a context budget.</p>
+  </div>
+</section>
+
+<section id="install" class="install-section">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Quick Install</h2>
+      <p>Connect your preferred autonomous agent environment to the AI Plugins marketplace.</p>
+    </div>
+    <div class="install-grid">
+      <div class="install-card">
+        <h4>Claude Code</h4>
+        <p>Register the entire marketplace catalog with one command:</p>
+        <div class="cmd-row">
+          <pre class="cmd"><code>claude plugin marketplace add ckir/aiplugins</code></pre>
+          <button type="button" class="btn copy" data-copy="claude plugin marketplace add ckir/aiplugins" aria-label="Copy Claude Code marketplace add command">Copy</button>
+        </div>
+      </div>
+      <div class="install-card">
+        <h4>Google Antigravity</h4>
+        <p>Install curated skills and custom tools directly into <code>~/.gemini/antigravity-cli</code>:</p>
+        <div class="cmd-row">
+          <pre class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/ckir/aiplugins/main/install-agy.sh | bash</code></pre>
+          <button type="button" class="btn copy" data-copy="curl -fsSL https://raw.githubusercontent.com/ckir/aiplugins/main/install-agy.sh | bash" aria-label="Copy Antigravity install command">Copy</button>
+        </div>
+      </div>
+      <div class="install-card">
+        <h4>OpenCode</h4>
+        <p>Add the marketplace config to your OpenCode configuration:</p>
+        <div class="cmd-row">
+          <pre class="cmd"><code>opencode plugin add ckir/aiplugins</code></pre>
+          <button type="button" class="btn copy" data-copy="opencode plugin add ckir/aiplugins" aria-label="Copy OpenCode add command">Copy</button>
+        </div>
+      </div>
+      <div class="install-card">
+        <h4>Qwen</h4>
+        <p>Download and extract prebuilt extensions into <code>~/.qwen/extensions</code>:</p>
+        <div class="cmd-row">
+          <pre class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/ckir/aiplugins/main/install-qwen.sh | bash</code></pre>
+          <button type="button" class="btn copy" data-copy="curl -fsSL https://raw.githubusercontent.com/ckir/aiplugins/main/install-qwen.sh | bash" aria-label="Copy Qwen install command">Copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="docs" class="wrap" style="padding: 2.5rem 0;">
+  <div class="section-head">
+    <h2>Guides &amp; Developer Resources</h2>
+    <p>Comprehensive documentation, architecture references, and API docs for contributors.</p>
+  </div>
+  <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem;">
+    <a href="USER_GUIDE.pdf" class="btn">User Guide (PDF)</a>
+    <a href="api/index.html" class="btn">Rustdoc API Documentation</a>
+    <a href="https://github.com/ckir/aiplugins" class="btn">GitHub Repository</a>
+    <a href="https://github.com/ckir/aiplugins/blob/main/CHANGELOG.md" class="btn">Changelog</a>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <img src="./aiplugins.svg" alt="AI Plugins emblem" width="28" height="28">
+        <span>AI Plugins</span>
+      </div>
+      <nav class="footer-nav" aria-label="Footer project links">
+        <a href="api/index.html">API docs</a>
+        <a href="USER_GUIDE.pdf">User Guide</a>
+        <a href="https://github.com/ckir/aiplugins">GitHub</a>
+        <a href="https://github.com/ckir/aiplugins/blob/main/CHANGELOG.md">Changelog</a>
+        <a href="https://github.com/ckir/aiplugins/blob/main/LICENSE">License</a>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <div>AI Plugins — Cross-Agent Monorepo &amp; MCP Marketplace. Released under the Apache 2.0 / MIT license.</div>
+      <div>Claude is a trademark of Anthropic, PBC. Google Antigravity is a trademark of Google LLC. All product names are trademarks of their respective owners.</div>
+    </div>
+  </div>
 </footer>
+
 <div role="status" aria-live="polite" id="live" class="visually-hidden"></div>
 </body>
 </html>
