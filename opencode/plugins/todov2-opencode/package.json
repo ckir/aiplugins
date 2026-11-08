@@ -54,8 +54,8 @@
     }
   },
   "devDependencies": {
-    "@opentui/core": "0.8.0",
-    "@opentui/solid": "0.8.0",
+    "@opentui/core": "0.8.2",
+    "@opentui/solid": "0.8.2",
     "@types/bun": "^1.4.0",
     "solid-js": "1.9.18",
     "typescript": "^7.0.2"
