@@ -73,7 +73,18 @@ jobs:
         uses: taiki-e/install-action@nextest
 
       - name: Run tests
+        env:
+          # The repo-tasks Windows tests append what they measure here.
+          REPO_TASKS_CI_NOTES: ${{ runner.temp }}/repo-tasks-ci-notes.txt
         run: cargo nextest run --workspace --no-fail-fast
+
+      - name: Upload the repo-tasks measurements
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: repo-tasks-ci-notes-${{ matrix.os }}
+          path: ${{ runner.temp }}/repo-tasks-ci-notes.txt
+          if-no-files-found: ignore
 
   opencode-test:
     name: OpenCode TS Tests (${{ matrix.os }})

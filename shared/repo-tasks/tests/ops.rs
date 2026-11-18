@@ -56,6 +56,7 @@ fn quick() -> Tuning {
         rename_retry: Duration::from_millis(300),
         read_retry: Duration::from_millis(100),
         poll: Duration::from_millis(5),
+        retry_log: None,
     }
 }
 

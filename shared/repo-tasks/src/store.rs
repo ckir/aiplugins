@@ -23,7 +23,13 @@ pub struct Tuning {
     pub rename_retry: Duration,
     pub read_retry: Duration,
     pub poll: Duration,
+    /// Where `retry_io` records each refused attempt (the error kind, once per refusal); `None`
+    /// records nothing. CI notes read it; nothing is printed.
+    pub retry_log: Option<RetryLog>,
 }
+
+/// The shared list of refused attempts a `Tuning` can carry.
+pub type RetryLog = std::sync::Arc<std::sync::Mutex<Vec<String>>>;
 
 impl Default for Tuning {
     fn default() -> Tuning {
@@ -32,6 +38,7 @@ impl Default for Tuning {
             rename_retry: Duration::from_secs(5),
             read_retry: Duration::from_secs(1),
             poll: Duration::from_millis(10),
+            retry_log: None,
         }
     }
 }
@@ -69,11 +76,20 @@ fn platform_retryable(e: &io::Error) -> bool {
     }
 }
 
+/// What the retry log keeps of a refused attempt: its kind, and the OS error number if any.
+fn refusal_label(e: &io::Error) -> String {
+    match e.raw_os_error() {
+        Some(n) => format!("{:?} (os error {n})", e.kind()),
+        None => format!("{:?}", e.kind()),
+    }
+}
+
 /// Run `op`; while it fails with an error `retryable` accepts, repeat it until `budget`
-/// has passed, counted from the first refusal.
+/// has passed, counted from the first refusal. Each refusal is pushed on `log` when there is one.
 fn retry_io<T>(
     budget: Duration,
     poll: Duration,
+    log: Option<&RetryLog>,
     retryable: fn(&io::Error) -> bool,
     mut op: impl FnMut() -> io::Result<T>,
 ) -> io::Result<T> {
@@ -82,7 +98,11 @@ fn retry_io<T>(
         match op() {
             Err(e) if retryable(&e) => {
                 let start = *first_refusal.get_or_insert_with(Instant::now);
-                eprintln!("repo-tasks: retrying after {:?} ({e})", e.kind());
+                if let Some(log) = log {
+                    log.lock()
+                        .unwrap_or_else(|p| p.into_inner())
+                        .push(refusal_label(&e));
+                }
                 if start.elapsed() >= budget {
                     return Err(e);
                 }
@@ -95,9 +115,13 @@ fn retry_io<T>(
 
 /// `Ok(None)` when the file does not exist.
 fn read_file(path: &Path, tuning: &Tuning) -> io::Result<Option<Vec<u8>>> {
-    match retry_io(tuning.read_retry, tuning.poll, platform_retryable, || {
-        fs::read(path)
-    }) {
+    match retry_io(
+        tuning.read_retry,
+        tuning.poll,
+        tuning.retry_log.as_ref(),
+        platform_retryable,
+        || fs::read(path),
+    ) {
         Ok(b) => Ok(Some(b)),
         Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(e),
@@ -206,17 +230,27 @@ fn replace_list(store: &Store, bytes: &[u8], tuning: &Tuning) -> Result<()> {
     let result = write_tmp(&tmp, bytes)
         .map_err(|e| io_err(&tmp, e))
         .and_then(|()| {
-            retry_io(tuning.rename_retry, tuning.poll, platform_retryable, || {
-                fs::rename(&tmp, &list)
-            })
+            retry_io(
+                tuning.rename_retry,
+                tuning.poll,
+                tuning.retry_log.as_ref(),
+                platform_retryable,
+                || fs::rename(&tmp, &list),
+            )
             .map_err(|e| io_err(&list, e))
         });
     if let Err(e) = result {
         let _ = fs::remove_file(&tmp);
         return Err(e);
     }
-    // The rename has happened; a failed folder flush is still a failed call.
-    sync_dir(&store.dir).map_err(|e| io_err(&store.dir, e))
+    after_rename(&store.dir, sync_dir);
+    Ok(())
+}
+
+/// The folder flush after a successful rename is best effort: the new list is already in place,
+/// so failing the call would invite a retry that duplicates a create.
+fn after_rename(dir: &Path, flush: impl FnOnce(&Path) -> io::Result<()>) {
+    let _ = flush(dir);
 }
 
 /// 7.5: outside git the store folder names the directory it belongs to.
@@ -289,6 +323,7 @@ mod tests {
         let r: io::Result<()> = retry_io(
             Duration::from_millis(50),
             Duration::from_millis(1),
+            None,
             always,
             || {
                 calls.set(calls.get() + 1);
@@ -302,6 +337,7 @@ mod tests {
         let r: io::Result<()> = retry_io(
             Duration::from_secs(5),
             Duration::from_millis(1),
+            None,
             never,
             || {
                 calls.set(calls.get() + 1);
@@ -315,6 +351,7 @@ mod tests {
         let r = retry_io(
             Duration::from_secs(5),
             Duration::from_millis(1),
+            None,
             always,
             || {
                 calls.set(calls.get() + 1);
@@ -326,5 +363,57 @@ mod tests {
             },
         );
         assert_eq!(r.unwrap(), 7);
+    }
+
+    #[test]
+    fn observer_gets_one_entry_per_refusal() {
+        let log: RetryLog = Default::default();
+        let calls = Cell::new(0);
+        let r = retry_io(
+            Duration::from_secs(5),
+            Duration::from_millis(1),
+            Some(&log),
+            |_| true,
+            || {
+                calls.set(calls.get() + 1);
+                if calls.get() < 4 {
+                    Err(io::Error::from(io::ErrorKind::PermissionDenied))
+                } else {
+                    Ok(())
+                }
+            },
+        );
+        assert!(r.is_ok());
+        let seen = log.lock().unwrap().clone();
+        assert_eq!(seen, vec!["PermissionDenied"; 3]);
+        // A raw OS error keeps its number; a refused error is not recorded.
+        let log: RetryLog = Default::default();
+        let _ = retry_io(
+            Duration::ZERO,
+            Duration::from_millis(1),
+            Some(&log),
+            |_| true,
+            || Err::<(), _>(io::Error::from_raw_os_error(32)),
+        );
+        assert_eq!(log.lock().unwrap().len(), 1);
+        assert!(log.lock().unwrap()[0].ends_with("(os error 32)"));
+        let _ = retry_io(
+            Duration::ZERO,
+            Duration::from_millis(1),
+            Some(&log),
+            |_| false,
+            || Err::<(), _>(io::Error::from_raw_os_error(32)),
+        );
+        assert_eq!(log.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_failed_folder_flush_after_the_rename_is_not_a_failure() {
+        let ran = Cell::new(false);
+        after_rename(Path::new("/x"), |_| {
+            ran.set(true);
+            Err(io::Error::other("disk gone"))
+        });
+        assert!(ran.get());
     }
 }

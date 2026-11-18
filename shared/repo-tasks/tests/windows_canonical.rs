@@ -27,17 +27,29 @@ fn note(line: &str) {
     }
 }
 
+/// Removes the temporary directory however the test ends, unwrap panics included.
+struct Cleanup(std::path::PathBuf);
+
+impl Drop for Cleanup {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
 #[test]
 fn differently_cased_spellings_give_one_store_key() {
     let base = std::env::temp_dir().join(format!("repo-tasks-canon-{}", std::process::id()));
+    let _cleanup = Cleanup(base.clone());
     let dir = base.join("MixedCase");
     std::fs::create_dir_all(&dir).unwrap();
     let real = std::fs::canonicalize(&dir)
         .unwrap()
         .to_string_lossy()
         .into_owned();
-    let lower = std::path::PathBuf::from(real.to_lowercase());
-    let upper = std::path::PathBuf::from(real.to_uppercase());
+    // ASCII only: the point is two spellings of the same path, not Unicode case mapping.
+    let lower = std::path::PathBuf::from(real.to_ascii_lowercase());
+    let upper = std::path::PathBuf::from(real.to_ascii_uppercase());
+    assert_ne!(lower, upper, "the two spellings must differ");
     let env = Env {
         local_app_data: Some(base.clone()),
         ..Env::default()
@@ -50,7 +62,6 @@ fn differently_cased_spellings_give_one_store_key() {
         b.start.display()
     ));
     let (ka, kb) = (store_key(&a.start), store_key(&b.start));
-    let _ = std::fs::remove_dir_all(&base);
     assert_eq!(ka, kb, "two spellings must give one store key");
     assert_eq!(a.dir, b.dir);
 }

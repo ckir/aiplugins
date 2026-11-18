@@ -59,6 +59,7 @@ fn quick() -> Tuning {
         rename_retry: Duration::from_millis(300),
         read_retry: Duration::from_millis(100),
         poll: Duration::from_millis(5),
+        retry_log: None,
     }
 }
 
@@ -291,12 +292,17 @@ fn windows_reader_and_writer_never_fail() {
     let t = Tmp::new();
     let s = std::sync::Arc::new(store_in(&t.0, true));
     let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let log: repo_tasks::store::RetryLog = Default::default();
     let writer = {
-        let (s, stop) = (s.clone(), stop.clone());
+        let (s, stop, log) = (s.clone(), stop.clone(), log.clone());
         std::thread::spawn(move || {
             let mut n = 0;
+            let tuning = Tuning {
+                retry_log: Some(log),
+                ..long()
+            };
             while !stop.load(Ordering::SeqCst) {
-                mutate(&s, &long(), |l| Ok(add_task(l, "w"))).expect("writer call failed");
+                mutate(&s, &tuning, |l| Ok(add_task(l, "w"))).expect("writer call failed");
                 n += 1;
             }
             n
@@ -304,11 +310,15 @@ fn windows_reader_and_writer_never_fail() {
     };
     let readers: Vec<_> = (0..4)
         .map(|_| {
-            let (s, stop) = (s.clone(), stop.clone());
+            let (s, stop, log) = (s.clone(), stop.clone(), log.clone());
             std::thread::spawn(move || {
                 let mut n = 0;
+                let tuning = Tuning {
+                    retry_log: Some(log),
+                    ..Tuning::default()
+                };
                 while !stop.load(Ordering::SeqCst) {
-                    read_list(&s, &Tuning::default()).expect("reader call failed");
+                    read_list(&s, &tuning).expect("reader call failed");
                     n += 1;
                 }
                 n
@@ -324,6 +334,13 @@ fn windows_reader_and_writer_never_fail() {
         use std::io::Write;
         if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(file) {
             let _ = writeln!(f, "windows-rw: writer calls {w}, reader calls {r}");
+            let mut counts = std::collections::BTreeMap::<String, u32>::new();
+            for kind in log.lock().unwrap().iter() {
+                *counts.entry(kind.clone()).or_default() += 1;
+            }
+            for (kind, n) in counts {
+                let _ = writeln!(f, "retry-kind: {kind} x{n}");
+            }
         }
     }
     assert!(w > 0 && r > 0);
