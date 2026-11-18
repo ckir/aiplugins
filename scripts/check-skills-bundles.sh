@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+# Copyright 2026 Costas Kirgoussios
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+#
+# Source-available software. It is NOT open source.
+# Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+# with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+# anti-circumvention). See both files at the repository root.
+
 #
 # Build every skills-only plugin bundle and assert the zips are what an
 # installer expects. The oracle for scripts/bundle-skills-plugin.sh.

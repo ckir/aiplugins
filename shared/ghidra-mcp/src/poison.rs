@@ -1,3 +1,11 @@
+// Copyright 2026 Costas Kirgoussios
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
+
 //! Bounded poison-set (spec §4.3): remembers (tool, selector) pairs that reproducibly crashed the
 //! worker, so an identical later request is rejected up-front without a third/fourth respawn. Bounded
 //! LRU (evicts oldest) so a stubborn agent spamming distinct payloads can't grow it without limit.

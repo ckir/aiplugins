@@ -1,3 +1,11 @@
+// Copyright 2026 Costas Kirgoussios
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
+
 //! Cross-language wire DTOs for the M1a read tools (spec §3). These are the worker's response shapes;
 //! the server canonicalizes address strings (via `address::AddressCanonicalizer`) before returning
 //! them to the MCP client, but the wire form carries whatever `space:offset` the worker emits.

@@ -1,3 +1,11 @@
+// Copyright 2026 Costas Kirgoussios
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
+
 //! Server configuration + static validation (spec §7). Precedence: CLI flag > env var > config file >
 //! built-in default. Validation happens BEFORE any worker boot so a misconfig surfaces as a clean
 //! onboarding error, not a boot crash-loop. `bootstrap_program` is required (the worker cannot boot

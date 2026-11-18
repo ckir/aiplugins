@@ -1,3 +1,11 @@
+// Copyright 2026 Costas Kirgoussios
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
+
 //! Worker launch configuration + launcher argv (spec §3/§4). The argv build is a pure function so
 //! it is unit-tested without a Ghidra install. Attach-only (`-process`, not `-import`) because v1
 //! attaches to already-analyzed projects (spec §8.1); writable (NOT `-readOnly`) since M2a's `rename`

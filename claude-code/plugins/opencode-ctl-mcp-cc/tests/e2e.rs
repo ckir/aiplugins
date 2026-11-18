@@ -1,3 +1,11 @@
+// Copyright 2026 Costas Kirgoussios
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
+
 //! End-to-end tests that run the plugin's real `serve` through rmcp's client against the
 //! mock `opencode` (`mock-opencode-ctl-cc`). Nothing here touches the real home or a real
 //! `opencode`: every spawned process gets explicit HOME, USERPROFILE and OPENCODE_CTL_HOME.

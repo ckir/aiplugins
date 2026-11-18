@@ -1,3 +1,11 @@
+// Copyright 2026 Costas Kirgoussios
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
+
 //! In-process Crucible assertions (spec §8): drive ServerState/execute directly so garbage inputs
 //! return the RIGHT structured ErrorCode. Gated on GHIDRA_MCP_E2E=1 + fixture env (real Ghidra).
 

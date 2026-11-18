@@ -1,3 +1,11 @@
+// Copyright 2026 Costas Kirgoussios
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
+
 //! Mock `opencode` binary logic (Task 12). `tests/bin/mock_opencode.rs` is a shim over [`main`].
 //!
 //! Test infrastructure only: it reads keyed fixtures from `MOCK_OPENCODE_FIXTURES`, keeps

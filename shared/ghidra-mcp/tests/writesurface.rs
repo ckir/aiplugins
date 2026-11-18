@@ -1,3 +1,11 @@
+// Copyright 2026 Costas Kirgoussios
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
+
 // M2b write-surface e2e. Gated by GHIDRA_MCP_E2E=1. Run from PowerShell, -j1 (single JVM per worker):
 //   $env:GHIDRA_MCP_E2E="1"; cargo nextest run -p ghidra-mcp --test writesurface -j1
 mod common;

@@ -1,3 +1,11 @@
+// Copyright 2026 Costas Kirgoussios
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
+
 //! End-to-end thin-slice proof (spec §14): boot a real Ghidra worker, attach a program, decompile
 //! a known function, get C back. Skipped unless GHIDRA_MCP_E2E=1 and the fixture env vars are set.
 //! (agy risk note A: if boot hangs on Windows, suspect an EDR/firewall intercept of the unsigned

@@ -1,3 +1,11 @@
+// Copyright 2026 Costas Kirgoussios
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
+
 //! Connection token for the loopback-TCP transport (spec §5/§6). The host generates a 128-bit
 //! token, hands it to the worker out-of-band via a short-lived 0600 file, and verifies the worker
 //! echoes it in the init handshake — so another local process that races the ephemeral port is

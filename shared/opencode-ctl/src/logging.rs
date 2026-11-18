@@ -1,3 +1,11 @@
+// Copyright 2026 Costas Kirgoussios
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
+
 //! File logging (spec "Logging"): `<home>/logs/serve-<pid>.log` and `pair-<pair-id>.log`, level
 //! `info` (`debug` on request), a 5 MiB cap that rolls once to `.1`, and retention. Nothing here
 //! ever writes to stdout: stdout is the MCP channel.

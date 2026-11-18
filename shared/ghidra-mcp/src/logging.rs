@@ -1,3 +1,11 @@
+// Copyright 2026 Costas Kirgoussios
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
+
 //! Server logging: a per-instance, size-bounded, owner-only file log — never stdout (spec §5). stdout
 //! is the MCP JSON-RPC channel; any byte there corrupts the protocol. The 128-bit connection token is
 //! NEVER passed to a log macro anywhere in the server (enforced by review, not code).

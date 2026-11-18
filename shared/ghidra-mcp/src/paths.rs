@@ -1,3 +1,11 @@
+// Copyright 2026 Costas Kirgoussios
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
+
 //! Filesystem locations for the server: the ghidra-mcp data dir, the per-version worker-script dir, and
 //! the per-instance log path (spec §5). Base dir = $GHIDRA_MCP_HOME, else %USERPROFILE%/$HOME + ".ghidra-mcp",
 //! else the system temp dir. No external dir crate (keeps the deny gate small).

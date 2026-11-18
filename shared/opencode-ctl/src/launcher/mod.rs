@@ -1,3 +1,11 @@
+// Copyright 2026 Costas Kirgoussios
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
+
 //! The launcher: `pair`, the tab wrappers, the terminal walk, `install-launcher` and the pure
 //! Windows resolvers (spec "Launcher"), and `resume` and `attach` (Task 19), which reuse
 //! `claim_file`, `write_wrapper`, `controller_env` and `LauncherCtx::before_claim`.

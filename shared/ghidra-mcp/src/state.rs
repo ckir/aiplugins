@@ -1,3 +1,11 @@
+// Copyright 2026 Costas Kirgoussios
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
+
 //! Server state: the single worker held behind an async mutex, its active attachment + address
 //! canonicalizer, the poison set, and a permit semaphore. Lazy single-flight boot (spec §5); strict
 //! inner<outer timeouts (spec §4.7); transparent crash respawn (spec §4.3) lives in `execute.rs`.

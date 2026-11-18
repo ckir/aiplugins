@@ -1,3 +1,11 @@
+// Copyright 2026 Costas Kirgoussios
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
+
 //! MCP tool handlers (spec §3). Each maps a worker `result` Value into the client-facing shape, then
 //! canonicalizes every address string through the attached program's `AddressCanonicalizer` (spec §6).
 //! Domain errors become `CallToolResult{isError:true}` with the `ErrorEnvelope` as text (spec §4.2).

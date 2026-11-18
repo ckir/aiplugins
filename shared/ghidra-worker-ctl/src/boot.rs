@@ -1,3 +1,11 @@
+// Copyright 2026 Costas Kirgoussios
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
+
 //! Boot orchestration (spec §4/§5). Host is the TCP server; the worker connects back and proves
 //! itself with a token+version init handshake. A racing local process without the token is rejected
 //! and the accept loop keeps going until the boot deadline (agy risk note A: a silent stall here is
