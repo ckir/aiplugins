@@ -235,7 +235,7 @@ Every entry point resolves a starting directory D, then a list from D (7.2 to 7.
 | Entry point | D is the first of these that is present |
 |---|---|
 | MCP server, on each tool call | `REPO_TASKS_DIR`; the process working directory |
-| Reminder (section 10) | `REPO_TASKS_DIR`; the workspace path in the host's event (10.2); the process working directory, except on Antigravity (10.2) |
+| Reminder (section 10) | `REPO_TASKS_DIR`; the workspace path in the host's event, which on OpenCode arrives as the `--workspace` argument (10.2); the process working directory, except on Antigravity (10.2) |
 | A subcommand run by a person (section 11) | the `--dir` argument; `REPO_TASKS_DIR`; the process working directory |
 
 `REPO_TASKS_DIR` counts as present when it is set and not blank. It must be an absolute path to an
@@ -245,7 +245,9 @@ not once at start [approved, point 4].
 
 The variable comes first for the reminder as well [driver's call]. Point 9 names the event's path
 first; but point 4 makes the variable an override, and a reminder that counted one list while the
-tools served another would mislead.
+tools served another would mislead. For the same reason `reminder` has no `--dir` argument: an
+argument that outranked the variable would bring the mismatch back. `--workspace` is only the
+form in which a host's event path arrives when the host passes no event on standard input.
 
 ### 7.2 The git common directory
 
@@ -392,18 +394,31 @@ Every change follows the same five steps:
    new content to `N.json.tmp`, flush it to disk, rename it over `N.json`
    (`pairing.rs:282` and `:329` show the pattern), and on Unix flush the folder to disk as well,
    so that a power cut leaves the old list or the new one and never neither. If the write or the
-   rename fails, the call fails, the old list stands, and the temp file is removed.
+   rename fails, the call fails, the old list stands, and the temp file is removed. One case is
+   retried first: on Windows a rename over a file that a reader holds open at that moment can be
+   refused [CLAIM, 2026-11-18, the author's knowledge of Windows; not measured, 15.6]. A rename
+   refused for that reason is repeated until it succeeds or the deadline of step 1 has passed.
+   `pairing.rs:329` does not retry.
 5. Release the lock.
 
 ### 8.3 Reading
 
 `task_list`, `task_get`, the reminder and the checklist subcommand take no lock. The rename in
-step 4 means a reader sees the whole old file or the whole new file.
+step 4 means a reader sees the whole old file or the whole new file. A reader opens the file,
+reads all of it and closes it at once; on Windows it opens the file so that it may be replaced
+while open (Rust's standard library does this by default), and a read refused because the file is
+being replaced at that moment is repeated for up to one second [PROPOSED, UNMEASURED]. The tests
+that run on CI's Windows runner (15.2) include one with a writer and several readers on one list,
+in which no call may fail.
+
+A reader that needs both files reads the list first and the archive second. A task is appended to
+the archive and flushed before the list is rewritten without it (8.5), so a task missing from the
+list that was read already has a complete line in the archive.
 
 A file that is not valid JSON, or breaks a rule in 8.1, is never repaired or overwritten
 [driver's call]. Every call fails with an error naming the file, except the reminder, which
-prints nothing. Naming the file lets a person repair or remove it by hand; the first release has
-no repair command.
+prints the notice of 10.1. Naming the file lets a person repair or remove it by hand; the first
+release has no repair command, so the tools stay unusable for that list until a person acts.
 
 ### 8.4 Two engine versions on one file [driver's call]
 
@@ -431,9 +446,10 @@ Moving a set of tasks to the archive, under the lock of 8.2:
 2. Rewrite the list without them (8.2, step 4), removing their ids from every remaining task's
    `blocked_by`.
 
-A crash between the two steps leaves a task in both files; the next move appends it again. A
-reader of the archive uses the last line for an id and ignores a final line that is not complete
-JSON. `next_id` is unchanged by any move.
+A crash between the two steps, or a failure of step 2, leaves a task in both files; a later move
+appends it again. The list wins: every reader of the archive ignores a line whose id is in the
+list, uses the last line for any other id, and ignores a final line that is not complete JSON.
+The archive is never cut back to undo step 1. `next_id` is unchanged by any move.
 
 A task reaches the archive in exactly three ways:
 
@@ -471,8 +487,11 @@ The server exposes four tools. Names and parameters are a contract.
 - Every reply is a single block of plain text.
 - A failed call returns an MCP tool error whose text is one line saying what was refused and why,
   and it changes nothing (8.2, step 3).
-- For an id that is not in the list, the error says which of two cases applies: the id was never
-  issued (it is below 1, or at or above `next_id`), or the task has left the list.
+- This rule is about the id a call acts on, the `id` of `task_get` and `task_update`. Ids named as
+  blockers follow 9.6 instead. When that id is not in the list, the error says which case
+  applies: the id was never issued (it is below 1, or at or above `next_id`); or the task has
+  left the list; or, for `task_get` only, the task has left the list and the archive holds no
+  record of it.
 
 ### 9.2 `task_create`
 
@@ -496,17 +515,37 @@ The server exposes four tools. Names and parameters are a contract.
   [driver's call on the encoding].
 - New tasks start as `pending`.
 - Reply: one line per task, `created #<id> <subject>`, followed by one line for each blocker that
-  was accepted as already satisfied.
+  was accepted as already satisfied (9.6):
+  `#<id>: blocker #<blocker id> has left the list and counts as satisfied`, where `<id>` is the
+  task that named it.
 
 ### 9.3 `task_get`
 
-`{ "id": 3 }`. Reply: the members of the task one per line as `name: value`, with `blocked_by` in
-full, a derived line `blocks:` listing the ids of tasks whose `blocked_by` contains this id, and
-the description last after a blank line.
+`{ "id": 3 }`. Reply, in this order:
 
-A task that has left the list is answered from the archive [driver's call]: the same lines,
-preceded by one line reading `archived <archived_at>` or `deleted <deleted_at>`. The call fails
-when the id was never issued, or when the archive holds no line for it.
+```text
+id: 3
+subject: Add a regression test
+status: pending
+owner: ck
+blocked_by: #2, #4
+blocks: #5
+created_at: 2026-11-18T10:12:00Z
+updated_at: 2026-11-18T10:40:31Z
+updated_by: claude-code
+
+The description, exactly as stored.
+```
+
+`blocked_by` lists every stored blocker, completed ones included. `blocks` is derived: the ids of
+tasks in the list whose `blocked_by` contains this id. The `owner`, `blocked_by` and `blocks`
+lines are left out when there is nothing to show, and so are the blank line and the description
+when the task has none.
+
+A task that has left the list is answered from the archive [driver's call], read as 8.3 and 8.5
+say: the same lines, preceded by one line reading `archived <archived_at>` or
+`deleted <deleted_at>`, and without a `blocks` line. The call fails when the id was never issued,
+or when the archive holds no line for it (9.1).
 
 ### 9.4 `task_update`
 
@@ -536,7 +575,12 @@ when the id was never issued, or when the archive holds no line for it.
   the archive cannot be written, the call fails and the task stays.
 - `delete: true` on a completed task fails: completed tasks leave the list only by archiving
   [approved, point 7].
-- Reply: `updated #<id>` or `deleted #<id>`, plus a line per blocker accepted as satisfied.
+- Reply: `updated #<id>` or `deleted #<id>`, plus a line per blocker accepted as satisfied, in
+  the form 9.2 gives.
+- Known limit: a completed task can be set back to pending and then deleted, in two calls. That
+  is not prevented, because reopening a task is ordinary work and a reopened task is an open
+  task. The rule above stops a single call removing finished work; the record survives either
+  way, in the archive with `deleted_at`.
 
 How deletion is carried out is the author's reading of point 7 [driver's call]. Point 7 lists
 "deleting the task" among the changes update can make, and also says completed tasks leave the
@@ -596,6 +640,15 @@ It contains no subject, description or owner. When n is 0, when there is no list
 anything fails, it prints nothing and still exits successfully: a reminder never blocks or fails
 a session.
 
+One failure is not silent [driver's call]. When the list file exists and cannot be used (it is
+not valid JSON, breaks a rule in 8.1, or has a newer `format`, 8.3 and 8.4), every tool call will
+fail, and an agent told nothing would not know a list exists. The reminder then prints this line
+instead, and still exits successfully:
+
+```text
+repo-tasks: this repository's task list cannot be read. Call the task_list tool to see why.
+```
+
 The line is produced by the engine binary's `reminder` subcommand and by nothing else. No wrapper
 reads the list file itself.
 
@@ -606,7 +659,7 @@ reads the list file itself.
 | Claude Code | `SessionStart` for the sources `startup`, `resume`, `clear`, and the compaction source | `hookSpecificOutput.additionalContext`, as `claude-code/plugins/re-ghidra-mcp-cc/src/bin/hook.rs:78-80` | `cwd`, then the variable `CLAUDE_PROJECT_DIR`, as that file's lines 41-43 |
 | Qwen | `SessionStart` for `startup`, `resume`, `clear` (`qwen/plugins/re-ghidra-mcp-qwen/qwen-extension.json:17-43`) | `systemMessage` and `hookSpecificOutput.additionalContext`, as `qwen/plugins/re-ghidra-mcp-qwen/src/bin/hook.rs:77-80` | the path that hook reads from its event |
 | Antigravity | `PreInvocation`, acting only when `invocationNum` is at most 1 (the check in `antigravity/plugins/re-ghidra-mcp-agy/src/bin/hook.rs`) | `injectSteps`, as that file's line 78 | `cwd` on standard input |
-| OpenCode | on the first `context` event of each session id (the event carries `sessionID`, as `opencode/plugins/todov2-opencode/plugin.ts:18` reads it), and again from the `compaction` hook (the `Plugin.define` block of `opencode/plugins/re-ghidra-mcp-opencode/plugin.ts`) | pushed onto `event.system` | `ctx.location.directory`, passed to the binary as `--dir` |
+| OpenCode | on the first `context` event of each session id (the event carries `sessionID`, as `opencode/plugins/todov2-opencode/plugin.ts:18` reads it), and again from the `compaction` hook (the `Plugin.define` block of `opencode/plugins/re-ghidra-mcp-opencode/plugin.ts`) | pushed onto `event.system` as `{ type: "text", text: <the line> }`, and only when `event.system` is an array, as `opencode/plugins/re-ghidra-mcp-opencode/plugin.ts:203-204` does | `ctx.location.directory`, passed to the binary as `--workspace` |
 
 D then follows the order in 7.1. Host rules [driver's call]:
 
@@ -616,8 +669,9 @@ D then follows the order in 7.1. Host rules [driver's call]:
   hook's working directory is the folder holding `hooks.json`, which is the plugin, not the
   workspace. With neither `REPO_TASKS_DIR` nor a `cwd` in the event, the reminder prints nothing.
 - **OpenCode's `plugin.ts` runs the binary** (as `opencode/plugins/rtk-mcp-opencode/plugin.ts`
-  runs its own with `spawnSync`) and pushes whatever line comes back. It reminds once per session
-  id, not once per plugin load, and it contains no code that parses the list.
+  runs its own with `spawnSync`) and pushes whatever line comes back, in the object form the
+  table gives; when nothing comes back it pushes nothing. It reminds once per session id, not
+  once per plugin load, and it contains no code that parses the list.
 
 The name of Claude Code's compaction source (`compact` [CLAIM, 2026-11-18, from the author's
 memory of the documentation]) and whether Qwen and Antigravity signal a compaction at all are for
@@ -631,12 +685,18 @@ Each wrapper ships one binary that contains the engine. Its subcommands:
 |---|---|
 | `serve` | runs the MCP server on standard input and output (OpenCode adds `--host opencode`, as `opencode-ctl` does) |
 | `reminder --event <host>` | `<host>` is `claude-code`, `qwen`, `antigravity` or `opencode`; prints the line of 10.1 wrapped the way that host expects (10.2), the bare line for `opencode`, or nothing |
-| `list` | prints exactly what `task_list` replies; `list --archived` prints the archive in the same line form, each line ending with `archived` or `deleted` and its time |
+| `list` | prints exactly what `task_list` replies; `list --archived` prints the archive (below) |
 | `archive` | archives every completed task (8.5) and says how many |
 | `--version` | prints the version |
 
-`reminder`, `list` and `archive` accept `--dir <path>` (7.1). No subcommand moves a task back
-from the archive in the first release.
+`list` and `archive` accept `--dir <path>`; `reminder` accepts `--workspace <path>` and no `--dir`
+(7.1). No subcommand moves a task back from the archive in the first release.
+
+`list --archived` prints line 1 exactly as `list` does, then one line per archived task in id
+order, read as 8.5 says (one line per id, and none for an id still in the list). Each line has
+the form of 9.5 with the mark the task had when it left, without the `[blocked by ...]` and
+in_progress parts, and ends with `[archived <archived_at>]` or `[deleted <deleted_at>]`. With no
+archive file, or none of its lines left to show, it prints line 1 and `no archived tasks`.
 
 Each wrapper also ships a command that runs `list`, on every host that has commands. The command
 is named `repo-tasks`, so that it cannot collide with a host's own task or todo commands
@@ -765,6 +825,8 @@ All names in this table follow from the working name `repo-tasks` and change wit
 - How the four hosts behave on Windows and macOS. Every measurement in 15.1 ran on one Linux
   machine.
 - Whether `CLAUDE_CODE_ENABLE_TODO_TOOLS` switches Claude Code's own tools back on.
+- Whether a rename over a file a reader holds open is refused on Windows, and how often (8.2,
+  8.3). This machine cannot measure it; the CI test named in 8.3 is the measurement.
 - Every figure marked [PROPOSED, UNMEASURED].
 
 ## 16. Order of work
@@ -782,7 +844,10 @@ The plan written when this document is approved covers step 1 and nothing else.
    this machine says `not measured`.
 2. **Revision.** Any section a measurement contradicts is revised, and the revision goes to the
    owner, before step 3. If a host cannot write under `.git`, sections 7.3 and 7.6 are the ones
-   to revisit, and that is the owner's decision.
+   to revisit, and that is the owner's decision. If a host starts its server somewhere other
+   than the workspace and its environment does not reach the server either, 7.1 has no way to
+   find the repository on that host; 7.1 and the start-up archiving in 8.5, which resolves the
+   list the same way before any request, are then the ones to revisit.
 3. **The implementation plan** is written only after steps 1 and 2, against code that exists then.
 
 ## 17. Left open
@@ -792,7 +857,9 @@ The plan written when this document is approved covers step 1 and nothing else.
 - The MCP server library (as `shared/opencode-ctl` uses) and the crates for git discovery and
   hashing (`sha2` is already in `Cargo.lock`); whether the JSON is written compact or indented;
   error wording beyond what sections 7 to 10 fix.
-- How OpenCode's `plugin.ts` learns the binary's absolute path.
+- How OpenCode's `plugin.ts` learns the binary's absolute path. The precedents here are a
+  configured value with an environment override (`opencode/plugins/rtk-mcp-opencode/plugin.ts:14`,
+  `:86-87`) and a fixed install location (`opencode/plugins/opencode-ctl-mcp-opencode/INSTALL.md:91`).
 - The command file for each host that has commands (section 11).
 - Test design. The rules in sections 7 to 10 are the oracle; 7.2 names its own.
 - Each wrapper's README says where lists are kept (7.3, 7.5) and how to remove them. Uninstalling
@@ -851,6 +918,13 @@ The rest fill gaps the approved text left:
     to the process working directory; OpenCode's `plugin.ts` runs the binary, reminds once per
     session id, and never parses the list (10.2).
 18. The command a person runs is named `repo-tasks` (section 11).
+19. The reminder prints a notice, with no task text, when the list file cannot be used (10.1).
+    Point 9 says only that it prints nothing when no task is open.
+20. `reminder` takes `--workspace` and no `--dir` (7.1, section 11).
+21. The list wins over the archive: an archive line for an id still in the list is ignored (8.5).
+22. The forms of the `task_get` reply, the satisfied-blocker line and `list --archived` (9.2, 9.3,
+    section 11).
+23. A refused rename and a refused read are retried on Windows (8.2, 8.3).
 
 ## 18. What done looks like
 
@@ -863,7 +937,8 @@ task 2 completed and task 3 in_progress with `task_update` (9.4). The session is
 The owner opens OpenCode in a second worktree of the same repository. On the session's first
 round the wrapper's `plugin.ts` runs `reminder` with the workspace directory (10.2); both
 worktrees resolve to one git common directory (7.2), so the line says three tasks are open, one
-in progress (10.1), and names no task. The model calls `task_list` and reads five lines: two
+in progress (10.1), and names no task. The model calls `task_list` and reads, under line 1, five
+task lines: two
 completed, task 3 in_progress and marked as last changed by `claude-code` with its time (9.5),
 tasks 4 and 5 blocked. It takes task 3 over with an ordinary update (9.4), and deletes task 5,
 which is no longer wanted; task 5 moves to the archive (8.5).
@@ -978,7 +1053,35 @@ Cynic, Resource Vampire, Mechanism Gamer; plus an audit of the first pass's own 
 | Resource Vampire | The archive grows for ever | Stated: the engine never trims it (8.5) |
 | Resource Vampire | The list reply grows for ever | Already put to the owner (17.2, item 3) |
 
-PANEL VERDICT: two solo passes, 23 findings, all folded, stated or put to the owner; the peer's round is still owed.
+### Panel round 1, the peer (2026-11-18, a new chat with none of the earlier context)
+
+Seated: Fold Auditor, Axiom Breaker, Cascade Analyst, State Corruptor, Protocol Pedant, Literal
+Implementer, Procedure Walker (new). The brief is `.clavity/seams/repo-tasks-design-panel-r1.md`;
+the peer returned FINDINGS-14. Each was checked against the document or the cited file.
+
+| Seat | Finding (the peer's severity) | Disposition |
+|---|---|---|
+| Fold Auditor | A deletion whose list rewrite fails leaves a `deleted_at` line for a task still in the list (MATERIAL) | FOLDED: the list wins; archive readers ignore a line whose id is in the list (8.5). The peer's fix, cutting the archive back, REJECTED: the archive is append-only |
+| Fold Auditor | `reminder --dir` from OpenCode against "`REPO_TASKS_DIR` first" (MATERIAL) | FOLDED: `reminder` takes `--workspace`, ranked as the event's path, and has no `--dir` (7.1, 10.2, section 11) |
+| Fold Auditor | 9.1 names two error cases, 9.3 a third (MINOR) | FOLDED (9.1) |
+| Axiom Breaker | Start-up archiving assumes the server starts in the repository (BLOCKING) | REJECTED as a new defect: the working directory belongs to the process, so the start-up resolution is the one every tool call gets, and a wrong one is the unmeasured item already in 15.6. Its consequence FOLDED into section 16, step 2 |
+| Axiom Breaker | A completed task can be reopened and then deleted (MATERIAL) | Stated as a known limit (9.4, Stand-downs); the record is kept either way. The peer's fixes not adopted: both forbid reopening finished work |
+| Cascade Analyst | A malformed list makes the reminder silent while every tool fails (MATERIAL) | FOLDED: a text-free notice line (10.1, 8.3). No repair command is added; 8.3 says so |
+| Cascade Analyst | A crash during archiving duplicates archive lines (MINOR) | REJECTED: 8.5 already stated it and the last-line rule that makes it harmless |
+| State Corruptor | On Windows a reader holding the file open makes the writer's rename fail (BLOCKING) | FOLDED as an unmeasured claim: a bounded retry, how readers open the file, and a CI test on Windows as the measurement (8.2, 8.3, 15.6). The existing `pairing.rs:329` has no retry |
+| State Corruptor | `task_get` can read a half-written archive line (MINOR) | REJECTED for the id asked about: the archive line is flushed before the list drops the task. The read order that makes this true is now stated (8.3) |
+| Protocol Pedant | A bare string pushed onto OpenCode's `event.system` (MATERIAL) | FOLDED: the object form, confirmed at `re-ghidra-mcp-opencode/plugin.ts:204` and `todov2-opencode/plugin.ts:20` (10.2) |
+| Protocol Pedant | `task_get`'s reply had no fixed order or form (MINOR) | FOLDED: a template (9.3) |
+| Protocol Pedant | The "accepted as satisfied" line had no form (MINOR) | FOLDED (9.2, 9.4) |
+| Literal Implementer | `list --archived` had no header, order or marks (MATERIAL) | FOLDED (section 11) |
+| Literal Implementer | How OpenCode's wrapper finds the binary is left to the builder (MINOR) | Left to the builder as before; the two precedents are now named (17.1) |
+| Procedure Walker | Section 18 says "five lines" where 9.5 gives six | FOLDED (section 18) |
+| Question 2 | 9.1 (an error) and 9.6 (accepted) read as one rule stated twice | FOLDED: 9.1 now says it covers the id a call acts on, and 9.6 covers blockers |
+
+The peer named as least examined: host behaviour on Windows and macOS, and the two outside
+sources beyond the cited lines.
+
+PANEL VERDICT: round 1 complete (two solo passes and the peer); the peer's 14 findings are disposed above; a second round over these folds is owed.
 
 ## Stand-downs
 
@@ -989,6 +1092,8 @@ PANEL VERDICT: two solo passes, 23 findings, all folded, stated or put to the ow
   (section 12).
 - Accepted limit: the two-writer guarantee rests on OS advisory locks. A repository on a
   filesystem that does not honour them (some network mounts) loses it.
+- Accepted limit: a completed task can be reopened and then deleted in two calls (9.4). Its
+  record stays in the archive.
 - Unverified and carried into the spike: everything in 15.6.
 - One clause of point 7 was written after the peer's last sign-off (end of section 6), and the
   four narrowings in 17.3 were written after the owner approved the text.
