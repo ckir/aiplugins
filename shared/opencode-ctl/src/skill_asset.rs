@@ -1,3 +1,11 @@
+// Copyright 2026 AI Plugins Marketplace Contributors
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 together with the
+// additional terms (evaluation grant, anti-circumvention) that apply to this
+// repository. See the LICENSE file at the repository root.
+
 //! The two opencode-ctl skills, embedded as templates and rendered per host.
 //!
 //! The canonical templates live INSIDE this crate (`skill/`), so `include_str!` needs no `..` traversal.

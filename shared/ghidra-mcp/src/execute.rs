@@ -1,3 +1,11 @@
+// Copyright 2026 AI Plugins Marketplace Contributors
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 together with the
+// additional terms (evaluation grant, anti-circumvention) that apply to this
+// repository. See the LICENSE file at the repository root.
+
 //! The request engine (spec §4.3/§4.4/§4.7/§5): the ordered pipeline every tool call runs through.
 //! Returns either a worker `result` Value (plus a snapshot of the active canonicalizer for the caller
 //! to canonicalize addresses) or a structured `ErrorEnvelope`.

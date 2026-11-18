@@ -1,3 +1,11 @@
+// Copyright 2026 AI Plugins Marketplace Contributors
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 together with the
+// additional terms (evaluation grant, anti-circumvention) that apply to this
+// repository. See the LICENSE file at the repository root.
+
 //! `doctor-json` (Task 16, part C): the eighteen checks, their messages, the compute and emit
 //! order, `launcher_link_status` and `parse_doctor_args`. Part A's startup/identity/serve tests
 //! live in tests/startup.rs.

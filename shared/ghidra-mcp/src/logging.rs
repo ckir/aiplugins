@@ -1,3 +1,11 @@
+// Copyright 2026 AI Plugins Marketplace Contributors
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 together with the
+// additional terms (evaluation grant, anti-circumvention) that apply to this
+// repository. See the LICENSE file at the repository root.
+
 //! Server logging: a per-instance, size-bounded, owner-only file log — never stdout (spec §5). stdout
 //! is the MCP JSON-RPC channel; any byte there corrupts the protocol. The 128-bit connection token is
 //! NEVER passed to a log macro anywhere in the server (enforced by review, not code).

@@ -1,3 +1,11 @@
+// Copyright 2026 AI Plugins Marketplace Contributors
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 together with the
+// additional terms (evaluation grant, anti-circumvention) that apply to this
+// repository. See the LICENSE file at the repository root.
+
 // M2d set_local e2e. Gated by GHIDRA_MCP_E2E=1. Run from PowerShell, -j1 (single JVM per worker):
 //   $env:GHIDRA_MCP_E2E="1"; cargo nextest run -p ghidra-mcp --test setlocal -j1
 mod common;

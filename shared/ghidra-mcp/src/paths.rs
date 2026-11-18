@@ -1,3 +1,11 @@
+// Copyright 2026 AI Plugins Marketplace Contributors
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 together with the
+// additional terms (evaluation grant, anti-circumvention) that apply to this
+// repository. See the LICENSE file at the repository root.
+
 //! Filesystem locations for the server: the ghidra-mcp data dir, the per-version worker-script dir, and
 //! the per-instance log path (spec §5). Base dir = $GHIDRA_MCP_HOME, else %USERPROFILE%/$HOME + ".ghidra-mcp",
 //! else the system temp dir. No external dir crate (keeps the deny gate small).

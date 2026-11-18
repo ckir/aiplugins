@@ -1,3 +1,11 @@
+// Copyright 2026 AI Plugins Marketplace Contributors
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 together with the
+// additional terms (evaluation grant, anti-circumvention) that apply to this
+// repository. See the LICENSE file at the repository root.
+
 //! Protocol-layer test (spec §8/§4.2): schema-invalid params are rejected at rmcp's deserialize
 //! boundary, BEFORE the handler body and therefore before any Ghidra worker is touched. Runs under
 //! plain `just test` — no GHIDRA_MCP_E2E gate, no live worker.

@@ -1,3 +1,11 @@
+// Copyright 2026 AI Plugins Marketplace Contributors
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 together with the
+// additional terms (evaluation grant, anti-circumvention) that apply to this
+// repository. See the LICENSE file at the repository root.
+
 //! Pure worker-lifecycle state machine (spec §4). No I/O: models the states and
 //! the one-shot WORKER_RESTARTED notice so lifecycle decisions are unit-testable
 //! without spawning a JVM.

@@ -1,3 +1,11 @@
+// Copyright 2026 AI Plugins Marketplace Contributors
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 together with the
+// additional terms (evaluation grant, anti-circumvention) that apply to this
+// repository. See the LICENSE file at the repository root.
+
 //! Windows rules that are pure text and path logic, compiled on every platform so the Linux and macOS
 //! legs test them: the verbatim-prefix strip, the `wt` directory argument, `PATHEXT` resolution, the
 //! `cmd.exe /c` wrap and the `.ps1` wrapper.

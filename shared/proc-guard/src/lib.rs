@@ -1,3 +1,11 @@
+// Copyright 2026 AI Plugins Marketplace Contributors
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 together with the
+// additional terms (evaluation grant, anti-circumvention) that apply to this
+// repository. See the LICENSE file at the repository root.
+
 //! Process kill-guard (spike D4). The worker tree is host -> cmd.exe -> java.exe; a plain
 //! child.kill() reaps only cmd.exe and orphans the JVM. On Windows a job with
 //! JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE kills the entire subtree the moment the host drops the last

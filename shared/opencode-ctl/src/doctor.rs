@@ -1,3 +1,11 @@
+// Copyright 2026 AI Plugins Marketplace Contributors
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 together with the
+// additional terms (evaluation grant, anti-circumvention) that apply to this
+// repository. See the LICENSE file at the repository root.
+
 //! `doctor-json`: the eighteen checks behind the `opencode-ctl-doctor` skill (spec Skills).
 //!
 //! The doctor COMPUTES the checks in a fixed order (`ctl_home_override`, `binary`, `registration`,

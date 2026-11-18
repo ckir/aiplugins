@@ -1,3 +1,11 @@
+// Copyright 2026 AI Plugins Marketplace Contributors
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Source-available software. It is NOT open source.
+// Licensed under the PolyForm Noncommercial License 1.0.0 together with the
+// additional terms (evaluation grant, anti-circumvention) that apply to this
+// repository. See the LICENSE file at the repository root.
+
 //! Framed JSON-RPC 2.0 request/response over the worker's TCP stream (spec §5). One request in
 //! flight at a time (the worker services calls single-threaded on the Ghidra thread). Uses the
 //! existing ghidra-ipc frame codec (4-byte BE length prefix) and RpcRequest/RpcResponse types.
