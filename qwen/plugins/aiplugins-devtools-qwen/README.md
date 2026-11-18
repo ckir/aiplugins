@@ -1,6 +1,6 @@
 # aiplugins-devtools-qwen
 
-A Qwen Code extension that ships three dev-tool skills:
+A Qwen Code extension that ships four dev-tool skills:
 
 - `code-review-and-quality`, a multi-axis code review (correctness, readability,
   architecture, security, performance) with security and performance checklists.
@@ -9,6 +9,9 @@ A Qwen Code extension that ships three dev-tool skills:
 - `human-friendly`, rewrites a Markdown file in place so it reads naturally,
   keeping code, links, tables, numbers and meaning intact. Supports
   `--review-only`, `--dry-run` and `--profile natural-professional|conversational|executive`.
+- `license-headers`, adds or enforces per-file license headers with google/addlicense for
+  custom or source-available licenses (header text read from your template file), with a
+  `LICENSE-ADDENDUM` template for extra terms. Bundles a wrapper script; needs `addlicense`.
 
 Slash commands: `/aiplugins-devtools:spec-panel-review <path>` and `/aiplugins-devtools:human-friendly <path>`.
 

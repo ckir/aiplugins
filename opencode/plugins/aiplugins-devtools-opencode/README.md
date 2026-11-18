@@ -1,6 +1,6 @@
 # aiplugins-devtools-opencode
 
-An OpenCode plugin that ships three dev-tool skills:
+An OpenCode plugin that ships four dev-tool skills:
 
 - `code-review-and-quality`, a multi-axis code review (correctness, readability,
   architecture, security, performance) with security and performance checklists.
@@ -9,6 +9,9 @@ An OpenCode plugin that ships three dev-tool skills:
 - `human-friendly`, rewrites a Markdown file in place so it reads naturally,
   keeping code, links, tables, numbers and meaning intact. Supports
   `--review-only`, `--dry-run` and `--profile natural-professional|conversational|executive`.
+- `license-headers`, adds or enforces per-file license headers with google/addlicense for
+  custom or source-available licenses (header text read from your template file), with a
+  `LICENSE-ADDENDUM` template for extra terms. Bundles a wrapper script; needs `addlicense`.
 
 Slash commands: `/spec-panel-review <path>` and `/human-friendly <path>` (command files; see Invocation).
 It carries only skills: no plugin code, no hooks, no MCP servers, no binaries.
@@ -32,12 +35,12 @@ available on OpenCode.
 <!-- footprint:begin -->
 ### Context footprint
 
-Installing this plugin adds **≥ 1,028 bytes** to every request, for the whole session. A further **≥ 37,037 bytes** load only when one of its skills or agents is actually invoked.
+Installing this plugin adds **≥ 1,329 bytes** to every request, for the whole session. A further **≥ 43,141 bytes** load only when one of its skills or agents is actually invoked.
 
 | Tier | Bytes | When you pay it |
 |---|---|---|
-| Resident | ≥ 1,028 | Every request, for the whole session |
-| Invocation | ≥ 37,037 | Only when that skill or agent runs |
+| Resident | ≥ 1,329 | Every request, for the whole session |
+| Invocation | ≥ 43,141 | Only when that skill or agent runs |
 
 **Bytes, not tokens.** This is the exact serialised size of what the host loads, measured by probing the plugin's own MCP server and reading its skill and agent frontmatter. It is not a token count and does not convert to one at a fixed rate — treat it as a figure you can compare between plugins, not as a context budget.
 
