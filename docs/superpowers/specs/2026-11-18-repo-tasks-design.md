@@ -253,7 +253,11 @@ capability and answer `roots/list` with the starting directory. So:
 - When the client declared `roots` in `initialize`, the server sends `roots/list` at once when it
   receives `notifications/initialized`, and again after each `notifications/roots/list_changed`.
   A request is **settled** when its reply arrives or 2 seconds [PROPOSED, UNMEASURED] after it was
-  sent, whichever is first; a reply that arrives later is still used when it comes. A client that
+  sent, whichever is first. A reply to the first request that arrives later is used only if no
+  tool call has yet resolved D; after one has, it is ignored, because adopting it would move later
+  calls to another list than the earlier ones used. A reply to a refresh (below) is always used.
+  Only one request is in flight at a time: a `roots/list_changed` notification that arrives
+  meanwhile is remembered, and one more request is sent when the reply comes. A client that
   declared no `roots` has nothing to settle. The 2 seconds start when the request is sent, so a
   tool call waits only for what is left of them, and once a request is settled no later call
   waits for it again.
@@ -1294,6 +1298,12 @@ the directory test; any Windows drive letter; the error for a call before `initi
 JSON-RPC error, code -32600 [driver's call]; a call resolves D once and keeps it; the 2 seconds
 can be shortened by tests only; start-up archiving is decided once and a late reply does not
 re-arm it. None rejected.
+
+Round 3 on that revision (the peer returned FINDINGS-3, each checked): FOLDED in 7.1 a late reply to
+the first request is used only before any call has resolved D, and one request is in flight at a
+time with a notification during it remembered; REJECTED below the floor: a timeout-only
+settlement skips start-up archiving for the whole session (8.5) — only housekeeping is delayed,
+the next start tries again, and the `archive` subcommand exists.
 
 ## Stand-downs
 
