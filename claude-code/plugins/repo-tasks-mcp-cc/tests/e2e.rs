@@ -198,3 +198,15 @@ fn hook_manifest_declares_four_sources() {
         );
     }
 }
+
+#[test]
+fn repo_tasks_command_runs_list() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("commands/repo-tasks.md");
+    let text = fs::read_to_string(path).expect("commands/repo-tasks.md");
+    assert!(text.len() < 400, "{} bytes", text.len());
+    assert!(text.starts_with("---\ndescription: "), "{text}");
+    assert!(
+        text.contains("${CLAUDE_PLUGIN_ROOT}/bin/repo-tasks-cc-mcp list"),
+        "{text}"
+    );
+}

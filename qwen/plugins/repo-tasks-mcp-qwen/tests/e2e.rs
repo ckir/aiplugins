@@ -212,3 +212,15 @@ fn extension_manifest_declares_three_sources() {
         assert!(hooks[0].get("args").is_none(), "{}", hooks[0]);
     }
 }
+
+#[test]
+fn repo_tasks_command_runs_list() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("commands/repo-tasks.md");
+    let text = fs::read_to_string(path).expect("commands/repo-tasks.md");
+    assert!(text.len() < 400, "{} bytes", text.len());
+    assert!(text.starts_with("---\ndescription: "), "{text}");
+    // Qwen Code does not substitute `${extensionPath}` in a command body (FileCommandLoader has no
+    // hydration), so the body names the binary and its installed place in words.
+    assert!(text.contains("repo-tasks-qwen-mcp list"), "{text}");
+    assert!(!text.contains("${"), "{text}");
+}

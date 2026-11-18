@@ -17,12 +17,12 @@ Tested with `@opencode/plugin` **2.0.32**. The V2 plugin API is beta; re-test on
 <!-- footprint:begin -->
 ### Context footprint
 
-Installing this plugin adds **≥ 2,497 bytes** to every request, for the whole session. A further **≥ 0 bytes** load only when one of its skills or agents is actually invoked. Its `plugin.ts` setup module adds **≥ 2,656 bytes**, loaded in-process with the host on every request and counted separately below so the TypeScript tier stays comparable across releases.
+Installing this plugin adds **≥ 2,550 bytes** to every request, for the whole session. A further **≥ 170 bytes** load only when one of its skills or agents is actually invoked. Its `plugin.ts` setup module adds **≥ 2,656 bytes**, loaded in-process with the host on every request and counted separately below so the TypeScript tier stays comparable across releases.
 
 | Tier | Bytes | When you pay it |
 |---|---|---|
-| Resident | ≥ 2,497 | Every request, for the whole session |
-| Invocation | ≥ 0 | Only when that skill or agent runs |
+| Resident | ≥ 2,550 | Every request, for the whole session |
+| Invocation | ≥ 170 | Only when that skill or agent runs |
 | Setup | ≥ 2,656 | Every request — `plugin.ts` loads in-process with the host |
 
 **Bytes, not tokens.** This is the exact serialised size of what the host loads, measured by probing the plugin's own MCP server and reading its skill and agent frontmatter. It is not a token count and does not convert to one at a fixed rate — treat it as a figure you can compare between plugins, not as a context budget.

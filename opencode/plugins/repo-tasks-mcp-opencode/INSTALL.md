@@ -80,15 +80,28 @@ the leading `.` with the absolute config dir (`$DEST`). The relative `./bin/...`
 The reminder in `plugin.ts` looks for the binary at `$DEST/bin/repo-tasks-cc-mcp`. To use another location, set the
 environment variable `REPO_TASKS_BIN` to its absolute path before starting OpenCode.
 
+## Step 4b - add the `/repo-tasks` command
+
+The plugin zip does not carry the command file, so create `$DEST/command/repo-tasks.md` with exactly this content
+(`mkdir -p "$DEST/command"` first). The command runs `list` on the binary and shows the list.
+
+```markdown
+---
+description: Show this repository's shared task list
+---
+Run `repo-tasks-cc-mcp list` and show its output unchanged. Use the absolute path of the binary from the `repo-tasks` server entry in the OpenCode config (`command[0]`).
+```
+
 ## Step 5 - verify
 
 1. `$DEST/bin/repo-tasks-cc-mcp` and `$DEST/plugins/repo-tasks-mcp-opencode.ts` exist and are non-empty.
 2. The merged config parses and the `repo-tasks` entry is under `mcp.servers`.
 3. From the directory where you ran `bun add`:
    `bun -e "await import('$DEST/plugins/repo-tasks-mcp-opencode.ts')"` exits 0 with no output.
-4. Restart OpenCode and confirm the `repo-tasks` server is connected (`/mcp`).
+4. `$DEST/command/repo-tasks.md` exists.
+5. Restart OpenCode and confirm the `repo-tasks` server is connected (`/mcp`) and `/repo-tasks` is in the `/` menu.
 
 ## Uninstall
 
-Delete `$DEST/plugins/repo-tasks-mcp-opencode.ts` and `$DEST/bin/repo-tasks-cc-mcp`, and remove the `repo-tasks`
+Delete `$DEST/plugins/repo-tasks-mcp-opencode.ts`, `$DEST/command/repo-tasks.md` and `$DEST/bin/repo-tasks-cc-mcp`, and remove the `repo-tasks`
 entry from `mcp.servers`. The task list lives in the repository and is not touched.

@@ -46,6 +46,12 @@ roots and the variable is not set, the tools fail with an error that names `REPO
 directory whose list you want. The reminder hook reads the workspace from the `workspacePaths` of its event
 (or from `REPO_TASKS_DIR`), and prints nothing when it has neither.
 
+## No slash command
+
+The other three hosts ship a `/repo-tasks` command that runs `list`. Antigravity's documentation has no
+commands page (its customization docs cover hooks, JSON configs, MCP servers, plugins, rules and skills), so
+this plugin ships none. To print the list, run `repo-tasks-agy-mcp list` yourself.
+
 ## Layout
 
 ```
