@@ -837,7 +837,7 @@ All names in this table follow from the working name `repo-tasks` and change wit
 - Measured on Linux in the spike (15.7): the working directory given to an MCP server, whether it
   may write under `.git`, and whether the host environment reaches the server and a hook, for
   Claude Code, Antigravity and OpenCode; Claude Code's compaction signal. Still not measured:
-  everything for Qwen (not installed here), OpenCode through its background service, a compaction
+  a compaction in Qwen (needs a model call), OpenCode through its background service, a compaction
   in Antigravity and in OpenCode.
 - Any hook event of Qwen beyond those this repository already uses.
 - How the four hosts behave on Windows and macOS. Every measurement in 15.1 ran on one Linux
@@ -855,14 +855,22 @@ Each host was started from three places: the repository root `R`, `R/sub/deep`, 
 worktree `W`. The probe was a stdio MCP server and a hook script that wrote one JSON line per
 start; the host's environment held `REPO_TASKS_DIR=/spike/dir` and `REPO_TASKS_LIST=spike-list`.
 
-| Cell | Claude Code 2.1.327 | Qwen | Antigravity (agy 1.5.11) | OpenCode 2.3.0 (`--standalone`) |
+| Cell | Claude Code 2.1.327 | Qwen Code 0.28.0 | Antigravity (agy 1.5.11) | OpenCode 2.3.0 (`--standalone`) |
 |---|---|---|---|---|
-| Server working directory | the starting directory, in all three places | not measured: `qwen` is not installed on this machine | the plugin folder, in all three places: `<root>/.agents/plugins/probe` for a plugin inside the repository, `~/.gemini/config/plugins/probe` for an installed one (second test below); the inherited variable `PWD` was the starting directory only while the launching shell's `PWD` was | the starting directory, in all three places |
-| May the server create a folder in the git common directory | yes; `W` resolved to `R/.git` | not measured: not installed | yes with the plugin inside the repository (git resolved from its folder); with an installed plugin git found no repository from the server's folder, and only the probe's fixed path could be written | yes; `W` resolved to `R/.git` |
-| `REPO_TASKS_DIR` and `REPO_TASKS_LIST` reach the server | yes, both | not measured: not installed | yes, both | yes, both, with the server's own `environment` empty |
-| They reach a session-start hook | yes, both | not measured: not installed | yes, both | yes, both, in the plugin's hook process |
-| Session-start event and the workspace path | `SessionStart` with `source` `startup`, `resume`, `compact`; payload keys `session_id`, `transcript_path`, `cwd`, `hook_event_name`, `source`; `cwd` is the starting directory | not measured: not installed | `SessionStart` once per run and `PreInvocation`; payload carries `cwd` and `workspacePaths`, both the starting directory; the hook's own working directory is the plugin folder | the plugin's `context` hook, on every model call, with `sessionID`; `ctx.location.directory` is the starting directory |
-| A compaction is signalled | yes: `SessionStart` with `source` `compact`, after a three-turn session was compacted with `claude -p "/compact" --resume <id>` | not measured: not installed | not measured: `hooks.md` names no compaction event and `agy --help` lists no compaction command | not measured: `opencode run "/compact"` was sent as ordinary text and no `compaction` hook line appeared; the only `compact` command in the source is the ACP catalog (`packages/cli/src/acp/catalog.ts:10`) |
+| Server working directory | the starting directory, in all three places | the starting directory, in all three places (`QWEN_HOME` isolated; the model was never reached) | the plugin folder, in all three places: `<root>/.agents/plugins/probe` for a plugin inside the repository, `~/.gemini/config/plugins/probe` for an installed one (second test below); the inherited variable `PWD` was the starting directory only while the launching shell's `PWD` was | the starting directory, in all three places |
+| May the server create a folder in the git common directory | yes; `W` resolved to `R/.git` | yes; `W` resolved to `R/.git` | yes with the plugin inside the repository (git resolved from its folder); with an installed plugin git found no repository from the server's folder, and only the probe's fixed path could be written | yes; `W` resolved to `R/.git` |
+| `REPO_TASKS_DIR` and `REPO_TASKS_LIST` reach the server | yes, both | yes, both | yes, both | yes, both, with the server's own `environment` empty |
+| They reach a session-start hook | yes, both | yes, both, in the hook process | yes, both | yes, both, in the plugin's hook process |
+| Session-start event and the workspace path | `SessionStart` with `source` `startup`, `resume`, `compact`; payload keys `session_id`, `transcript_path`, `cwd`, `hook_event_name`, `source`; `cwd` is the starting directory | `SessionStart` with `source` `startup` fired in all three places before any model call; payload keys `cwd`, `hook_event_name`, `model`, `permission_mode`, `session_id`, `source`, `timestamp`, `transcript_path`; `cwd` is the starting directory | `SessionStart` once per run and `PreInvocation`; payload carries `cwd` and `workspacePaths`, both the starting directory; the hook's own working directory is the plugin folder | the plugin's `context` hook, on every model call, with `sessionID`; `ctx.location.directory` is the starting directory |
+| A compaction is signalled | yes: `SessionStart` with `source` `compact`, after a three-turn session was compacted with `claude -p "/compact" --resume <id>` | not measured: a compaction needs a model call and no Qwen credential was used; read in the source at `v0.28.0` (`packages/core/src/hooks/types.ts:49-52`, `:1085-1091`; `chatCompressionService.ts:309-327`, `:1624`): `PreCompact` and `PostCompact` events and a `SessionStart` source `compact` exist | not measured: `hooks.md` names no compaction event and `agy --help` lists no compaction command | not measured: `opencode run "/compact"` was sent as ordinary text and no `compaction` hook line appeared; the only `compact` command in the source is the ACP catalog (`packages/cli/src/acp/catalog.ts:10`) |
+
+Qwen Code 0.28.0 was installed for this (`npm install --prefix`, no scripts, no dependencies, into the
+spike's own folder; not global), run with `QWEN_HOME` and the probe in its `settings.json`, and
+stopped at "No auth type is selected": the server start, the hook and the MCP `roots` reply all
+happen before that, so every cell above except compaction is measured, and no model credential
+was used. Its source at tag `v0.28.0` (commit `895dfca8`) was read for the compaction events. Its
+MCP client also declares `roots` and answered `roots/list` with the starting directory
+(`file:///tmp/repo-tasks-spike/repo`, `.../repo/sub/deep`, `.../wt`).
 
 Also not measured: OpenCode through its background service, because one was already running
 (`opencode serve --service`) and is not the spike's to stop; a run against it would not load the
@@ -889,22 +897,22 @@ Sections this contradicts or confirms:
   then measured (the roots test below): for the owner at step 2 (16). 8.5's start-up archiving resolves the list the same way and is affected the same
   way; 15.6's earlier unknown about the server's directory is settled for three of the four hosts.
 - **The roots test** (2026-11-18, the same probe extended; Antigravity again as an installed and
-  then removed plugin, config files byte-identical after). In all three measured hosts the client
+  then removed plugin, config files byte-identical after). In all four measured hosts the client
   declares the MCP `roots` capability in `initialize` (Antigravity: `roots` with
   `listChanged: true`, client `antigravity-client` v1.0.0, also `elicitation`), and answers a
   `roots/list` request sent by the server after `notifications/initialized` with exactly one
   root, the starting directory as a `file://` URI: Claude Code `file:///tmp/repo-tasks-spike/repo/sub/deep`,
   OpenCode the same, Antigravity the same from `R/sub/deep` and `file:///tmp/repo-tasks-spike/wt`
-  from the linked worktree. So on Antigravity the server can learn the workspace without
-  `REPO_TASKS_DIR`, from a request 7.1 does not yet mention. Not measured: Qwen; a host with
+  from the linked worktree; Qwen Code the same (`.../repo/sub/deep` and the worktree). So on Antigravity the server can learn the workspace without
+  `REPO_TASKS_DIR`, from a request 7.1 does not yet mention. Not measured: a host with
   several roots; a root changing during a session (`listChanged` was declared by Antigravity,
   and no change was provoked); a client that declares no `roots`. A revision of 7.1 that ranks
   the first root after `REPO_TASKS_DIR` and before the process working directory is the owner's
   decision at step 2; it also affects 8.5's start-up archiving, which would have to wait for the
   reply to `roots/list` before it can resolve the list.
-- 7.3 and 7.6: confirmed for the three measured hosts: each server could create and remove a
+- 7.3 and 7.6: confirmed for the four measured hosts: each server could create and remove a
   folder in the git common directory, from `W` as well.
-- 7.1 and 10.2, environment: confirmed for the server and the hook on the three measured hosts.
+- 7.1 and 10.2, environment: confirmed for the server and the hook on the four measured hosts.
 - 10.2, the Claude Code compaction source named `compact` [CLAIM, 2026-11-18]: confirmed.
 - 10.2, Antigravity: confirmed; `workspacePaths` and `cwd` are both present, and a hook's working
   directory is the plugin folder.
