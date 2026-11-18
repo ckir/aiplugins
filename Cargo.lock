@@ -1011,6 +1011,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "repo-tasks-mcp-qwen"
+version = "0.1.0"
+dependencies = [
+ "repo-tasks",
+ "rmcp",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "rmcp"
 version = "3.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
