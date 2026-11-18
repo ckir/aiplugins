@@ -525,7 +525,8 @@ The server exposes four tools. Names and parameters are a contract.
 - Reply: one line per task, `created #<id> <subject>`, followed by one line for each blocker that
   was accepted as already satisfied (9.6):
   `#<id>: blocker #<blocker id> has left the list and counts as satisfied`, where `<id>` is the
-  task that named it.
+  task that named it. All `created` lines come first, in id order; the satisfied lines follow,
+  ordered by task id and then by blocker id.
 
 ### 9.3 `task_get`
 
@@ -652,7 +653,7 @@ repo-tasks: <n> open in this repository's task list, <m> in progress. Call the t
 ```
 
 It contains no subject, description or owner. When n is 0, when there is no list, or when
-anything fails, it prints nothing and still exits successfully: a reminder never blocks or fails
+anything else fails, it prints nothing and still exits successfully: a reminder never blocks or fails
 a session.
 
 One failure is not silent [driver's call]. When the list file exists and cannot be used (it is
@@ -674,7 +675,7 @@ reads the list file itself.
 |---|---|---|---|
 | Claude Code | `SessionStart` for the sources `startup`, `resume`, `clear`, and the compaction source | `hookSpecificOutput.additionalContext`, as `claude-code/plugins/re-ghidra-mcp-cc/src/bin/hook.rs:78-80` | `cwd`, then the variable `CLAUDE_PROJECT_DIR`, as that file's lines 41-43 |
 | Qwen | `SessionStart` for `startup`, `resume`, `clear` (`qwen/plugins/re-ghidra-mcp-qwen/qwen-extension.json:17-43`) | `systemMessage` and `hookSpecificOutput.additionalContext`, as `qwen/plugins/re-ghidra-mcp-qwen/src/bin/hook.rs:77-80` | the path that hook reads from its event |
-| Antigravity | `PreInvocation`, acting only when `invocationNum` is at most 1 (the check in `antigravity/plugins/re-ghidra-mcp-agy/src/bin/hook.rs`) | `injectSteps`, as that file's line 78 | `cwd` on standard input |
+| Antigravity | `PreInvocation`, acting only when `invocationNum` is at most 1 (the check in `antigravity/plugins/re-ghidra-mcp-agy/src/bin/hook.rs`) | `injectSteps`, as that file's line 78 | the first entry of `workspacePaths`, as `antigravity/plugins/re-ghidra-mcp-agy/src/bin/hook.rs:89-96` reads it, else `cwd`, both on standard input |
 | OpenCode | on the first `context` event of each session id (the event carries `sessionID`, as `opencode/plugins/todov2-opencode/plugin.ts:18` reads it), and again from the `compaction` hook (the `Plugin.define` block of `opencode/plugins/re-ghidra-mcp-opencode/plugin.ts`) | pushed onto `event.system` as `{ type: "text", text: <the line> }`, and only when `event.system` is an array, as `opencode/plugins/re-ghidra-mcp-opencode/plugin.ts:203-204` does | `ctx.location.directory`, passed to the binary as `--workspace` |
 
 D then follows the order in 7.1. Host rules [driver's call]:
@@ -683,7 +684,7 @@ D then follows the order in 7.1. Host rules [driver's call]:
   wrapper's own binary run as `reminder --event <host>`. There is no separate hook binary.
 - **Antigravity never falls back to the process working directory.** Its documentation says a
   hook's working directory is the folder holding `hooks.json`, which is the plugin, not the
-  workspace. With neither `REPO_TASKS_DIR` nor a `cwd` in the event, the reminder prints nothing.
+  workspace. With neither `REPO_TASKS_DIR` nor a workspace path in the event, the reminder prints nothing.
 - **OpenCode's `plugin.ts` runs the binary** as `reminder --event opencode --workspace <path>` (as `opencode/plugins/rtk-mcp-opencode/plugin.ts`
   runs its own with `spawnSync`) and pushes whatever line comes back, in the object form the
   table gives; when nothing comes back it pushes nothing. It reminds once per session id, not
@@ -702,7 +703,7 @@ Each wrapper ships one binary that contains the engine. Its subcommands:
 | `serve` | runs the MCP server on standard input and output (OpenCode adds `--host opencode`, as `opencode-ctl` does) |
 | `reminder --event <host>` | `<host>` is `claude-code`, `qwen`, `antigravity` or `opencode`; prints the line of 10.1 wrapped the way that host expects (10.2), the bare line for `opencode`, or nothing |
 | `list` | prints exactly what `task_list` replies; `list --archived` prints the archive (below) |
-| `archive` | archives every completed task (8.5) and says how many |
+| `archive` | archives every completed task (8.5) and prints one line, `archived <n> tasks` (`archived 1 task` for one), or `no completed tasks` when there are none |
 | `--version` | prints the version |
 
 `list` and `archive` accept `--dir <path>`; `reminder` accepts `--workspace <path>` and no `--dir`
@@ -826,7 +827,8 @@ All names in this table follow from the working name `repo-tasks` and change wit
 ### 15.5 Antigravity (its bundled documentation, under `~/.gemini/antigravity-cli/builtin/skills/agy-customizations/docs/`)
 
 - A hook command's working directory is the folder holding `hooks.json` (`hooks.md:129-131`); the
-  workspace arrives as `"cwd"` on standard input (`hooks.md:165`).
+  workspace arrives as `"cwd"` on standard input (`hooks.md:165`) and as `"workspacePaths"`
+  (`hooks.md:159`).
 - `SessionStart` and `PreInvocation` events exist. No restriction on where a started process may
   write is stated.
 
@@ -1106,6 +1108,21 @@ the peer returned FINDINGS-14. Each was checked against the document or the cite
 The peer named as least examined: host behaviour on Windows and macOS, and the two outside
 sources beyond the cited lines.
 
+### Panel round 3, the peer (same chat)
+
+Seated: Fold Auditor, State Corruptor, Protocol Pedant, Literal Implementer (the last three new),
+Axiom Breaker, Procedure Walker. The brief is `.clavity/seams/repo-tasks-design-panel-r3.md`; the
+peer returned FINDINGS-3, all MINOR. Fold Auditor, State Corruptor, Axiom Breaker and Procedure
+Walker found nothing.
+
+| Seat | Finding (the peer's severity) | Disposition |
+|---|---|---|
+| Protocol Pedant | The order of satisfied-blocker lines in a create reply (MINOR) | FOLDED (9.2) |
+| Protocol Pedant | `archive` output had no form (MINOR) | FOLDED (section 11) |
+| Literal Implementer | Antigravity's existing hook reads `workspacePaths`, the document says `cwd` | FOLDED, checked in `hook.rs:89-96` and `hooks.md:159`: both are in the payload; `workspacePaths` first, else `cwd` (10.2, 15.5) |
+| Question 2 | 10.1 says "when anything fails" prints nothing, then adds a notice | FOLDED: "anything else fails" |
+| Question 1 | A writer retrying `PermissionDenied` waits 5 seconds on a real read-only file | REJECTED: bounded and stated in 8.2; the cost of a real permission fault is 5 seconds, once |
+
 ### Panel round 2, the peer (2026-11-18, same chat)
 
 Seated: Fold Auditor, Axiom Breaker, Mechanism Gamer, Dependency Cynic, Blindspot Auditor (the
@@ -1131,7 +1148,7 @@ three fell, on its reading of the lines. Each finding was checked against the do
 | Procedure Walker | Section 18 reached sentence 11 | no finding |
 | Question 2 | The spike gives no way to trigger a compaction (peer) | FOLDED in part: a cell the owner accepts as unmeasurable no longer blocks the plan (16); the method belongs to the spike's own plan |
 
-PANEL VERDICT: round 2 complete (the peer returned FINDINGS-13, all disposed above); a third round over these folds is owed.
+PANEL VERDICT: round 2 complete (the peer returned FINDINGS-13, all disposed above); round 3 returned three MINOR findings, folded below it; a fourth round over those folds is owed.
 
 ## Stand-downs
 
