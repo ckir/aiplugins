@@ -34,23 +34,23 @@ Spec: `docs/specs/2026-10-18-opencode-ctl-mcp-design.md`. After execution comes 
 
 ## devtools: pin LF on the shared skill references and notices
 
-**Status:** IMPLEMENTED 2026-11-18 - `.gitattributes` now pins the whole devtools skill tree (shared and the cc, qwen, agy and opencode copies) to LF, so `references/`, `THIRD-PARTY-NOTICE.md` and `assets/` are covered; `git check-attr eol` reports `lf` on all 50 files. Windows autocrlf checkout itself not exercised.
+**Status:** SHIPPED 2026-11-18 - merged as PR #150 (e1d10bb); `.gitattributes` now pins the whole devtools skill tree (shared and the cc, qwen, agy and opencode copies) to LF, so `references/`, `THIRD-PARTY-NOTICE.md` and `assets/` are covered; `git check-attr eol` reports `lf` on all 50 files. Windows autocrlf checkout itself not exercised.
 
 ## opencode devtools INSTALL.md: copy steps hardcode skill and command names
 
-**Status:** IMPLEMENTED 2026-11-18 - INSTALL.md copies by loop over the bundle (`"$STAGE"/skills/*/`, `"$STAGE"/commands/*.md`) and names no skill; `scripts/check-devtools-skills.sh` fails if it names a shipped skill or command or loses the globs (four new mutation cases).
+**Status:** SHIPPED 2026-11-18 - merged as PR #150 (e1d10bb); INSTALL.md copies by loop over the bundle (`"$STAGE"/skills/*/`, `"$STAGE"/commands/*.md`) and names no skill; `scripts/check-devtools-skills.sh` fails if it names a shipped skill or command or loses the globs (four new mutation cases).
 
 ## Qwen installers: no release carries the extension zip
 
-**Status:** IMPLEMENTED 2026-11-18 - both installers resolve the newest `<extension>-v*` release through the releases API and download from that tag; `aiplugins-devtools-qwen` added to the `.ps1` `ValidateSet` and both usage lists. Measured live with bash and `pwsh` 7 on Linux for all four extensions; Windows PowerShell 5.1 not run.
+**Status:** SHIPPED 2026-11-18 - merged as PR #150 (e1d10bb); both installers resolve the newest `<extension>-v*` release through the releases API and download from that tag; `aiplugins-devtools-qwen` added to the `.ps1` `ValidateSet` and both usage lists. Measured live with bash and `pwsh` 7 on Linux for all four extensions; Windows PowerShell 5.1 not run.
 
 ## mlc scans untracked scratch and fails local link checks
 
-**Status:** IMPLEMENTED 2026-11-18 - the Justfile already ignored `./.clavity`; the lefthook pre-push `mlc` line now does too.
+**Status:** SHIPPED 2026-11-18 - merged as PR #150 (e1d10bb); the Justfile already ignored `./.clavity`; the lefthook pre-push `mlc` line now does too.
 
 ## release-refresh: pass github.head_ref through env, not inline
 
-**Status:** IMPLEMENTED 2026-11-18 - the push step reads `HEAD_REF` from `env:` and quotes it; actionlint clean.
+**Status:** SHIPPED 2026-11-18 - merged as PR #150 (e1d10bb); the push step reads `HEAD_REF` from `env:` and quotes it; actionlint clean.
 
 ## release-please: a release PR goes stale behind main and is not rebuilt
 
