@@ -13,12 +13,13 @@
 ## Global Constraints
 
 - The spike is throwaway and merges no product code (16, step 1). The only file this plan changes in the repository is the design document (Task 6), plus this plan.
-- All probe files live in `SPIKE=/tmp/repo-tasks-spike`, outside the repository. Nothing is installed globally and no host configuration under the home directory is edited: every host is pointed at its configuration by flag or by a file in the throwaway repository.
+- All probe files live in `SPIKE=/tmp/repo-tasks-spike`, outside the repository. Nothing is installed globally and no host configuration under the home directory is edited: every host is pointed at its configuration by flag, by environment variable or by a file in the throwaway repository. A host still writes its own session records where it always does (Claude Code and Antigravity under the home directory); that is recorded in `SPIKE/notes.md`, not prevented.
 - Every cell of the result table holds what was observed with the command or log line that showed it, or the words `not measured` and the reason (16, step 1).
 - `REPO_TASKS_DIR` and `REPO_TASKS_LIST` are the two variable names measured; the probe sets them to the values `/spike/dir` and `spike-list`.
 - Each host is run from three starting places: the main checkout root `R`, a subdirectory `R/sub/deep`, and a linked worktree `W`. The log records which.
 - Host runs use real model calls. Each prompt is the single word `ok`-style trivial request; no run needs a tool call, because every measurement except compaction is logged at server or hook start.
 - Every host run is wrapped in `timeout 180` and is bracketed by a process census (`pgrep -af '<host>'` before and after). A process the run left behind, and that was absent before, is stopped by its own pid and noted in `SPIKE/notes.md`; a process present before is never touched.
+- Every host configuration is generated per run from a template by `sed`, which writes the run's log path (`SPIKE/logs/<host>-<label>.jsonl`) and the fixed git directory (`SPIKE/repo/.git`) into the probe's two arguments (`probe_mcp.py <log> <fixed-git-dir>`, `probe_hook.py <log> <label>`). Each run therefore has its own log, and each run script takes `<place> <label> [prompt]` (and `<mode>` for OpenCode, before the prompt).
 - A host may start an MCP server lazily. When a run leaves no `start` line, it is repeated once with a prompt that asks the model to call the probe tool by name; only when that run also leaves none is the cell `not measured: server did not start` with the debug-log reason.
 - Windows and macOS are out of scope (17.2, item 2). Timing is not measured, so the timing-measurement rules do not apply.
 
@@ -41,11 +42,11 @@
 - Produces: `probe_mcp.py <log> <fixed-git-dir>`: a stdio MCP server (newline-delimited JSON-RPC 2.0) answering `initialize`, `tools/list` (one tool `probe`) and `tools/call`; on start-up, before reading any input, it appends one line to `<log>`.
 - Produces: `probe_hook.py <log> <label>`: reads standard input fully, appends one line to `<log>`, prints `{}` and exits 0.
 - Produces the log line shape (one JSON object per line), with these keys: `kind` (`start` or `hook`), `label`, `ts` (RFC 3339 UTC), `cwd` (`os.getcwd()`), `argv`, `env` (an object with only the keys `REPO_TASKS_DIR`, `REPO_TASKS_LIST`, `PWD`, `CLAUDE_PROJECT_DIR`, each `null` when unset), `ppid`, and for `start` (with `label` set to `mcp`): `git_common_dir` (output of `git rev-parse --path-format=absolute --git-common-dir` run in `cwd`, or the error text), `mkdir` (`"ok"` or the OS error from creating `<git_common_dir>/repo-tasks-spike/` and removing it again, or `"skipped: no repository at cwd"` when `git_common_dir` is an error) and `mkdir_fixed` (the same create-and-remove in `<fixed-git-dir>`, always attempted; this one answers "may this process write under `.git`" independently of where the host started it); for `hook`: `stdin` (the raw text read, up to 64 KiB).
-- Produces `make_fixture.sh`: creates `SPIKE/repo` (git repository `R` with one commit, a directory `sub/deep`), and a linked worktree `SPIKE/wt` (`W`) of it, and an empty `SPIKE/logs/`. Idempotent: it deletes and recreates `SPIKE/repo`, `SPIKE/wt` first.
+- Produces `make_fixture.sh`: creates `SPIKE/repo` (git repository `R` with one commit, a directory `sub/deep`), and a linked worktree `SPIKE/wt` (`W`) of it, and an empty `SPIKE/logs/`. Idempotent: it deletes and recreates `SPIKE/repo`, `SPIKE/wt` first. Any file a host needs inside the repository (Task 4's `.agents/` folder) is written and committed in `R` before `W` is added, so `W` holds it too.
 
 - [ ] **Step 1: Write the self-test first (`selftest.sh`)**
 
-It runs `make_fixture.sh`, then starts `python3 probe_mcp.py $SPIKE/logs/self.jsonl` with its working directory set to `SPIKE/repo/sub/deep` and `REPO_TASKS_DIR=/spike/dir` in its environment, sends one `initialize` request and one `tools/list` request on standard input, reads two reply lines, closes standard input, and asserts with `jq`: the log has exactly one `start` line; `cwd` ends in `/sub/deep`; `git_common_dir` equals `SPIKE/repo/.git`; `mkdir` and `mkdir_fixed` are `"ok"`; a start from `/tmp` (no repository) has `mkdir` `"skipped: no repository at cwd"` and `mkdir_fixed` `"ok"`; `env.REPO_TASKS_DIR` is `/spike/dir`; `env.REPO_TASKS_LIST` is `null`; the `tools/list` reply names a tool `probe`. It then pipes `{"hookEventName":"X","cwd":"/c"}` into `probe_hook.py $SPIKE/logs/self.jsonl lbl` and asserts a `hook` line whose `stdin` parses back to that object. A second start from `SPIKE/wt` asserts `git_common_dir` is still `SPIKE/repo/.git`, the oracle being `git rev-parse --path-format=absolute --git-common-dir` (the one 7.2 names).
+It runs `make_fixture.sh`, then starts `python3 probe_mcp.py $SPIKE/logs/self-<n>.jsonl $SPIKE/repo/.git` (a new log file for each of its runs, so each log holds exactly one `start` line) with its working directory set to `SPIKE/repo/sub/deep` and `REPO_TASKS_DIR=/spike/dir` in its environment, sends one `initialize` request and one `tools/list` request on standard input, reads two reply lines, closes standard input, and asserts with `jq`: the log has exactly one `start` line; `cwd` ends in `/sub/deep`; `git_common_dir` equals `SPIKE/repo/.git`; `mkdir` and `mkdir_fixed` are `"ok"`; a start from `/tmp` (no repository) has `mkdir` `"skipped: no repository at cwd"` and `mkdir_fixed` `"ok"`; `env.REPO_TASKS_DIR` is `/spike/dir`; `env.REPO_TASKS_LIST` is `null`; the `tools/list` reply names a tool `probe`. It then pipes `{"hookEventName":"X","cwd":"/c"}` into `probe_hook.py $SPIKE/logs/self.jsonl lbl` and asserts a `hook` line whose `stdin` parses back to that object. A second start from `SPIKE/wt` asserts `git_common_dir` is still `SPIKE/repo/.git`, the oracle being `git rev-parse --path-format=absolute --git-common-dir` (the one 7.2 names).
 
 - [ ] **Step 2: Run it to see it fail**
 
@@ -82,7 +83,7 @@ Run `claude --help` and confirm these exist (they did at 2.1.327): `-p`, `--mcp-
 
 - [ ] **Step 2: Write the two configuration files and the script**
 
-`cc-mcp.json` declares one server `probe` with command `python3`, arguments the absolute path of `probe_mcp.py` and the absolute log path. `cc-settings.json` declares `SessionStart` hooks whose command runs `probe_hook.py` with the log path and label `cc-hook`, one entry per matcher source: `startup`, `resume`, `clear`, `compact`. Command and log paths are absolute. `run_cc.sh` runs `claude -p "reply with the word ok" --mcp-config cc-mcp.json --strict-mcp-config --settings cc-settings.json --setting-sources "" --debug-file SPIKE/logs/cc-debug-<label>.txt` and records the exit status.
+`cc-mcp.json` (a template, see Global Constraints) declares one server `probe` with command `python3`, arguments the absolute path of `probe_mcp.py`, the log path and the fixed git directory. `cc-settings.json` declares `SessionStart` hooks whose command runs `probe_hook.py` with the log path and label `cc-hook`, one entry per matcher source: `startup`, `resume`, `clear`, `compact`. Command and log paths are absolute. `run_cc.sh` runs `claude -p "reply with the word ok" --mcp-config cc-mcp.json --strict-mcp-config --settings cc-settings.json --setting-sources "" --debug-file SPIKE/logs/cc-debug-<label>.txt` and records the exit status.
 
 - [ ] **Step 3: Run the three places**
 
@@ -118,19 +119,19 @@ Under `## Qwen` in `SPIKE/notes.md` write every cell as `not measured: qwen is n
 ### Task 4: Antigravity
 
 **Files:**
-- Create: `.agents/` folders inside the fixture repository `R` and worktree `W` (the customization root named in `hooks.md:8-9` and `plugins.md:13`; the fixture is outside this repository), `/tmp/repo-tasks-spike/run_agy.sh`
+- Create: `.agents/plugins/probe/` inside the fixture repository `R`, committed there before `W` is added (the customization root and plugin folder named in `hooks.md:8-9` and `plugins.md:13`; the fixture is outside this repository), `/tmp/repo-tasks-spike/run_agy.sh`
 
 **Interfaces:**
 - Consumes: Task 1's probe.
-- Produces: `run_agy.sh <place> <label>`, same contract as `run_cc.sh`, using `agy --print` (flags confirmed in `agy --help`: `--print`, `--log-file`, `--settings`, `--dangerously-skip-permissions`).
+- Produces: `run_agy.sh <place> <label> [prompt]`, same contract as `run_cc.sh`, using `agy --print` (flags confirmed in `agy --help`: `--print`, `--log-file`, `--settings`, `--dangerously-skip-permissions`).
 
 - [ ] **Step 1: Read how a plugin declares its server and hook**
 
-Read, in this order, `~/.gemini/antigravity-cli/builtin/skills/agy-customizations/docs/plugins.md`, `mcp_servers.md`, `hooks.md` and `json_configs.md`, and the shipped example `antigravity/plugins/re-ghidra-mcp-agy/` (`plugin.json`, `mcp_config.json`, `hooks.json`). Write into `SPIKE/notes.md` the exact file names and keys you will use, each with the document and line you took it from. The documents name the workspace customization root `.agents/` with `hooks.json` directly in it (`hooks.md:8-9`) and per-plugin `plugins/<name>/mcp_config.json` (`mcp_servers.md:21`); use those, in the fixture, so nothing is installed and nothing under the home directory changes. Because `.agents/` is found from the workspace, record for each place whether it was found (the `hooks.md:131` working directory is then `.agents/`, not the plugin). If the documents do not make a workspace-level `.agents/` take effect in a headless `--print` run, stop and report `STATE_MISMATCH`: the owner decides whether a throwaway `agy plugin install` and removal is allowed.
+Read, in this order, `~/.gemini/antigravity-cli/builtin/skills/agy-customizations/docs/plugins.md`, `mcp_servers.md`, `hooks.md` and `json_configs.md`, and the shipped example `antigravity/plugins/re-ghidra-mcp-agy/` (`plugin.json`, `mcp_config.json`, `hooks.json`). Write into `SPIKE/notes.md` the exact file names and keys you will use, each with the document and line you took it from. The documents name the workspace customization root `.agents/` with `hooks.json` directly in it (`hooks.md:8-9`) and per-plugin `plugins/<name>/mcp_config.json` (`mcp_servers.md:21-22`, the only workspace-level MCP location the document names); use those, in the fixture, so nothing is installed and nothing under the home directory changes. Because `.agents/` is found from the workspace, record for each place whether it was found (the `hooks.md:131` working directory is then `.agents/`, not the plugin). If the documents do not make a workspace-level `.agents/` take effect in a headless `--print` run, stop and report `STATE_MISMATCH`: the owner decides whether a throwaway `agy plugin install` and removal is allowed.
 
 - [ ] **Step 2: Write the plugin folder and the script to those names**
 
-`R/.agents/` holds the MCP configuration for the probe server (absolute paths, passing `SPIKE/repo/.git` as the fixed git directory) and `hooks.json` with a `SessionStart` entry and a `PreInvocation` entry, each running `probe_hook.py` with labels `agy-sessionstart` and `agy-preinvocation`. `run_agy.sh` runs `agy --print "reply with the word ok"` from the chosen place, with `REPO_TASKS_DIR` and `REPO_TASKS_LIST` set.
+`R/.agents/plugins/probe/` holds `mcp_config.json` (the probe server, absolute paths) and `hooks.json` (hooks of a plugin sit in the plugin's own folder, `plugins.md:63`), with the plugin metadata file and any enabling step `plugins.md` requires (read in step 1), and the hooks file has a `SessionStart` entry and a `PreInvocation` entry, each running `probe_hook.py` with labels `agy-sessionstart` and `agy-preinvocation`. `run_agy.sh` runs `agy --print "reply with the word ok"` from the chosen place, with `REPO_TASKS_DIR` and `REPO_TASKS_LIST` set.
 
 - [ ] **Step 3: Run the three places and read the cells**
 
@@ -145,7 +146,7 @@ As Task 2, steps 3 and 5. For each `hook` line also record whether `stdin` has `
 
 **Interfaces:**
 - Consumes: Task 1's probe.
-- Produces: `run_oc.sh <place> <label> <mode>` where `<mode>` is `standalone` or `service`; same log contract. It exports `REPO_TASKS_DIR=/spike/dir`, `REPO_TASKS_LIST=spike-list` and `OPENCODE_CONFIG_DIR=/tmp/repo-tasks-spike/oc` (the variable read at `packages/cli/src/index.ts:145` and `packages/util/src/global.ts:79` in the OpenCode source) before running the host.
+- Produces: `run_oc.sh <place> <label> <mode> [prompt]` where `<mode>` is `standalone` or `service`; same log contract. It exports `REPO_TASKS_DIR=/spike/dir`, `REPO_TASKS_LIST=spike-list` and `OPENCODE_CONFIG_DIR=/tmp/repo-tasks-spike/oc` (the variable read at `packages/cli/src/index.ts:145` and `packages/util/src/global.ts:79` in the OpenCode source) before running the host, and `XDG_DATA_HOME`, `XDG_STATE_HOME` and `XDG_CACHE_HOME` set under `/tmp/repo-tasks-spike/xdg/` so the host's session data, state and locks do not land in the home directory (OpenCode's directories follow XDG, `packages/util/src/global.ts:5`; confirm in that file which variables it reads).
 
 - [ ] **Step 1: Read the two shapes**
 
@@ -157,7 +158,7 @@ The MCP entry shape is in `opencode/plugins/opencode-ctl-mcp-opencode/INSTALL.md
 
 - [ ] **Step 3: Run and read**
 
-For each of the three places in both modes (`service` mode may leave a background service running: the census of the global constraints applies, and a service present before the run is never stopped): confirm a `start` line, then read the cells as in Task 2 step 5. Add the `ctx.location.directory` value from the `oc-context` line (the document's source of the workspace path, 10.2). Compaction: trigger a long enough session only if `opencode` offers a command for it; otherwise `not measured` with the reason.
+For each of the three places in both modes (`service` mode may leave a background service running and a running service is reused by the next run, which hides that run's `start` line: before each `service` run, stop the service this plan started, found by the census; if a service was already running before the plan began, `service` mode is `not measured: a service was already running and is not ours to stop`): confirm a `start` line, then read the cells as in Task 2 step 5. Add the `ctx.location.directory` value from the `oc-context` line (the document's source of the workspace path, 10.2). Compaction: trigger a long enough session only if `opencode` offers a command for it; otherwise `not measured` with the reason.
 
 ---
 
@@ -193,3 +194,5 @@ git commit -m "docs(spec): record the repo-tasks spike results"
 ## Review ledger (panel round 1, 2026-11-18, the peer returned FINDINGS-11)
 
 All 11 were checked against the files before folding. Folded: the `start` line's `label`; `mkdir` conflated the server's directory with `.git` write permission (a `mkdir_fixed` probe added); a lazy server read as "did not start" (a repeat with a tool-calling prompt); Antigravity's loose plugin (workspace `.agents/` per `hooks.md:8-9`, nothing installed); OpenCode's plugin not registered and `@opencode/plugin` unresolved (`OPENCODE_CONFIG_DIR`, `plugins/probe.ts`, a read-only `node_modules` link); `run_oc.sh` omitting the two variables; `claude -p "/compact"` unproven (two routes, then `not measured`); the OpenCode background service left running and missing timeouts (a process census and `timeout 180`); Antigravity compaction read from documents only (a command search added). None rejected.
+
+Panel round 2 (FINDINGS-8, checked against `mcp_servers.md:16-22`, `plugins.md:8-16`, `global.ts:5`): folded all eight: the two probe arguments and per-run logs and prompts by template (Global Constraints); the workspace MCP location is a plugin folder; `W` receives `.agents/` through a commit in `R`; the self-test uses one log per run; a reused OpenCode service; OpenCode's XDG directories moved under `SPIKE`. None rejected.
