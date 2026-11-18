@@ -1,24 +1,55 @@
-ADDENDUM TO THE POLYFORM NONCOMMERCIAL LICENSE 1.0.0
+# Additional Terms to the PolyForm Noncommercial License 1.0.0
 
-DRAFT STUB. This file contains structure only. The operative terms are to be
-written (and reviewed by counsel) by the licensor before this repository is
-released under them. Nothing below grants or restricts any right yet.
+Required Notice: Copyright Costas Kirgoussios
 
-Licensor: Costas Kirgoussios
+The file `LICENSE` contains the PolyForm Noncommercial License 1.0.0
+(<https://polyformproject.org/licenses/noncommercial/1.0.0>), unmodified.
+These Additional Terms are offered by the same licensor, together with those
+terms, for the same software. Capitalized terms not defined here have the
+meaning given in `LICENSE`.
 
-1. Relationship to the PolyForm Noncommercial License 1.0.0
-   The file LICENSE contains the PolyForm Noncommercial License 1.0.0,
-   unmodified. This addendum supplements it. [TO BE WRITTEN: precedence if the
-   two conflict; whether a breach of this addendum is a breach of LICENSE.]
+## Relationship to the PolyForm Terms
 
-2. Evaluation Grant
-   [TO BE WRITTEN: who may evaluate, for what purpose, for how long, and what
-   is permitted beyond the noncommercial grant in LICENSE.]
+These Additional Terms supplement `LICENSE`. If they conflict with it, these
+Additional Terms control. Anything you do with the software that breaks these
+Additional Terms is a violation of the terms under the **Violations** section
+of `LICENSE`, including its notice and 32-day cure period.
 
-3. Anti-Circumvention
-   [TO BE WRITTEN: what may not be circumvented, disabled or removed (for
-   example license checks, notices, usage limits), and the consequence.]
+## Commercial Evaluation Grant
 
-4. Source-Available, Not Open Source
-   Everything in this repository is source-available software. It is not open
-   source.
+The licensor grants you and your company a license to use the software for
+internal testing and evaluation, whether or not that use is a permitted
+purpose under `LICENSE`, for 30 days starting on the day your company first
+runs the software. The grant is royalty-free, applies once per company (a
+fork, a new entity or a new account does not restart it), and covers
+evaluation only. It does not cover production use, use for the benefit of
+third parties, or any other commercial use.
+
+Use beyond that period, and any production or other commercial use, needs a
+separate written license agreement with the licensor, which may require a
+fee and a license key. To arrange one, contact:
+[LICENSOR CONTACT: to be supplied by the licensor].
+
+## Anti-Circumvention
+
+You may not disable, bypass, remove, alter or otherwise circumvent any
+technical measure the software uses to check, limit or enforce licensing,
+including any license key check or evaluation-period check, and you may not
+help anyone else do so. You may not remove or obscure functionality that
+such a measure protects, or any license or copyright notice in the software,
+including the copyright and license headers in source files.
+
+This section limits the right to make changes and new works under the
+**Changes and New Works License** section of `LICENSE`. It applies to every
+use of the software, including noncommercial use.
+
+## Source-Available, Not Open Source
+
+Everything in this repository is source-available software. It is not open
+source. Nothing in `LICENSE` or these Additional Terms grants the rights
+defined by the Open Source Definition.
+
+## Governing Law
+
+[GOVERNING LAW AND VENUE: to be supplied by the licensor, or delete this
+section to leave it unspecified.]
