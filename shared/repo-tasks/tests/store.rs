@@ -320,5 +320,11 @@ fn windows_reader_and_writer_never_fail() {
     let w: u32 = writer.join().unwrap();
     let r: u32 = readers.into_iter().map(|h| h.join().unwrap()).sum();
     println!("writer calls: {w}, reader calls: {r}");
+    if let Some(file) = std::env::var_os("REPO_TASKS_CI_NOTES") {
+        use std::io::Write;
+        if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(file) {
+            let _ = writeln!(f, "windows-rw: writer calls {w}, reader calls {r}");
+        }
+    }
     assert!(w > 0 && r > 0);
 }
