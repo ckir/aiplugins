@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/ckir/aiplugins/compare/aiplugins-devtools-agy-v0.4.0...aiplugins-devtools-agy-v0.5.0) (2026-11-18)
+
+
+### Features
+
+* **devtools:** add license-headers skill ([e26b991](https://github.com/ckir/aiplugins/commit/e26b991413966d564acf27b1a12a2fb0776ff5f2))
+* **devtools:** add license-headers skill ([e48ca3a](https://github.com/ckir/aiplugins/commit/e48ca3a1dff94c04562c9689666b72bfda20cbb7))
+
 ## [0.4.0](https://github.com/ckir/aiplugins/compare/aiplugins-devtools-agy-v0.3.0...aiplugins-devtools-agy-v0.4.0) (2026-11-02)
 
 

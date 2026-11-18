@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1](https://github.com/ckir/aiplugins/compare/re-ghidra-mcp-opencode-v0.10.0...re-ghidra-mcp-opencode-v0.10.1) (2026-11-18)
+
+
+### Bug Fixes
+
+* keep opencode plugin.ts header-free to preserve footprint ([9d6d59e](https://github.com/ckir/aiplugins/commit/9d6d59eeb7b19875e12c38ab65be29222c3822ff))
+
 ## [0.10.0](https://github.com/ckir/aiplugins/compare/re-ghidra-mcp-opencode-v0.9.0...re-ghidra-mcp-opencode-v0.10.0) (2026-10-17)
 
 
