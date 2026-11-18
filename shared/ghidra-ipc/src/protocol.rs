@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 //
 // Source-available software. It is NOT open source.
-// Licensed under the PolyForm Noncommercial License 1.0.0 together with the
-// additional terms (evaluation grant, anti-circumvention) that apply to this
-// repository. See the LICENSE file at the repository root.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
 
 //! Cross-language wire DTOs for the M1a read tools (spec §3). These are the worker's response shapes;
 //! the server canonicalizes address strings (via `address::AddressCanonicalizer`) before returning

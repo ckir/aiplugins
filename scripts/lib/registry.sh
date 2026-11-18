@@ -3,9 +3,9 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 #
 # Source-available software. It is NOT open source.
-# Licensed under the PolyForm Noncommercial License 1.0.0 together with the
-# additional terms (evaluation grant, anti-circumvention) that apply to this
-# repository. See the LICENSE file at the repository root.
+# Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+# with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+# anti-circumvention). See both files at the repository root.
 
 # Shared core for per-host wiring checks: every agent/plugin enumeration
 # comes from agents.json. No host names are hardcoded below this line.

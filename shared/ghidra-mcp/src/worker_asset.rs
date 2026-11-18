@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 //
 // Source-available software. It is NOT open source.
-// Licensed under the PolyForm Noncommercial License 1.0.0 together with the
-// additional terms (evaluation grant, anti-circumvention) that apply to this
-// repository. See the LICENSE file at the repository root.
+// Licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE) together
+// with the additional terms in LICENSE-ADDENDUM (evaluation grant,
+// anti-circumvention). See both files at the repository root.
 
 //! Embed the worker `.java` in the binary and extract it to a per-user script dir at boot, keyed
 //! by content hash so the extracted copy always matches the compiled binary (spec §12). Only the
