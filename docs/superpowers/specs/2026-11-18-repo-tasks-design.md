@@ -1108,21 +1108,6 @@ the peer returned FINDINGS-14. Each was checked against the document or the cite
 The peer named as least examined: host behaviour on Windows and macOS, and the two outside
 sources beyond the cited lines.
 
-### Panel round 3, the peer (same chat)
-
-Seated: Fold Auditor, State Corruptor, Protocol Pedant, Literal Implementer (the last three new),
-Axiom Breaker, Procedure Walker. The brief is `.clavity/seams/repo-tasks-design-panel-r3.md`; the
-peer returned FINDINGS-3, all MINOR. Fold Auditor, State Corruptor, Axiom Breaker and Procedure
-Walker found nothing.
-
-| Seat | Finding (the peer's severity) | Disposition |
-|---|---|---|
-| Protocol Pedant | The order of satisfied-blocker lines in a create reply (MINOR) | FOLDED (9.2) |
-| Protocol Pedant | `archive` output had no form (MINOR) | FOLDED (section 11) |
-| Literal Implementer | Antigravity's existing hook reads `workspacePaths`, the document says `cwd` | FOLDED, checked in `hook.rs:89-96` and `hooks.md:159`: both are in the payload; `workspacePaths` first, else `cwd` (10.2, 15.5) |
-| Question 2 | 10.1 says "when anything fails" prints nothing, then adds a notice | FOLDED: "anything else fails" |
-| Question 1 | A writer retrying `PermissionDenied` waits 5 seconds on a real read-only file | REJECTED: bounded and stated in 8.2; the cost of a real permission fault is 5 seconds, once |
-
 ### Panel round 2, the peer (2026-11-18, same chat)
 
 Seated: Fold Auditor, Axiom Breaker, Mechanism Gamer, Dependency Cynic, Blindspot Auditor (the
@@ -1147,6 +1132,21 @@ three fell, on its reading of the lines. Each finding was checked against the do
 | Blindspot Auditor | A start-up archiving failure goes to standard error that nobody sees (MINOR) | REJECTED below the floor: nothing is lost, the next start retries |
 | Procedure Walker | Section 18 reached sentence 11 | no finding |
 | Question 2 | The spike gives no way to trigger a compaction (peer) | FOLDED in part: a cell the owner accepts as unmeasurable no longer blocks the plan (16); the method belongs to the spike's own plan |
+
+### Panel round 3, the peer (same chat)
+
+Seated: Fold Auditor, State Corruptor, Protocol Pedant, Literal Implementer (the last three new),
+Axiom Breaker, Procedure Walker. The brief is `.clavity/seams/repo-tasks-design-panel-r3.md`; the
+peer returned FINDINGS-3, all MINOR. Fold Auditor, State Corruptor, Axiom Breaker and Procedure
+Walker found nothing.
+
+| Seat | Finding (the peer's severity) | Disposition |
+|---|---|---|
+| Protocol Pedant | The order of satisfied-blocker lines in a create reply (MINOR) | FOLDED (9.2) |
+| Protocol Pedant | `archive` output had no form (MINOR) | FOLDED (section 11) |
+| Literal Implementer | Antigravity's existing hook reads `workspacePaths`, the document says `cwd` | FOLDED, checked in `hook.rs:89-96` and `hooks.md:159`: both are in the payload; `workspacePaths` first, else `cwd` (10.2, 15.5) |
+| Question 2 | 10.1 says "when anything fails" prints nothing, then adds a notice | FOLDED: "anything else fails" |
+| Question 1 | A writer retrying `PermissionDenied` waits 5 seconds on a real read-only file | REJECTED: bounded and stated in 8.2; the cost of a real permission fault is 5 seconds, once |
 
 PANEL VERDICT: round 2 complete (the peer returned FINDINGS-13, all disposed above); round 3 returned three MINOR findings, folded below it; a fourth round over those folds is owed.
 
