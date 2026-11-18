@@ -234,7 +234,7 @@ Every entry point resolves a starting directory D, then a list from D (7.2 to 7.
 
 | Entry point | D is the first of these that is present |
 |---|---|
-| MCP server, on each tool call | `REPO_TASKS_DIR`; the client's first root (below); the process working directory |
+| MCP server, on each tool call | `REPO_TASKS_DIR`; the client's first root (below); the process working directory, except on Antigravity (below) |
 | Reminder (section 10) | `REPO_TASKS_DIR`; the workspace path in the host's event, which on OpenCode arrives as the `--workspace` argument (10.2); the process working directory, except on Antigravity (10.2) |
 | A subcommand run by a person (section 11) | the `--dir` argument; `REPO_TASKS_DIR`; the process working directory |
 
@@ -250,16 +250,32 @@ the variable]. The spike (15.7) found that Antigravity starts an installed serve
 own folder, with no variable naming the workspace, while all four hosts declare the MCP `roots`
 capability and answer `roots/list` with the starting directory. So:
 
-- When the client declared `roots` in `initialize`, the server sends `roots/list` once after it
+- When the client declared `roots` in `initialize`, the server sends `roots/list` at once when it
   receives `notifications/initialized`, and again after each `notifications/roots/list_changed`.
-- The reply's roots are read in order; the first whose `uri` is a `file://` URI naming an
-  existing directory becomes the root directory, converted to a local path (percent-decoding, and
-  on Windows `file:///C:/x` to `C:\x`). Other roots are ignored: the spike saw one root per host
-  and never several [driver's call, unmeasured].
-- A tool call that arrives while a `roots/list` request is unanswered waits for the reply for up
-  to 2 seconds [PROPOSED, UNMEASURED], then goes on without it.
-- A client that declared no `roots`, a failed or empty reply, and a reply with no usable root all
-  mean "no root": D falls to the process working directory. None of them is an error.
+  A request is **settled** when its reply arrives or 2 seconds [PROPOSED, UNMEASURED] after it was
+  sent, whichever is first; a reply that arrives later is still used when it comes. A client that
+  declared no `roots` has nothing to settle. The 2 seconds start when the request is sent, so a
+  tool call waits only for what is left of them, and once a request is settled no later call
+  waits for it again.
+- The reply's roots are read in order; the first whose `uri` names an existing directory becomes
+  the root directory. A `file://` URI is read as RFC 8089 gives it [CLAIM, 2026-11-18]: the
+  authority is empty or `localhost` (any other authority, such as a network share, makes the root
+  unusable), the path is percent-decoded as UTF-8 (a byte sequence that is not valid UTF-8 makes
+  it unusable), and on Windows `/c:/x` and `/C:/x` become `c:\x` and `C:\x`. Any other scheme is
+  unusable. Other roots are ignored: the spike saw one root per host and never several [driver's
+  call, unmeasured].
+- A tool call that arrives while a request is not settled waits for it, as above, then goes on.
+  A tool call that arrives before `notifications/initialized` is refused with an error saying the
+  server is not initialized, and touches no list: the protocol puts that notification before any
+  such call [CLAIM, 2026-11-18], and answering it from the working directory could open the
+  wrong list.
+- A client that declared no `roots`, a failed or empty reply, and a reply with no usable root
+  all mean "no root": D falls to the process working directory, except on Antigravity. A refresh
+  that fails, times out or has no usable root keeps the root already held.
+- **Antigravity has no working-directory fallback for the server**, as it has none for the
+  reminder (10.2): its installed server starts in the plugin's folder (15.7), so with neither the
+  variable nor a root every call fails with an error that names `REPO_TASKS_DIR` and says the
+  host gave no workspace. The wrapper's compiled-in host (8.1) decides this.
 - The root is held as the last answer received and used by every later call; D is still resolved
   on each call, so a changed root is followed.
 
@@ -482,9 +498,11 @@ wherever it stands in the file. A damaged archive line never fails a call and is
 A task reaches the archive in exactly three ways:
 
 - **MCP server start.** After the `initialized` notification, once the question of a root is
-  settled (the reply arrived, the 2 seconds of 7.1 passed, or the client declared no roots), and
-  before `serve` answers its first tool call, it resolves the list as a tool call would and reads
-  it without the lock. A host that never sends `initialized` never triggers it. The condition is: the list holds at least one task,
+  answered (the client declared no roots, or its reply to `roots/list` arrived, usable or not),
+  and before `serve` answers its first tool call, it resolves the list as a tool call would and reads
+  it without the lock. A host that never sends `initialized`, and a request
+  that is only settled by the 2 seconds of 7.1 running out, never trigger it: an unanswered root
+  must not let it act on the working directory's list, and the next start tries again. The condition is: the list holds at least one task,
   every task is completed, and every task's `updated_at` is at least 12 hours in the past
   [PROPOSED, UNMEASURED]. Only when the condition holds does it make one non-blocking attempt at
   the lock, read the list again under it, and, if the condition still holds, archive them all
@@ -1246,6 +1264,21 @@ Walker found nothing.
 | Question 1 | A writer retrying `PermissionDenied` waits 5 seconds on a real read-only file | REJECTED: bounded and stated in 8.2; the cost of a real permission fault is 5 seconds, once |
 
 PANEL VERDICT: round 2 complete (the peer returned FINDINGS-13, all disposed above); round 3 returned three MINOR findings, folded below it; a fourth round over those folds is owed.
+
+### Panel round on the roots revision (2026-11-18, the peer, same chat)
+
+The brief is `.clavity/seams/repo-tasks-roots-panel-r1.md`; the peer returned FINDINGS-7, each
+checked against the text.
+
+| Seat | Finding (the peer's severity) | Disposition |
+|---|---|---|
+| Fold Auditor | The working-directory fallback on Antigravity opens a list for the plugin's folder (MATERIAL) | FOLDED: no fallback on Antigravity; the call fails and names `REPO_TASKS_DIR` (7.1), as 10.2 already says for the reminder |
+| Fold Auditor | 8.5 used a 2-second settlement that 7.1 defined only for a waiting tool call (BLOCKING) | FOLDED: a request is settled by its reply or 2 seconds after it was sent; 8.5 acts only on an answered request (7.1, 8.5) |
+| Fold Auditor | Windows `file://` forms beyond `C:` (MATERIAL) | FOLDED as RFC 8089 reading, marked [CLAIM] (7.1) |
+| State Corruptor | A call before `initialized` skips the wait (MATERIAL) | FOLDED: refused with an error, no list touched (7.1) |
+| State Corruptor | Every call waits again after a timeout (MATERIAL) | FOLDED: a settled request is not waited for again (7.1) |
+| Literal Implementer | A refresh that times out: keep or clear the root (MINOR) | FOLDED: the root held is kept (7.1) |
+| Blindspot Auditor | Start-up archiving after a timeout acts on the working directory's list (MATERIAL) | FOLDED: a timeout-only settlement skips start-up archiving (8.5) |
 
 ## Stand-downs
 
