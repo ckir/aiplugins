@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/ckir/aiplugins/compare/todov2-opencode-v0.6.0...todov2-opencode-v0.6.1) (2026-11-18)
+
+
+### Bug Fixes
+
+* keep opencode plugin.ts header-free to preserve footprint ([9d6d59e](https://github.com/ckir/aiplugins/commit/9d6d59eeb7b19875e12c38ab65be29222c3822ff))
+
 ## [0.6.0](https://github.com/ckir/aiplugins/compare/todov2-opencode-v0.5.1...todov2-opencode-v0.6.0) (2026-10-17)
 
 
