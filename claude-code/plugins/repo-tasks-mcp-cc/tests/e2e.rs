@@ -6,8 +6,6 @@
 // with the additional terms in LICENSE-ADDENDUM (evaluation grant,
 // anti-circumvention). See both files at the repository root.
 
-//! End-to-end tests that run the plugin's real `serve` through rmcp's client against the
-
 //! End-to-end tests that run the plugin's real binary: `serve` through rmcp's client, and
 //! `reminder` as the SessionStart hook runs it, in throwaway git repositories.
 

@@ -367,7 +367,7 @@ fn uri_table() {
     assert_eq!(p("file:/home/u", false), Some(PathBuf::from("/home/u")));
     assert_eq!(p("file://server/share/x", false), None);
     assert_eq!(p("file:///a%20b", false), Some(PathBuf::from("/a b")));
-    assert_eq!(p("file:///caf%C3%A9", false), Some(PathBuf::from("/café")));
+    assert_eq!(p("file:///a%C3%A9b", false), Some(PathBuf::from("/aéb")));
     assert_eq!(p("file:///a%FFb", false), None);
     assert_eq!(p("file:///a%2", false), None);
     assert_eq!(p("file:///a%zz", false), None);
