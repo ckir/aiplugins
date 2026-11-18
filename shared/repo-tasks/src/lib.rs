@@ -15,4 +15,5 @@ pub mod host;
 pub mod model;
 pub mod ops;
 pub mod resolve;
+pub mod roots;
 pub mod store;
