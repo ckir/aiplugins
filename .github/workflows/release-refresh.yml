@@ -55,6 +55,11 @@ jobs:
         run: bash scripts/gen-marketplaces.sh
 
       - name: Commit refresh
+        env:
+          # Passed through env, never spliced into the script text: head_ref is
+          # attacker-influenced input, and the job guard is the only thing
+          # standing between it and the shell.
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           # Only the generated marketplace manifests. A release branch never
           # carries hand-written changes, but an unrestricted `git add -A`
@@ -71,5 +76,5 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git commit -m "chore: refresh derived files on release branch"
-            git push origin HEAD:${{ github.head_ref }}
+            git push origin "HEAD:${HEAD_REF}"
           fi

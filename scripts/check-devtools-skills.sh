@@ -110,6 +110,14 @@ mutation_test() {
     case_run "extra skill folder in a copy" 1 "different set of skills" "mkdir $cc_plugin/skills/extra"
     case_run "OpenCode rewrite also hit a body line" 1 "stale copy:" \
         "echo 'name: spec-panel-review' >> $sk; for d in $cc_plugin $qwen_plugin $agy_plugin; do cp $sk \$d/skills/spec-panel-review/SKILL.md; done; sed 's/^name: spec-panel-review\$/name: aiplugins-devtools-spec-panel-review/' $sk > $ocs"
+    case_run "INSTALL.md hardcodes a skill name" 1 "names the shipped skill 'human-friendly'" \
+        "echo 'for skill in human-friendly; do :; done' >> $oc_plugin/INSTALL.md"
+    case_run "INSTALL.md hardcodes a command name" 1 "names the shipped command 'spec-panel-review.md'" \
+        "echo 'cp commands/spec-panel-review.md x' >> $oc_plugin/INSTALL.md"
+    case_run "INSTALL.md no longer loops over the skills" 1 "no loop over every skill folder" \
+        "sed 's|\"\$STAGE\"/skills/\*/|x|' $oc_plugin/INSTALL.md > t.tmp && mv t.tmp $oc_plugin/INSTALL.md"
+    case_run "INSTALL.md no longer copies every command" 1 "no copy of every command file" \
+        "sed 's|\"\$STAGE\"/commands/\*.md|x|' $oc_plugin/INSTALL.md > t.tmp && mv t.tmp $oc_plugin/INSTALL.md"
     case_run "attribution line removed" 1 "copyright line missing" \
         "n=$skills_root/code-review-and-quality/THIRD-PARTY-NOTICE.md; grep -v 'Copyright (c) 2025 Addy Osmani' \$n > t.tmp; mv t.tmp \$n"
 
@@ -261,6 +269,28 @@ for cmd in "${cmd_files[@]}"; do
         [ -d "$oc_root/$ref" ] || bad "$cmd: names skill '$ref' which $oc_root does not ship"
     done <<<"$refs"
 done
+
+# INSTALL.md must derive the copy list from the bundle instead of listing names:
+# a hardcoded list left `license-headers` out while every other gate stayed green.
+# So it may not name any shipped skill or command, and it must still copy by glob.
+oc_install="$oc_plugin/INSTALL.md"
+if [ ! -f "$oc_install" ]; then
+    bad "$oc_install: missing"
+else
+    for name in "${skill_names[@]}"; do
+        grep -qF -- "$name" "$oc_install" \
+            && bad "$oc_install: names the shipped skill '$name'; derive the list from the bundle instead"
+    done
+    for cmd in "${cmd_files[@]}"; do
+        [ -f "$cmd" ] || continue
+        grep -qF -- "$(basename "$cmd")" "$oc_install" \
+            && bad "$oc_install: names the shipped command '$(basename "$cmd")'; derive the list from the bundle instead"
+    done
+    # shellcheck disable=SC2016  # the literal text '$STAGE' is what is searched for
+    grep -qF '"$STAGE"/skills/*/' "$oc_install" || bad "$oc_install: no loop over every skill folder in the bundle"
+    # shellcheck disable=SC2016
+    grep -qF '"$STAGE"/commands/*.md' "$oc_install" || bad "$oc_install: no copy of every command file in the bundle"
+fi
 
 # --- registry helpers ---
 # Run as a child process: sourcing registry.sh would make it read this script's $1.
