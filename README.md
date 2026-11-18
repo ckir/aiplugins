@@ -68,6 +68,9 @@ verification) and asks whether to install project-local or global first:
 | `re-ghidra-mcp-agy` | ≥ 21,586 | ≥ 36,815 |
 | `re-ghidra-mcp-cc` | ≥ 21,631 | ≥ 36,903 |
 | `re-ghidra-mcp-opencode` | ≥ 21,297 | ≥ 37,147 |
+| `repo-tasks-mcp-agy` | ≥ 2,381 | ≥ 0 |
+| `repo-tasks-mcp-cc` | ≥ 2,381 | ≥ 0 |
+| `repo-tasks-mcp-opencode` | ≥ 2,381 | ≥ 0 |
 | `repo-user-guide-agy` | ≥ 468 | ≥ 11,474 |
 | `repo-user-guide-cc` | ≥ 468 | ≥ 11,474 |
 | `repo-user-guide-opencode` | ≥ 468 | ≥ 11,474 |
