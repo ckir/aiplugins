@@ -424,15 +424,20 @@ fn call_before_initialized_is_json_rpc_error() {
 async fn client_that_never_answers_roots_does_not_hang() {
     let rig = Rig::new();
     write_old_completed_list(&rig);
-    let client = connect(
-        rig.tokio_command(&rig.repo, "claude", 400),
-        TestClient::new(Roots::Silent),
-    )
-    .await;
+    let silent = TestClient::new(Roots::Silent);
+    let asked = silent.asked.clone();
+    let client = connect(rig.tokio_command(&rig.repo, "claude", 400), silent).await;
     let began = Instant::now();
     let list = call(&client, "task_list", json!({})).await;
     let took = began.elapsed();
     assert!(took < Duration::from_millis(400 + 1500), "took {took:?}");
+    // The call waited for what was left of the window: a request really was in flight.
+    assert!(took >= Duration::from_millis(400 - 100), "took {took:?}");
+    assert_eq!(
+        asked.load(Ordering::SeqCst),
+        1,
+        "roots/list was not sent once"
+    );
     // Timed out: the call falls to the working directory (the repository) and the list is untouched.
     assert!(list.contains("#1 [x] old 1"), "{list}");
     assert_eq!(list_task_count(&rig), 2);
@@ -460,12 +465,19 @@ async fn startup_skipped_on_timeout_only() {
     let rig = Rig::new();
     write_old_completed_list(&rig);
     // A request settled only by the window running out never triggers it.
-    let silent = connect(
-        rig.tokio_command(&rig.repo, "claude", 300),
-        TestClient::new(Roots::Silent),
-    )
-    .await;
+    let mute = TestClient::new(Roots::Silent);
+    let mute_asked = mute.asked.clone();
+    let silent = connect(rig.tokio_command(&rig.repo, "claude", 300), mute).await;
+    let began = Instant::now();
     let _ = call(&silent, "task_list", json!({})).await;
+    let took = began.elapsed();
+    assert!(took >= Duration::from_millis(300 - 100), "took {took:?}");
+    assert!(took < Duration::from_millis(300 + 1500), "took {took:?}");
+    assert_eq!(
+        mute_asked.load(Ordering::SeqCst),
+        1,
+        "roots/list was not sent once"
+    );
     assert_eq!(archive_lines(&rig), 0);
     assert_eq!(list_task_count(&rig), 2);
     let _ = silent.cancel().await;
