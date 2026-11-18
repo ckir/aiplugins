@@ -112,7 +112,7 @@ binaries=$(
             | .[]
             | select(type == "string" and contains("CLAUDE_PLUGIN_ROOT"))
         ' "$config"
-    done | sed 's#.*/bin/##; s#\.exe$##' | sort -u
+    done | sed 's#.*/bin/##; s#[[:space:]].*##; s#\.exe$##' | sort -u
 )
 [ -n "$binaries" ] || {
     echo "ERROR: $plugin declares no \${CLAUDE_PLUGIN_ROOT}/bin/... commands to bundle." >&2
