@@ -234,14 +234,34 @@ Every entry point resolves a starting directory D, then a list from D (7.2 to 7.
 
 | Entry point | D is the first of these that is present |
 |---|---|
-| MCP server, on each tool call | `REPO_TASKS_DIR`; the process working directory |
+| MCP server, on each tool call | `REPO_TASKS_DIR`; the client's first root (below); the process working directory |
 | Reminder (section 10) | `REPO_TASKS_DIR`; the workspace path in the host's event, which on OpenCode arrives as the `--workspace` argument (10.2); the process working directory, except on Antigravity (10.2) |
 | A subcommand run by a person (section 11) | the `--dir` argument; `REPO_TASKS_DIR`; the process working directory |
 
 `REPO_TASKS_DIR` counts as present when it is set and not blank. It must be an absolute path to an
 existing directory; otherwise every call fails with an error naming the variable and its value
 (the reminder prints nothing instead, 10.1). The server reads the working directory on each call,
-not once at start [approved, point 4].
+not once at start [approved, point 4]. The reminder and the subcommands are separate processes with
+no client, so the root does not enter their rows.
+
+**The client's first root** [owner ruling, 2026-11-18, after the spike: "Yes to both, revise 7.1 and
+8.5"; it extends point 4 of the approved text, which names only the process working directory and
+the variable]. The spike (15.7) found that Antigravity starts an installed server in the plugin's
+own folder, with no variable naming the workspace, while all four hosts declare the MCP `roots`
+capability and answer `roots/list` with the starting directory. So:
+
+- When the client declared `roots` in `initialize`, the server sends `roots/list` once after it
+  receives `notifications/initialized`, and again after each `notifications/roots/list_changed`.
+- The reply's roots are read in order; the first whose `uri` is a `file://` URI naming an
+  existing directory becomes the root directory, converted to a local path (percent-decoding, and
+  on Windows `file:///C:/x` to `C:\x`). Other roots are ignored: the spike saw one root per host
+  and never several [driver's call, unmeasured].
+- A tool call that arrives while a `roots/list` request is unanswered waits for the reply for up
+  to 2 seconds [PROPOSED, UNMEASURED], then goes on without it.
+- A client that declared no `roots`, a failed or empty reply, and a reply with no usable root all
+  mean "no root": D falls to the process working directory. None of them is an error.
+- The root is held as the last answer received and used by every later call; D is still resolved
+  on each call, so a changed root is followed.
 
 The variable comes first for the reminder as well [driver's call]. Point 9 names the event's path
 first; but point 4 makes the variable an override, and a reminder that counted one list while the
@@ -461,8 +481,10 @@ wherever it stands in the file. A damaged archive line never fails a call and is
 
 A task reaches the archive in exactly three ways:
 
-- **MCP server start.** Before `serve` answers its first request it resolves the list as a tool
-  call would and reads it without the lock. The condition is: the list holds at least one task,
+- **MCP server start.** After the `initialized` notification, once the question of a root is
+  settled (the reply arrived, the 2 seconds of 7.1 passed, or the client declared no roots), and
+  before `serve` answers its first tool call, it resolves the list as a tool call would and reads
+  it without the lock. A host that never sends `initialized` never triggers it. The condition is: the list holds at least one task,
   every task is completed, and every task's `updated_at` is at least 12 hours in the past
   [PROPOSED, UNMEASURED]. Only when the condition holds does it make one non-blocking attempt at
   the lock, read the list again under it, and, if the condition still holds, archive them all
@@ -906,10 +928,10 @@ Sections this contradicts or confirms:
   from the linked worktree; Qwen Code the same (`.../repo/sub/deep` and the worktree). So on Antigravity the server can learn the workspace without
   `REPO_TASKS_DIR`, from a request 7.1 does not yet mention. Not measured: a host with
   several roots; a root changing during a session (`listChanged` was declared by Antigravity,
-  and no change was provoked); a client that declares no `roots`. A revision of 7.1 that ranks
-  the first root after `REPO_TASKS_DIR` and before the process working directory is the owner's
-  decision at step 2; it also affects 8.5's start-up archiving, which would have to wait for the
-  reply to `roots/list` before it can resolve the list.
+  and no change was provoked); a client that declares no `roots`. The owner
+  ruled on 2026-11-18 that 7.1 ranks the first root after `REPO_TASKS_DIR` and before the process
+  working directory, and 8.5's start-up archiving waits for the reply to `roots/list`; both are
+  now written there.
 - 7.3 and 7.6: confirmed for the four measured hosts: each server could create and remove a
   folder in the git common directory, from `W` as well.
 - 7.1 and 10.2, environment: confirmed for the server and the hook on the four measured hosts.
@@ -938,7 +960,9 @@ The plan written when this document is approved covers step 1 and nothing else.
    to revisit, and that is the owner's decision. If a host starts its server somewhere other
    than the workspace and its environment does not reach the server either, 7.1 has no way to
    find the repository on that host; 7.1 and the start-up archiving in 8.5, which resolves the
-   list the same way before any request, are then the ones to revisit.
+   list the same way before any tool call, are then the ones to revisit. (Outcome of step 2,
+   2026-11-18: the spike found exactly that on Antigravity; the owner ruled that 7.1 and 8.5 take
+   the client's first root, and accepted the cells 15.7 leaves `not measured`.)
 3. **The implementation plan** is written only after steps 1 and 2, against code that exists then.
 
 ## 17. Left open
@@ -978,7 +1002,10 @@ The plan written when this document is approved covers step 1 and nothing else.
 
 ### 17.3 The author's calls, in one place
 
-Each is marked [driver's call] where it appears. None has been ruled on by the owner.
+Each is marked [driver's call] where it appears. None has been ruled on by the owner. One ruling
+came after the spike and is not an author's call: the client's first root in 7.1 and 8.5, with
+the cells 15.7 leaves `not measured` accepted (2026-11-18). Its details (one root read, a 2-second
+wait, `file://` only) are the author's.
 
 Four narrow or extend a point of the approved text, and need the owner's eye first:
 
