@@ -9,11 +9,13 @@
 //! Shared engine for repo-tasks: one task list per repository.
 
 pub mod archive;
+pub mod cli;
 pub mod clock;
 pub mod error;
 pub mod host;
 pub mod model;
 pub mod ops;
+pub mod reminder;
 pub mod resolve;
 pub mod roots;
 pub mod server;
