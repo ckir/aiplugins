@@ -62,8 +62,9 @@ Anti-goals [driver's call]: outcomes that make this a failure even if every tool
 - Two agents in one repository hold different lists without being told.
 - A change is lost, or the list file is left unreadable, by a crash or by two writers.
 - Text one agent wrote reaches another agent's context without that agent calling a tool.
-- A tool call destroys a record. Nothing a model can call erases a task: a deleted task is kept
-  in the archive (9.4).
+- A task disappears without trace. Whatever any tool call does, every task ever created is in
+  the list or in the archive (8.5, 9.4). Rewriting a task's text is not this: update may change
+  any field.
 - The tracker disables, overrides or wraps a host's own list tool.
 
 ## 4. Constraints
@@ -252,15 +253,18 @@ Walk up from D to the filesystem root. At the first directory that has an entry 
 
 - if `.git` is a directory, that directory is the git directory G;
 - if `.git` is a file whose content starts with `gitdir: `, G is the path after that prefix,
-  resolved against the directory holding the file.
+  with trailing whitespace and line endings trimmed, resolved against the directory holding the
+  file.
 
 G must be an existing directory that contains a file named `HEAD`. A `.git` entry that does not
 lead to one (a worktree whose main repository is gone, an unreadable file) makes every call fail
 with an error naming the entry. It is never treated as "not a git repository", because that would
 silently open a different list [driver's call].
 
-The git common directory C is G joined with the content of the file `G/commondir` when that file
-exists (a path relative to G), and G itself otherwise. C is then made canonical and absolute.
+The git common directory C is the content of the file `G/commondir` when that file exists
+(trimmed the same way, and resolved against G when it is relative), and G itself otherwise. C is
+then made canonical and absolute. On Windows the `\\?\` prefix that canonicalization adds is
+removed wherever a path is shown or hashed.
 
 The oracle is `git rev-parse --path-format=absolute --git-common-dir` run in D. The engine's
 answer must equal the oracle's in each of these cases, and tests must cover each:
@@ -398,7 +402,8 @@ step 4 means a reader sees the whole old file or the whole new file.
 
 A file that is not valid JSON, or breaks a rule in 8.1, is never repaired or overwritten
 [driver's call]. Every call fails with an error naming the file, except the reminder, which
-prints nothing.
+prints nothing. Naming the file lets a person repair or remove it by hand; the first release has
+no repair command.
 
 ### 8.4 Two engine versions on one file [driver's call]
 
@@ -433,11 +438,13 @@ JSON. `next_id` is unchanged by any move.
 A task reaches the archive in exactly three ways:
 
 - **MCP server start.** Before `serve` answers its first request it resolves the list as a tool
-  call would and makes one non-blocking attempt at the lock. If it gets the lock, the list holds
-  at least one task, every task is completed, and no task's `updated_at` lies within the last 12
-  hours [PROPOSED, UNMEASURED], it archives them all with `archived_at`. In every other case, and
-  on any failure, the list is left as it is and the server starts normally; a failure writes one
-  line to standard error.
+  call would and reads it without the lock. The condition is: the list holds at least one task,
+  every task is completed, and every task's `updated_at` is at least 12 hours in the past
+  [PROPOSED, UNMEASURED]. Only when the condition holds does it make one non-blocking attempt at
+  the lock, read the list again under it, and, if the condition still holds, archive them all
+  with `archived_at`. In every other case, and on any failure, nothing is written and the server
+  starts normally; a failure writes one line to standard error. A repository with no list is not
+  touched: no folder and no lock file are created.
 - **A person.** The `archive` subcommand (section 11) archives every completed task, whatever its
   age, with `archived_at`.
 - **Deletion.** `task_update` with `delete: true` moves one open task to the archive with
@@ -450,6 +457,9 @@ The 12-hour condition is the author's addition to point 7 [driver's call]. Witho
 that restarts its server in the middle of a session, or a second agent opened a moment after a
 plan is finished, would empty a list the person is still looking at. The test uses the machine's
 clock; a clock set backwards only delays archiving.
+
+The engine never trims the archive. A person may delete the file; `task_get` can then no longer
+answer for the tasks it held.
 
 ## 9. The tools
 
@@ -532,7 +542,7 @@ How deletion is carried out is the author's reading of point 7 [driver's call]. 
 "deleting the task" among the changes update can make, and also says completed tasks leave the
 list in two ways only. Read together, deletion cannot apply to a completed task. Keeping the
 deleted record in the archive, rather than erasing it, is what keeps the anti-goal in section 3:
-no tool call destroys a record.
+no task disappears without trace.
 
 ### 9.5 `task_list`
 
@@ -625,9 +635,12 @@ Each wrapper ships one binary that contains the engine. Its subcommands:
 | `archive` | archives every completed task (8.5) and says how many |
 | `--version` | prints the version |
 
-`reminder`, `list` and `archive` accept `--dir <path>` (7.1).
+`reminder`, `list` and `archive` accept `--dir <path>` (7.1). No subcommand moves a task back
+from the archive in the first release.
 
-Each wrapper also ships a command that runs `list`, on every host that has commands. This
+Each wrapper also ships a command that runs `list`, on every host that has commands. The command
+is named `repo-tasks`, so that it cannot collide with a host's own task or todo commands
+[driver's call]. This
 repository has command folders for OpenCode and Qwen today
 (`opencode/plugins/aiplugins-devtools-opencode/commands`, `qwen/plugins/example/commands`); the
 form for Claude Code and whether Antigravity has one are the builder's to settle.
@@ -661,6 +674,8 @@ task text (10.1) is the one place where text is deliberately kept out of a conte
   ceiling is not the same quantity as the measured figure: `rtk-mcp-cc` measures 3,690 and has a
   ceiling of 5,696.
 - The first release ships no skill, so no skill frontmatter adds to the resident figure.
+- The implementation plan includes a check that fails when a wrapper's measured resident figure
+  is 3,690 bytes or more, so that the stop line does not depend on anyone remembering it.
 
 ## 14. Interfaces
 
@@ -762,7 +777,9 @@ The plan written when this document is approved covers step 1 and nothing else.
    `REPO_TASKS_DIR` and `REPO_TASKS_LIST`, set in the host's environment, reach the server and
    reach a session-start hook; which session-start event exists, and whether its payload carries
    the workspace path; whether a compaction is signalled. Its output is a table added to section
-   15.
+   15. Every cell holds what was observed, with the command or log line that showed it, or the
+   words `not measured` and the reason. The implementation plan is not written while a cell for
+   this machine says `not measured`.
 2. **Revision.** Any section a measurement contradicts is revised, and the revision goes to the
    owner, before step 3. If a host cannot write under `.git`, sections 7.3 and 7.6 are the ones
    to revisit, and that is the owner's decision.
@@ -778,6 +795,8 @@ The plan written when this document is approved covers step 1 and nothing else.
 - How OpenCode's `plugin.ts` learns the binary's absolute path.
 - The command file for each host that has commands (section 11).
 - Test design. The rules in sections 7 to 10 are the oracle; 7.2 names its own.
+- Each wrapper's README says where lists are kept (7.3, 7.5) and how to remove them. Uninstalling
+  a plugin leaves them in place.
 - The repository wiring a new plugin needs. The pull request that added `opencode-ctl` (merge
   `9f315e5`) touched, outside the plugin folders: `agents.json`; the four marketplace files
   (`.claude-plugin/`, `.qwen-plugin/`, `.agy-plugin/`, `.opencode-plugin/marketplace.json`);
@@ -831,6 +850,7 @@ The rest fill gaps the approved text left:
 17. One binary per wrapper with the hook as a subcommand; Antigravity's reminder never falls back
     to the process working directory; OpenCode's `plugin.ts` runs the binary, reminds once per
     session id, and never parses the list (10.2).
+18. The command a person runs is named `repo-tasks` (section 11).
 
 ## 18. What done looks like
 
@@ -939,7 +959,26 @@ Blindspot Auditor, Activation Auditor, Dependency Cynic, Resource Vampire, Mecha
 | Boundary Smuggler | A subject could carry terminal escape sequences into a person's terminal | FOLDED: no control characters (8.1) |
 | Boundary Smuggler | Text one agent writes is read by another through the tools | Stated as the trust model (section 12); no mechanism added |
 
-PANEL VERDICT: round 1 solo, 12 findings, 11 folded and 1 stated; the peer's round is still owed.
+### Panel, second solo pass (2026-11-18)
+
+Seated, none of them used in the first pass: Blindspot Auditor, Activation Auditor, Dependency
+Cynic, Resource Vampire, Mechanism Gamer; plus an audit of the first pass's own folds.
+
+| Seat | Finding | Disposition |
+|---|---|---|
+| Fold audit | "No task changed within the last 12 hours" let a timestamp in the future pass the test | FOLDED: every `updated_at` must be at least 12 hours in the past (8.5) |
+| Fold audit | The start-up archive took the lock first, creating a folder and a lock file in a repository with no list | FOLDED: read first, lock only when the condition holds (8.5) |
+| Mechanism Gamer | "No tool call destroys a record" was false as written: update rewrites any field | FOLDED: the anti-goal now says no task disappears without trace (section 3) |
+| Mechanism Gamer | The 3,690-byte stop line depended on someone remembering it | FOLDED: the plan carries a failing check (section 13) |
+| Mechanism Gamer | The spike gate could be met by leaving a measurement out | FOLDED: every cell is filled or says `not measured`, and that blocks the plan (section 16) |
+| Blindspot Auditor | No word on recovering a malformed list, moving a task back from the archive, or what an uninstall leaves behind | FOLDED as stated limits (8.3, section 11, 17.1) |
+| Activation Auditor | A command named after tasks or todos can collide with a host's own | FOLDED: it is named `repo-tasks` (section 11) |
+| Dependency Cynic | A `.git` file can end in a carriage return; `commondir` can be absolute; a Windows path shows its `\\?\` prefix | FOLDED (7.2) |
+| Dependency Cynic | Advisory locks are not honoured on every filesystem | Accepted limit (Stand-downs) |
+| Resource Vampire | The archive grows for ever | Stated: the engine never trims it (8.5) |
+| Resource Vampire | The list reply grows for ever | Already put to the owner (17.2, item 3) |
+
+PANEL VERDICT: two solo passes, 23 findings, all folded, stated or put to the owner; the peer's round is still owed.
 
 ## Stand-downs
 
@@ -948,6 +987,8 @@ PANEL VERDICT: round 1 solo, 12 findings, 11 folded and 1 stated; the peer's rou
   was never put to the peer.
 - Accepted, no mechanism: text written by one agent is read by another through the tools
   (section 12).
+- Accepted limit: the two-writer guarantee rests on OS advisory locks. A repository on a
+  filesystem that does not honour them (some network mounts) loses it.
 - Unverified and carried into the spike: everything in 15.6.
 - One clause of point 7 was written after the peer's last sign-off (end of section 6), and the
   four narrowings in 17.3 were written after the owner approved the text.
