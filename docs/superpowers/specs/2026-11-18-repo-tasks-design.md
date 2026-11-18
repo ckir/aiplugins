@@ -885,9 +885,23 @@ Sections this contradicts or confirms:
   Antigravity an installed server cannot find the repository from its process, and a rule that
   falls back to `PWD` would work only by accident. What remains is `REPO_TASKS_DIR` set in the
   host's environment (which is one value for all workspaces), something the server is told
-  through the protocol (whether Antigravity offers MCP `roots` was not measured), or leaving
-  Antigravity's tools without a list: for the owner at step 2 (16). 8.5's start-up archiving resolves the list the same way and is affected the same
+  through the protocol, or leaving Antigravity's tools without a list. The protocol route was
+  then measured (the roots test below): for the owner at step 2 (16). 8.5's start-up archiving resolves the list the same way and is affected the same
   way; 15.6's earlier unknown about the server's directory is settled for three of the four hosts.
+- **The roots test** (2026-11-18, the same probe extended; Antigravity again as an installed and
+  then removed plugin, config files byte-identical after). In all three measured hosts the client
+  declares the MCP `roots` capability in `initialize` (Antigravity: `roots` with
+  `listChanged: true`, client `antigravity-client` v1.0.0, also `elicitation`), and answers a
+  `roots/list` request sent by the server after `notifications/initialized` with exactly one
+  root, the starting directory as a `file://` URI: Claude Code `file:///tmp/repo-tasks-spike/repo/sub/deep`,
+  OpenCode the same, Antigravity the same from `R/sub/deep` and `file:///tmp/repo-tasks-spike/wt`
+  from the linked worktree. So on Antigravity the server can learn the workspace without
+  `REPO_TASKS_DIR`, from a request 7.1 does not yet mention. Not measured: Qwen; a host with
+  several roots; a root changing during a session (`listChanged` was declared by Antigravity,
+  and no change was provoked); a client that declares no `roots`. A revision of 7.1 that ranks
+  the first root after `REPO_TASKS_DIR` and before the process working directory is the owner's
+  decision at step 2; it also affects 8.5's start-up archiving, which would have to wait for the
+  reply to `roots/list` before it can resolve the list.
 - 7.3 and 7.6: confirmed for the three measured hosts: each server could create and remove a
   folder in the git common directory, from `W` as well.
 - 7.1 and 10.2, environment: confirmed for the server and the hook on the three measured hosts.
