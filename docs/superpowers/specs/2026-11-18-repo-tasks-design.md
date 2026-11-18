@@ -1314,7 +1314,12 @@ the next start tries again, and the `archive` subcommand exists.
 Round 4 on that revision (the peer returned FINDINGS-3, each checked): FOLDED in 7.1 without a
 fifth round, as they were one missing clause and the tests it needs: a remembered notification is
 served after a timeout as after a reply, and the tests for these rules are listed in both
-directions. No round on this revision was clean; the owner may ask for one more.
+directions.
+
+Round 5 on that revision (asked for by the owner; three seats: Fold Auditor, Cascade Analyst,
+Literal Implementer): CLEAN, no findings. The peer's own remark, not a finding: a client that
+never answers `roots/list` and notifies a change every second is asked again once per 2 seconds,
+without bound, with one request in flight and no growth in memory; that is accepted.
 
 ## Stand-downs
 
