@@ -257,7 +257,8 @@ capability and answer `roots/list` with the starting directory. So:
   tool call has yet resolved D; after one has, it is ignored, because adopting it would move later
   calls to another list than the earlier ones used. A reply to a refresh (below) is always used.
   Only one request is in flight at a time: a `roots/list_changed` notification that arrives
-  meanwhile is remembered, and one more request is sent when the reply comes. A client that
+  meanwhile is remembered, and one more request is sent when the request settles, by its reply or by the 2
+  seconds running out. A client that
   declared no `roots` has nothing to settle. The 2 seconds start when the request is sent, so a
   tool call waits only for what is left of them, and once a request is settled no later call
   waits for it again.
@@ -285,6 +286,11 @@ capability and answer `roots/list` with the starting directory. So:
 - The root is held as the last answer received and used by every later call; D is still resolved
   on each call, so a changed root is followed. A call resolves D once, when it starts, and uses
   that D until it ends; a reply that arrives during a call changes the root for later calls only.
+- Tests must cover each of these, in both directions: a late first reply is accepted before any
+  call has resolved D and ignored after one has; a notification during a request yields exactly
+  one follow-up request, sent after a reply and after a timeout alike; no second request is ever
+  in flight; a call before `initialized` is refused and touches no list; a client that declared
+  no `roots` is never sent a request.
 - The 2 seconds are a constant of the engine, not a setting; the engine's tests may shorten it
   through a parameter that no host configuration reaches, so that a test with a client that never
   replies does not take 2 seconds.
@@ -1304,6 +1310,11 @@ the first request is used only before any call has resolved D, and one request i
 time with a notification during it remembered; REJECTED below the floor: a timeout-only
 settlement skips start-up archiving for the whole session (8.5) — only housekeeping is delayed,
 the next start tries again, and the `archive` subcommand exists.
+
+Round 4 on that revision (the peer returned FINDINGS-3, each checked): FOLDED in 7.1 without a
+fifth round, as they were one missing clause and the tests it needs: a remembered notification is
+served after a timeout as after a reply, and the tests for these rules are listed in both
+directions. No round on this revision was clean; the owner may ask for one more.
 
 ## Stand-downs
 
