@@ -90,7 +90,7 @@ names=$(
                 | select(type == "string")
             ' "$config"
         done
-    } | sed 's#.*/bin/##; s#\.exe$##' | tr -d '\r' | sort -u
+    } | sed 's#.*/bin/##; s#[[:space:]].*##; s#\.exe$##' | tr -d '\r' | sort -u
 )
 [ -n "$names" ] || {
     echo "ERROR: $root declares no probed entry points (no \${CLAUDE_PLUGIN_ROOT}/bin/... or agy bare-name commands)." >&2

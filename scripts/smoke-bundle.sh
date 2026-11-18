@@ -51,7 +51,7 @@ binaries=$(
             | .[]
             | select(type == "string" and contains("CLAUDE_PLUGIN_ROOT"))
         ' "$config"
-    done | sed 's#.*/bin/##; s#\.exe$##' | tr -d '\r' | sort -u
+    done | sed 's#.*/bin/##; s#[[:space:]].*##; s#\.exe$##' | tr -d '\r' | sort -u
 )
 [ -n "$binaries" ] || {
     echo "ERROR: $plugin declares no \${CLAUDE_PLUGIN_ROOT}/bin/... commands." >&2
