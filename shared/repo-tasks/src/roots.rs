@@ -100,8 +100,9 @@ pub fn first_usable(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     None,
-    /// Send one `roots/list` request now.
-    SendRequest,
+    /// Send one `roots/list` request now, with this sequence number; its reply must be
+    /// passed back to `on_reply` with the same number.
+    SendRequest(u64),
 }
 
 /// What a tool call must do before it resolves D.
@@ -128,6 +129,7 @@ pub enum Settlement {
 
 #[derive(Debug)]
 struct Outstanding {
+    seq: u64,
     first: bool,
     /// Settled by timeout; its reply, if any, is still to come.
     settled: bool,
@@ -144,6 +146,7 @@ pub struct RootState {
     /// Requests in the order sent; only the last can be unsettled.
     outstanding: VecDeque<Outstanding>,
     first_sent: bool,
+    next_seq: u64,
     pending_refresh: bool,
     d_resolved: bool,
     root: Option<PathBuf>,
@@ -160,6 +163,7 @@ impl RootState {
             initialized: false,
             outstanding: VecDeque::new(),
             first_sent: false,
+            next_seq: 0,
             pending_refresh: false,
             d_resolved: false,
             root: None,
@@ -198,7 +202,10 @@ impl RootState {
             return Action::None;
         }
         self.pending_refresh = false;
+        let seq = self.next_seq;
+        self.next_seq += 1;
         self.outstanding.push_back(Outstanding {
+            seq,
             first: !self.first_sent,
             settled: false,
             deadline: now + self.window,
@@ -207,7 +214,7 @@ impl RootState {
         while self.outstanding.len() > MAX_OUTSTANDING {
             self.outstanding.pop_front();
         }
-        Action::SendRequest
+        Action::SendRequest(seq)
     }
 
     /// `notifications/initialized` arrived.
@@ -224,10 +231,13 @@ impl RootState {
     }
 
     /// A reply to `roots/list` arrived: the roots' URIs, or `None` for an error reply.
-    /// Replies are matched to requests in the order the requests were sent.
-    pub fn on_reply(&mut self, roots: Option<Vec<String>>, now: Instant) -> Action {
+    /// `seq` is the number the request carried; an unknown one is ignored.
+    pub fn on_reply(&mut self, seq: u64, roots: Option<Vec<String>>, now: Instant) -> Action {
         self.settle_timeouts(now);
-        let Some(req) = self.outstanding.pop_front() else {
+        let Some(idx) = self.outstanding.iter().position(|o| o.seq == seq) else {
+            return Action::None;
+        };
+        let Some(req) = self.outstanding.remove(idx) else {
             return Action::None;
         };
         let use_it = if req.settled {
@@ -264,18 +274,26 @@ impl RootState {
         self.send_if_due(now)
     }
 
-    /// A tool call starts. `Go` marks D as resolved. A timeout noticed here leaves a remembered
-    /// refresh to the next event or tick.
-    pub fn call_started(&mut self, now: Instant) -> CallGate {
+    /// A tool call starts. `Go` marks D as resolved. The action is what `on_tick` would return:
+    /// a remembered refresh to send once this call has settled a timeout.
+    pub fn call_started(&mut self, now: Instant) -> (CallGate, Action) {
         if !self.initialized {
-            return CallGate::Refuse;
+            return (CallGate::Refuse, Action::None);
         }
         self.settle_timeouts(now);
         if let Some(o) = self.in_flight() {
-            return CallGate::Wait(o.deadline.saturating_duration_since(now));
+            return (
+                CallGate::Wait(o.deadline.saturating_duration_since(now)),
+                Action::None,
+            );
         }
         self.d_resolved = true;
-        CallGate::Go
+        (CallGate::Go, self.send_if_due(now))
+    }
+
+    /// The deadline of the request in flight, so the caller can schedule an `on_tick`.
+    pub fn next_deadline(&self) -> Option<Instant> {
+        self.in_flight().map(|o| o.deadline)
     }
 
     pub fn current_root(&self) -> Option<&Path> {
