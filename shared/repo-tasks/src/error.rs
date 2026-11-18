@@ -50,6 +50,8 @@ pub enum Error {
     LockTimeout { path: PathBuf, secs: u64 },
     #[error("{reason}")]
     Refused { reason: String },
+    #[error("the MCP server stopped: {reason}")]
+    Server { reason: String },
     #[error("refusing to write an empty list file: {}", path.display())]
     EmptyWrite { path: PathBuf },
 }

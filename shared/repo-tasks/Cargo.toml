@@ -16,12 +16,21 @@ name = "repo_tasks"
 dist = false
 
 [dependencies]
+rmcp = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[[bin]]
+name = "mock-repo-tasks"
+path = "tests/bin/serve.rs"
 
 [[bin]]
 name = "hold-lock"
 path = "tests/bin/hold_lock.rs"
+
+[dev-dependencies]
+rmcp = { workspace = true, features = ["client", "transport-child-process"] }
