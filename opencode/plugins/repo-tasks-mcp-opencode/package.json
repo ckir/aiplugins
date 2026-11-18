@@ -2,7 +2,7 @@
   "name": "repo-tasks-mcp-opencode",
   "version": "0.1.0",
   "private": true,
-  "description": "OpenCode V2 front for repo-tasks: a git-tracked task list for the repository, served over MCP, with a once-per-session reminder.",
+  "description": "OpenCode V2 front for repo-tasks: a per-repository task list kept under .git (untracked), served over MCP, with a once-per-session reminder.",
   "license": "PolyForm-Noncommercial-1.0.0",
   "dependencies": {
     "@opencode/plugin": "2.0.32"

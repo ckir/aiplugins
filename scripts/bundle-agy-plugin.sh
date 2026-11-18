@@ -109,7 +109,7 @@ binaries=$(
             | .[]
             | select(type == "string")
         ' "$config"
-    done | sed 's#.*/bin/##; s#[[:space:]].*##; s#\.exe$##' | sort -u
+    done | sed 's#[[:space:]].*##; s#.*/bin/##; s#\.exe$##' | sort -u
 )
 [ -n "$binaries" ] || {
     echo "ERROR: $plugin declares no bin/... commands to bundle." >&2

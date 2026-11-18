@@ -418,3 +418,34 @@ fn archive_completed_without_a_list_creates_nothing() {
     assert_eq!(archive_completed(&store, &quick(), &Fixed(NOW)).unwrap(), 0);
     assert!(!store.dir.exists());
 }
+
+#[cfg(unix)]
+#[test]
+fn an_archive_path_that_is_a_symlink_is_refused_and_nothing_moves() {
+    let tmp = Tmp::new();
+    let store = store_in(&tmp.0);
+    seed(&store, &list_of(vec![task(1, Status::Completed, NOW, &[])]));
+    let target = tmp.0.join("elsewhere.txt");
+    fs::write(&target, b"keep me\n").unwrap();
+    // A live link, then a dangling one: neither is followed.
+    for dangling in [false, true] {
+        let _ = fs::remove_file(store.file(FileKind::Archive));
+        let t = if dangling {
+            tmp.0.join("not-there.txt")
+        } else {
+            target.clone()
+        };
+        std::os::unix::fs::symlink(&t, store.file(FileKind::Archive)).unwrap();
+        let e = archive_completed(&store, &quick(), &Fixed(NOW)).unwrap_err();
+        let text = e.to_string();
+        assert!(!text.contains('\n'), "{text}");
+        assert!(text.contains("symlink"), "{text}");
+        assert!(
+            text.contains(&store.file(FileKind::Archive).display().to_string()),
+            "{text}"
+        );
+        assert_eq!(fs::read(&target).unwrap(), b"keep me\n");
+        assert!(!tmp.0.join("not-there.txt").exists());
+        assert_eq!(read_list(&store, &quick()).unwrap().tasks.len(), 1);
+    }
+}

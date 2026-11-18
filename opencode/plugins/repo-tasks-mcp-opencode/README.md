@@ -1,7 +1,7 @@
 # repo-tasks-mcp-opencode
 
-An OpenCode V2 plugin that gives an OpenCode session the `repo-tasks` list: the tasks of a repository, kept in the
-repository and served over MCP (`task_create`, `task_list`, `task_get` and the update tool).
+An OpenCode V2 plugin that gives an OpenCode session the `repo-tasks` list: the tasks of a repository, kept beside
+its git data (under `.git`, untracked) and served over MCP (`task_create`, `task_list`, `task_get` and the update tool).
 
 It is the OpenCode front of `shared/repo-tasks`; the other fronts are `repo-tasks-mcp-cc`, `repo-tasks-mcp-qwen` and
 `repo-tasks-mcp-agy`. This front is a source-only bundle and ships no binary of its own: it uses the Claude Code
@@ -39,6 +39,21 @@ Follow `INSTALL.md` (written for an agent to execute).
 ## Settings
 
 `REPO_TASKS_BIN` names the binary the reminder runs. Unset, the plugin uses `<config dir>/bin/repo-tasks-cc-mcp`.
+
+## Your lists
+
+- Inside a git repository the list is under the git common directory, in `repo-tasks/` (for an ordinary
+  clone, `<repo>/.git/repo-tasks/`). Git does not track that folder, so a list is never committed, pushed or
+  cloned: every clone has its own.
+- Outside git it is in the per-user data directory (`$XDG_DATA_HOME` or `~/.local/share` on Linux,
+  `~/Library/Application Support` on macOS, `%LOCALAPPDATA%` on Windows), under `repo-tasks/<key>/`.
+- To remove a list, delete its folder. Uninstalling this plugin leaves the lists in place.
+- `/repo-tasks` (or `repo-tasks-cc-mcp list`) prints the list. `repo-tasks-cc-mcp list --archived` prints the archived tasks, and `repo-tasks-cc-mcp archive`
+  moves every completed task to the archive, whatever its age.
+- Windows and macOS are `not measured`: CI runs the engine's own tests there, but how this host starts the
+  server and the hook on those systems has not been measured.
+- "One to 50 tasks" per create call and the 2-second wait for the client's roots are proposed values and
+  unmeasured.
 
 ## Layout
 

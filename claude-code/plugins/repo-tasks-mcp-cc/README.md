@@ -33,6 +33,21 @@ Install from the marketplace once it is registered, or build the binary locally:
 $ just build-repo-tasks-mcp-cc
 ```
 
+## Your lists
+
+- Inside a git repository the list is under the git common directory, in `repo-tasks/` (for an ordinary
+  clone, `<repo>/.git/repo-tasks/`). Git does not track that folder, so a list is never committed, pushed or
+  cloned: every clone has its own.
+- Outside git it is in the per-user data directory (`$XDG_DATA_HOME` or `~/.local/share` on Linux,
+  `~/Library/Application Support` on macOS, `%LOCALAPPDATA%` on Windows), under `repo-tasks/<key>/`.
+- To remove a list, delete its folder. Uninstalling this plugin leaves the lists in place.
+- `/repo-tasks` (or `${CLAUDE_PLUGIN_ROOT}/bin/repo-tasks-cc-mcp list`) prints the list. `repo-tasks-cc-mcp list --archived` prints the archived tasks, and `repo-tasks-cc-mcp archive`
+  moves every completed task to the archive, whatever its age.
+- Windows and macOS are `not measured`: CI runs the engine's own tests there, but how this host starts the
+  server and the hook on those systems has not been measured.
+- "One to 50 tasks" per create call and the 2-second wait for the client's roots are proposed values and
+  unmeasured.
+
 ## Layout
 
 ```

@@ -420,7 +420,9 @@ Rules:
   [PROPOSED, UNMEASURED].
 - `subject` and `owner` contain no control character (U+0000 to U+001F, U+007F), so each stays on
   one line and cannot carry terminal escape sequences. `description` may contain line feeds and
-  tabs and no other control character [driver's call].
+  tabs and no other control character [driver's call]. Input also refuses U+0080 to U+009F (they
+  include U+009B, a terminal CSI introducer) in all three fields; a file that already holds a C1
+  character still reads [driver's call].
 - `status` is one of `pending`, `in_progress`, `completed`.
 - `blocked_by` is an array of ids, ascending, without duplicates, never containing the task's own
   id, and containing only ids of tasks present in the list. It may name completed tasks.
@@ -1085,6 +1087,8 @@ The rest fill gaps the approved text left:
     damaged line (8.5).
 26. The reminder's notice also covers an unreadable list file and an unfollowable `.git`
     entry (10.1).
+27. Input refuses the C1 controls U+0080 to U+009F as well; a list file that already holds one
+    still reads (8.1).
 
 ## 18. What done looks like
 

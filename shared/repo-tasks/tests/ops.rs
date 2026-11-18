@@ -711,3 +711,59 @@ fn create_validates_text() {
     }
     assert!(read_list(&s, &quick()).unwrap().tasks.is_empty());
 }
+
+/// 8.1, as the author narrowed it: input refuses U+0080 to U+009F as well (U+009B is a terminal
+/// CSI introducer), while a file that already holds one still reads.
+#[test]
+fn c1_controls_are_refused_on_input_but_still_read() {
+    let tmp = Tmp::new();
+    let s = store_in(&tmp.0);
+    for c in ['\u{80}', '\u{85}', '\u{9b}', '\u{9f}'] {
+        let e = create(
+            &s,
+            &clk(),
+            json!({"tasks": [{"subject": format!("a{c}[31m")}]}),
+        )
+        .expect_err("subject");
+        one_line(&e);
+        assert!(e.contains("control character"), "{e}");
+        let e = create(
+            &s,
+            &clk(),
+            json!({"tasks": [{"subject": "ok", "owner": format!("o{c}")}]}),
+        )
+        .expect_err("owner");
+        one_line(&e);
+        let e = create(
+            &s,
+            &clk(),
+            json!({"tasks": [{"subject": "ok", "description": format!("d{c}")}]}),
+        )
+        .expect_err("description");
+        one_line(&e);
+    }
+    // Nothing was created; U+00A0 and U+00FF are not controls and are accepted.
+    assert_eq!(read_list(&s, &quick()).unwrap().tasks.len(), 0);
+    create(
+        &s,
+        &clk(),
+        json!({"tasks": [{"subject": "x\u{e9}\u{a0}\u{ff}"}]}),
+    )
+    .unwrap();
+    for field in ["subject", "owner", "description"] {
+        let e = update(&s, &clk(), json!({"id": 1, field: "x\u{9b}"})).expect_err(field);
+        one_line(&e);
+    }
+    // A list that already holds a C1 character in a subject still reads, lists and updates.
+    let now = rfc3339(T0);
+    let file = json!({"format": 1, "next_id": 2, "tasks": [{
+        "id": 1, "subject": "old\u{9b}", "status": "pending", "blocked_by": [],
+        "created_at": now, "updated_at": now, "updated_by": "claude-code"}]});
+    std::fs::write(
+        s.dir.join("default.json"),
+        serde_json::to_vec(&file).unwrap(),
+    )
+    .unwrap();
+    assert!(list_text(&s).contains("old\u{9b}"));
+    update(&s, &clk(), json!({"id": 1, "status": "in_progress"})).unwrap();
+}

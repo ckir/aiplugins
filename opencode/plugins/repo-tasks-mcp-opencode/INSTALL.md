@@ -104,4 +104,4 @@ Run `repo-tasks-cc-mcp list` and show its output unchanged. Use the absolute pat
 ## Uninstall
 
 Delete `$DEST/plugins/repo-tasks-mcp-opencode.ts`, `$DEST/command/repo-tasks.md` and `$DEST/bin/repo-tasks-cc-mcp`, and remove the `repo-tasks`
-entry from `mcp.servers`. The task list lives in the repository and is not touched.
+entry from `mcp.servers`. The task lists live under the git common directory (`.git/repo-tasks/`, untracked) or, outside git, in the per-user data directory; uninstalling does not touch them, and deleting that folder removes them.

@@ -43,14 +43,31 @@ On Antigravity the server starts in the plugin's own folder, not in your workspa
 says nothing about which repository to use. The workspace comes from the MCP `roots` the host sends, or from
 the `REPO_TASKS_DIR` environment variable (an absolute path to an existing directory). When the host sends no
 roots and the variable is not set, the tools fail with an error that names `REPO_TASKS_DIR`; set it to the
-directory whose list you want. The reminder hook reads the workspace from the `workspacePaths` of its event
-(or from `REPO_TASKS_DIR`), and prints nothing when it has neither.
+directory whose list you want. The reminder hook reads the workspace from the first of the event's
+`workspacePaths`, then from the event's `cwd`, or from `REPO_TASKS_DIR` (which wins over both); it never uses
+the process directory. When it has no workspace, no list or no open task it prints `{}`, the JSON object
+Antigravity's hooks must write to standard output.
 
 ## No slash command
 
 The other three hosts ship a `/repo-tasks` command that runs `list`. Antigravity's documentation has no
 commands page (its customization docs cover hooks, JSON configs, MCP servers, plugins, rules and skills), so
 this plugin ships none. To print the list, run `repo-tasks-agy-mcp list` yourself.
+
+## Your lists
+
+- Inside a git repository the list is under the git common directory, in `repo-tasks/` (for an ordinary
+  clone, `<repo>/.git/repo-tasks/`). Git does not track that folder, so a list is never committed, pushed or
+  cloned: every clone has its own.
+- Outside git it is in the per-user data directory (`$XDG_DATA_HOME` or `~/.local/share` on Linux,
+  `~/Library/Application Support` on macOS, `%LOCALAPPDATA%` on Windows), under `repo-tasks/<key>/`.
+- To remove a list, delete its folder. Uninstalling this plugin leaves the lists in place.
+- `repo-tasks-agy-mcp list` prints the list. `repo-tasks-agy-mcp list --archived` prints the archived tasks, and `repo-tasks-agy-mcp archive`
+  moves every completed task to the archive, whatever its age.
+- Windows and macOS are `not measured`: CI runs the engine's own tests there, but how this host starts the
+  server and the hook on those systems has not been measured.
+- "One to 50 tasks" per create call and the 2-second wait for the client's roots are proposed values and
+  unmeasured.
 
 ## Layout
 

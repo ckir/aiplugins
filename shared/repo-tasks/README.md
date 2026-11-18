@@ -37,15 +37,19 @@ The reminder uses the variable, then the host event's workspace path, then the p
 ## Archive
 
 Completed tasks leave the list for `N.archive.jsonl`; `task_get` still answers for them, and
-`repo-tasks list --archived` prints them.
+`repo-tasks-<host>-mcp list --archived` prints them (`repo-tasks-cc-mcp`, `repo-tasks-qwen-mcp`,
+`repo-tasks-agy-mcp`; OpenCode uses the Claude Code binary), or `/repo-tasks` on the hosts that have
+commands, which runs `list`. The `archive` subcommand moves every completed task to the archive,
+whatever its age. To remove a list, delete its folder; uninstalling a plugin leaves lists in place.
 
 ## Subcommands
 
 ```
 serve [--host h]
 reminder --event <claude-code|qwen|antigravity|opencode> [--workspace <path>]
-list [--archived] [--dir <path>]
-archive [--dir <path>]
+                 (antigravity prints `{}` when it has nothing to say; the others print nothing)
+list [--archived] [--dir <path>]     (control characters other than line feed and tab print as `\u{..}`)
+archive [--dir <path>]               (archives every completed task, whatever its age)
 --version
 ```
 
@@ -64,7 +68,8 @@ archive [--dir <path>]
   canonical form of differently cased paths (`tests/windows_canonical.rs`) and the error kind of a
   refused rename or read while another process holds the file (`windows_reader_and_writer_never_fail`
   in `tests/store.rs`). When `REPO_TASKS_CI_NOTES` names a file, both tests append their findings to
-  it so CI can upload them. Status: Task 11 measurements pending; the tests compile for
+  it so CI can upload them. Status: no CI run has measured these yet; the tests compile for
   `x86_64-pc-windows-gnu` but have not run.
-- The three length limits (subject 200, description 8000, owner 64) are proposed and unmeasured.
+- The three length limits (subject 200, description 8000, owner 64), "one to 50 tasks" per create
+  call and the 2-second wait for the client's roots are proposed and unmeasured.
 - Locking rests on OS advisory locks, which not every filesystem honours.

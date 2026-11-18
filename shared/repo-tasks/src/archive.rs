@@ -81,6 +81,15 @@ fn ends_in_torn_line(file: &mut std::fs::File) -> io::Result<bool> {
 }
 
 fn append_lines(path: &Path, lines: &[String]) -> Result<()> {
+    // Never follow a symlink at the archive path: the append would write wherever it points.
+    if fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()) {
+        return Err(Error::Refused {
+            reason: format!(
+                "the archive path {} is a symlink; remove it so the archive can be written",
+                path.display()
+            ),
+        });
+    }
     let mut o = OpenOptions::new();
     o.read(true).append(true).create(true);
     #[cfg(unix)]

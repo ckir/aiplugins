@@ -141,7 +141,7 @@
         "source": "archive",
         "url": "https://github.com/ckir/aiplugins/releases/download/repo-tasks-mcp-opencode-v0.1.0/repo-tasks-mcp-opencode-opencode.zip"
       },
-      "description": "OpenCode V2 front for repo-tasks: a git-tracked task list for the repository, served over MCP, with a once-per-session reminder.",
+      "description": "OpenCode V2 front for repo-tasks: a per-repository task list kept under .git (untracked), served over MCP, with a once-per-session reminder.",
       "author": {
         "name": "AI Plugins Marketplace Contributors"
       },

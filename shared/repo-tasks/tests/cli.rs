@@ -550,3 +550,58 @@ async fn version_line_and_usage() {
     assert_eq!(r.code, 1);
     assert!(r.err.contains("qwen"), "{}", r.err);
 }
+
+/// Output side only: the subcommands print a control character other than line feed and tab as
+/// text (`\u{1b}`), so a stored escape sequence cannot drive a person's terminal.
+#[tokio::test]
+async fn subcommands_print_control_characters_as_text() {
+    let tmp = Tmp::new();
+    let repo = tmp.repo("r");
+    let dir = repo.display().to_string();
+    let env = env_in(&tmp, None);
+
+    // The list read path refuses ESC but accepts a C1 control (8.1), so U+009B reaches `list`.
+    write_list(
+        &repo,
+        vec![task(1, "red\u{9b}31m and \u{1b}[0m", "pending")],
+    );
+    let r = go(env.clone(), "", &["list", "--dir", &dir]).await;
+    // A subject with ESC is an invalid list: the command fails and prints no subject.
+    assert_ne!(r.code, 0, "{}", r.out);
+    assert!(!r.out.contains('\u{1b}') && !r.err.contains('\u{1b}'));
+
+    write_list(&repo, vec![task(1, "red\u{9b}31m", "pending")]);
+    let r = go(env.clone(), "", &["list", "--dir", &dir]).await;
+    assert_eq!(r.code, 0, "{}", r.err);
+    assert!(r.out.contains("#1 [ ] red\\u{9b}31m"), "{:?}", r.out);
+    assert!(!r.out.contains('\u{9b}'), "{:?}", r.out);
+
+    // The archive reader does not validate text, so ESC reaches `list --archived`.
+    let mut t = task(7, "gone \u{1b}[2J tab\there", "completed");
+    t["owner"] = json!("o\u{7f}");
+    t["archived_at"] = json!("2026-11-19T01:00:00Z");
+    fs::write(
+        repo.join(".git/repo-tasks/default.archive.jsonl"),
+        format!("{t}\n"),
+    )
+    .unwrap();
+    let r = go(env.clone(), "", &["list", "--archived", "--dir", &dir]).await;
+    assert_eq!(r.code, 0, "{}", r.err);
+    assert!(
+        r.out
+            .contains("#7 [x] gone \\u{1b}[2J tab\there [owner o\\u{7f}] [archived"),
+        "{:?}",
+        r.out
+    );
+    assert!(!r
+        .out
+        .chars()
+        .any(|c| c.is_control() && c != '\n' && c != '\t'));
+
+    // `archive` prints a count only, and still no control character.
+    let r = go(env, "", &["archive", "--dir", &dir]).await;
+    assert!(!r
+        .out
+        .chars()
+        .any(|c| c.is_control() && c != '\n' && c != '\t'));
+}

@@ -65,7 +65,7 @@ for plugin in "${plugins[@]}"; do
                 | .[]
                 | select(type == "string")
             ' "$config"
-        done | sed 's#.*/bin/##; s#[[:space:]].*##; s#\.exe$##' | tr -d '\r' | sort -u
+        done | sed 's#[[:space:]].*##; s#.*/bin/##; s#\.exe$##' | tr -d '\r' | sort -u
     )
     [ -n "$binaries" ] || {
         echo "ERROR: $plugin declares no commands in hooks.json or mcp_config.json." >&2

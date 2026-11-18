@@ -46,6 +46,7 @@ if [ $# -lt 1 ]; then
     echo "  rtk-mcp-qwen         RTK command rewriter hook" >&2
     echo "  opencode-ctl-mcp-qwen  OpenCode worker sessions (20 MCP tools)" >&2
     echo "  aiplugins-devtools-qwen  Devtools skills (code review, spec panel review, ...)" >&2
+    echo "  repo-tasks-mcp-qwen  Per-repository task list (4 MCP tools)" >&2
     exit 2
 fi
 

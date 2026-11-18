@@ -97,6 +97,18 @@ fn plain(e: Error) -> Error {
     }
 }
 
+/// Input only (8.1 as narrowed by the author): C1 controls U+0080 to U+009F are refused on top of
+/// what `model::validate_*` refuse. U+009B is a terminal CSI introducer. The list-file read path
+/// does not call this, so a list that already holds one still reads.
+fn no_c1(what: &str, s: &str) -> Result<()> {
+    if s.chars().any(|c| ('\u{80}'..='\u{9f}').contains(&c)) {
+        return Err(refuse(format!(
+            "{what} must not contain a control character"
+        )));
+    }
+    Ok(())
+}
+
 fn non_empty(s: String) -> Option<String> {
     (!s.is_empty()).then_some(s)
 }
@@ -205,13 +217,20 @@ pub fn create(
     let mut checked = Vec::with_capacity(n);
     for (i, t) in args.tasks.iter().enumerate() {
         let pos = i + 1;
+        no_c1("a subject", &t.subject)?;
         let subject = validate_subject(&t.subject).map_err(plain)?;
         let description = match &t.description {
-            Some(d) => non_empty(validate_description(d).map_err(plain)?),
+            Some(d) => {
+                no_c1("a description", d)?;
+                non_empty(validate_description(d).map_err(plain)?)
+            }
             None => None,
         };
         let owner = match &t.owner {
-            Some(o) => non_empty(validate_owner(o).map_err(plain)?),
+            Some(o) => {
+                no_c1("an owner", o)?;
+                non_empty(validate_owner(o).map_err(plain)?)
+            }
             None => None,
         };
         let mut earlier = Vec::new();
@@ -353,6 +372,15 @@ pub fn update(
         return Err(refuse(
             "delete cannot be combined with any other change in one call",
         ));
+    }
+    for (what, v) in [
+        ("a subject", &args.subject),
+        ("a description", &args.description),
+        ("an owner", &args.owner),
+    ] {
+        if let Some(v) = v {
+            no_c1(what, v)?;
+        }
     }
     let subject = args
         .subject

@@ -135,6 +135,27 @@ fn say(w: &mut dyn Write, text: &str) {
     let _ = w.flush();
 }
 
+/// The one rule for what a person's terminal is shown by `list`, `list --archived` and `archive`:
+/// every control character except line feed and tab is written as text, `\u{1b}` for ESC and
+/// `\u{9b}` for the C1 CSI introducer, so a stored escape sequence cannot drive the terminal.
+/// Output side only: `validate` and the tool replies (data for the model) are not touched.
+fn printable(text: &str) -> String {
+    text.chars()
+        .map(|c| {
+            if c.is_control() && c != '\n' && c != '\t' {
+                c.escape_unicode().to_string()
+            } else {
+                c.to_string()
+            }
+        })
+        .collect()
+}
+
+/// `say` for text that may hold stored task text.
+fn say_printable(w: &mut dyn Write, text: &str) {
+    say(w, &printable(text));
+}
+
 fn one_line(e: &Error) -> String {
     e.to_string()
         .split_whitespace()
@@ -238,7 +259,7 @@ fn list_cmd(rest: &[String], io: &mut Io<'_>) -> Result<(), Failure> {
     let header = ListHeader::for_store(&store);
     if !flags.has("--archived") {
         let text = ops::list(&store, &tuning, &header).map_err(|e| engine_error(&e))?;
-        say(io.out, &text);
+        say_printable(io.out, &text);
         return Ok(());
     }
     // The list first, the archive second: an id still in the list is not shown.
@@ -249,7 +270,7 @@ fn list_cmd(rest: &[String], io: &mut Io<'_>) -> Result<(), Failure> {
         lines.push("no archived tasks".to_string());
     }
     lines.extend(entries.iter().map(archived_line));
-    say(io.out, &lines.join("\n"));
+    say_printable(io.out, &lines.join("\n"));
     Ok(())
 }
 
@@ -283,6 +304,6 @@ fn archive_cmd(rest: &[String], io: &mut Io<'_>) -> Result<(), Failure> {
         1 => "archived 1 task".to_string(),
         n => format!("archived {n} tasks"),
     };
-    say(io.out, &text);
+    say_printable(io.out, &text);
     Ok(())
 }
