@@ -214,7 +214,7 @@ fn reminder_prints_hook_json() {
     let (ok, stdout, stderr) =
         rig.reminder(&json!({"workspacePaths": [rig.repo], "invocationNum": 2}));
     assert!(ok, "{stderr}");
-    assert_eq!(stdout, "");
+    assert_eq!(stdout, "{}\n");
 }
 
 #[test]

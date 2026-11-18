@@ -217,6 +217,17 @@ async fn reminder_hook_env_and_process_dir_fallbacks() {
 #[tokio::test]
 async fn reminder_silent_cases() {
     let tmp = Tmp::new();
+    // Antigravity alone prints `{}` for a silent case; the other hosts print nothing.
+    let done_ag = tmp.repo("done-ag");
+    write_list(&done_ag, vec![task(1, "x", "completed")]);
+    let ev = json!({"workspacePaths": [done_ag], "invocationNum": 1}).to_string();
+    let r = go(
+        env_in(&tmp, None),
+        &ev,
+        &["reminder", "--event", "antigravity"],
+    )
+    .await;
+    assert_eq!((r.code, r.out.as_str(), r.err.as_str()), (0, "{}\n", ""));
     // n is 0: every task completed.
     let done = tmp.repo("done");
     write_list(&done, vec![task(1, "x", "completed")]);
@@ -333,7 +344,8 @@ async fn reminder_antigravity_never_uses_process_dir() {
             &["reminder", "--event", "antigravity"],
         )
         .await;
-        assert_eq!((r.code, r.out.as_str()), (0, ""), "event {ev:?}");
+        // Antigravity wants a JSON object on stdout even when there is nothing to say.
+        assert_eq!((r.code, r.out.as_str()), (0, "{}\n"), "event {ev:?}");
     }
     // The control: Claude Code falls back to the process directory.
     let r = go(
@@ -351,7 +363,7 @@ async fn reminder_antigravity_never_uses_process_dir() {
         &["reminder", "--event", "antigravity"],
     )
     .await;
-    assert_eq!(r.out, "");
+    assert_eq!(r.out, "{}\n");
     // The first workspace path wins over cwd.
     let ev = json!({"workspacePaths": [repo], "cwd": tmp.0}).to_string();
     let r = go(

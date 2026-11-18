@@ -20,12 +20,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${extensionPath}${/}bin${/}repo-tasks-qwen-mcp",
-            "args": [
-              "reminder",
-              "--event",
-              "qwen"
-            ],
+            "command": "${extensionPath}${/}bin${/}repo-tasks-qwen-mcp reminder --event qwen",
             "name": "repo-tasks-qwen-reminder",
             "timeout": 10000
           }
@@ -36,12 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${extensionPath}${/}bin${/}repo-tasks-qwen-mcp",
-            "args": [
-              "reminder",
-              "--event",
-              "qwen"
-            ],
+            "command": "${extensionPath}${/}bin${/}repo-tasks-qwen-mcp reminder --event qwen",
             "name": "repo-tasks-qwen-reminder",
             "timeout": 10000
           }
@@ -52,12 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${extensionPath}${/}bin${/}repo-tasks-qwen-mcp",
-            "args": [
-              "reminder",
-              "--event",
-              "qwen"
-            ],
+            "command": "${extensionPath}${/}bin${/}repo-tasks-qwen-mcp reminder --event qwen",
             "name": "repo-tasks-qwen-reminder",
             "timeout": 10000
           }

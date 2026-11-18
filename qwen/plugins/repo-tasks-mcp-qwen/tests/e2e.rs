@@ -202,10 +202,13 @@ fn extension_manifest_declares_three_sources() {
         let hooks = e["hooks"].as_array().unwrap();
         assert_eq!(hooks.len(), 1);
         assert_eq!(hooks[0]["type"], "command");
+        // Qwen Code runs a hook command as one shell string and has no `args` field for hooks
+        // (hooks/types.ts:91-104, hooks/hookRunner.ts:1284-1285 at v0.28.0), so the arguments
+        // ride inside `command`.
         assert_eq!(
             hooks[0]["command"],
-            "${extensionPath}${/}bin${/}repo-tasks-qwen-mcp"
+            "${extensionPath}${/}bin${/}repo-tasks-qwen-mcp reminder --event qwen"
         );
-        assert_eq!(hooks[0]["args"], json!(["reminder", "--event", "qwen"]));
+        assert!(hooks[0].get("args").is_none(), "{}", hooks[0]);
     }
 }

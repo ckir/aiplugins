@@ -26,6 +26,15 @@ src/main.rs           thin main: all behaviour is in shared/repo-tasks
 tests/e2e.rs          the built binary, driven over stdio, in throwaway git repositories
 ```
 
+## The hook command is one string
+
+Qwen Code's command hook has no `args` field: `CommandHookConfig` is `type`, `command`, `name`,
+`timeout` and a few more (`packages/core/src/hooks/types.ts:91-104`, Qwen Code v0.28.0), and the
+runner starts `<shell> -c <command>` (`packages/core/src/hooks/hookRunner.ts:1284-1285`). The
+manifest therefore carries the arguments inside `command`
+(`${extensionPath}${/}bin${/}repo-tasks-qwen-mcp reminder --event qwen`), the form the spike measured.
+The `args` of an MCP server entry are a different, honoured field.
+
 ## Testing
 
 ```console

@@ -207,14 +207,18 @@ fn reminder_cmd(rest: &[String], io: &mut Io<'_>) -> Result<(), Failure> {
     if event.reads_stdin() {
         let _ = io.stdin.read_to_string(&mut raw);
     }
-    if let Some(text) = reminder::output(
+    match reminder::output(
         event,
         &io.env,
         &io.hook_env,
         &raw,
         flags.value("--workspace"),
     ) {
-        say(io.out, &text);
+        Some(text) => say(io.out, &text),
+        // Antigravity's hooks "must output their result as a JSON object on stdout"
+        // (hooks.md:145-147); the other hosts take silence.
+        None if event == HostEvent::Antigravity => say(io.out, "{}"),
+        None => {}
     }
     Ok(())
 }
