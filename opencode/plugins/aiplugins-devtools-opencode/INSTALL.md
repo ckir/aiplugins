@@ -59,19 +59,22 @@ rm -rf /tmp/aiplugins-devtools-opencode-stage && mkdir -p /tmp/aiplugins-devtool
 unzip -q -o /tmp/aiplugins-devtools-opencode.zip -d /tmp/aiplugins-devtools-opencode-stage
 ```
 
-The zip's top level IS the plugin directory (no wrapper folder). Copy each
-whole skill folder, including `references/` and `THIRD-PARTY-NOTICE.md` where
-present, into `$DEST/skills/`, and the command file into `$DEST/command/`
-(OpenCode does not list skills in its `/` menu, so the slash command is a
-command file):
+The zip's top level IS the plugin directory (no wrapper folder). Copy every
+skill folder in the bundle whole, including `references/`, `assets/` and
+`THIRD-PARTY-NOTICE.md` where present, into `$DEST/skills/`, and every command
+file into `$DEST/command/` (OpenCode does not list skills in its `/` menu, so
+each slash command is a command file). The loop reads the folder names from the
+bundle, so this step needs no edit when a skill is added:
 
 ```bash
+STAGE=/tmp/aiplugins-devtools-opencode-stage
 mkdir -p "$DEST/skills" "$DEST/command"
-for skill in aiplugins-devtools-code-review-and-quality aiplugins-devtools-spec-panel-review aiplugins-devtools-human-friendly; do
+for dir in "$STAGE"/skills/*/; do
+  skill=$(basename "$dir")
   rm -rf "$DEST/skills/$skill"
-  cp -r "/tmp/aiplugins-devtools-opencode-stage/skills/$skill" "$DEST/skills/"
+  cp -r "$dir" "$DEST/skills/$skill"
 done
-cp /tmp/aiplugins-devtools-opencode-stage/commands/spec-panel-review.md /tmp/aiplugins-devtools-opencode-stage/commands/human-friendly.md "$DEST/command/"
+cp "$STAGE"/commands/*.md "$DEST/command/"
 ```
 
 Do not rename the folders: OpenCode requires a skill's folder name to equal
@@ -80,30 +83,26 @@ the `name:` in its `SKILL.md` frontmatter, and each pair is
 
 ## Step 3 - verify the install
 
-1. `$DEST/skills/aiplugins-devtools-code-review-and-quality/SKILL.md` exists
-   and is non-empty, and the `references/` folder and
-   `THIRD-PARTY-NOTICE.md` sit beside it.
-2. `$DEST/skills/aiplugins-devtools-spec-panel-review/SKILL.md` exists and is
-   non-empty, and `$DEST/command/spec-panel-review.md` exists.
-3. `$DEST/skills/aiplugins-devtools-human-friendly/SKILL.md` exists and is
-   non-empty, and `$DEST/command/human-friendly.md` exists.
-4. The first lines of each `SKILL.md` contain `name:` followed by its folder
-   name (`aiplugins-devtools-code-review-and-quality`,
-   `aiplugins-devtools-spec-panel-review`, `aiplugins-devtools-human-friendly`).
-5. Restart OpenCode (skills and commands load at startup), then check that all
-   three skills appear in OpenCode's skill list and that `/spec-panel-review`
-   and `/human-friendly` appear in its `/` menu. If either does not appear, report that to the user rather
-   than editing OpenCode's configuration.
+1. Every folder under `$STAGE/skills/` now exists under `$DEST/skills/` with a
+   non-empty `SKILL.md`, and every file under `$STAGE/commands/` exists under
+   `$DEST/command/`. (Compare the two listings; do not rely on a remembered
+   list of names.)
+2. The first lines of each `SKILL.md` contain `name:` followed by its folder
+   name (each pair is `aiplugins-devtools-<skill>`). A skill whose folder and
+   `name:` differ is not loaded.
+3. Restart OpenCode (skills and commands load at startup), then check that every
+   copied skill appears in OpenCode's skill list and every copied command
+   appears in its `/` menu. If one does not appear, report that to the user
+   rather than editing OpenCode's configuration.
 
 This install procedure has not been exercised against a running OpenCode by
-the authors of this document; step 4 is the first real test, so report
+the authors of this document; step 3 is the first real test, so report
 exactly what you see.
 
 ## Invoking the skill
 
-Invoke a skill by its prefixed folder name,
-`aiplugins-devtools-code-review-and-quality` or
-`aiplugins-devtools-spec-panel-review`, or run `/spec-panel-review <path>` to
-panel-review a spec or plan. A colon is not valid in a folder
+Invoke a skill by its prefixed folder name, `aiplugins-devtools-<skill>`, or
+run its slash command, `/<skill> <path>`, where the bundle ships one (the
+README lists both). A colon is not valid in a folder
 name, so the `aiplugins-devtools:` form used on other agents is not available
 on OpenCode.

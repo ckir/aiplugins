@@ -19,12 +19,20 @@
 #   curl -fsSL https://raw.githubusercontent.com/ckir/aiplugins/main/scripts/install-qwen-extension.sh | bash -s -- re-ghidra-mcp-qwen
 #   curl -fsSL https://raw.githubusercontent.com/ckir/aiplugins/main/scripts/install-qwen-extension.sh | bash -s -- rtk-mcp-qwen
 #   curl -fsSL https://raw.githubusercontent.com/ckir/aiplugins/main/scripts/install-qwen-extension.sh | bash -s -- opencode-ctl-mcp-qwen
+#   curl -fsSL https://raw.githubusercontent.com/ckir/aiplugins/main/scripts/install-qwen-extension.sh | bash -s -- aiplugins-devtools-qwen
 #
 # Or run directly:
 #
 #   bash scripts/install-qwen-extension.sh re-ghidra-mcp-qwen
 #   bash scripts/install-qwen-extension.sh rtk-mcp-qwen
 #   bash scripts/install-qwen-extension.sh opencode-ctl-mcp-qwen
+#   bash scripts/install-qwen-extension.sh aiplugins-devtools-qwen
+#
+# Every extension is released under its own tag (<extension>-v<version>), so the
+# repository's "latest" release is whichever plugin shipped last and almost never
+# carries this extension's zip. The script therefore looks up the newest release
+# tagged <extension>-v* and downloads the zip from that tag. Set GITHUB_TOKEN to
+# raise the API rate limit (60 requests an hour unauthenticated).
 #
 set -euo pipefail
 
@@ -37,23 +45,71 @@ if [ $# -lt 1 ]; then
     echo "  re-ghidra-mcp-qwen   Ghidra MCP for Qwen Code (19 RE tools)" >&2
     echo "  rtk-mcp-qwen         RTK command rewriter hook" >&2
     echo "  opencode-ctl-mcp-qwen  OpenCode worker sessions (20 MCP tools)" >&2
+    echo "  aiplugins-devtools-qwen  Devtools skills (code review, spec panel review, ...)" >&2
     exit 2
 fi
 
 ext="$1"
+# The name becomes part of a URL and a directory path, so refuse anything else.
+case "$ext" in
+    "" | *[!a-z0-9-]*)
+        echo "ERROR: '${ext}' is not a valid extension name (lowercase letters, digits and '-')." >&2
+        exit 2
+        ;;
+esac
 zip_name="${ext}-extension.zip"
-url="https://github.com/${REPO}/releases/latest/download/${zip_name}"
 ext_dir="${HOME}/.qwen/extensions/${ext}"
 
-# Require either curl or wget
+# Require either curl or wget. fetch <out-file> <url>; fetch_text <url> prints the body.
 if command -v curl >/dev/null 2>&1; then
     fetch() { curl -fSL --progress-bar -o "$1" "$2"; }
+    fetch_text() {
+        if [ -n "${GITHUB_TOKEN:-}" ]; then
+            curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" "$1"
+        else
+            curl -fsSL "$1"
+        fi
+    }
 elif command -v wget >/dev/null 2>&1; then
     fetch() { wget -q --show-progress -O "$1" "$2"; }
+    fetch_text() {
+        if [ -n "${GITHUB_TOKEN:-}" ]; then
+            wget -qO- --header="Authorization: Bearer ${GITHUB_TOKEN}" "$1"
+        else
+            wget -qO- "$1"
+        fi
+    }
 else
     echo "ERROR: curl or wget required." >&2
     exit 1
 fi
+
+# Newest release tagged <ext>-v*. The API lists releases newest first, so the first
+# match on the first page that has one is the latest. The trailing "-v" keeps
+# 'rtk-mcp-qwen' from matching a longer name that merely starts with it.
+resolve_tag() {
+    local page=1 body tag
+    while [ "$page" -le 10 ]; do
+        body=$(fetch_text "https://api.github.com/repos/${REPO}/releases?per_page=100&page=${page}") || return 1
+        tag=$(printf '%s\n' "$body" | grep -o '"tag_name": *"[^"]*"' | sed 's/.*: *"\(.*\)"/\1/' \
+            | grep -m1 "^${ext}-v[0-9]" || true)
+        if [ -n "$tag" ]; then
+            printf '%s\n' "$tag"
+            return 0
+        fi
+        # An empty page (just "[]") means there are no older releases to look at.
+        printf '%s' "$body" | grep -q '"tag_name"' || return 1
+        page=$((page + 1))
+    done
+    return 1
+}
+
+echo "Looking up the latest release of ${ext}..."
+tag=$(resolve_tag) || {
+    echo "ERROR: no release tagged '${ext}-v*' found in ${REPO} (or the GitHub API could not be reached)." >&2
+    exit 1
+}
+url="https://github.com/${REPO}/releases/download/${tag}/${zip_name}"
 
 # Require unzip
 command -v unzip >/dev/null 2>&1 || {
@@ -75,7 +131,10 @@ echo "Downloading..."
 fetch "$tmpzip" "$url"
 
 # Validate it looks like a Qwen extension zip
-if ! unzip -l "$tmpzip" 2>/dev/null | grep -q 'qwen-extension.json'; then
+# (List first, grep after: under `pipefail`, `grep -q` quitting early can hand `unzip`
+# a SIGPIPE and fail a zip that does hold the manifest. Seen once on a valid zip.)
+zip_listing=$(unzip -l "$tmpzip" 2>/dev/null || true)
+if ! grep -q 'qwen-extension.json' <<<"$zip_listing"; then
     echo "ERROR: ${zip_name} does not contain qwen-extension.json — not a valid Qwen extension." >&2
     exit 1
 fi

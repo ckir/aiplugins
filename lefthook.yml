@@ -22,6 +22,6 @@ pre-push:
     clippy:
       run: cargo clippy --workspace --all-targets --all-features -- -D warnings
     mlc:
-      run: mlc --offline --ignore-path "./node_modules,./opencode/plugins/re-ghidra-mcp-opencode/node_modules,./opencode/plugins/opencode-ctl-mcp-opencode/node_modules,./opencode/plugins/rtk-mcp-opencode/node_modules,./opencode/plugins/todov2-opencode/node_modules,./target,./docs/site"
+      run: mlc --offline --ignore-path "./node_modules,./opencode/plugins/re-ghidra-mcp-opencode/node_modules,./opencode/plugins/opencode-ctl-mcp-opencode/node_modules,./opencode/plugins/rtk-mcp-opencode/node_modules,./opencode/plugins/todov2-opencode/node_modules,./target,./docs/site,./.clavity"
     license-headers:
       run: scripts/check-license-headers.sh

@@ -4,7 +4,7 @@ Tracked work that is not in a task list yet. Entry format: the heading is the ti
 
 ## opencode-ctl-mcp: execute the implementation plan
 
-**Status:** SCHEDULED 2026-10-19 - plan `docs/superpowers/plans/2026-10-18-opencode-ctl-mcp.md` (branch `feat/opencode-ctl-mcp`, 18 panel rounds, not GREEN) waits on the owner's round-19-or-ship call and an execution method (subagent-driven recommended).
+**Status:** SHIPPED 2026-11-18 - merged as PR #103 (9f315e5); the plan was executed, and `opencode-ctl-mcp-*` v0.2.x is released. The open items below are tracked separately.
 
 Spec: `docs/specs/2026-10-18-opencode-ctl-mcp-design.md`. After execution comes the AGY-CAPSTONE review of the committed code, then AGY-TEST-AUDIT.
 
@@ -30,27 +30,27 @@ Spec: `docs/specs/2026-10-18-opencode-ctl-mcp-design.md`. After execution comes 
 
 ## aiplugins-devtools: capstone and test-audit
 
-**Status:** OPEN 2026-10-19 - branch `feat/aiplugins-devtools` has all tasks done; the AGY-CAPSTONE review, then AGY-TEST-AUDIT, then the merge decision remain, to run in a fresh session (owner ruling).
+**Status:** SHIPPED 2026-11-18 - `feat/aiplugins-devtools` merged as PR #80 (260d49c) and `aiplugins-devtools-*` v0.5.0 is released. The repo holds no record that the capstone and test-audit named here ran for that branch; whether they were waived is the owner's to say.
 
 ## devtools: pin LF on the shared skill references and notices
 
-**Status:** OPEN 2026-11-02 - `.gitattributes` pins `**/SKILL.md` and `shared/devtools/commands/*.md` but not `shared/devtools/skills/**/references/*.md` or `THIRD-PARTY-NOTICE.md`, so a Windows autocrlf checkout fails `scripts/check-devtools-skills.sh` (the `diff -r` at line 112 against the LF-pinned `opencode/**/*.md` copies). Pin every copy together (shared, cc, qwen, agy); pinning shared alone breaks the per-agent `diff -r`. CI runs on ubuntu only, so it is unseen. Verified 2026-11-02 with `git check-attr eol`.
+**Status:** IMPLEMENTED 2026-11-18 - `.gitattributes` now pins the whole devtools skill tree (shared and the cc, qwen, agy and opencode copies) to LF, so `references/`, `THIRD-PARTY-NOTICE.md` and `assets/` are covered; `git check-attr eol` reports `lf` on all 50 files. Windows autocrlf checkout itself not exercised.
 
 ## opencode devtools INSTALL.md: copy steps hardcode skill and command names
 
-**Status:** OPEN 2026-11-02 - `opencode/plugins/aiplugins-devtools-opencode/INSTALL.md:70` lists the skills and the command by name with no drift check, so adding one to `shared/devtools` leaves the install steps incomplete while every gate stays green. Needs a gate that derives the list, or a loop over `skills/*`.
+**Status:** IMPLEMENTED 2026-11-18 - INSTALL.md copies by loop over the bundle (`"$STAGE"/skills/*/`, `"$STAGE"/commands/*.md`) and names no skill; `scripts/check-devtools-skills.sh` fails if it names a shipped skill or command or loses the globs (four new mutation cases).
 
 ## Qwen installers: no release carries the extension zip
 
-**Status:** OPEN 2026-11-02 - `scripts/install-qwen-extension.sh:37` downloads `releases/latest/download/<ext>-extension.zip`, but the repo Latest release (`aiplugins-devtools-agy-v0.3.0`) has only `aiplugins-devtools-agy-agy-plugin.zip`, so the documented one-liner 404s. `scripts/install-qwen-extension.ps1:24,34` also omits `aiplugins-devtools-qwen` from its `ValidateSet`. Per-plugin tags mean `latest` cannot work; resolve the tag per extension.
+**Status:** IMPLEMENTED 2026-11-18 - both installers resolve the newest `<extension>-v*` release through the releases API and download from that tag; `aiplugins-devtools-qwen` added to the `.ps1` `ValidateSet` and both usage lists. Measured live with bash and `pwsh` 7 on Linux for all four extensions; Windows PowerShell 5.1 not run.
 
 ## mlc scans untracked scratch and fails local link checks
 
-**Status:** OPEN 2026-11-02 - `just links` and the lefthook pre-push `mlc` (Justfile:51, lefthook.yml:22) do not ignore the git-ignored `.clavity/`, so `.clavity/scratch/opencode-ctl-plan-panel/round11-agy.md` and `round18-agy.md` (66 `file://` hits in round11 alone) fail the check locally. Add `./.clavity` to the `--ignore-path` list in both places.
+**Status:** IMPLEMENTED 2026-11-18 - the Justfile already ignored `./.clavity`; the lefthook pre-push `mlc` line now does too.
 
 ## release-refresh: pass github.head_ref through env, not inline
 
-**Status:** OPEN 2026-11-03 - `.github/workflows/release-refresh.yml:58` runs `git push origin HEAD:${{ github.head_ref }}` inline, which actionlint flags as potentially untrusted input. The job `if:` guard pins `head_ref` to `release-please--branches--main`, so it is likely unexploitable today, but the flagged pattern is one guard edit away from real. Pass it through an `env:` variable and quote it.
+**Status:** IMPLEMENTED 2026-11-18 - the push step reads `HEAD_REF` from `env:` and quotes it; actionlint clean.
 
 ## release-please: a release PR goes stale behind main and is not rebuilt
 

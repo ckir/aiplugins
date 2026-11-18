@@ -19,7 +19,7 @@
     and extracting the bundle directly into ~/.qwen/extensions/<name>/.
 
 .PARAMETER ExtensionName
-    The extension to install: re-ghidra-mcp-qwen, rtk-mcp-qwen or opencode-ctl-mcp-qwen
+    The extension to install: re-ghidra-mcp-qwen, rtk-mcp-qwen, opencode-ctl-mcp-qwen or aiplugins-devtools-qwen
 
 .EXAMPLE
     # One-liner install (PowerShell):
@@ -31,7 +31,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('re-ghidra-mcp-qwen', 'rtk-mcp-qwen', 'opencode-ctl-mcp-qwen')]
+    [ValidateSet('re-ghidra-mcp-qwen', 'rtk-mcp-qwen', 'opencode-ctl-mcp-qwen', 'aiplugins-devtools-qwen')]
     [string]$ExtensionName
 )
 
@@ -41,13 +41,39 @@ function Install-QwenExtension {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory, Position = 0)]
-        [ValidateSet('re-ghidra-mcp-qwen', 'rtk-mcp-qwen', 'opencode-ctl-mcp-qwen')]
+        [ValidateSet('re-ghidra-mcp-qwen', 'rtk-mcp-qwen', 'opencode-ctl-mcp-qwen', 'aiplugins-devtools-qwen')]
         [string]$Name
     )
 
     $repo = 'ckir/aiplugins'
     $zipName = "$Name-extension.zip"
-    $url = "https://github.com/$repo/releases/latest/download/$zipName"
+
+    # Every extension is released under its own tag (<name>-v<version>), so the repository's
+    # "latest" release is whichever plugin shipped last and almost never carries this zip.
+    # Look up the newest release tagged <name>-v<digit>; the API lists newest first.
+    $headers = @{ 'User-Agent' = 'install-qwen-extension' }
+    if ($env:GITHUB_TOKEN) { $headers['Authorization'] = "Bearer $env:GITHUB_TOKEN" }
+    $tag = $null
+    for ($page = 1; $page -le 10 -and -not $tag; $page++) {
+        try {
+            $response = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases?per_page=100&page=$page" -Headers $headers
+            # Some PowerShell versions return the JSON array as one object; unroll it so each
+            # release is its own item (otherwise $_.tag_name is every tag at once).
+            $releases = @($response | ForEach-Object { $_ })
+        }
+        catch {
+            Write-Error "Could not list releases of ${repo}: $_"
+            return
+        }
+        if ($releases.Count -eq 0) { break }
+        $match = @($releases | Where-Object { $_.tag_name -match ('^' + [regex]::Escape($Name) + '-v\d') })
+        if ($match.Count -gt 0) { $tag = $match[0].tag_name }
+    }
+    if (-not $tag) {
+        Write-Error "No release tagged '$Name-v*' found in $repo."
+        return
+    }
+    $url = "https://github.com/$repo/releases/download/$tag/$zipName"
     $extDir = Join-Path $env:USERPROFILE ".qwen\extensions\$Name"
 
     Write-Host "Installing Qwen Code extension: $Name" -ForegroundColor Cyan
@@ -69,6 +95,7 @@ function Install-QwenExtension {
 
     # Validate
     try {
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
         $zip = [System.IO.Compression.ZipFile]::OpenRead($tmpZip)
         $hasManifest = $zip.Entries | Where-Object { $_.FullName -eq 'qwen-extension.json' }
         $zip.Dispose()
@@ -129,6 +156,7 @@ else {
     Write-Host "  re-ghidra-mcp-qwen   Ghidra MCP for Qwen Code (19 RE tools)"
     Write-Host "  rtk-mcp-qwen         RTK command rewriter hook"
     Write-Host "  opencode-ctl-mcp-qwen  OpenCode worker sessions (20 MCP tools)"
+    Write-Host "  aiplugins-devtools-qwen  Devtools skills (code review, spec panel review, ...)"
     Write-Host ""
     Write-Host "Or use the function directly after piping:" -ForegroundColor Yellow
     Write-Host '  Install-QwenExtension re-ghidra-mcp-qwen'
