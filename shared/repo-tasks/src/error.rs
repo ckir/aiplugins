@@ -40,4 +40,14 @@ pub enum Error {
         "the list has format {found} but this engine knows format {newest}: update the plugin"
     )]
     NewerFormat { found: u64, newest: u32 },
+    #[error("{}: {source}", path.display())]
+    ListFile {
+        path: PathBuf,
+        #[source]
+        source: Box<Error>,
+    },
+    #[error("could not take the lock {} within {secs} seconds: another process holds it", path.display())]
+    LockTimeout { path: PathBuf, secs: u64 },
+    #[error("refusing to write an empty list file: {}", path.display())]
+    EmptyWrite { path: PathBuf },
 }
