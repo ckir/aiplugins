@@ -8,6 +8,7 @@
 
 //! Shared engine for repo-tasks: one task list per repository.
 
+pub mod archive;
 pub mod clock;
 pub mod error;
 pub mod host;
