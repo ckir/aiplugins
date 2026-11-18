@@ -26,9 +26,9 @@ directory; there is no `opencode.jsonc` to merge.
 
 OpenCode keys a skill by its folder name, so here the skills are invoked as
 `aiplugins-devtools-code-review-and-quality` and
-`aiplugins-devtools-spec-panel-review` and `aiplugins-devtools-human-friendly`. OpenCode also does not list skills in
-its `/` menu, so the plugin ships command files, `commands/spec-panel-review.md` and `commands/human-friendly.md`;
-`/spec-panel-review <path>` and `/human-friendly <path>` load the skill and run it on the path. A colon is not valid in a folder
+`aiplugins-devtools-spec-panel-review`, `aiplugins-devtools-human-friendly` and `aiplugins-devtools-license-headers`. OpenCode also does not list skills in
+its `/` menu, so the plugin ships command files, `commands/spec-panel-review.md`, `commands/human-friendly.md` and `commands/license-headers.md`;
+`/spec-panel-review <path>`, `/human-friendly <path>` and `/license-headers <request>` load the skill and run it on the argument. A colon is not valid in a folder
 name, so the `aiplugins-devtools:` form used on the other agents is not
 available on OpenCode.
 
