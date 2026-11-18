@@ -257,27 +257,33 @@ capability and answer `roots/list` with the starting directory. So:
   declared no `roots` has nothing to settle. The 2 seconds start when the request is sent, so a
   tool call waits only for what is left of them, and once a request is settled no later call
   waits for it again.
-- The reply's roots are read in order; the first whose `uri` names an existing directory becomes
-  the root directory. A `file://` URI is read as RFC 8089 gives it [CLAIM, 2026-11-18]: the
+- The reply's roots are read in order; a root's `uri` is converted to a local path first, and the
+  first whose path is an existing directory becomes the root directory. A `file://` URI is read
+  as RFC 8089 gives it [CLAIM, 2026-11-18]: the
   authority is empty or `localhost` (any other authority, such as a network share, makes the root
   unusable), the path is percent-decoded as UTF-8 (a byte sequence that is not valid UTF-8 makes
-  it unusable), and on Windows `/c:/x` and `/C:/x` become `c:\x` and `C:\x`. Any other scheme is
+  it unusable), and on Windows a path `/L:/x` with any ASCII letter L, upper or lower case, becomes `L:\x`. Any other scheme is
   unusable. Other roots are ignored: the spike saw one root per host and never several [driver's
   call, unmeasured].
 - A tool call that arrives while a request is not settled waits for it, as above, then goes on.
   A tool call that arrives before `notifications/initialized` is refused with an error saying the
-  server is not initialized, and touches no list: the protocol puts that notification before any
+  server is not initialized (a JSON-RPC error response with code -32600, not a tool result: it is
+  a protocol violation, not a refused task [driver's call]), and touches no list: the protocol puts that notification before any
   such call [CLAIM, 2026-11-18], and answering it from the working directory could open the
   wrong list.
-- A client that declared no `roots`, a failed or empty reply, and a reply with no usable root
-  all mean "no root": D falls to the process working directory, except on Antigravity. A refresh
+- A client that declared no `roots`, a failed or empty reply, a request that was settled by the
+  2 seconds running out, and a reply with no usable root all mean "no root": D falls to the process working directory, except on Antigravity. A refresh
   that fails, times out or has no usable root keeps the root already held.
 - **Antigravity has no working-directory fallback for the server**, as it has none for the
   reminder (10.2): its installed server starts in the plugin's folder (15.7), so with neither the
   variable nor a root every call fails with an error that names `REPO_TASKS_DIR` and says the
   host gave no workspace. The wrapper's compiled-in host (8.1) decides this.
 - The root is held as the last answer received and used by every later call; D is still resolved
-  on each call, so a changed root is followed.
+  on each call, so a changed root is followed. A call resolves D once, when it starts, and uses
+  that D until it ends; a reply that arrives during a call changes the root for later calls only.
+- The 2 seconds are a constant of the engine, not a setting; the engine's tests may shorten it
+  through a parameter that no host configuration reaches, so that a test with a client that never
+  replies does not take 2 seconds.
 
 The variable comes first for the reminder as well [driver's call]. Point 9 names the event's path
 first; but point 4 makes the variable an override, and a reminder that counted one list while the
@@ -502,7 +508,9 @@ A task reaches the archive in exactly three ways:
   and before `serve` answers its first tool call, it resolves the list as a tool call would and reads
   it without the lock. A host that never sends `initialized`, and a request
   that is only settled by the 2 seconds of 7.1 running out, never trigger it: an unanswered root
-  must not let it act on the working directory's list, and the next start tries again. The condition is: the list holds at least one task,
+  must not let it act on the working directory's list, and the next start tries again. It is
+  decided once, when the question is first settled; a reply that arrives afterwards does not
+  re-arm it. The condition is: the list holds at least one task,
   every task is completed, and every task's `updated_at` is at least 12 hours in the past
   [PROPOSED, UNMEASURED]. Only when the condition holds does it make one non-blocking attempt at
   the lock, read the list again under it, and, if the condition still holds, archive them all
@@ -1279,6 +1287,13 @@ checked against the text.
 | State Corruptor | Every call waits again after a timeout (MATERIAL) | FOLDED: a settled request is not waited for again (7.1) |
 | Literal Implementer | A refresh that times out: keep or clear the root (MINOR) | FOLDED: the root held is kept (7.1) |
 | Blindspot Auditor | Start-up archiving after a timeout acts on the working directory's list (MATERIAL) | FOLDED: a timeout-only settlement skips start-up archiving (8.5) |
+
+Round 2 on that revision (the peer returned FINDINGS-7, each checked against the text), all
+FOLDED in 7.1 and 8.5: a timed-out first request counts as "no root"; the URI is converted before
+the directory test; any Windows drive letter; the error for a call before `initialized` is a
+JSON-RPC error, code -32600 [driver's call]; a call resolves D once and keeps it; the 2 seconds
+can be shortened by tests only; start-up archiving is decided once and a late reply does not
+re-arm it. None rejected.
 
 ## Stand-downs
 
