@@ -1001,6 +1001,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "repo-tasks-mcp-agy"
+version = "0.1.0"
+dependencies = [
+ "repo-tasks",
+ "rmcp",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "repo-tasks-mcp-cc"
 version = "0.1.0"
 dependencies = [

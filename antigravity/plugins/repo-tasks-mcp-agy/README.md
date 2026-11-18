@@ -1,0 +1,46 @@
+# repo-tasks-mcp-agy
+
+An Antigravity plugin that gives the agent a task list kept per git repository: four MCP tools
+(`task_create`, `task_list`, `task_get`, `task_update`) whose tasks outlive the session and are shared with
+any other agent working in the same repository. A `PreInvocation` hook adds one line saying how many tasks are
+open, on the first invocation of a session only, so the agent knows to call `task_list`; it never prints the
+tasks themselves.
+
+It is the Antigravity front of `shared/repo-tasks`; the other fronts are `repo-tasks-mcp-cc`,
+`repo-tasks-mcp-qwen` and `repo-tasks-mcp-opencode`.
+
+## Install
+
+Install from the marketplace once it is registered, or build the binary locally:
+
+```console
+$ just build-repo-tasks-mcp-agy
+```
+
+`mcp_config.json` names the bare binary `repo-tasks-agy-mcp`; the host resolves it through `PATH`, so put the
+installed `bin/` on `PATH`.
+
+## Which repository
+
+On Antigravity the server starts in the plugin's own folder, not in your workspace, so the process directory
+says nothing about which repository to use. The workspace comes from the MCP `roots` the host sends, or from
+the `REPO_TASKS_DIR` environment variable (an absolute path to an existing directory). When the host sends no
+roots and the variable is not set, the tools fail with an error that names `REPO_TASKS_DIR`; set it to the
+directory whose list you want. The reminder hook reads the workspace from the `workspacePaths` of its event
+(or from `REPO_TASKS_DIR`), and prints nothing when it has neither.
+
+## Layout
+
+```
+plugin.json                  manifest
+mcp_config.json              registers `repo-tasks-agy-mcp serve`
+hooks.json                   PreInvocation runs `repo-tasks-agy-mcp reminder --event antigravity` (acts only when invocationNum is at most 1)
+src/bin/mcp.rs               thin main: all behaviour is in shared/repo-tasks
+tests/e2e.rs                 the built binary, driven over stdio, in throwaway git repositories
+```
+
+## Testing
+
+```console
+$ cargo nextest run -p repo-tasks-mcp-agy
+```
