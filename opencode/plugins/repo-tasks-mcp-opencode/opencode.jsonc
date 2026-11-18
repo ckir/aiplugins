@@ -1,0 +1,1 @@
+{"$schema":"https://opencode.ai/config.json","mcp":{"servers":{"repo-tasks":{"type":"local","command":["<DEST>/bin/repo-tasks-cc-mcp","serve","--host","opencode"],"disabled":false}}},"permissions":[],"skills":[]}
