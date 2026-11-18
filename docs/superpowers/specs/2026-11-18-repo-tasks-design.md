@@ -834,11 +834,11 @@ All names in this table follow from the working name `repo-tasks` and change wit
 
 ### 15.6 Not measured
 
-- For Claude Code, Qwen and Antigravity at run time: the working directory given to an MCP
-  server, whether it may write under `.git`, and whether the host environment reaches it. For
-  OpenCode these rest on a reading of the source, not a run.
-- Whether `REPO_TASKS_DIR` and `REPO_TASKS_LIST` reach a hook process as well as the server.
-- Whether Claude Code signals a compaction to a `SessionStart` hook, and under what name.
+- Measured on Linux in the spike (15.7): the working directory given to an MCP server, whether it
+  may write under `.git`, and whether the host environment reaches the server and a hook, for
+  Claude Code, Antigravity and OpenCode; Claude Code's compaction signal. Still not measured:
+  everything for Qwen (not installed here), OpenCode through its background service, a compaction
+  in Antigravity and in OpenCode.
 - Any hook event of Qwen beyond those this repository already uses.
 - How the four hosts behave on Windows and macOS. Every measurement in 15.1 ran on one Linux
   machine.
@@ -848,6 +848,45 @@ All names in this table follow from the working name `repo-tasks` and change wit
 - Whether Windows canonicalization returns one spelling for two differently cased starts of the
   same directory (7.5); a test on CI's Windows runner decides it.
 - Every figure marked [PROPOSED, UNMEASURED].
+
+### 15.7 Spike results (2026-11-18, Linux, a throwaway repository and a linked worktree)
+
+Each host was started from three places: the repository root `R`, `R/sub/deep`, and a linked
+worktree `W`. The probe was a stdio MCP server and a hook script that wrote one JSON line per
+start; the host's environment held `REPO_TASKS_DIR=/spike/dir` and `REPO_TASKS_LIST=spike-list`.
+
+| Cell | Claude Code 2.1.327 | Qwen | Antigravity (agy 1.5.11) | OpenCode 2.3.0 (`--standalone`) |
+|---|---|---|---|---|
+| Server working directory | the starting directory, in all three places | not measured: `qwen` is not installed on this machine | the plugin folder (`<root>/.agents/plugins/probe`), in all three places; the inherited variable `PWD` was the starting directory | the starting directory, in all three places |
+| May the server create a folder in the git common directory | yes; `W` resolved to `R/.git` | not measured: not installed | yes (the plugin folder sat inside the repository; a plugin elsewhere was not measured) | yes; `W` resolved to `R/.git` |
+| `REPO_TASKS_DIR` and `REPO_TASKS_LIST` reach the server | yes, both | not measured: not installed | yes, both | yes, both, with the server's own `environment` empty |
+| They reach a session-start hook | yes, both | not measured: not installed | yes, both | yes, both, in the plugin's hook process |
+| Session-start event and the workspace path | `SessionStart` with `source` `startup`, `resume`, `compact`; payload keys `session_id`, `transcript_path`, `cwd`, `hook_event_name`, `source`; `cwd` is the starting directory | not measured: not installed | `SessionStart` once per run and `PreInvocation`; payload carries `cwd` and `workspacePaths`, both the starting directory; the hook's own working directory is the plugin folder | the plugin's `context` hook, on every model call, with `sessionID`; `ctx.location.directory` is the starting directory |
+| A compaction is signalled | yes: `SessionStart` with `source` `compact`, after a three-turn session was compacted with `claude -p "/compact" --resume <id>` | not measured: not installed | not measured: `hooks.md` names no compaction event and `agy --help` lists no compaction command | not measured: `opencode run "/compact"` was sent as ordinary text and no `compaction` hook line appeared; the only `compact` command in the source is the ACP catalog (`packages/cli/src/acp/catalog.ts:10`) |
+
+Also not measured: OpenCode through its background service, because one was already running
+(`opencode serve --service`) and is not the spike's to stop; a run against it would not load the
+spike's configuration directory. A bare `claude -p "/compact"` on a fresh session answered "Not
+enough messages to compact"; the compaction above needed a session of three turns.
+
+Sections this contradicts or confirms:
+
+- 7.1, Claude Code and OpenCode: the process working directory is the starting directory; the rule
+  stands. **Antigravity contradicts it**: the server starts in the plugin folder, so "the process
+  working directory" is the plugin's, not the workspace's, and the server cannot find the
+  repository from it unless `REPO_TASKS_DIR` is set. The spike saw `PWD` (a variable the host
+  inherited and did not reset) equal to the starting directory; a rule that reads it is for the
+  owner to decide at step 2 (16), and it was not tested with a plugin installed outside the
+  repository. 8.5's start-up archiving resolves the list the same way and is affected the same
+  way; 15.6's earlier unknown about the server's directory is settled for three of the four hosts.
+- 7.3 and 7.6: confirmed for the three measured hosts: each server could create and remove a
+  folder in the git common directory, from `W` as well.
+- 7.1 and 10.2, environment: confirmed for the server and the hook on the three measured hosts.
+- 10.2, the Claude Code compaction source named `compact` [CLAIM, 2026-11-18]: confirmed.
+- 10.2, Antigravity: confirmed; `workspacePaths` and `cwd` are both present, and a hook's working
+  directory is the plugin folder.
+- 10.2, OpenCode: confirmed; the event carries `sessionID` and `ctx.location.directory` is the
+  starting directory.
 
 ## 16. Order of work
 
