@@ -64,7 +64,7 @@ If it hangs or fails partway, kill it, delete the partial state and retry once.
     "servers": {
       "repo-tasks": {
         "type": "local",
-        "command": ["<DEST>/bin/repo-tasks-cc-mcp", "serve", "--host", "opencode"],
+        "command": ["./bin/repo-tasks-cc-mcp", "serve", "--host", "opencode"],
         "disabled": false
       }
     }
@@ -74,7 +74,7 @@ If it hangs or fails partway, kill it, delete the partial state and retry once.
 
 Add the `repo-tasks` entry under the existing `mcp.servers` (creating it if absent) in `$DEST/opencode.json` or
 `$DEST/opencode.jsonc` (create `opencode.jsonc` if neither exists). Write `command[0]` as an ABSOLUTE path: replace
-`<DEST>` with the absolute config dir. A relative `./bin/...` does not resolve against the config dir. Keep `serve`,
+the leading `.` with the absolute config dir (`$DEST`). The relative `./bin/...` in the shipped snippet does not resolve against the config dir. Keep `serve`,
 `--host`, `opencode` exactly. On Windows name the `.exe`. Do not paste the snippet over the user's config.
 
 The reminder in `plugin.ts` looks for the binary at `$DEST/bin/repo-tasks-cc-mcp`. To use another location, set the

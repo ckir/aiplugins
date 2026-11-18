@@ -136,6 +136,7 @@ describe("opencode.jsonc", () => {
   const cfg = JSON.parse(readFileSync(join(root, "opencode.jsonc"), "utf8"));
   test("launches serve with --host opencode", () => {
     const server = cfg.mcp.servers["repo-tasks"];
-    expect(server.command).toEqual(["<DEST>/bin/repo-tasks-cc-mcp", "serve", "--host", "opencode"]);
+    expect(server.command).toEqual(["./bin/repo-tasks-cc-mcp", "serve", "--host", "opencode"]);
+    expect(JSON.stringify(server)).not.toContain("<DEST>");
   });
 });
