@@ -1,0 +1,47 @@
+{
+  "description": "SessionStart reminder. Prints one line saying how many tasks are open in this repository's task list, never the tasks themselves, so the model knows to call task_list. Silent when the repository has no open tasks, and never blocks. Registered per source, including compact, so the reminder is restored after a context compaction.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/repo-tasks-cc-mcp reminder --event claude-code",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/repo-tasks-cc-mcp reminder --event claude-code",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/repo-tasks-cc-mcp reminder --event claude-code",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/repo-tasks-cc-mcp reminder --event claude-code",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

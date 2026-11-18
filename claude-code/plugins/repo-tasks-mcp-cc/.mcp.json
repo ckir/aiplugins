@@ -1,0 +1,1 @@
+{"mcpServers":{"repo-tasks-mcp-cc":{"command":"${CLAUDE_PLUGIN_ROOT}/bin/repo-tasks-cc-mcp","args":["serve"]}}}

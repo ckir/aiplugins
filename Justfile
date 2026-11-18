@@ -428,6 +428,20 @@ build-opencode-ctl-mcp-cc:
     done
     @echo "Plugin binaries staged in claude-code/plugins/opencode-ctl-mcp-cc/bin/"
 
+# Build the repo-tasks-mcp-cc Claude Code plugin's binary into its bin/ directory.
+# Windows developers run this locally; CI produces the other platforms.
+build-repo-tasks-mcp-cc:
+    cargo build -p repo-tasks-mcp-cc --release --bin repo-tasks-cc-mcp
+    mkdir -p claude-code/plugins/repo-tasks-mcp-cc/bin
+    for b in repo-tasks-cc-mcp; do \
+        if [ -f "target/release/$b.exe" ]; then \
+            cp "target/release/$b.exe" claude-code/plugins/repo-tasks-mcp-cc/bin/; \
+        else \
+            cp "target/release/$b" claude-code/plugins/repo-tasks-mcp-cc/bin/; \
+        fi; \
+    done
+    @echo "Plugin binaries staged in claude-code/plugins/repo-tasks-mcp-cc/bin/"
+
 # Build the opencode-ctl-mcp-qwen Qwen Code extension's binary into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
 build-opencode-ctl-mcp-qwen:
