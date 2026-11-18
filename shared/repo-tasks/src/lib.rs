@@ -11,4 +11,5 @@
 pub mod clock;
 pub mod error;
 pub mod host;
+pub mod model;
 pub mod resolve;

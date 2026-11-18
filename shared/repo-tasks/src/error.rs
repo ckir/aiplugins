@@ -34,4 +34,10 @@ pub enum Error {
         #[source]
         source: std::io::Error,
     },
+    #[error("the list breaks a rule: {reason}")]
+    ListInvalid { reason: String },
+    #[error(
+        "the list has format {found} but this engine knows format {newest}: update the plugin"
+    )]
+    NewerFormat { found: u64, newest: u32 },
 }
