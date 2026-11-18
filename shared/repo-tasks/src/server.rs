@@ -9,13 +9,16 @@
 //! The MCP server: four tools over the engine, the client's roots (7.1) and the start-up
 //! archiving of 8.5.
 
+use std::borrow::Cow;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
-use rmcp::model::{CallToolResult, ContentBlock, Implementation, ServerCapabilities, ServerConfig};
+use rmcp::model::{
+    CallToolResult, ContentBlock, Implementation, ProtocolVersion, ServerCapabilities, ServerConfig,
+};
 use rmcp::service::{NotificationContext, Peer};
 use rmcp::{ErrorData, RoleServer, ServerHandler, ServiceExt};
 
@@ -29,6 +32,8 @@ use crate::ops::{self, CreateArgs, GetArgs, ListHeader, UpdateArgs};
 use crate::resolve::{locate, start_dir, Entry, Env, Store};
 use crate::roots::{Action, CallGate, RootState, Settlement, ROOTS_WINDOW};
 use crate::store::Tuning;
+
+const MAX_PROTOCOL: ProtocolVersion = ProtocolVersion::V_2025_11_25;
 
 /// What a host's configuration cannot reach: the roots window, shortened by tests only.
 #[derive(Debug, Clone)]
@@ -45,11 +50,15 @@ impl Default for ServeOptions {
 }
 
 /// Serves on standard input and output until the client goes away.
+///
+/// The not-initialized guard relies on rmcp spawning the `initialized` handler before the task of
+/// the next message, which holds on a `current_thread` runtime (all four binaries use one); on a
+/// multi-thread runtime the guard could refuse a legitimate first call.
 pub async fn serve(host: Host, version: &str, env: Env) -> EResult<()> {
     serve_with(host, version, env, ServeOptions::default()).await
 }
 
-/// `serve` with the options that tests change.
+/// `serve` with the options that tests change. The runtime note on [`serve`] applies.
 pub async fn serve_with(host: Host, version: &str, env: Env, opts: ServeOptions) -> EResult<()> {
     let stopped = |e: &dyn std::fmt::Display| Error::Server {
         reason: e.to_string(),
@@ -356,6 +365,14 @@ impl RepoTasksServer {
 
 #[rmcp::tool_handler(router = self.tool_router)]
 impl ServerHandler for RepoTasksServer {
+    /// Stops at 2025-11-25, the newest revision with the `initialize` handshake. rmcp's default
+    /// also offers 2026-07-28, on which a client need not initialize and server-to-client requests
+    /// (`roots/list`) are forbidden (rmcp 3.10.0 `src/service/server.rs:62-67`); this server
+    /// refuses every call before `initialized` and asks for the roots.
+    fn supported_protocol_versions(&self) -> Cow<'static, [ProtocolVersion]> {
+        Cow::Borrowed(ProtocolVersion::known_up_to(&MAX_PROTOCOL))
+    }
+
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build()).with_server_info(
             Implementation::new("repo-tasks", self.shared.version.clone()),

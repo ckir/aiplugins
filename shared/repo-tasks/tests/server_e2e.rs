@@ -492,3 +492,146 @@ async fn startup_skipped_on_timeout_only() {
     assert_eq!(asked.load(Ordering::SeqCst), 0, "a request was sent");
     let _ = client.cancel().await;
 }
+
+/// The refusal text of a call that must have been refused, as a JSON-RPC error or a tool error.
+async fn refusal_of(client: &Client, name: &str, args: Value) -> String {
+    let params = CallToolRequestParams::new(name.to_string())
+        .with_arguments(args.as_object().cloned().unwrap_or_default());
+    match client.call_tool(params).await {
+        Err(e) => e.to_string(),
+        Ok(r) => {
+            assert_eq!(
+                r.is_error,
+                Some(true),
+                "{name} was not refused: {}",
+                text_of(&r)
+            );
+            text_of(&r)
+        }
+    }
+}
+
+#[tokio::test]
+async fn unknown_members_are_refused_and_the_list_is_untouched() {
+    let rig = Rig::new();
+    let client = connect(
+        rig.tokio_command(&rig.repo, "claude", 2000),
+        TestClient::new(Roots::Undeclared),
+    )
+    .await;
+    call(
+        &client,
+        "task_create",
+        json!({"tasks": [{"subject": "a"}, {"subject": "b"}]}),
+    )
+    .await;
+    let before = fs::read(rig.store().join("default.json")).unwrap();
+
+    let msg = refusal_of(
+        &client,
+        "task_update",
+        json!({"id": 2, "status": "completed", "blocked_by": [1]}),
+    )
+    .await;
+    assert!(msg.contains("blocked_by"), "{msg}");
+    assert_eq!(msg.trim().lines().count(), 1, "{msg}");
+
+    let msg = refusal_of(
+        &client,
+        "task_create",
+        json!({"tasks": [{"subject": "c", "blockedBy": [1]}]}),
+    )
+    .await;
+    assert!(msg.contains("blockedBy"), "{msg}");
+    assert_eq!(msg.trim().lines().count(), 1, "{msg}");
+
+    let msg = refusal_of(
+        &client,
+        "task_create",
+        json!({"tasks": [{"subject": "c"}], "extra": 1}),
+    )
+    .await;
+    assert!(msg.contains("extra"), "{msg}");
+    let msg = refusal_of(&client, "task_get", json!({"id": 1, "verbose": true})).await;
+    assert!(msg.contains("verbose"), "{msg}");
+
+    assert_eq!(fs::read(rig.store().join("default.json")).unwrap(), before);
+    let _ = client.cancel().await;
+}
+
+#[tokio::test]
+async fn the_tool_schemas_forbid_additional_properties() {
+    let rig = Rig::new();
+    let client = connect(
+        rig.tokio_command(&rig.repo, "claude", 2000),
+        TestClient::new(Roots::Undeclared),
+    )
+    .await;
+    let tools = client.list_all_tools().await.expect("list_tools");
+    for t in tools.iter().filter(|t| t.name != "task_list") {
+        let s = Value::Object((*t.input_schema).clone());
+        assert_eq!(s["additionalProperties"], json!(false), "{}: {s}", t.name);
+        if t.name == "task_create" {
+            let n = &s["$defs"]["NewTask"];
+            assert_eq!(n["additionalProperties"], json!(false), "NewTask: {s}");
+        }
+    }
+    let _ = client.cancel().await;
+}
+
+/// A client that proposes the newest protocol revision is never served on it. On `initialize`
+/// rmcp answers with the newest handshake revision the server supports (2025-11-25); a first
+/// request that skips the handshake and names 2026-07-28 in its `_meta` is refused with an
+/// unsupported-protocol-version error (without the override rmcp serves it, and the server would
+/// then have no way to ask `roots/list`).
+#[test]
+fn newer_protocol_proposal_is_not_accepted() {
+    let rig = Rig::new();
+    let mut child = rig
+        .command(&rig.repo, "claude", 2000)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn");
+    let mut stdin = child.stdin.take().unwrap();
+    let stdout = child.stdout.take().unwrap();
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+            if tx.send(line).is_err() {
+                break;
+            }
+        }
+    });
+    writeln!(
+        stdin,
+        "{}",
+        json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {"_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientCapabilities": {},
+        "io.modelcontextprotocol/clientInfo": {"name": "raw", "version": "0"}}}})
+    )
+    .unwrap();
+    stdin.flush().unwrap();
+    let reply = read_json_line(&rx);
+    assert_eq!(reply["id"], 1, "{reply}");
+    assert!(
+        reply.get("error").is_some() && reply.get("result").is_none(),
+        "{reply}"
+    );
+    // The handshake still works and settles on the older revision.
+    writeln!(
+        stdin,
+        "{}",
+        json!({"jsonrpc": "2.0", "id": 2, "method": "initialize", "params": {
+        "protocolVersion": "2026-07-28", "capabilities": {},
+        "clientInfo": {"name": "raw", "version": "0"}}})
+    )
+    .unwrap();
+    stdin.flush().unwrap();
+    let init = read_json_line(&rx);
+    assert_eq!(init["result"]["protocolVersion"], "2025-11-25", "{init}");
+    let _ = child.kill();
+    let _ = child.wait();
+}

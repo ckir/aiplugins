@@ -54,6 +54,12 @@ archive [--dir <path>]
 - `rmcp`'s `Peer::list_roots` is marked deprecated in rmcp 3.10.0
   (`src/service/server.rs:931`) because the MCP specification is deprecating roots. The engine
   uses it with `#[allow(deprecated)]`. A later rmcp that removes it needs rework of spec 7.1.
+- Protocol version. rmcp 3.10.0 would also serve protocol 2026-07-28, on which a client need not
+  send `initialize`/`initialized` and server-to-client requests are forbidden, so `list_roots`
+  errors (rmcp `src/service/server.rs:921-923`) and spec 7.1 falls back to the working directory.
+  Antigravity has no such fallback, so every call there would fail. The server therefore stops at
+  `V_2025_11_25` (`supported_protocol_versions` in `src/server.rs`); a request that names the newer
+  version is refused. That pin is the mitigation until spec 7.1 is revised.
 - Windows and macOS behaviour is `not measured` until CI has run the branch. That covers the
   canonical form of differently cased paths (`tests/windows_canonical.rs`) and the error kind of a
   refused rename or read while another process holds the file (`windows_reader_and_writer_never_fail`

@@ -22,11 +22,13 @@ use std::collections::{BTreeMap, BTreeSet};
 const MAX_CREATE: usize = 50;
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct CreateArgs {
     pub tasks: Vec<NewTask>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct NewTask {
     pub subject: String,
     pub description: Option<String>,
@@ -36,6 +38,7 @@ pub struct NewTask {
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct GetArgs {
     pub id: i64,
 }
@@ -45,6 +48,7 @@ fn status_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
 }
 
 #[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct UpdateArgs {
     pub id: i64,
     #[serde(default)]
