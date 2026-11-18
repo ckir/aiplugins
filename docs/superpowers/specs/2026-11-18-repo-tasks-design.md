@@ -316,7 +316,8 @@ When the walk in 7.2 finds no `.git` entry, the store folder is `B/repo-tasks/K/
   `$HOME/.local/share`.
 - K is the first 16 hexadecimal characters of the SHA-256 of the UTF-8 bytes of canonical D. On
   Windows the `\\?\` prefix that canonicalization adds is removed before hashing. No case
-  folding is applied.
+  folding is applied; two spellings of one directory give one K only if canonicalization returns
+  the spelling stored on disk [CLAIM, 2026-11-18, not measured; added to 15.6].
 
 The folder also holds `directory.txt` containing canonical D, so a person can tell the folders
 apart. Known limit: starting from a subdirectory of a non-git directory gives a different K and
@@ -397,8 +398,11 @@ Every change follows the same five steps:
    rename fails, the call fails, the old list stands, and the temp file is removed. One case is
    retried first: on Windows a rename over a file that a reader holds open at that moment can be
    refused [CLAIM, 2026-11-18, the author's knowledge of Windows; not measured, 15.6]. A rename
-   refused for that reason is repeated until it succeeds or the deadline of step 1 has passed.
-   `pairing.rs:329` does not retry.
+   refused for that reason is repeated for up to 5 seconds [PROPOSED, UNMEASURED], counted from
+   the first refusal and not from step 1, so that the time the lock took does not change it. Only
+   an error of kind `PermissionDenied` or a sharing violation is repeated, because Windows may
+   report this case as either [CLAIM, 2026-11-18, not measured]; every other error fails the call
+   at once. The Windows test of 8.3 records which kind appears. `pairing.rs:329` does not retry.
 5. Release the lock.
 
 ### 8.3 Reading
@@ -407,7 +411,8 @@ Every change follows the same five steps:
 step 4 means a reader sees the whole old file or the whole new file. A reader opens the file,
 reads all of it and closes it at once; on Windows it opens the file so that it may be replaced
 while open (Rust's standard library does this by default), and a read refused because the file is
-being replaced at that moment is repeated for up to one second [PROPOSED, UNMEASURED]. The tests
+being replaced at that moment (the same two error kinds as in 8.2) is repeated for up to one
+second [PROPOSED, UNMEASURED]. The tests
 that run on CI's Windows runner (15.2) include one with a writer and several readers on one list,
 in which no call may fail.
 
@@ -442,14 +447,17 @@ exactly one of `"archived_at"` or `"deleted_at"`, in the form of 8.1. It is only
 
 Moving a set of tasks to the archive, under the lock of 8.2:
 
-1. Append their lines to the archive and flush it to disk.
+1. Append their lines to the archive and flush it to disk. When the file is not empty and its
+   last byte is not a line feed (a crash left half a line), the append begins with a line feed,
+   so a new line never joins an old fragment.
 2. Rewrite the list without them (8.2, step 4), removing their ids from every remaining task's
    `blocked_by`.
 
 A crash between the two steps, or a failure of step 2, leaves a task in both files; a later move
 appends it again. The list wins: every reader of the archive ignores a line whose id is in the
-list, uses the last line for any other id, and ignores a final line that is not complete JSON.
-The archive is never cut back to undo step 1. `next_id` is unchanged by any move.
+list, uses the last line for any other id, and ignores any line that is not a complete JSON object,
+wherever it stands in the file. A damaged archive line never fails a call and is never repaired
+(8.3 governs the list file only). The archive is never cut back to undo step 1. `next_id` is unchanged by any move.
 
 A task reaches the archive in exactly three ways:
 
@@ -490,8 +498,8 @@ The server exposes four tools. Names and parameters are a contract.
 - This rule is about the id a call acts on, the `id` of `task_get` and `task_update`. Ids named as
   blockers follow 9.6 instead. When that id is not in the list, the error says which case
   applies: the id was never issued (it is below 1, or at or above `next_id`); or the task has
-  left the list; or, for `task_get` only, the task has left the list and the archive holds no
-  record of it.
+  left the list (`task_update`; `task_get` answers from the archive instead, 9.3); or, for
+  `task_get` only, the task has left the list and the archive holds no record of it.
 
 ### 9.2 `task_create`
 
@@ -564,6 +572,13 @@ or when the archive holds no line for it (9.1).
 
 - Only `id` is required; at least one other member must be present. `delete: false` counts as
   absent.
+- A call that would change nothing (for example the status it already has, or a blocker already
+  stored) still succeeds, writes nothing, and leaves `updated_at` and `updated_by` as they were.
+  A call that changes anything sets both. The test of 8.5 therefore measures real changes, and a
+  repeated no-op cannot hold off archiving [driver's call].
+- `remove_blocked_by` follows 9.6 for a blocker's number: an id below 1, or at or above
+  `next_id`, fails the call; any other id that is not among the task's stored blockers is
+  ignored. An id named in both `add_blocked_by` and `remove_blocked_by` fails the call.
 - The id must be in the list; otherwise the call fails (9.1).
 - An empty `owner` or `description` removes that member.
 - Any status may follow any status. The engine does not stop a task starting or completing while
@@ -641,8 +656,9 @@ anything fails, it prints nothing and still exits successfully: a reminder never
 a session.
 
 One failure is not silent [driver's call]. When the list file exists and cannot be used (it is
-not valid JSON, breaks a rule in 8.1, or has a newer `format`, 8.3 and 8.4), every tool call will
-fail, and an agent told nothing would not know a list exists. The reminder then prints this line
+not valid JSON, breaks a rule in 8.1, has a newer `format`, 8.3 and 8.4, or cannot be opened or
+read), or when 7.2 stops with an error on a `.git` entry that cannot be followed, every tool call
+will fail, and an agent told nothing would not know a list exists. The reminder then prints this line
 instead, and still exits successfully:
 
 ```text
@@ -668,7 +684,7 @@ D then follows the order in 7.1. Host rules [driver's call]:
 - **Antigravity never falls back to the process working directory.** Its documentation says a
   hook's working directory is the folder holding `hooks.json`, which is the plugin, not the
   workspace. With neither `REPO_TASKS_DIR` nor a `cwd` in the event, the reminder prints nothing.
-- **OpenCode's `plugin.ts` runs the binary** (as `opencode/plugins/rtk-mcp-opencode/plugin.ts`
+- **OpenCode's `plugin.ts` runs the binary** as `reminder --event opencode --workspace <path>` (as `opencode/plugins/rtk-mcp-opencode/plugin.ts`
   runs its own with `spawnSync`) and pushes whatever line comes back, in the object form the
   table gives; when nothing comes back it pushes nothing. It reminds once per session id, not
   once per plugin load, and it contains no code that parses the list.
@@ -827,6 +843,8 @@ All names in this table follow from the working name `repo-tasks` and change wit
 - Whether `CLAUDE_CODE_ENABLE_TODO_TOOLS` switches Claude Code's own tools back on.
 - Whether a rename over a file a reader holds open is refused on Windows, and how often (8.2,
   8.3). This machine cannot measure it; the CI test named in 8.3 is the measurement.
+- Whether Windows canonicalization returns one spelling for two differently cased starts of the
+  same directory (7.5); a test on CI's Windows runner decides it.
 - Every figure marked [PROPOSED, UNMEASURED].
 
 ## 16. Order of work
@@ -841,7 +859,8 @@ The plan written when this document is approved covers step 1 and nothing else.
    the workspace path; whether a compaction is signalled. Its output is a table added to section
    15. Every cell holds what was observed, with the command or log line that showed it, or the
    words `not measured` and the reason. The implementation plan is not written while a cell for
-   this machine says `not measured`.
+   this machine says `not measured`, unless the owner has accepted that cell at step 2 (for
+   example one that cannot be triggered from a script, such as a compaction).
 2. **Revision.** Any section a measurement contradicts is revised, and the revision goes to the
    owner, before step 3. If a host cannot write under `.git`, sections 7.3 and 7.6 are the ones
    to revisit, and that is the owner's decision. If a host starts its server somewhere other
@@ -925,6 +944,12 @@ The rest fill gaps the approved text left:
 22. The forms of the `task_get` reply, the satisfied-blocker line and `list --archived` (9.2, 9.3,
     section 11).
 23. A refused rename and a refused read are retried on Windows (8.2, 8.3).
+24. A call that changes nothing succeeds and leaves `updated_at` alone; `remove_blocked_by`
+    validation (9.4).
+25. An archive append starts with a line feed after a torn line; archive readers skip any
+    damaged line (8.5).
+26. The reminder's notice also covers an unreadable list file and an unfollowable `.git`
+    entry (10.1).
 
 ## 18. What done looks like
 
@@ -1081,7 +1106,32 @@ the peer returned FINDINGS-14. Each was checked against the document or the cite
 The peer named as least examined: host behaviour on Windows and macOS, and the two outside
 sources beyond the cited lines.
 
-PANEL VERDICT: round 1 complete (two solo passes and the peer); the peer's 14 findings are disposed above; a second round over these folds is owed.
+### Panel round 2, the peer (2026-11-18, same chat)
+
+Seated: Fold Auditor, Axiom Breaker, Mechanism Gamer, Dependency Cynic, Blindspot Auditor (the
+last three new), Procedure Walker. The brief is `.clavity/seams/repo-tasks-design-panel-r2.md`;
+the peer returned FINDINGS-13. It also re-read the three round 1 findings I had rejected: all
+three fell, on its reading of the lines. Each finding was checked against the document or file.
+
+| Seat | Finding (the peer's severity) | Disposition |
+|---|---|---|
+| Fold Auditor | A torn archive line fuses with the next append and is then not a final line (MATERIAL) | FOLDED: an append starts with a line feed after a torn line, and any damaged line is skipped (8.5). Its claim that readers then fail was wrong: 8.3 governs the list only, now said |
+| Fold Auditor | OpenCode's invocation omits `--event` (MINOR) | FOLDED (10.2) |
+| Fold Auditor | `task_get` can never return the "left the list" case (MINOR) | FOLDED (9.1) |
+| Fold Auditor | The rename retry deadline is what is left of the lock budget (MINOR) | FOLDED: its own 5 seconds from the first refusal (8.2) |
+| Axiom Breaker | `remove_blocked_by` has no validation rule (MATERIAL) | FOLDED (9.4) |
+| Axiom Breaker | A no-op update moves `updated_at` and holds off archiving (MATERIAL) | FOLDED: a call that changes nothing writes nothing (9.4) |
+| Mechanism Gamer | A Linux-only spike gate passes with Windows and macOS unmeasured (MATERIAL) | REJECTED as already put to the owner (17.2, item 2). A cell that cannot be measured from a script may now be accepted by the owner (16) |
+| Mechanism Gamer | One non-blocking attempt at start-up skips archiving for a long session (MINOR) | REJECTED below the floor: only housekeeping is delayed; the next start and the `archive` subcommand retry |
+| Dependency Cynic | A Windows rename over an open file may fail as `ERROR_ACCESS_DENIED`, not a sharing violation (BLOCKING) | FOLDED as MATERIAL: still an unmeasured claim; the retried error kinds are now named and the test records which appears (8.2, 8.3). Severity not accepted: nothing is built on it before the CI measurement |
+| Dependency Cynic | Differently cased Windows paths give two lists (MATERIAL) | FOLDED as an unknown: canonicalization may already return one spelling; a Windows CI test decides (7.5, 15.6). Lower-casing not adopted |
+| Dependency Cynic | No locking crate is named (MINOR) | REJECTED: `pairing.rs:427` calls `lock.lock()` on a `std::fs::File` and the file imports no locking crate |
+| Blindspot Auditor | The reminder prints nothing on a permission or `.git` failure (MATERIAL) | FOLDED: the notice of 10.1 now covers both |
+| Blindspot Auditor | A start-up archiving failure goes to standard error that nobody sees (MINOR) | REJECTED below the floor: nothing is lost, the next start retries |
+| Procedure Walker | Section 18 reached sentence 11 | no finding |
+| Question 2 | The spike gives no way to trigger a compaction (peer) | FOLDED in part: a cell the owner accepts as unmeasurable no longer blocks the plan (16); the method belongs to the spike's own plan |
+
+PANEL VERDICT: round 2 complete (the peer returned FINDINGS-13, all disposed above); a third round over these folds is owed.
 
 ## Stand-downs
 
