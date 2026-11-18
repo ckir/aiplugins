@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright 2026 AI Plugins Marketplace Contributors
+# Copyright 2026 Costas Kirgoussios
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 #
 # Source-available software. It is NOT open source.
@@ -24,4 +24,4 @@ mapfile -t files < <(printf '%s\n' "${files[@]}" \
 
 # -check only tests that a copyright/SPDX header exists; -l/-f/-c are required args, not validated.
 exec addlicense -check -f LICENSE-HEADER.tmpl -l PolyForm-Noncommercial-1.0.0 \
-  -c "AI Plugins Marketplace Contributors" "${files[@]}"
+  -c "Costas Kirgoussios" "${files[@]}"

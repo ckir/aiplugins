@@ -1,5 +1,5 @@
 <#
- Copyright 2026 AI Plugins Marketplace Contributors
+ Copyright 2026 Costas Kirgoussios
  SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 
  Source-available software. It is NOT open source.
