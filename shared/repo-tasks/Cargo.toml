@@ -16,6 +16,7 @@ name = "repo_tasks"
 dist = false
 
 [dependencies]
+schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

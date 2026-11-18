@@ -48,6 +48,8 @@ pub enum Error {
     },
     #[error("could not take the lock {} within {secs} seconds: another process holds it", path.display())]
     LockTimeout { path: PathBuf, secs: u64 },
+    #[error("{reason}")]
+    Refused { reason: String },
     #[error("refusing to write an empty list file: {}", path.display())]
     EmptyWrite { path: PathBuf },
 }

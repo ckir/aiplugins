@@ -13,5 +13,6 @@ pub mod clock;
 pub mod error;
 pub mod host;
 pub mod model;
+pub mod ops;
 pub mod resolve;
 pub mod store;
