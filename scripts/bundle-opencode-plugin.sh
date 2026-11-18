@@ -105,6 +105,11 @@ fi
 if [ -d "$plugindir/agents" ]; then
     cp -r "$plugindir/agents" "$stage/agents"
 fi
+# commands/ holds slash-command files (repo-tasks-mcp-opencode); copy it only
+# when the source has it.
+if [ -d "$plugindir/commands" ]; then
+    cp -r "$plugindir/commands" "$stage/commands"
+fi
 # Multi-file TypeScript plugins keep their imports beside the entry points
 # (todov2-opencode's plugin.ts imports ./tool/*, and tui.tsx is its second
 # entry). A single-file copy would break those imports at install time.
