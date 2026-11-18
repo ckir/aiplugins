@@ -857,8 +857,8 @@ start; the host's environment held `REPO_TASKS_DIR=/spike/dir` and `REPO_TASKS_L
 
 | Cell | Claude Code 2.1.327 | Qwen | Antigravity (agy 1.5.11) | OpenCode 2.3.0 (`--standalone`) |
 |---|---|---|---|---|
-| Server working directory | the starting directory, in all three places | not measured: `qwen` is not installed on this machine | the plugin folder (`<root>/.agents/plugins/probe`), in all three places; the inherited variable `PWD` was the starting directory | the starting directory, in all three places |
-| May the server create a folder in the git common directory | yes; `W` resolved to `R/.git` | not measured: not installed | yes (the plugin folder sat inside the repository; a plugin elsewhere was not measured) | yes; `W` resolved to `R/.git` |
+| Server working directory | the starting directory, in all three places | not measured: `qwen` is not installed on this machine | the plugin folder, in all three places: `<root>/.agents/plugins/probe` for a plugin inside the repository, `~/.gemini/config/plugins/probe` for an installed one (second test below); the inherited variable `PWD` was the starting directory only while the launching shell's `PWD` was | the starting directory, in all three places |
+| May the server create a folder in the git common directory | yes; `W` resolved to `R/.git` | not measured: not installed | yes with the plugin inside the repository (git resolved from its folder); with an installed plugin git found no repository from the server's folder, and only the probe's fixed path could be written | yes; `W` resolved to `R/.git` |
 | `REPO_TASKS_DIR` and `REPO_TASKS_LIST` reach the server | yes, both | not measured: not installed | yes, both | yes, both, with the server's own `environment` empty |
 | They reach a session-start hook | yes, both | not measured: not installed | yes, both | yes, both, in the plugin's hook process |
 | Session-start event and the workspace path | `SessionStart` with `source` `startup`, `resume`, `compact`; payload keys `session_id`, `transcript_path`, `cwd`, `hook_event_name`, `source`; `cwd` is the starting directory | not measured: not installed | `SessionStart` once per run and `PreInvocation`; payload carries `cwd` and `workspacePaths`, both the starting directory; the hook's own working directory is the plugin folder | the plugin's `context` hook, on every model call, with `sessionID`; `ctx.location.directory` is the starting directory |
@@ -874,10 +874,19 @@ Sections this contradicts or confirms:
 - 7.1, Claude Code and OpenCode: the process working directory is the starting directory; the rule
   stands. **Antigravity contradicts it**: the server starts in the plugin folder, so "the process
   working directory" is the plugin's, not the workspace's, and the server cannot find the
-  repository from it unless `REPO_TASKS_DIR` is set. The spike saw `PWD` (a variable the host
-  inherited and did not reset) equal to the starting directory; a rule that reads it is for the
-  owner to decide at step 2 (16), and it was not tested with a plugin installed outside the
-  repository. 8.5's start-up archiving resolves the list the same way and is affected the same
+  repository from it unless `REPO_TASKS_DIR` is set. A second test installed
+  the probe as a plugin (`agy plugin install`, removed afterwards; the home configuration files
+  were byte-identical before and after) and ran it from `R/sub/deep` three ways: the server's
+  working directory was `~/.gemini/config/plugins/probe`, where git found no repository;
+  `PWD` was the launching shell's value when kept, `/home/user` when the launcher set it so, and
+  absent when unset, so it is inherited and says nothing about the workspace; no variable the
+  server received named the workspace (only `PLUGIN_ROOT` and `PLUGIN_DATA` among the host's own);
+  the hook payload still carried the workspace in `cwd` and `workspacePaths` in all three. So on
+  Antigravity an installed server cannot find the repository from its process, and a rule that
+  falls back to `PWD` would work only by accident. What remains is `REPO_TASKS_DIR` set in the
+  host's environment (which is one value for all workspaces), something the server is told
+  through the protocol (whether Antigravity offers MCP `roots` was not measured), or leaving
+  Antigravity's tools without a list: for the owner at step 2 (16). 8.5's start-up archiving resolves the list the same way and is affected the same
   way; 15.6's earlier unknown about the server's directory is settled for three of the four hosts.
 - 7.3 and 7.6: confirmed for the three measured hosts: each server could create and remove a
   folder in the git common directory, from `W` as well.
