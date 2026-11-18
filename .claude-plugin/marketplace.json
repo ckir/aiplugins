@@ -111,6 +111,27 @@
         "delegate",
         "rust"
       ]
+    },
+    {
+      "name": "repo-tasks-mcp-cc",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/repo-tasks-mcp-cc-v0.1.0/repo-tasks-mcp-cc-plugin.zip"
+      },
+      "description": "A per-repository task list for Claude Code over MCP: four tools to create, list, read and update tasks that outlive the session and are shared with other agents working in the same repository.",
+      "author": {
+        "name": "AI Plugins Marketplace Contributors"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/claude-code/plugins/repo-tasks-mcp-cc",
+      "license": "PolyForm-Noncommercial-1.0.0",
+      "category": "development",
+      "keywords": [
+        "tasks",
+        "todo",
+        "mcp",
+        "repository",
+        "rust"
+      ]
     }
   ]
 }

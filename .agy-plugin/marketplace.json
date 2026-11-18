@@ -111,6 +111,27 @@
         "delegate",
         "rust"
       ]
+    },
+    {
+      "name": "repo-tasks-mcp-agy",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/repo-tasks-mcp-agy-v0.1.0/repo-tasks-mcp-agy-agy-plugin.zip"
+      },
+      "description": "An Antigravity front for repo-tasks-mcp: a task list kept per git repository, over MCP",
+      "author": {
+        "name": "AI Plugins Marketplace Contributors"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/antigravity/plugins/repo-tasks-mcp-agy",
+      "license": "PolyForm-Noncommercial-1.0.0",
+      "category": "development",
+      "keywords": [
+        "tasks",
+        "todo",
+        "mcp",
+        "repository",
+        "rust"
+      ]
     }
   ]
 }

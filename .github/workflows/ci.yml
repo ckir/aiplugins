@@ -257,12 +257,15 @@ jobs:
           just build-rtk-mcp-cc
           just build-re-ghidra-mcp-cc
           just build-opencode-ctl-mcp-cc
+          just build-repo-tasks-mcp-cc
           just build-rtk-mcp-opencode
           just build-re-ghidra-mcp-opencode
           just build-rtk-mcp-agy
           just build-re-ghidra-mcp-agy
           just build-opencode-ctl-mcp-agy
           just build-opencode-ctl-mcp-opencode
+          just build-repo-tasks-mcp-agy
+          just build-repo-tasks-mcp-opencode
 
       # Freshness: a committed document that no longer matches a fresh
       # measurement is caught here, before any threshold is consulted.

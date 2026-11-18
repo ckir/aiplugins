@@ -467,6 +467,31 @@ build-opencode-ctl-mcp-opencode:
     fi
     @echo "Plugin binary staged in opencode/plugins/opencode-ctl-mcp-opencode/bin/"
 
+# Build the repo-tasks-mcp-qwen Qwen Code extension's binary into its bin/ directory.
+# Windows developers run this locally; CI produces the other platforms.
+build-repo-tasks-mcp-qwen:
+    cargo build -p repo-tasks-mcp-qwen --release --bin repo-tasks-qwen-mcp
+    mkdir -p qwen/plugins/repo-tasks-mcp-qwen/bin
+    for b in repo-tasks-qwen-mcp; do \
+        if [ -f "target/release/$b.exe" ]; then \
+            cp "target/release/$b.exe" qwen/plugins/repo-tasks-mcp-qwen/bin/; \
+        else \
+            cp "target/release/$b" qwen/plugins/repo-tasks-mcp-qwen/bin/; \
+        fi; \
+    done
+    @echo "Plugin binaries staged in qwen/plugins/repo-tasks-mcp-qwen/bin/"
+
+# Stage repo-tasks-mcp-opencode's MCP binary (the cc front's) into its bin/ directory.
+build-repo-tasks-mcp-opencode:
+    cargo build -p repo-tasks-mcp-cc --release --bin repo-tasks-cc-mcp
+    mkdir -p opencode/plugins/repo-tasks-mcp-opencode/bin
+    if [ -f "target/release/repo-tasks-cc-mcp.exe" ]; then \
+        cp "target/release/repo-tasks-cc-mcp.exe" opencode/plugins/repo-tasks-mcp-opencode/bin/; \
+    else \
+        cp "target/release/repo-tasks-cc-mcp" opencode/plugins/repo-tasks-mcp-opencode/bin/; \
+    fi
+    @echo "Plugin binary staged in opencode/plugins/repo-tasks-mcp-opencode/bin/"
+
 # Stage rtk-mcp-opencode's MCP binary into its bin/ directory.
 build-rtk-mcp-opencode:
     cargo build -p rtk-mcp-cc --release --bin rtk-cc-mcp
@@ -514,6 +539,19 @@ build-opencode-ctl-mcp-agy:
         fi; \
     done
     @echo "Plugin binaries staged in antigravity/plugins/opencode-ctl-mcp-agy/bin/"
+
+# Build the repo-tasks-mcp-agy plugin's binary into its bin/ directory.
+build-repo-tasks-mcp-agy:
+    cargo build -p repo-tasks-mcp-agy --release --bin repo-tasks-agy-mcp
+    mkdir -p antigravity/plugins/repo-tasks-mcp-agy/bin
+    for b in repo-tasks-agy-mcp; do \
+        if [ -f "target/release/$b.exe" ]; then \
+            cp "target/release/$b.exe" antigravity/plugins/repo-tasks-mcp-agy/bin/; \
+        else \
+            cp "target/release/$b" antigravity/plugins/repo-tasks-mcp-agy/bin/; \
+        fi; \
+    done
+    @echo "Plugin binaries staged in antigravity/plugins/repo-tasks-mcp-agy/bin/"
 
 # Build the re-ghidra-mcp-agy plugin's binaries into its bin/ directory.
 build-re-ghidra-mcp-agy:

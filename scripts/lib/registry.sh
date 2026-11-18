@@ -54,11 +54,11 @@ registry_field() {
 
 if [ "${1:-}" = "--self-test" ]; then
     failures=0
-    [ "$(registry_plugins claude-code | tr '\n' ' ')" = "rtk-mcp-cc re-ghidra-mcp-cc aiplugins-devtools-cc repo-user-guide-cc opencode-ctl-mcp-cc " ] \
+    [ "$(registry_plugins claude-code | tr '\n' ' ')" = "rtk-mcp-cc re-ghidra-mcp-cc aiplugins-devtools-cc repo-user-guide-cc opencode-ctl-mcp-cc repo-tasks-mcp-cc " ] \
         || { echo "FAIL plugins claude-code"; failures=$((failures + 1)); }
-    [ "$(registry_plugins opencode | tr '\n' ' ')" = "rtk-mcp-opencode re-ghidra-mcp-opencode todov2-opencode aiplugins-devtools-opencode repo-user-guide-opencode opencode-ctl-mcp-opencode " ] \
+    [ "$(registry_plugins opencode | tr '\n' ' ')" = "rtk-mcp-opencode re-ghidra-mcp-opencode todov2-opencode aiplugins-devtools-opencode repo-user-guide-opencode opencode-ctl-mcp-opencode repo-tasks-mcp-opencode " ] \
         || { echo "FAIL plugins opencode"; failures=$((failures + 1)); }
-    [ "$(registry_plugins antigravity | tr '\n' ' ')" = "rtk-mcp-agy re-ghidra-mcp-agy aiplugins-devtools-agy repo-user-guide-agy opencode-ctl-mcp-agy " ] \
+    [ "$(registry_plugins antigravity | tr '\n' ' ')" = "rtk-mcp-agy re-ghidra-mcp-agy aiplugins-devtools-agy repo-user-guide-agy opencode-ctl-mcp-agy repo-tasks-mcp-agy " ] \
         || { echo "FAIL plugins antigravity"; failures=$((failures + 1)); }
     [ "$(registry_manifest_path qwen rtk-mcp-qwen)" = "qwen/plugins/rtk-mcp-qwen/qwen-extension.json" ] \
         || { echo "FAIL manifest path"; failures=$((failures + 1)); }
@@ -82,7 +82,7 @@ if [ "${1:-}" = "--self-test" ]; then
         || { echo "FAIL published name devtools"; failures=$((failures + 1)); }
     [ "$(registry_plugin_for_published claude-code aiplugins-devtools)" = "aiplugins-devtools-cc" ] \
         || { echo "FAIL plugin-for-published devtools"; failures=$((failures + 1)); }
-    [ "$(bash "$(dirname "${BASH_SOURCE[0]}")/../registry-plugins.sh" claude-code | tr '\n' ' ')" = "rtk-mcp-cc re-ghidra-mcp-cc aiplugins-devtools-cc repo-user-guide-cc opencode-ctl-mcp-cc " ] \
+    [ "$(bash "$(dirname "${BASH_SOURCE[0]}")/../registry-plugins.sh" claude-code | tr '\n' ' ')" = "rtk-mcp-cc re-ghidra-mcp-cc aiplugins-devtools-cc repo-user-guide-cc opencode-ctl-mcp-cc repo-tasks-mcp-cc " ] \
         || { echo "FAIL registry-plugins real"; failures=$((failures + 1)); }
     # registry-plugins.sh argument validation: usage + exit 2, and no self-test leak.
     rp="$(dirname "${BASH_SOURCE[0]}")/../registry-plugins.sh"
@@ -107,7 +107,7 @@ if [ "${1:-}" = "--self-test" ]; then
         || { echo "FAIL skills-only listed"; failures=$((failures + 1)); }
     ! registry_is_skills_only claude-code re-ghidra-mcp-cc \
         || { echo "FAIL skills-only unlisted sibling"; failures=$((failures + 1)); }
-    [ "$(REGISTRY=$scratch bash "$(dirname "${BASH_SOURCE[0]}")/../registry-plugins.sh" claude-code --exclude-skills-only | tr '\n' ' ')" = "re-ghidra-mcp-cc aiplugins-devtools-cc repo-user-guide-cc opencode-ctl-mcp-cc " ] \
+    [ "$(REGISTRY=$scratch bash "$(dirname "${BASH_SOURCE[0]}")/../registry-plugins.sh" claude-code --exclude-skills-only | tr '\n' ' ')" = "re-ghidra-mcp-cc aiplugins-devtools-cc repo-user-guide-cc opencode-ctl-mcp-cc repo-tasks-mcp-cc " ] \
         || { echo "FAIL registry-plugins exclude"; failures=$((failures + 1)); }
     REGISTRY=$real_registry
     rm -f "$scratch"
