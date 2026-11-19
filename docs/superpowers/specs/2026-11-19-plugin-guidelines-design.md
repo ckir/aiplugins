@@ -153,17 +153,22 @@ Contract:
   other check scripts do for tool output.
 - Candidates: every inline backticked span is split on whitespace and each token is judged on its own,
   so `bash scripts/gen-marketplaces.sh` checks `scripts/gen-marketplaces.sh` (measured: a whole-span rule
-  skips every command line, where the paths most likely to rot are). A token is a path candidate when it
+  skips every command line, where the paths most likely to rot are). A trailing `:<digits>` is removed
+  from the token FIRST, before anything else is decided (measured: `README.md:164` and `Justfile:360`
+  match neither the extension list nor the root list until the suffix is gone). Then a token is a path
+  candidate when it
   contains `/` (checked relative to the repository root), or has no `/` and either ends in one of the
   extensions `md`, `json`, `toml`, `sh`, `yml`, `yaml`, `lock`, `rs`, `ts`, `txt`, or is one of the
   extensionless or dotted root files `Justfile`, `LICENSE`, `LICENSE-ADDENDUM`, `.gitignore`,
-  `.gitattributes` (a bare name, checked at the root only). A trailing `:<digits>` is removed before the
-  check. Consequence for the text: a file that is not at the root is always written with its
+  `.gitattributes` (a bare name, checked at the root only). Consequence for the text: a file that is not at the root is always written with its
   repository-relative path, never by its bare name, and the extensionless list is closed: a name outside
   it is not checked.
 - What is skipped: a token containing `<`, `>`, `{`, `}` or `*`; a token that is not a repository path by
   shape, namely one containing `://`, starting with `@`, `~`, `$`, `/` or `-`, or starting with
-  `origin/` or `refs/`; and everything inside fenced code blocks (both backtick and tilde fences). Any
+  `origin/` or `refs/`; and everything inside fenced code blocks. Fences follow the CommonMark rule: a
+  fence opens on a line of at least three backticks or tildes and closes only on a line of the same
+  character that is at least as long, so a four-backtick fence can hold a three-backtick one (this
+  repository's Markdown already uses four-backtick fences, in the skill documents). Any
   other token with a `/` is asserted to be a repository path, so text such as a MIME type has to be
   written outside backticks or reworded; the skip list stays short on purpose.
 - A token that git ignores is skipped only when the shallowest ignored prefix of it has an existing
@@ -173,8 +178,9 @@ Contract:
   shallowest ignored prefix has a parent that does not exist). The root `bin/` is not ignored
   (`.gitignore` ignores `bin/` only under three plugin trees), so the text writes `<plugin dir>/bin/`,
   which the placeholder rule skips.
-- It fails, naming the file and the span, on a path that does not exist; on an unbalanced code fence
-  (an unclosed fence would otherwise silently disable the check for the rest of the file); and when any
+- It fails, naming the file, the line and the span (`file:line: ...`), on a path that does not exist; on
+  an unbalanced code fence, naming the line where the unclosed fence opened (an unclosed fence would
+  otherwise silently disable the check for the rest of the file); and when any
   one input file yields zero checked paths, so losing every path from `HACK.md` cannot hide behind the
   guidelines' count.
 
@@ -189,9 +195,18 @@ failing only when it is on the closed list; a `:<digits>` suffix handled; a path
 checked; a placeholder, a URL and a git ref skipped; an ignored path whose shallowest ignored prefix has an
 existing parent skipped (`target/release/`) and one with a missing parent failing (a misspelt plugin
 directory above `bin/`); an ignored directory written without its trailing slash; a fenced block skipped,
-tilde fences included; an unbalanced fence failing; and an input file with no paths failing.
+tilde fences and a three-backtick fence nested in a four-backtick one included; an unbalanced fence
+failing with the line where it opened; a bare root file cited with a line suffix (`README.md:164`)
+checked; and an input file with no paths failing.
 
-Wiring: the `check` recipe, a `ci.yml` step, and the `lefthook.yml` `pre-push` block. The `wiring` job
+Self-test wiring follows the neighbours (measured: five scripts take a `--selftest` flag; of those,
+`bump-opencode-plugin.sh` and `rerun-runner-failures.sh` each have a `Justfile` recipe listed in `check`
+and a `ci.yml` step): the new script takes `--selftest`, which runs the fixtures, and that has its own
+recipe in `check` and its own `ci.yml` step, separate from the run over the two documents. A self-test
+nothing runs would prove nothing.
+
+Wiring of the check itself: the `check` recipe, a `ci.yml` step, and the `lefthook.yml` `pre-push`
+block. The `wiring` job
 (`Plugin Wiring`) in `ci.yml` is the natural home, being the job that already runs the other static
 checks; the plan confirms it.
 
