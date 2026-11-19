@@ -171,6 +171,12 @@ Contract:
   repository's Markdown already uses four-backtick fences, in the skill documents). Any
   other token with a `/` is asserted to be a repository path, so text such as a MIME type has to be
   written outside backticks or reworded; the skip list stays short on purpose.
+- A token with a `..` segment (`..`, `../x`, `x/../y`, `x/..`) fails outright, and is never tested for
+  existence: it is not a path written from the repository root, and `test -e` would follow it out of the
+  repository and pass on a file that is not the repository's (measured from the repository root:
+  `test -e ../../../../../etc/passwd` succeeds, and `test -e ../aiplugins/README.md` succeeds through the
+  checkout directory's own name). Backslashes and a `.`-only token are treated the same way as any other
+  token: judged by the rules above, with no special case.
 - A token that git ignores is skipped only when the shallowest ignored prefix of it has an existing
   parent. Build output absent from a fresh clone (`target/release/` has the ignored prefix `target`,
   whose parent is the root) does not fail; a misspelt directory above an ignored `bin/` does (measured:
@@ -197,7 +203,8 @@ existing parent skipped (`target/release/`) and one with a missing parent failin
 directory above `bin/`); an ignored directory written without its trailing slash; a fenced block skipped,
 tilde fences and a three-backtick fence nested in a four-backtick one included; an unbalanced fence
 failing with the line where it opened; a bare root file cited with a line suffix (`README.md:164`)
-checked; and an input file with no paths failing.
+checked; a token with a `..` segment failing, in each of the four positions listed above, including one
+that would resolve to a file that exists; and an input file with no paths failing.
 
 Self-test wiring follows the neighbours (measured: five scripts take a `--selftest` flag; of those,
 `bump-opencode-plugin.sh` and `rerun-runner-failures.sh` each have a `Justfile` recipe listed in `check`
