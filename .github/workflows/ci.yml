@@ -152,6 +152,16 @@ jobs:
       - name: Self-test the runner-failure re-run decision
         run: bash scripts/rerun-runner-failures.sh --selftest
 
+      # mlc checks Markdown links, not paths written in backticks, so a document
+      # could name a path that no longer exists and fail nothing. This requires
+      # every path the contributor documents name to exist, and the self-test
+      # proves the check rejects each seeded defect.
+      - name: Self-test the documented-paths check
+        run: bash scripts/check-doc-paths.sh --selftest
+
+      - name: Check the paths named in the contributor documents
+        run: bash scripts/check-doc-paths.sh
+
       - name: Check antigravity wiring
         run: bash scripts/check-agy-wiring.sh
 
