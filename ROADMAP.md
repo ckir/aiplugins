@@ -59,3 +59,11 @@ Spec: `docs/specs/2026-10-18-opencode-ctl-mcp-design.md`. After execution comes 
 ## repo-tasks-mcp: overlap of todov2-opencode with OpenCode's built-in todowrite
 
 **Status:** OPEN 2026-11-18 - OpenCode 2.3.0 ships a built-in `todowrite` again as an opt-in (`{ "experimental": { "todo": true } }`, `packages/core/src/tool/plugin/todo.ts`, `CHANGELOG.md:1244` at the installed tag; spec `docs/superpowers/specs/2026-11-18-repo-tasks-design.md` 15.4), under the same tool name `opencode/plugins/todov2-opencode` registers. The repo-tasks work leaves the plugin untouched (spec 12); the owner rules whether to keep it, make it yield when the built-in is on, or retire it.
+
+## Qwen PowerShell installer rejects repo-tasks-mcp-qwen
+
+**Status:** OPEN 2026-11-19 - `scripts/install-qwen-extension.ps1` lists four names in its `ValidateSet` (lines 34 and 44) and lacks `repo-tasks-mcp-qwen`, which `scripts/install-qwen-extension.sh` lists (line 49), so `pwsh scripts/install-qwen-extension.ps1 repo-tasks-mcp-qwen` stops with "does not belong to the set" (measured with `pwsh` on Linux). Fix: add the name to both sets and to its usage text, as PR #150 did for `aiplugins-devtools-qwen`. Found while writing the plugin-guidelines plan.
+
+## just links fails where repo-tasks-mcp-opencode dependencies are installed
+
+**Status:** OPEN 2026-11-19 - the `links` recipe in the `Justfile` passes `mlc` an `--ignore-path` list that omits `./opencode/plugins/repo-tasks-mcp-opencode/node_modules`, which the lefthook pre-push `mlc` line lists. With that folder present `just links` exits 1 and prints 7900 lines, 7244 of them from it (measured 2026-11-19), and `links` is part of `just check`. Fix: add the path to the recipe. Found while measuring baselines for the plugin-guidelines plan.
