@@ -839,9 +839,12 @@ A **new family** also needs the release plumbing, because tags for crate-less pl
 Rust release workflow: add the tag pattern `'<family>-*-v*'` to `.github/workflows/skills-bundles.yml`, add
 `'!<family>-*-v*'` after the positive patterns in `.github/workflows/release.yml` and
 `.github/workflows/opencode-bundles.yml`, and add the same exclusion to the list in
-`scripts/check-skills-release-wiring.sh`, which is hardcoded. Nothing fails if you skip the workflow edits:
-that check knows only the two existing families, so extending its list is what makes it verify yours. A new
-host's plugin in an existing family needs none of this: the family's patterns already match.
+`scripts/check-skills-release-wiring.sh`, which is hardcoded. That script reads every `skillsOnly` key of
+`agents.json`, so `just skills-release-wiring` fails when `.github/workflows/skills-bundles.yml` does not select
+your plugin's tag or `.github/workflows/release.yml` does not exclude it. It verifies the exclusion in
+`.github/workflows/opencode-bundles.yml` only for the families in its hardcoded list, so extending that list is
+what makes it verify yours. A new host's plugin in an existing
+family needs none of this: the family's patterns already match.
 
 Verification status: not yet walked through.
 
@@ -947,7 +950,7 @@ Releases, tag handling, the footprint override and marketplace URL regeneration 
 maintainer procedure: see `HACK.md`.
 `````
 
-- [ ] **Step 2b: Byte-identity check.** The file ends with exactly one newline. `sha256sum docs/PLUGIN_GUIDELINES.md` must print `3eccb96d071002bf832f4aab6da400b169aac439f1706bfb5f1cca3fea9cd085`. If it does not, `diff` against the block above and fix the transcription.
+- [ ] **Step 2b: Byte-identity check.** The file ends with exactly one newline. `sha256sum docs/PLUGIN_GUIDELINES.md` must print `c9d7ad410f6b265b6339ef253251a432b343614c01e48c18d2d0b9994d0af063`. If it does not, `diff` against the block above and fix the transcription.
 
 - [ ] **Step 3: Edit `README.md`** (two edits).
 
@@ -1115,7 +1118,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 **Interfaces:** Consumes the committed document (Task 4) and the wired check (Task 5). Produces a list of gaps, the fixed document, and the final `Verification status:` lines.
 
-- [ ] **Step 1: Record state.** `git rev-parse HEAD` (note it as `BASE`), `git status --short` empty. Record the long-running dependency: the document's footprint row needs the plugin binaries built first; building them takes several minutes on this machine and is expected.
+- [ ] **Step 1: Record state.** `git rev-parse HEAD` (note it as `BASE`), `git status --short` empty. Record the long-running dependency: the document's footprint row needs the plugin binaries built first. Measure what is already staged with `ls claude-code/plugins/*/bin antigravity/plugins/*/bin opencode/plugins/*/bin 2>/dev/null` and note which plugins lack a binary; walkthrough A's brief caps the whole footprint step at 40 minutes, so a missing binary costs at most that.
 
 - [ ] **Step 2: Dispatch walkthrough A (kind B, a skills-only plugin on a Cargo host, in a NEW family, which exercises the hardest rows).** Fresh Sonnet subagent, foreground, with exactly this brief:
 
@@ -1123,9 +1126,11 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 >
 > Read `docs/PLUGIN_GUIDELINES.md` and nothing else in `docs/`. Your task: add one throwaway skills-only plugin for Claude Code named `zz-oracle-cc`, in a new family `zz-oracle`, with a single skill `zz-oracle-skill` whose `SKILL.md` has valid frontmatter and two lines of body. Do exactly what the document tells you for that kind, in the order it gives, and use ONLY the document for knowledge of what to change; do not use any prior knowledge of this repository's layout.
 >
-> After the edits, run the gates the document names for what you changed (including the ones in its section 5), except `just check` as a whole. Run `just footprint-regen` only after building the binaries the document says to build first; run it in the background and wait.
+> After the edits, run the gates the document names for what you changed (including the ones in its section 5), except `just check` as a whole. Run `just footprint-regen` only after building the binaries the document says to build first. Budget: if a staged binary already exists under `<plugin folder>/bin/` for a plugin, do not rebuild it; run each long command in the background and wait; if the builds and the footprint run have not finished within 40 minutes of wall-clock time, stop, leave them unfinished, and report `footprint run: not completed` under part (6) with the last output line. An unfinished footprint run is an acceptable result; a hung one is not.
 >
 > Report in this exact shape: (1) a numbered list of every file you created or changed, each tagged `DOC` if the document named it or `GATE` if you had to change it because a gate or error told you to; (2) for every `GATE` item, the command, the exact failing output line, and what you changed; (3) every command you ran that the document did not name; (4) every sentence of the document that was wrong, ambiguous, or that you could not do as written, quoted; (5) the final result of every gate you ran, with its exit code; (6) the gates you could not run and why. Do not summarise away failures. Do not fix the document.
+
+- [ ] **Step 2b: Driver check between the walkthroughs.** Run `git branch --show-current` (expect `scratch/oracle-skills-only`), `git branch --list scratch/oracle-skills-only` (expect one line), `git ls-files claude-code/plugins/zz-oracle-cc | head -3` (expect at least one tracked file) and `git status --short` (expect no output). If agent A returned an error, or the tree is not clean, do not dispatch B: read what A reported, then on `scratch/oracle-skills-only` run `git status --short`; commit whatever is there with `git add -A && git commit -m "oracle: leftovers"` (this branch is thrown away in Step 7, and the commit leaves the tree clean for B). If A did not create the plugin at all, record that as a gap in the document (the brief or a row failed it) and still continue with B.
 
 - [ ] **Step 3: Dispatch walkthrough B (kind A, a Rust front, no-build gates only).** After A has returned and its branch exists, a second fresh Sonnet subagent with this brief:
 
@@ -1142,7 +1147,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
   2. Remove the `zz-oracle` line from `docs/site/families.txt`; run `just site-check`. The document says `scripts/check-site.sh` fails on a family-set difference.
   3. Remove the `zz-oracle-cc` row from `scripts/check-package-versions.sh`; run `bash scripts/check-package-versions.sh`. The document says nothing fails.
 
-- [ ] **Step 5: Judge and fix.** First run `git checkout -- .` (restore the last spot-check), then `git switch docs/plugin-guidelines` and confirm with `git branch --show-current`; the document fixes must be committed here, never on a scratch branch, which Step 7 deletes. For every item in the two reports under (1) `GATE`, (3) and (4), and for any spot-check whose result differs from the document, decide: the document is wrong or incomplete (fix it), or the agent erred (note why). Edit `docs/PLUGIN_GUIDELINES.md` only. For each wording that a spot-check measured, replace the unmeasured wording with the measured one. Then replace the two lines `Verification status: not yet walked through.` (kinds A and B) with the truth, in this form and no other claims:
+- [ ] **Step 5: Judge and fix.** First run `git checkout -- .` (restore the last spot-check), then `git switch docs/plugin-guidelines` and confirm with `git branch --show-current`; the document fixes must be committed here, never on a scratch branch, which Step 7 deletes. For every item in the two reports under (1) `GATE`, (3) and (4), every non-zero exit in (5), every gate listed in (6) except those a brief told the agent not to run, and for any spot-check whose result differs from the document, decide: the document is wrong or incomplete (fix it), or the agent erred (note why). Edit `docs/PLUGIN_GUIDELINES.md` only. For each wording that a spot-check measured, replace the unmeasured wording with the measured one. Then replace the two lines `Verification status: not yet walked through.` (kinds A and B) with the truth, in this form and no other claims:
   - kind A: `Verification status: checked by a walkthrough of the gates that need no build; the footprint probe, the bundle smoke and the binary build were not run.`
   - kind B: `Verification status: checked by a walkthrough, including the footprint run and the release-plumbing rows for a new family.` (Adjust to what was actually run; if the footprint run or a row was not run, say that instead.)
 
