@@ -33,7 +33,7 @@ impl Tmp {
             N.fetch_add(1, Ordering::SeqCst)
         ));
         fs::create_dir_all(&p).unwrap();
-        Tmp(fs::canonicalize(&p).unwrap())
+        Tmp(repo_tasks::resolve::canonical(&p).unwrap())
     }
 
     /// A directory that looks like a git repository to the engine (a `.git` with a `HEAD`).

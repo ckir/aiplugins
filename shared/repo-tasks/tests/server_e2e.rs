@@ -44,7 +44,7 @@ impl Tmp {
             std::process::id(),
             N.fetch_add(1, Ordering::SeqCst)
         ));
-        let p = fs::canonicalize({
+        let p = repo_tasks::resolve::canonical({
             fs::create_dir_all(&p).unwrap();
             &p
         })
@@ -174,7 +174,12 @@ async fn connect(cmd: tokio::process::Command, client: TestClient) -> Client {
 }
 
 fn file_uri(p: &Path) -> String {
-    format!("file://{}", p.display())
+    // RFC 8089: on Windows `C:\x\y` is `file:///C:/x/y`.
+    if cfg!(windows) {
+        format!("file:///{}", p.display().to_string().replace('\\', "/"))
+    } else {
+        format!("file://{}", p.display())
+    }
 }
 
 async fn call_raw(client: &Client, name: &str, args: Value) -> CallToolResult {

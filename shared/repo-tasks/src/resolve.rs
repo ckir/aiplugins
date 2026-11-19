@@ -189,7 +189,9 @@ fn strip_verbatim(p: PathBuf) -> PathBuf {
     p
 }
 
-fn canonical(p: &Path) -> io::Result<PathBuf> {
+/// The canonical form of `p`, without the Windows `\\?\` prefix. Public so tests build
+/// their expectations from the same spelling the engine uses.
+pub fn canonical(p: &Path) -> io::Result<PathBuf> {
     fs::canonicalize(p).map(strip_verbatim)
 }
 
@@ -584,6 +586,8 @@ mod tests {
         let base = std::env::temp_dir();
         let mut env = Env {
             home: Some(base.clone()),
+            xdg_data_home: Some(base.clone()),
+            local_app_data: Some(base.clone()),
             repo_tasks_list: Some(ok64.clone()),
             ..Env::default()
         };

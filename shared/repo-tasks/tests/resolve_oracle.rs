@@ -24,7 +24,7 @@ impl Tmp {
         let p = std::env::temp_dir().join(format!("repo-tasks-oracle-{}-{n}", std::process::id()));
         let _ = fs::remove_dir_all(&p);
         fs::create_dir_all(&p).unwrap();
-        Tmp(fs::canonicalize(p).unwrap())
+        Tmp(repo_tasks::resolve::canonical(&p).unwrap())
     }
 }
 
@@ -181,7 +181,18 @@ fn oracle_matches_git_for_each_case() {
     git_ok(&bare, &["init", "-q", "--bare"]);
     let s = locate(&bare, &env_for(&base)).unwrap();
     assert_eq!(s.common_dir, None);
-    assert!(s.dir.starts_with(base.join("data").join("repo-tasks")));
+    // The per-user data folder: `$HOME/Library/Application Support` on macOS (the env's
+    // `home`), the `data` folder given as XDG_DATA_HOME / LOCALAPPDATA elsewhere.
+    let data_root = if cfg!(target_os = "macos") {
+        base.join("Library").join("Application Support")
+    } else {
+        base.join("data")
+    };
+    assert!(
+        s.dir.starts_with(data_root.join("repo-tasks")),
+        "{:?}",
+        s.dir
+    );
 
     // Outside any repository.
     let plain = base.join("plain");

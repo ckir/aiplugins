@@ -171,7 +171,7 @@ async fn call(client: &Client, name: &str, args: Value) -> String {
 async fn acceptance_section_18() {
     let base = std::env::temp_dir().join(format!("repo-tasks-accept-{}", std::process::id()));
     fs::create_dir_all(&base).unwrap();
-    let base = fs::canonicalize(&base).unwrap();
+    let base = repo_tasks::resolve::canonical(&base).unwrap();
     let _tmp = Tmp(base.clone());
     let home = base.join("home");
     let main = base.join("main");

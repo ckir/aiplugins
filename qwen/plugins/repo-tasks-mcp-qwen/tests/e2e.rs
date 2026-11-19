@@ -216,7 +216,10 @@ fn extension_manifest_declares_three_sources() {
 #[test]
 fn repo_tasks_command_runs_list() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("commands/repo-tasks.md");
-    let text = fs::read_to_string(path).expect("commands/repo-tasks.md");
+    // A Windows checkout may use CRLF line endings.
+    let text = fs::read_to_string(path)
+        .expect("commands/repo-tasks.md")
+        .replace("\r\n", "\n");
     assert!(text.len() < 400, "{} bytes", text.len());
     assert!(text.starts_with("---\ndescription: "), "{text}");
     // Qwen Code does not substitute `${extensionPath}` in a command body (FileCommandLoader has no

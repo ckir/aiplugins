@@ -17,6 +17,10 @@ import plugin from "../plugin.ts";
 const root = join(import.meta.dir, "..");
 const LINE = "repo-tasks: 2 open tasks in .repo-tasks/tasks.json; use task_list.";
 
+// The fake binary is a `#!/bin/sh` script: Windows cannot spawn it. The real binary on
+// Windows is exercised by the Rust tests; these hook-wiring tests run on Linux and macOS.
+const unix = process.platform === "win32" ? test.skip : test;
+
 type Handler = (event: Record<string, unknown>) => void;
 let dir: string;
 let savedBin: string | undefined;
@@ -56,7 +60,7 @@ async function load(directory = "/work/space") {
 }
 
 describe("hooks", () => {
-  test("pushes_once_per_session", async () => {
+  unix("pushes_once_per_session", async () => {
     fakeBinary(LINE);
     const h = await load();
     const a1 = { sessionID: "s1", system: [] as unknown[] };
@@ -70,7 +74,7 @@ describe("hooks", () => {
     expect(b1.system).toHaveLength(1);
   });
 
-  test("pushes_object_form", async () => {
+  unix("pushes_object_form", async () => {
     fakeBinary(LINE);
     const h = await load();
     const e = { sessionID: "s1", system: [] as unknown[] };
@@ -78,7 +82,7 @@ describe("hooks", () => {
     expect(e.system).toEqual([{ type: "text", text: LINE }]);
   });
 
-  test("silent_when_no_line", async () => {
+  unix("silent_when_no_line", async () => {
     fakeBinary("");
     const h = await load();
     const e = { sessionID: "s1", system: [] as unknown[] };
@@ -89,7 +93,7 @@ describe("hooks", () => {
     expect(c.system).toHaveLength(0);
   });
 
-  test("silent_when_system_not_array", async () => {
+  unix("silent_when_system_not_array", async () => {
     fakeBinary(LINE);
     const h = await load();
     expect(() => h.context!({ sessionID: "s1" })).not.toThrow();
@@ -98,7 +102,7 @@ describe("hooks", () => {
     expect(() => h.compaction!({ system: null })).not.toThrow();
   });
 
-  test("compaction_pushes", async () => {
+  unix("compaction_pushes", async () => {
     fakeBinary(LINE);
     const h = await load();
     const first = { sessionID: "s1", system: [] as unknown[] };
@@ -117,7 +121,7 @@ describe("hooks", () => {
     expect(e.system).toHaveLength(0);
   });
 
-  test("passes_workspace_and_event_arguments", async () => {
+  unix("passes_workspace_and_event_arguments", async () => {
     const f = fakeBinary(LINE);
     const h = await load("/some/work dir");
     h.context!({ sessionID: "s1", system: [] });
