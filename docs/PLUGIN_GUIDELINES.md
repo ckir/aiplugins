@@ -59,12 +59,18 @@ skip it. "Nothing fails" is stated where it is true, because those are the rows 
 | `.claude-plugin/marketplace.json`, `.qwen-plugin/marketplace.json`, `.agy-plugin/marketplace.json`, `.opencode-plugin/marketplace.json` | Run `bash scripts/gen-marketplaces.sh`. | yes | `bash scripts/gen-marketplaces.sh --check`, the CI step "Check generated marketplaces are current". |
 | `release-please-config.json` | Run `bash scripts/gen-release-please-packages.sh`; it rewrites only the `packages` table. | yes | `bash scripts/gen-release-please-packages.sh --check`, a CI step. |
 | `.release-please-manifest.json` | Add the key `<host folder>/<plugin folder>` with the value `"0.1.0"`. | no | `scripts/check-release-manifest.sh` compares the keys with the registry. It never checks the values. |
-| `scripts/check-package-versions.sh` | Add a row to the table of plugin, crate or manifest, host manifest and version field. A plugin with no crate names its manifest twice. | no | Nothing: a plugin missing from the table is not checked. |
+| `scripts/check-package-versions.sh` | Add a string to the `for spec in` list, in the form `<plugin folder>|<crate or manifest>|<host manifest>|.version`, each path from the repository root. A plugin with no crate names its host manifest twice. | no | Nothing: a plugin missing from the list is not checked. |
 | `docs/site/families.txt` | Add your family, one per line, sorted, if it is new. | no | `just site-check`: `scripts/check-site.sh` fails when the catalog's families and this file differ. |
-| `docs/footprints/<plugin>.json`, `docs/footprints/budgets.json` | Build the plugin binaries first (the build list in `.github/workflows/footprint-freshness.yml` is the full set), then run `just footprint-regen`. It measures every plugin of Claude Code, OpenCode and Antigravity, ratchets the budgets, and rewrites the README footprint regions. Qwen plugins are outside this gate. | yes | `just footprint` and the CI job "Plugin Footprint": stale or untracked footprint documents. |
+| `docs/footprints/<plugin>.json`, `docs/footprints/budgets.json` | Build the plugin binaries first (the build list in `.github/workflows/footprint-freshness.yml` is the full set), then run `just footprint-regen`. It measures every plugin of Claude Code, OpenCode and Antigravity, ratchets the budgets, and rewrites the README footprint regions. A skills-only plugin has no binary of its own to build, but the run still measures the others, so their binaries must be staged. Commit the regenerated files before you run `just footprint`: it fails on a footprint document that is not committed. Qwen plugins are outside this gate. | yes | `just footprint` and the CI job "Plugin Footprint": stale or untracked footprint documents. |
 | The plugin's own `README.md` | Add the marker pair `<!-- footprint:begin -->` and `<!-- footprint:end -->` once, by hand, where the figure goes. The root `README.md` carries the same pair for the comparison table. | region: yes | `just footprint-regen` stops with an error naming the file. |
 | `README.md` | Add the plugin to the documentation index under its host's heading. | no | Nothing checks it. |
-| `QWEN.md` | Add the plugin to the tables that list plugins and their folders. | no | Nothing checks it. |
+| `QWEN.md` | Rust fronts only: the table under "Agent Plugins" has one column per plugin family and one row per host; add a column for your family with the folder in each host's row it exists for. The table lists no skills-only plugin, so kinds B and D skip this row. | no | Nothing checks it. |
+
+**The host manifest.** It needs `name`, `version` (semantic) and `description`. The marketplace generator also
+reads `license`, `author.name` and `keywords` when they are present; copy the exemplar's manifest. `name` is the
+published name: the folder name, unless `publishedNames` in `agents.json` maps the folder to another one (the
+manifest of `claude-code/plugins/repo-user-guide-cc/` says `repo-user-guide`). A **family** is the plugin's
+name without the host suffix, such as `repo-tasks-mcp` for `repo-tasks-mcp-cc`.
 
 Release tags are never pushed by hand; see `HACK.md`.
 
@@ -81,8 +87,10 @@ Release tags are never pushed by hand; see `HACK.md`.
 
 | File | What to do | Generated | What fails if you skip it |
 |---|---|---|---|
-| `Cargo.lock` | Commit the change `cargo` makes when the crate joins the workspace. | yes | Nothing: no build here passes `--locked`, so the next contributor's build rewrites it. |
+| `Cargo.lock` | Run `cargo metadata --format-version 1 > /dev/null`; it adds the crate to `Cargo.lock`. Commit that change. | yes | Nothing: no build here passes `--locked`, so the next contributor's build rewrites it. |
 | `scripts/check-package-versions.sh` | As in 3.1, and add the crate's `Cargo.toml` to the list of crates that must not inherit the workspace version. | no | Nothing: the list is hardcoded. |
+| `<plugin folder>/.gitignore` | Claude Code and Antigravity: a file holding the line `/bin/`, with the leading slash, so that the binary sources inside the crate stay tracked; copy `claude-code/plugins/repo-tasks-mcp-cc/.gitignore`. The root `.gitignore` already covers the Qwen and OpenCode staging folders. | no | Nothing: a built binary shows as untracked. |
+| `Cargo.toml` release metadata | Copy the exemplar's `[package.metadata.release]`, which rewrites the version in the host manifest in the same commit as a crate version bump, and `[package.metadata.dist.binaries]`. | no | Nothing in this repository checks either. |
 | `Justfile` | Add a `build-<plugin>` recipe that builds the binary and stages it into `<plugin folder>/bin/`; copy the one for `claude-code/plugins/repo-tasks-mcp-cc/`. | no | Nothing by itself; the next two rows depend on it. |
 | `.github/workflows/ci.yml`, `.github/workflows/footprint-freshness.yml` | Add `just build-<plugin>` to the build list in each: the "Build plugin binaries" step of the footprint job, and the "Regenerate and upsert correction branch" step. | no | The footprint run cannot start the plugin's server and refuses to publish a figure for it. |
 | Hooks and MCP configs | Every binary named in `<plugin folder>/hooks/hooks.json` or `<plugin folder>/.mcp.json` must be a `[[bin]]` target. | no | `scripts/check-plugin-wiring.sh`. |
@@ -92,7 +100,7 @@ Release tags are never pushed by hand; see `HACK.md`.
 Mark Windows and macOS as `not measured` in the plugin's README unless you ran it there, as
 `claude-code/plugins/repo-tasks-mcp-cc/README.md` does.
 
-Verification status: not yet walked through.
+Verification status: checked by a walkthrough of the gates that need no build; the footprint probe, the bundle smoke and the binary build were not run.
 
 ### 3.3 Kind B: skills-only on a Cargo host
 
@@ -109,7 +117,7 @@ There is no `Cargo.toml` and no folder of binaries.
 |---|---|---|---|
 | `Cargo.toml` | Add the folder to the `exclude` array: the workspace members are globs and a folder with no crate must be listed. | no | Cargo cannot load the workspace. |
 | `scripts/check-skills-bundles.sh` | Add a `<host id>:<plugin>` line to the `pairs` list. | no | Nothing: the bundle is not built or checked. |
-| The bundle itself | `scripts/bundle-skills-plugin.sh` builds the zip and rejects it without the manifest, `README.md`, a `skills/*/SKILL.md`, `LICENSE`, or if it holds a folder of binaries. Skills adapted from upstream must ship `skills/<skill>/THIRD-PARTY-NOTICE.md`; the exemption for this repository's own skills is hardcoded to the `repo-user-guide-` prefix. | no | `just skills-bundles`. The script refuses to run from a Windows shell; use WSL, Linux or macOS. |
+| The bundle itself | `scripts/bundle-skills-plugin.sh` builds the zip and rejects it without the manifest, `README.md`, a `skills/*/SKILL.md`, or if it holds a folder of binaries. It copies the repository's `LICENSE` in itself, so the plugin folder needs none. A plugin must ship `skills/<skill>/THIRD-PARTY-NOTICE.md`; the exemption for this repository's own skills is hardcoded to the `repo-user-guide-` prefix. For a skill of your own, add a notice that says it carries no third-party material, or widen that exemption in the script. | no | `just skills-bundles`, which prints only `bundler failed`. To see what is missing, run `bash scripts/bundle-skills-plugin.sh <host id> <plugin> <scratch dir>`. The script refuses to run from a Windows shell; use WSL, Linux or macOS. |
 | `scripts/check-package-versions.sh` | As in 3.1, with the manifest named twice. | no | Nothing. |
 
 A **new family** also needs the release plumbing, because tags for crate-less plugins must not reach the
@@ -123,7 +131,7 @@ your plugin's tag or `.github/workflows/release.yml` does not exclude it. It ver
 what makes it verify yours. A new host's plugin in an existing
 family needs none of this: the family's patterns already match.
 
-Verification status: not yet walked through.
+Verification status: checked by a walkthrough, including the footprint run and the release-plumbing rows for a new family.
 
 ### 3.4 Kind C: an OpenCode plugin
 
@@ -199,7 +207,7 @@ Verification status: checked by reading only.
   for a measurement correction is in `HACK.md`.
 - **The plugin README.** Say what the plugin does in the first paragraph, carry the footprint region, give
   the install line, and mark anything you did not run on a host as `not measured`. Copy the headings of the
-  exemplar for your kind.
+  exemplar's own `README.md` (the exemplar for your kind is in section 2).
 - **Generated files.** Never edit these by hand; run the command: the four marketplace manifests
   (`bash scripts/gen-marketplaces.sh`), the `packages` table in `release-please-config.json`
   (`bash scripts/gen-release-please-packages.sh`), everything under `docs/footprints/` and the footprint
@@ -220,8 +228,10 @@ Run the checks that cover what you touched; `just check` runs all of them and ne
 | Skills-only plugins | `just skills-bundles`, `just skills-release-wiring` |
 | Footprint or budgets | `just footprint-regen`, then `just footprint` and `just footprint-budgets` |
 | The catalog or families | `just site-check` |
-| Documents | `just links`, `just spellcheck`, `bash scripts/check-doc-paths.sh` |
+| Documents | `just links` (see below), `just spellcheck`, `bash scripts/check-doc-paths.sh` |
 | Anything | `just check` |
+
+`just links` exits 1 wherever the dependencies of `opencode/plugins/repo-tasks-mcp-opencode/` are installed, because its ignore list omits that `node_modules` folder; that is an existing defect, not yours. Run the `mlc` command from the `pre-push` block of `lefthook.yml` instead.
 
 Releases, tag handling, the footprint override and marketplace URL regeneration after a release are
 maintainer procedure: see `HACK.md`.
