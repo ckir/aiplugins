@@ -606,4 +606,36 @@ mod tests {
             assert_eq!(locate(&base, &env).unwrap().list, "default");
         }
     }
+
+    /// 7.5: outside git, with `XDG_DATA_HOME` unset or empty, B is `$HOME/.local/share`.
+    #[test]
+    #[cfg(all(unix, not(target_os = "macos")))]
+    fn outside_git_falls_back_to_local_share_when_xdg_data_home_unset_or_empty() {
+        let base = std::env::temp_dir();
+        let home = base.join("repo-tasks-fallback-home");
+        let want = home
+            .join(".local/share/repo-tasks")
+            .join(store_key(&canonical(&base).unwrap()));
+        for xdg in [None, Some(PathBuf::new())] {
+            let env = Env {
+                home: Some(home.clone()),
+                xdg_data_home: xdg.clone(),
+                ..Env::default()
+            };
+            let s = locate(&base, &env).expect("locate");
+            assert!(s.common_dir.is_none(), "temp dir must be outside git");
+            assert_eq!(s.dir, want, "xdg_data_home = {xdg:?}");
+        }
+        // Control: a set XDG_DATA_HOME wins over HOME.
+        let env = Env {
+            home: Some(home),
+            xdg_data_home: Some(base.join("xdg")),
+            ..Env::default()
+        };
+        assert_eq!(
+            locate(&base, &env).unwrap().dir,
+            base.join("xdg/repo-tasks")
+                .join(store_key(&canonical(&base).unwrap()))
+        );
+    }
 }

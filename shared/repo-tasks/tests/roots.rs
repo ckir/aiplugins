@@ -118,6 +118,30 @@ fn refresh_reply_used_when_earlier_request_never_answered() {
     assert_eq!(root(&s), Some(PathBuf::from("/b")));
 }
 
+/// 7.1: only the last 16 unanswered requests are kept for matching late replies. With 17
+/// refreshes timed out, the oldest is forgotten (its late reply is ignored) and the next
+/// oldest is still matched (its late reply is used).
+#[test]
+fn only_the_last_sixteen_outstanding_requests_are_matched() {
+    let t0 = Instant::now();
+    let mut s = state(true);
+    let q0 = seq(s.on_initialized(t0));
+    s.on_reply(q0, uris(&["file:///a"]), ms(t0, 100));
+    go(&mut s, ms(t0, 200));
+    assert_eq!(root(&s), Some(PathBuf::from("/a")));
+    // Each refresh times out (3000 ms apart, window 2000 ms) and is never answered.
+    let qs: Vec<u64> = (0..17)
+        .map(|i| seq(s.on_list_changed(ms(t0, 1000 + i * 3000))))
+        .collect();
+    let late = ms(t0, 100_000);
+    // The oldest of the 17 was evicted: its reply is unknown and changes nothing.
+    s.on_reply(qs[0], uris(&["file:///b"]), late);
+    assert_eq!(root(&s), Some(PathBuf::from("/a")));
+    // The second oldest is the 16th kept: its late reply is used.
+    s.on_reply(qs[1], uris(&["file:///b"]), late);
+    assert_eq!(root(&s), Some(PathBuf::from("/b")));
+}
+
 #[test]
 fn remembered_refresh_sent_when_a_call_settles_the_timeout() {
     let t0 = Instant::now();
