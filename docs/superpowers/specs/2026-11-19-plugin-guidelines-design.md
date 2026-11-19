@@ -1,6 +1,9 @@
 # Plugin guidelines: keeping the README's promise
 
-Status: design approved by the owner on 2026-11-19; spec awaiting owner review. No plan yet.
+Status: design approved by the owner on 2026-11-19; spec awaiting owner review. No plan yet. Adversarial
+panel (the agy peer, four rounds; findings 7, 4, 1, then a clean round) concluded 2026-11-19; the panel
+reads a document and does not run code, so the path check's contract is still unproven until its
+self-test exists.
 
 ## 1. Problem
 
@@ -61,7 +64,7 @@ counter-turn was held and the result is recorded.
 
 New:
 - `docs/PLUGIN_GUIDELINES.md`.
-- `scripts/check-doc-paths.sh`, and a self-test for it (section 7).
+- `scripts/check-doc-paths.sh`, which also carries its own `--selftest` mode (section 7).
 
 Edited:
 - `README.md`: the promise line becomes links to the guidelines and `HACK.md`; the documentation index gains
@@ -156,21 +159,20 @@ Contract:
   skips every command line, where the paths most likely to rot are). A trailing `:<digits>` is removed
   from the token FIRST, before anything else is decided (measured: `README.md:164` and `Justfile:360`
   match neither the extension list nor the root list until the suffix is gone). Then a token is a path
-  candidate when it
-  contains `/` (checked relative to the repository root), or has no `/` and either ends in one of the
-  extensions `md`, `json`, `toml`, `sh`, `yml`, `yaml`, `lock`, `rs`, `ts`, `txt`, or is one of the
-  extensionless or dotted root files `Justfile`, `LICENSE`, `LICENSE-ADDENDUM`, `.gitignore`,
-  `.gitattributes` (a bare name, checked at the root only). Consequence for the text: a file that is not at the root is always written with its
-  repository-relative path, never by its bare name, and the extensionless list is closed: a name outside
-  it is not checked.
+  candidate when it contains `/` (checked relative to the repository root), or has no `/` and either ends
+  in one of the extensions `md`, `json`, `toml`, `sh`, `yml`, `yaml`, `lock`, `rs`, `ts`, `txt`, or is one
+  of the extensionless or dotted root files `Justfile`, `LICENSE`, `LICENSE-ADDENDUM`, `.gitignore`,
+  `.gitattributes` (a bare name, checked at the root only). Consequence for the text: a file that is not
+  at the root is always written with its repository-relative path, never by its bare name, and the
+  extensionless list is closed: a name outside it is not checked.
 - What is skipped: a token containing `<`, `>`, `{`, `}` or `*`; a token that is not a repository path by
   shape, namely one containing `://`, starting with `@`, `~`, `$`, `/` or `-`, or starting with
   `origin/` or `refs/`; and everything inside fenced code blocks. Fences follow the CommonMark rule: a
   fence opens on a line of at least three backticks or tildes and closes only on a line of the same
   character that is at least as long, so a four-backtick fence can hold a three-backtick one (this
-  repository's Markdown already uses four-backtick fences, in the skill documents). Any
-  other token with a `/` is asserted to be a repository path, so text such as a MIME type has to be
-  written outside backticks or reworded; the skip list stays short on purpose.
+  repository's Markdown already uses four-backtick fences, in the skill documents). Any other token with
+  a `/` is asserted to be a repository path, so text such as a MIME type has to be written outside
+  backticks or reworded; the skip list stays short on purpose.
 - A token with a `..` segment (`..`, `../x`, `x/../y`, `x/..`) fails outright, and is never tested for
   existence: it is not a path written from the repository root, and `test -e` would follow it out of the
   repository and pass on a file that is not the repository's (measured from the repository root:
@@ -186,9 +188,8 @@ Contract:
   which the placeholder rule skips.
 - It fails, naming the file, the line and the span (`file:line: ...`), on a path that does not exist; on
   an unbalanced code fence, naming the line where the unclosed fence opened (an unclosed fence would
-  otherwise silently disable the check for the rest of the file); and when any
-  one input file yields zero checked paths, so losing every path from `HACK.md` cannot hide behind the
-  guidelines' count.
+  otherwise silently disable the check for the rest of the file); and when any one input file yields zero
+  checked paths, so losing every path from `HACK.md` cannot hide behind the guidelines' count.
 
 Known risk, named by the peer and accepted: a placeholder or illustrative path that the skip rules miss
 becomes a false failure, and false failures train people to ignore the check. The skip rules therefore stay
@@ -212,10 +213,9 @@ and a `ci.yml` step): the new script takes `--selftest`, which runs the fixtures
 recipe in `check` and its own `ci.yml` step, separate from the run over the two documents. A self-test
 nothing runs would prove nothing.
 
-Wiring of the check itself: the `check` recipe, a `ci.yml` step, and the `lefthook.yml` `pre-push`
-block. The `wiring` job
-(`Plugin Wiring`) in `ci.yml` is the natural home, being the job that already runs the other static
-checks; the plan confirms it.
+Wiring of the check itself: the `check` recipe, a `ci.yml` step, and the `lefthook.yml` `pre-push` block.
+The `wiring` job (`Plugin Wiring`) in `ci.yml` is the natural home, being the job that already runs the
+other static checks; the plan confirms it.
 
 Licensing: `scripts/check-license-headers.sh` covers `.sh` files (its scope is `.rs .sh .ts .js .py .ps1`)
 and not Markdown, so the new script carries the repository's license header and the two documents do not.
@@ -223,11 +223,14 @@ The check reads tracked files only, so it sees the script once it is added.
 
 ## 8. Risks and what stays open
 
-- The guidelines are only as good as their sources. The oracle in section 6 is the mitigation, and it does
-  not cover the Rust binary and OpenCode kinds end to end.
+- The guidelines are only as good as their sources. The oracle in section 6 is the mitigation. It runs
+  both throwaways without a build, so the Rust front is checked on its static gates only, and the two
+  OpenCode kinds are checked by reading.
 - The check proves a path exists, not that the sentence around it is true.
-- A third contributor-facing document set (`README.md`, `HACK.md`, the guidelines) needs a clear division.
-  The guidelines own "adding a plugin"; `HACK.md` owns maintainer procedure. Where a topic could sit in
+- The extensionless root-file list is closed, so a misspelt `Justfile` is caught only because it is on the
+  list; any other bare extensionless name goes unchecked. Accepted: widening it means guessing at prose.
+- Three contributor-facing documents (`README.md`, `HACK.md`, the guidelines) need a clear division. The
+  guidelines own "adding a plugin"; `HACK.md` owns maintainer procedure. Where a topic could sit in
   either, it stays in `HACK.md` and the guidelines link to it.
 
 Left for the plan, because they depend on code to be read then: the exact script name and shell idiom, the
@@ -235,9 +238,15 @@ extraction technique (the contract in section 7 is fixed; only how it is impleme
 spell check applies to the new files, the self-test's file layout and recipe name, and the final wording of
 every checklist row.
 
+One constraint on that implementation: the check runs in the pre-push hook on Windows hosts, where every
+external process is slow, so the number of processes it starts must not grow with the number of tokens
+(for example one `git check-ignore --stdin` call for all ignored-path questions, not one per token). No
+timing for this has been measured, and none can be from this Linux host.
+
 ## 9. Stand-downs
 
-Recorded from panel round 1 (agy, 2026-11-19):
+Recorded from the panel (agy, 2026-11-19). Rounds 2, 3 and 4 raised nothing that was stood down: each
+finding was measured and folded, and round 4 returned no findings. Round 1:
 
 - `REJECTED: the peer's proposed fix for the ignored-path rule` (check whether any leading component is
   ignored): measured against `.gitignore:65`, `qwen/plugins/typo-qwen/bin/` is ignored through its `bin`
