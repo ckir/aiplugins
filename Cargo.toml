@@ -61,7 +61,7 @@ windows = { version = "0.62", features = [
 ] }
 
 # Unix-only. Process group management for the worker lifecycle on Linux/macOS.
-nix = { version = "0.31", features = ["process", "signal"] }
+nix = { version = "0.32", features = ["process", "signal"] }
 
 # Dev-only.
 insta = { version = "1", features = ["json"] }
