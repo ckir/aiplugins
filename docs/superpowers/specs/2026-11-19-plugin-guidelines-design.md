@@ -3,7 +3,11 @@
 Status: design approved by the owner on 2026-11-19; implemented on branch docs/plugin-guidelines per
 docs/superpowers/plans/2026-11-19-plugin-guidelines.md. The adversarial panel (four rounds) read documents and
 did not run code; the path check's contract is proven by its self-test and mutation run (Task 2), not by the
-panel.
+panel. The capstone review of the committed script amended the contract in three ways, each measured: a
+line range (`:<digits>-<digits>`) is stripped like a single line number; a run of two or more adjacent
+backticks outside a fence fails, because a double-backtick span was silently unchecked; and the ignore test
+disables git's global ignore files, so a developer's global ignore cannot excuse a dead path locally that CI
+would fail.
 
 ## 1. Problem
 
@@ -159,8 +163,8 @@ Contract:
   other check scripts do for tool output.
 - Candidates: every inline backticked span is split on whitespace and each token is judged on its own,
   so `bash scripts/gen-marketplaces.sh` checks `scripts/gen-marketplaces.sh` (measured: a whole-span rule
-  skips every command line, where the paths most likely to rot are). A trailing `:<digits>` is removed
-  from the token FIRST, before anything else is decided (measured: `README.md:164` and `Justfile:360`
+  skips every command line, where the paths most likely to rot are). A trailing `:<digits>` or
+  `:<digits>-<digits>` is removed from the token FIRST, before anything else is decided (measured: `README.md:164` and `Justfile:360`
   match neither the extension list nor the root list until the suffix is gone). Then a token is a path
   candidate when it contains `/` (checked relative to the repository root), or has no `/` and either ends
   in one of the extensions `md`, `json`, `toml`, `sh`, `yml`, `yaml`, `lock`, `rs`, `ts`, `txt`, or is one

@@ -20,9 +20,16 @@
 # them to exist. It proves a path exists, not that the sentence around it is
 # true.
 #
+# FILE paths are read relative to ROOT (default: the repository holding this
+# script), not to the caller's directory. Git's global ignore files are switched
+# off for the ignore test (core.excludesFile=/dev/null), so a run on a machine
+# with a global ignore decides as CI does; .gitignore files and
+# .git/info/exclude still apply.
+#
 # Rules, in the order they are applied to each token of each backticked span
 # (a span is split on whitespace, so `bash scripts/x.sh` checks scripts/x.sh):
-#   1. A trailing :<digits> is removed first (README.md:164 -> README.md).
+#   1. A trailing :<digits> or :<digits>-<digits> is removed first
+#      (README.md:164 and README.md:164-170 -> README.md).
 #   2. SKIP a token with < > { } or *; a token that is not a repository path by
 #      shape (contains ://, starts with @ ~ $ / or -, or starts with origin/ or
 #      refs/); and everything inside fenced code blocks (CommonMark fences: the
@@ -38,8 +45,10 @@
 #      build output absent from a fresh clone (target/release/) passes while a
 #      misspelt directory above an ignored bin/ still fails.
 # Also FAIL: an unclosed code fence, a line with an odd number of backticks
-# outside a fence (a stray backtick shifts every span after it), and an input
-# file in which no path was checked.
+# outside a fence (a stray backtick shifts every span after it), a run of two or
+# more adjacent backticks outside a fence (a double-backtick span is not
+# parsed, and its path would go unchecked), and an input file in which no path
+# was checked.
 set -euo pipefail
 
 self=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
@@ -76,6 +85,7 @@ BEGIN { bt = sprintf("%c", 96); infence = 0 }
     tmp = line
     n = gsub(bt, "", tmp)
     if (n % 2 == 1) { print "ERR\t" NR "\todd number of backticks on the line"; next }
+    if (index(line, bt bt) > 0) { print "ERR\t" NR "\ta run of two or more backticks outside a fence; write each path in single backticks"; next }
     m = split(line, parts, bt)
     for (i = 2; i <= m; i += 2) {
         nt = split(parts[i], toks, /[ \t]+/)
@@ -111,7 +121,7 @@ run_check() {
                 continue
             fi
             t=$tok
-            if [[ $t =~ ^(.*):[0-9]+$ ]]; then t=${BASH_REMATCH[1]}; fi
+            if [[ $t =~ ^(.*):[0-9]+(-[0-9]+)?$ ]]; then t=${BASH_REMATCH[1]}; fi
             [ -n "$t" ] || continue
             case $t in
                 *'<'* | *'>'* | *'{'* | *'}'* | *'*'*) continue ;;
@@ -156,7 +166,7 @@ run_check() {
                 done
                 probes="$probes$t"$'\n'"${t%/}/"$'\n'
             done
-            ignored=$(printf '%s' "$probes" | git check-ignore --stdin 2>/dev/null | tr -d '\r' || true)
+            ignored=$(printf '%s' "$probes" | git -c core.excludesFile=/dev/null check-ignore --stdin 2>/dev/null | tr -d '\r' || true)
             for want in "${missing[@]}"; do
                 ln=${want%%$'\t'*}
                 t=${want#*$'\t'}
@@ -198,10 +208,11 @@ run_check() {
 # real script against a throwaway repository, so an edit that turns a failure
 # branch into a no-op turns a case red.
 selftest() {
-    local fx n=0 bad=0 out rc
+    local fx am n=0 bad=0 out rc
     fx=$(mktemp -d)
-    # shellcheck disable=SC2064  # expand now: $fx is local and gone when the trap fires
-    trap "rm -rf '$fx'" EXIT
+    am=$(mktemp -d)   # a user's global git configuration, as the ambient-ignore cases fake it
+    # shellcheck disable=SC2064  # expand now: $fx and $am are local and gone when the trap fires
+    trap "rm -rf '$fx' '$am'" EXIT
     (
         cd "$fx"
         git init -q .
@@ -242,6 +253,8 @@ selftest() {
     case_run "line suffix on a bare root file"   pass "README.md" <<< "${bt}README.md:164${bt}"
     case_run "line suffix on a nested file"      pass "scripts/ok.sh" <<< "${bt}scripts/ok.sh:12${bt}"
     case_run "line suffix does not hide a dead path" fail "docs/nope.md does not exist" <<< "${bt}docs/nope.md:3${bt} ${bt}README.md${bt}"
+    case_run "line range on a nested file"      pass "scripts/ok.sh" <<< "${bt}scripts/ok.sh:12-15${bt}"
+    case_run "line range does not hide a dead path" fail "docs/nope.md does not exist" <<< "${bt}docs/nope.md:3-5${bt} ${bt}README.md${bt}"
     case_run "path inside a command line is checked" pass "scripts/ok.sh" <<< "Run ${bt}bash scripts/ok.sh --flag${bt}."
     case_run "dead path inside a command line fails" fail "scripts/gone.sh does not exist" <<< "Run ${bt}bash scripts/gone.sh${bt} ${bt}README.md${bt}"
     case_run "placeholder, URL, git ref and flag skipped" pass "" <<< "${bt}<plugin dir>/bin/${bt} ${bt}https://example.com/a/b${bt} ${bt}origin/main${bt} ${bt}@types/node${bt} ${bt}--out=x/y${bt} ${bt}\$HOME/x${bt} ${bt}a/*${bt} ${bt}README.md${bt}"
@@ -249,8 +262,18 @@ selftest() {
     case_run "ignored dir under a real plugin"   pass "git-ignored build output" <<< "${bt}plugins/real/bin/${bt}"
     case_run "ignored dir without its trailing slash" pass "git-ignored build output" <<< "${bt}plugins/real/bin${bt}"
     case_run "misspelt dir above an ignored bin/ fails" fail "above its ignored part" <<< "${bt}plugins/typo/bin/${bt} ${bt}README.md${bt}"
-    case_run ".. in each of the four positions fails" fail "has a .. segment" <<< "${bt}..${bt} ${bt}../x${bt} ${bt}x/../y${bt} ${bt}x/..${bt} ${bt}README.md${bt}"
+    # One case per position: in one shared document the first failing token satisfies
+    # the exit code and the message, and a later position could be dropped unseen.
+    case_run ".. alone fails"                  fail "docs/case.md:1: .. has a .. segment" <<< "${bt}..${bt} ${bt}README.md${bt}"
+    case_run "leading ../ fails"               fail "docs/case.md:1: ../x has a .. segment" <<< "${bt}../x${bt} ${bt}README.md${bt}"
+    case_run "inner /../ fails"                fail "docs/case.md:1: x/../y has a .. segment" <<< "${bt}x/../y${bt} ${bt}README.md${bt}"
+    case_run "trailing /.. fails even when it resolves" fail "docs/case.md:1: x/.. has a .. segment" <<< "${bt}x/..${bt} ${bt}README.md${bt}"
     case_run ".. that would resolve to a real file fails" fail "docs/../README.md has a .. segment" <<< "${bt}docs/../README.md${bt}"
+    # Each shape the skip rule drops is shown to be dropped: were it checked, the
+    # token (absent from the fixture) would fail the run.
+    case_run "refs/ token skipped"             pass "" <<< "${bt}refs/heads/main${bt} ${bt}README.md${bt}"
+    case_run "~ token skipped"                 pass "" <<< "${bt}~/gone/x.md${bt} ${bt}README.md${bt}"
+    case_run "absolute path skipped, not tested against the host" pass "" <<< "${bt}/gone-by-design/x.md${bt} ${bt}README.md${bt}"
     case_run "backtick fence skipped" pass "" <<EOF
 ${bt}${bt}${bt}
 docs/nope.md
@@ -298,6 +321,16 @@ ${bt}${bt}${bt}
 ${bt}docs/nope.md${bt}
 EOF
     case_run "odd backtick count fails" fail "docs/case.md:1: odd number of backticks" <<< "${bt}README.md${bt} and a stray ${bt}"
+    case_run "a double-backtick span fails rather than hiding its path" fail "docs/case.md:1: a run of two or more backticks" <<< "${bt}README.md${bt} and ${bt}${bt}scripts/gone.sh${bt}${bt}"
+
+    # A user's global git ignore must not excuse a dead path: with it, the check would
+    # pass on that machine and fail in CI. Two routes: core.excludesFile in the global
+    # configuration, and git's default $XDG_CONFIG_HOME/git/ignore.
+    printf '*.md\n' > "$am/ignore"
+    printf '[core]\n\texcludesFile = %s\n' "$am/ignore" > "$am/gitconfig"
+    mkdir -p "$am/xdg/git"; printf '*.md\n' > "$am/xdg/git/ignore"
+    GIT_CONFIG_GLOBAL="$am/gitconfig" case_run "a global core.excludesFile does not excuse a dead path" fail "docs/nope.md does not exist" <<< "See ${bt}docs/nope.md${bt}."
+    GIT_CONFIG_GLOBAL=/dev/null XDG_CONFIG_HOME="$am/xdg" case_run "the default global ignore does not excuse a dead path" fail "docs/nope.md does not exist" <<< "See ${bt}docs/nope.md${bt}."
     case_run "a file with no checked path fails" fail "no repository path was checked" <<< "Only prose and ${bt}just check${bt}."
     case_run "CRLF input is read like LF" pass "scripts/ok.sh" < <(printf '%s\r\n%s\r\n%s\r\n%s\r\n' '```' 'docs/nope.md' '```' "${bt}scripts/ok.sh${bt}")
 
