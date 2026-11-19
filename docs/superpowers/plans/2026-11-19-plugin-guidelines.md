@@ -41,9 +41,11 @@ mlc --offline --ignore-path "./node_modules,./opencode/plugins/re-ghidra-mcp-ope
 
 Expected: exit 0 (measured on this branch before any task: exit 0).
 
-## Dispatch rules (apply to every subagent dispatch in this plan)
+## Dispatch rules (apply to every implementation dispatch, Tasks 1 to 5)
 
-Each dispatch prompt MUST carry all of these, pasted whole:
+The two walkthrough agents of Task 6 are the exception: they must not see this plan, the spec or these rules, so they get only the standalone briefs written in Task 6. Their scope is enforced by the driver afterwards (Task 6, Steps 2, 3 and 7), not by the file list in rule 8, because they must edit whatever files the document under test tells them to.
+
+Each implementation dispatch prompt MUST carry all of these, pasted whole:
 
 1. **Step 0, state verification.** Open the files the task names and confirm the context described matches reality before editing. If it differs, STOP and report `STATE_MISMATCH: <what>`; do not adapt.
 2. **Shape-divergence stop.** If making anything work would change the shape, type or encoding of a value in the content pasted in this plan, STOP and report `[original] -> [yours] because <reason>`. "It runs" is not a justification.
@@ -586,7 +588,7 @@ addlicense -check -f LICENSE-HEADER.tmpl -l PolyForm-Noncommercial-1.0.0 -c "Cos
 
 Expected: both print nothing and exit 0.
 
-- [ ] **Step 5: Run the mutation harness, which proves each self-test case would go red.** Save the harness below to `<scratchpad>/mutate.py`, copy the script next to it, and run it there (it rewrites a copy named `mut.sh`, never the repository file).
+- [ ] **Step 5: Run the mutation harness, which proves each self-test case would go red.** Save the harness below as `mutate.py` in the directory `${TMPDIR:-/tmp}/check-doc-paths-mutation` (expand the variable to an absolute path first, for example with `echo "${TMPDIR:-/tmp}/check-doc-paths-mutation"`, and give the file-writing tool that absolute path), copy the script next to it, and run it there (it rewrites a copy named `mut.sh`, never the repository file).
 
 `````python
 import subprocess, sys, shutil, os
@@ -627,8 +629,12 @@ sys.exit(1 if survived else 0)
 `````
 
 ```bash
-cp scripts/check-doc-paths.sh <scratchpad>/check-doc-paths.sh
-cd <scratchpad> && python3 mutate.py
+M="${TMPDIR:-/tmp}/check-doc-paths-mutation"
+mkdir -p "$M"
+# ... save the harness above as "$M/mutate.py" here ...
+cp scripts/check-doc-paths.sh "$M/check-doc-paths.sh"
+(cd "$M" && python3 mutate.py)
+rm -rf "$M"
 ```
 
 Expected: 18 lines starting `KILLED`, then `survivors: 0`, exit 0. A `SURVIVED` or `BAD MUTANT` line means a self-test case no longer pins its rule: STOP and report it.
@@ -1123,7 +1129,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 - [ ] **Step 3: Dispatch walkthrough B (kind A, a Rust front, no-build gates only).** After A has returned and its branch exists, a second fresh Sonnet subagent with this brief:
 
-> You are testing a document, not writing code. Work in `/home/user/Development/Rust/aiplugins`. Run `git switch -c scratch/oracle-rust-front` from `BASE` (the commit named by `git rev-parse docs/plugin-guidelines`); local commits are allowed on it; NEVER push, merge, or touch any other branch.
+> You are testing a document, not writing code. Work in `/home/user/Development/Rust/aiplugins`. Run `git switch -c scratch/oracle-rust-front docs/plugin-guidelines` (the working tree is clean, so this works from whichever branch you find yourself on); commit everything you create before you finish and leave the working tree clean; local commits are allowed on it; NEVER push, merge, or touch any other branch.
 >
 > Read `docs/PLUGIN_GUIDELINES.md` and nothing else in `docs/`. Add one throwaway Rust front for Claude Code named `zz-rust-oracle-cc`: a crate with one `[[bin]]` target `zz-rust-oracle-cc-mcp` whose `main` prints one line and exits, an `.mcp.json` that names that binary as `${CLAUDE_PLUGIN_ROOT}/bin/zz-rust-oracle-cc-mcp`, and the host manifest. Do exactly what the document says for a Rust front, using ONLY the document for what to change.
 >
@@ -1131,12 +1137,12 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 >
 > Report in the same six-part shape as the first brief. Do not fix the document.
 
-- [ ] **Step 4: Spot-check three "what fails" claims by reversing one edit at a time** on `scratch/oracle-skills-only` (the driver runs these, not an agent). For each, make the single reversal, run the command, record the exit code and the first failing line, then `git checkout -- .` to restore:
+- [ ] **Step 4: Spot-check three "what fails" claims by reversing one edit at a time** on `scratch/oracle-skills-only` (the driver runs these, not an agent). Walkthrough B left the working tree on its own branch, so first run `git switch scratch/oracle-skills-only` and confirm with `git branch --show-current`. For each, make the single reversal, run the command, record the exit code and the first failing line, then `git checkout -- .` to restore:
   1. Remove the new folder from the `exclude` array in the root `Cargo.toml`; run `cargo metadata --no-deps --format-version 1 >/dev/null`. Record what happens (the document says "Cargo cannot load the workspace").
   2. Remove the `zz-oracle` line from `docs/site/families.txt`; run `just site-check`. The document says `scripts/check-site.sh` fails on a family-set difference.
   3. Remove the `zz-oracle-cc` row from `scripts/check-package-versions.sh`; run `bash scripts/check-package-versions.sh`. The document says nothing fails.
 
-- [ ] **Step 5: Judge and fix.** Back on `docs/plugin-guidelines`. For every item in the two reports under (1) `GATE`, (3) and (4), and for any spot-check whose result differs from the document, decide: the document is wrong or incomplete (fix it), or the agent erred (note why). Edit `docs/PLUGIN_GUIDELINES.md` only. For each wording that a spot-check measured, replace the unmeasured wording with the measured one. Then replace the two lines `Verification status: not yet walked through.` (kinds A and B) with the truth, in this form and no other claims:
+- [ ] **Step 5: Judge and fix.** First run `git checkout -- .` (restore the last spot-check), then `git switch docs/plugin-guidelines` and confirm with `git branch --show-current`; the document fixes must be committed here, never on a scratch branch, which Step 7 deletes. For every item in the two reports under (1) `GATE`, (3) and (4), and for any spot-check whose result differs from the document, decide: the document is wrong or incomplete (fix it), or the agent erred (note why). Edit `docs/PLUGIN_GUIDELINES.md` only. For each wording that a spot-check measured, replace the unmeasured wording with the measured one. Then replace the two lines `Verification status: not yet walked through.` (kinds A and B) with the truth, in this form and no other claims:
   - kind A: `Verification status: checked by a walkthrough of the gates that need no build; the footprint probe, the bundle smoke and the binary build were not run.`
   - kind B: `Verification status: checked by a walkthrough, including the footprint run and the release-plumbing rows for a new family.` (Adjust to what was actually run; if the footprint run or a row was not run, say that instead.)
 
@@ -1180,10 +1186,11 @@ just spellcheck
 bash scripts/check-license-headers.sh
 shellcheck scripts/check-doc-paths.sh
 # and LINKS (see "Shared commands")
+git status --short
 git diff --stat main...HEAD
 ```
 
-Expected: `All 31 self-test cases passed.`; `All documented paths exist.`; LINKS and the others exit 0 with no findings. The diff stat names exactly: the spec, this plan, `scripts/check-doc-paths.sh`, `HACK.md`, `docs/PLUGIN_GUIDELINES.md`, `README.md`, `Justfile`, `.github/workflows/ci.yml`, `lefthook.yml`. Any other file is a stop-and-explain.
+Expected: `All 31 self-test cases passed.`; `All documented paths exist.`; LINKS and the others exit 0 with no findings; `git status --short` prints nothing (a walkthrough that left files behind shows here). The diff stat names exactly: the spec, this plan, `scripts/check-doc-paths.sh`, `HACK.md`, `docs/PLUGIN_GUIDELINES.md`, `README.md`, `Justfile`, `.github/workflows/ci.yml`, `lefthook.yml`. Any other file is a stop-and-explain.
 
 - [ ] **Step 2: Run what `just check` runs that is cheap here,** and say which parts were not run: `just versions`, `just wiring`, `just marketplace`, `just qwen-marketplace`, `just agy-marketplace`, `just opencode-wiring`, `just agy-wiring`, `just footprint-budgets`, `just skills-bundles`, `just skills-release-wiring`, `just site-check`. Expected: each exits 0, because this branch changes no plugin. Measured before any task: `versions`, `wiring`, `marketplace`, `qwen-marketplace`, `agy-marketplace`, `opencode-wiring`, `agy-wiring`, `footprint-budgets` and `skills-release-wiring` each exit 0; `skills-bundles` and `site-check` were not measured in advance. Record any failure with its output; a failure on an untouched area is an anomaly to capture, not to fix here.
 
@@ -1212,4 +1219,5 @@ Expected: `All 31 self-test cases passed.`; `All documented paths exist.`; LINKS
 - **Spec coverage.** Deliverables (spec section 4): the guidelines (Task 4, proved in 6), the script and self-test (2), the README edit (4), the `HACK.md` fixes (3), the wiring (5). Verification oracle with two throwaways and the "checked by walkthrough or reading" markings (6). Licensing (2, Global Constraints). The Windows process-count constraint (the script makes one `git check-ignore` call per input file, in the code of Task 2). Out-of-scope items are not touched: no `.github/CONTRIBUTING.md`, no new README content, no change to any existing check script.
 - **Placeholder scan.** The only deliberate temporary text is `Verification status: not yet walked through.`, which Task 6 Step 5 replaces and Task 6 Step 6 counts to zero.
 - **Type and name consistency.** The script is `scripts/check-doc-paths.sh` everywhere; recipes are `doc-paths` and `doc-paths-test`; the case count is 31 in Tasks 2, 5 and 7; the HACK.md fix count is four in the spec amendment and in Task 3.
+- **Dry run.** Tasks 1 to 5 were executed literally in a throwaway worktree during planning, by extracting this plan's blocks and applying its Old/New edits with a script: all 7 + 4 + 2 + 4 edit pairs matched exactly one place; the script and the guidelines were byte-identical to their stated checksums; the self-test printed 31 `ok` lines and `All 31 self-test cases passed.`; shellcheck and addlicense exited 0; the mutation harness printed 18 `KILLED` and `survivors: 0`; the pre-fix `HACK.md` run printed exactly the three `FAIL` lines and `3 problem(s)`; after the fixes `HACK.md | 8 ++++----`; the link check exited 0; `just doc-paths-test` and `just doc-paths` passed; both new CI steps landed in the `wiring` job right after the runner-failure self-test; `lefthook validate` printed `All good`. The worktree and its branch were then removed. Tasks 6, 7 and 8 were not dry-run.
 - **Not proved by this plan:** Windows and macOS behaviour of the script (the self-test passes under four awk implementations on Linux only); the footprint, bundle-smoke and binary-build parts of the Rust front walkthrough; the OpenCode kinds, which are checked by reading only and say so.
