@@ -1,0 +1,11 @@
+{
+  "repo-tasks-reminder": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "repo-tasks-agy-mcp reminder --event antigravity",
+        "timeout": 10
+      }
+    ]
+  }
+}

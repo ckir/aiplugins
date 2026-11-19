@@ -68,7 +68,9 @@ for name in $(all_plugins antigravity | sort -u); do
         jqr -e . "$hooks_json" > /dev/null || fail "$name: $hooks_json is not valid JSON"
         while IFS= read -r command; do
             [ -n "$command" ] || continue
-            bin=$(basename "$command")
+            # Only the first whitespace-separated word is the binary path; a
+            # hook may pass a subcommand and flags.
+            bin=$(basename "${command%%[[:space:]]*}")
             bin=${bin%.exe}
             checked=$((checked + 1))
             if printf '%s\n' "$known" | grep -qxF "$bin"; then

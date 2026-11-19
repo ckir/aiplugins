@@ -68,6 +68,9 @@ verification) and asks whether to install project-local or global first:
 | `re-ghidra-mcp-agy` | ≥ 21,586 | ≥ 36,815 |
 | `re-ghidra-mcp-cc` | ≥ 21,631 | ≥ 36,903 |
 | `re-ghidra-mcp-opencode` | ≥ 21,297 | ≥ 37,147 |
+| `repo-tasks-mcp-agy` | ≥ 2,497 | ≥ 0 |
+| `repo-tasks-mcp-cc` | ≥ 2,550 | ≥ 105 |
+| `repo-tasks-mcp-opencode` | ≥ 2,550 | ≥ 170 |
 | `repo-user-guide-agy` | ≥ 468 | ≥ 11,474 |
 | `repo-user-guide-cc` | ≥ 468 | ≥ 11,474 |
 | `repo-user-guide-opencode` | ≥ 468 | ≥ 11,474 |
@@ -134,23 +137,27 @@ Plugin and example READMEs, by agent directory:
   - [`repo-user-guide-cc`](claude-code/plugins/repo-user-guide-cc/) — PDF user guides for a repository, with verified examples; published as `repo-user-guide`.
   - [`rtk-mcp-cc`](claude-code/plugins/rtk-mcp-cc/) — `rtk` shell-command rewriting for 60–90% fewer output tokens, plus analytics MCP tools.
   - [`opencode-ctl-mcp-cc`](claude-code/plugins/opencode-ctl-mcp-cc/) — delegate bounded work to an OpenCode worker session over MCP, with a paired-TUI launcher plus driver and doctor skills.
+  - [`repo-tasks-mcp-cc`](claude-code/plugins/repo-tasks-mcp-cc/) — A per-repository task list over MCP: four tools to create, list, read and update tasks that outlive the session and are shared with other agents working in the same repository.
   - [`example`](claude-code/plugins/example/) — template Rust Claude Code plugin (TODO/FIXME/HACK tracker).
 - `antigravity/plugins/`
   - [`aiplugins-devtools-agy`](antigravity/plugins/aiplugins-devtools-agy/) — dev-tool skills container published as `aiplugins-devtools`; first skill `code-review-and-quality` (multi-axis code review).
   - [`re-ghidra-mcp-agy`](antigravity/plugins/re-ghidra-mcp-agy/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
   - [`rtk-mcp-agy`](antigravity/plugins/rtk-mcp-agy/) — `rtk` shell-command rewriting via MCP proxy plus `PreInvocation` hook.
   - [`opencode-ctl-mcp-agy`](antigravity/plugins/opencode-ctl-mcp-agy/) — delegate bounded work to an OpenCode worker session over MCP, with driver and doctor skills.
+  - [`repo-tasks-mcp-agy`](antigravity/plugins/repo-tasks-mcp-agy/) — A per-repository task list over MCP: four tools to create, list, read and update tasks that outlive the session and are shared with other agents working in the same repository.
 - `qwen/plugins/`
   - [`aiplugins-devtools-qwen`](qwen/plugins/aiplugins-devtools-qwen/) — dev-tool skills container published as `aiplugins-devtools`; first skill `code-review-and-quality` (multi-axis code review).
   - [`re-ghidra-mcp-qwen`](qwen/plugins/re-ghidra-mcp-qwen/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools.
   - [`rtk-mcp-qwen`](qwen/plugins/rtk-mcp-qwen/) — `rtk` `PreToolUse` hook rewriting `run_shell_command` calls.
   - [`opencode-ctl-mcp-qwen`](qwen/plugins/opencode-ctl-mcp-qwen/) — delegate bounded work to an OpenCode worker session over MCP, with driver and doctor skills.
+  - [`repo-tasks-mcp-qwen`](qwen/plugins/repo-tasks-mcp-qwen/) — A per-repository task list over MCP: four tools to create, list, read and update tasks that outlive the session and are shared with other agents working in the same repository.
   - [`example`](qwen/plugins/example/) — example Rust-based MCP server extension.
 - `opencode/plugins/`
   - [`aiplugins-devtools-opencode`](opencode/plugins/aiplugins-devtools-opencode/) — dev-tool skills container published as `aiplugins-devtools`; first skill `code-review-and-quality` (multi-axis code review).
   - [`re-ghidra-mcp-opencode`](opencode/plugins/re-ghidra-mcp-opencode/) — persistent headless Ghidra JVM exposed as 19 reverse-engineering MCP tools, plus session hooks.
   - [`rtk-mcp-opencode`](opencode/plugins/rtk-mcp-opencode/) — `rtk` shell-command rewriting for OpenCode, plus analytics MCP tools.
   - [`opencode-ctl-mcp-opencode`](opencode/plugins/opencode-ctl-mcp-opencode/) — lets an OpenCode session delegate bounded work to a worker OpenCode session over MCP (source-only bundle).
+  - [`repo-tasks-mcp-opencode`](opencode/plugins/repo-tasks-mcp-opencode/) — A per-repository task list over MCP: four tools to create, list, read and update tasks that outlive the session and are shared with other agents working in the same repository.
   - [`todov2-opencode`](opencode/plugins/todov2-opencode/) — the V2-removed `todowrite` session tool plus a live todo sidebar list.
   - [`repo-user-guide-opencode`](opencode/plugins/repo-user-guide-opencode/) — PDF user guides for a repository, with verified examples; published as `repo-user-guide`.
 

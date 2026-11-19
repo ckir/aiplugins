@@ -55,3 +55,7 @@ Spec: `docs/specs/2026-10-18-opencode-ctl-mcp-design.md`. After execution comes 
 ## release-please: a release PR goes stale behind main and is not rebuilt
 
 **Status:** OPEN 2026-11-03 - release-please re-pushes its branch only when the PR body changes (v17.6.0 `src/manifest.ts:1094-1100`), so a release PR stays based on an old main and merges conflict with feature branches that touched the same generated files; a conflicted PR gets no `pull_request` workflows, so `release-refresh` cannot repair it. Measured on #129 (2026-11-02): fixed by `gh pr update-branch`, which needs the owner's say-so before a release merge. The footprint stamp removal (#133) removed the main conflict source; the merge-flow spec `docs/specs/2026-11-02-merge-flow.md` (M2/M3) covers the rest. Decide whether the leftover cases warrant automation there.
+
+## repo-tasks-mcp: overlap of todov2-opencode with OpenCode's built-in todowrite
+
+**Status:** OPEN 2026-11-18 - OpenCode 2.3.0 ships a built-in `todowrite` again as an opt-in (`{ "experimental": { "todo": true } }`, `packages/core/src/tool/plugin/todo.ts`, `CHANGELOG.md:1244` at the installed tag; spec `docs/superpowers/specs/2026-11-18-repo-tasks-design.md` 15.4), under the same tool name `opencode/plugins/todov2-opencode` registers. The repo-tasks work leaves the plugin untouched (spec 12); the owner rules whether to keep it, make it yield when the built-in is on, or retire it.

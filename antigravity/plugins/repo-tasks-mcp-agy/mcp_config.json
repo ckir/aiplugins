@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "repo-tasks-mcp": {
+      "command": "repo-tasks-agy-mcp",
+      "args": ["serve"]
+    }
+  }
+}

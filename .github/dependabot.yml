@@ -64,6 +64,20 @@ updates:
           - "*"
 
   - package-ecosystem: "npm"
+    directory: "/opencode/plugins/repo-tasks-mcp-opencode"
+    schedule:
+      interval: "weekly"
+    # The wiring gate pins @opencode/plugin to the OpenCode version we test
+    # against and requires every README and INSTALL.md to say the same, so only
+    # a person moves it, in one change across all four plugins.
+    ignore:
+      - dependency-name: "@opencode/plugin"
+    groups:
+      npm-repo-tasks:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "npm"
     directory: "/opencode/plugins/todov2-opencode"
     schedule:
       interval: "weekly"

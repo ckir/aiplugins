@@ -73,7 +73,18 @@ jobs:
         uses: taiki-e/install-action@nextest
 
       - name: Run tests
+        env:
+          # The repo-tasks Windows tests append what they measure here.
+          REPO_TASKS_CI_NOTES: ${{ runner.temp }}/repo-tasks-ci-notes.txt
         run: cargo nextest run --workspace --no-fail-fast
+
+      - name: Upload the repo-tasks measurements
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: repo-tasks-ci-notes-${{ matrix.os }}
+          path: ${{ runner.temp }}/repo-tasks-ci-notes.txt
+          if-no-files-found: ignore
 
   opencode-test:
     name: OpenCode TS Tests (${{ matrix.os }})
@@ -257,12 +268,15 @@ jobs:
           just build-rtk-mcp-cc
           just build-re-ghidra-mcp-cc
           just build-opencode-ctl-mcp-cc
+          just build-repo-tasks-mcp-cc
           just build-rtk-mcp-opencode
           just build-re-ghidra-mcp-opencode
           just build-rtk-mcp-agy
           just build-re-ghidra-mcp-agy
           just build-opencode-ctl-mcp-agy
           just build-opencode-ctl-mcp-opencode
+          just build-repo-tasks-mcp-agy
+          just build-repo-tasks-mcp-opencode
 
       # Freshness: a committed document that no longer matches a fresh
       # measurement is caught here, before any threshold is consulted.

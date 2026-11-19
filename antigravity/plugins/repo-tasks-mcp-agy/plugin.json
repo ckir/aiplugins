@@ -1,0 +1,5 @@
+{
+  "name": "repo-tasks-mcp-agy",
+  "version": "0.1.0",
+  "description": "An Antigravity front for repo-tasks-mcp: a task list kept per git repository, over MCP"
+}

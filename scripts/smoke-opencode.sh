@@ -62,6 +62,7 @@ import plugin from './$dir/plugin.ts';
 const hooks = {};
 const ctx = {
   options: {},
+  location: { directory: process.cwd() },
   tool: {
     hook: async (n, f) => { (hooks['tool:' + n] ??= []).push(f); },
     transform: async (f) => { await f({ add: (t) => { (hooks['tool:registered'] ??= []).push(t.name); } }); },

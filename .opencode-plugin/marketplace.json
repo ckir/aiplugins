@@ -134,6 +134,27 @@
         "delegate",
         "rust"
       ]
+    },
+    {
+      "name": "repo-tasks-mcp-opencode",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/ckir/aiplugins/releases/download/repo-tasks-mcp-opencode-v0.1.0/repo-tasks-mcp-opencode-opencode.zip"
+      },
+      "description": "OpenCode V2 front for repo-tasks: a per-repository task list kept under .git (untracked), served over MCP, with a once-per-session reminder.",
+      "author": {
+        "name": "AI Plugins Marketplace Contributors"
+      },
+      "homepage": "https://github.com/ckir/aiplugins/tree/main/opencode/plugins/repo-tasks-mcp-opencode",
+      "license": "PolyForm-Noncommercial-1.0.0",
+      "category": "development",
+      "keywords": [
+        "tasks",
+        "todo",
+        "mcp",
+        "repository",
+        "rust"
+      ]
     }
   ]
 }

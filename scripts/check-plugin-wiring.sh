@@ -43,7 +43,9 @@ checked=0
 while IFS= read -r reference; do
     file=${reference%%::*}
     command=${reference#*::}
-    name=$(basename "$command")
+    # A hook may run the binary with a subcommand and flags; only the first
+    # whitespace-separated word is the binary path.
+    name=$(basename "${command%%[[:space:]]*}")
     name=${name%.exe}
     checked=$((checked + 1))
 
