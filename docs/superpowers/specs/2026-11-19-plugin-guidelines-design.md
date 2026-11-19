@@ -1,9 +1,9 @@
 # Plugin guidelines: keeping the README's promise
 
-Status: design approved by the owner on 2026-11-19; spec awaiting owner review. No plan yet. Adversarial
-panel (the agy peer, four rounds; findings 7, 4, 1, then a clean round) concluded 2026-11-19; the panel
-reads a document and does not run code, so the path check's contract is still unproven until its
-self-test exists.
+Status: design approved by the owner on 2026-11-19; implemented on branch docs/plugin-guidelines per
+docs/superpowers/plans/2026-11-19-plugin-guidelines.md. The adversarial panel (four rounds) read documents and
+did not run code; the path check's contract is proven by its self-test and mutation run (Task 2), not by the
+panel.
 
 ## 1. Problem
 
