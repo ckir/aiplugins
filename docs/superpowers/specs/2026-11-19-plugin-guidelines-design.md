@@ -26,6 +26,9 @@ scaffold commit `637037e`, before the repository grew its conventions. Nothing k
   one more problem and one shape the contract must handle: the bare shorthand `check-package-versions.sh`
   (the file is `scripts/check-package-versions.sh`; a bare name does not resolve from the root), and a span
   carrying a line suffix, `tools/plugin-footprint/src/manifest.rs:16`, whose file does exist.
+- The first real run of the script (the plan's Task 2) over `HACK.md` found a third bare script name that the
+  prototype missed, because the prototype looked only at spans that end in an extension:
+  `gen-marketplaces.sh --check`, in the paragraph about the release-please bump pull request.
 
 Three requirements that an author would otherwise find only by failing CI were found while preparing
 this design and are the reason a plain "list the files" document is not enough:
@@ -48,7 +51,7 @@ counter-turn was held and the result is recorded.
 | 2 | Scope | The wiring checklist for each plugin type, plus the authoring standards. No new README content. |
 | 3 | "More details" | The scaffold README was 25 lines with three sections. It now carries install steps, a footprint table, the `shared/` crate table and a documentation index, none of which the scaffold had. That half of the promise is treated as kept, and the pull request says so. |
 | 4 | Drift | A new script checks that the paths named in the two contributor documents exist, and runs wherever the other checks run. agy first proposed prose only and withdrew it once shown that `mlc` skips code spans. |
-| 5 | `HACK.md` | Fixed in the same change: the dead `claude-code/example/` path, the "Task 6" jargon, and the bare `check-package-versions.sh` written as its full path. Its other content is untouched. |
+| 5 | `HACK.md` | Fixed in the same change: the dead `claude-code/example/` path, the "Task 6" jargon, and the two bare script names `check-package-versions.sh` and `gen-marketplaces.sh`, each written as `scripts/<name>`. Its other content is untouched. |
 
 ## 3. Out of scope
 
@@ -69,7 +72,7 @@ New:
 Edited:
 - `README.md`: the promise line becomes links to the guidelines and `HACK.md`; the documentation index gains
   an entry for the guidelines.
-- `HACK.md`: the three fixes named in section 2, row 5.
+- `HACK.md`: the four fixes named in section 2, row 5.
 - `Justfile`, `.github/workflows/ci.yml` and `lefthook.yml`: wiring for the new check, following how the
   neighbouring checks are wired (`Justfile` `check` recipe, `ci.yml` steps that run `bash scripts/...`,
   the `lefthook.yml` `pre-push` block).
@@ -173,7 +176,8 @@ Contract:
   repository's Markdown already uses four-backtick fences, in the skill documents). Any other token with
   a `/` is asserted to be a repository path, so text such as a MIME type has to be written outside
   backticks or reworded; the skip list stays short on purpose.
-- A token with a `..` segment (`..`, `../x`, `x/../y`, `x/..`) fails outright, and is never tested for
+- A token with a `..` segment (`..`, `../x`, `x/../y`, `x/..`) fails outright, whether or not it contains a
+  `/` and before it is classified as a candidate, and is never tested for
   existence: it is not a path written from the repository root, and `test -e` would follow it out of the
   repository and pass on a file that is not the repository's (measured from the repository root:
   `test -e ../../../../../etc/passwd` succeeds, and `test -e ../aiplugins/README.md` succeeds through the
@@ -188,7 +192,9 @@ Contract:
   which the placeholder rule skips.
 - It fails, naming the file, the line and the span (`file:line: ...`), on a path that does not exist; on
   an unbalanced code fence, naming the line where the unclosed fence opened (an unclosed fence would
-  otherwise silently disable the check for the rest of the file); and when any one input file yields zero
+  otherwise silently disable the check for the rest of the file); on a line outside a fence with an odd
+  number of backticks (a stray backtick would shift every span after it on that line); and when any one
+  input file yields zero
   checked paths, so losing every path from `HACK.md` cannot hide behind the guidelines' count.
 
 Known risk, named by the peer and accepted: a placeholder or illustrative path that the skip rules miss
@@ -197,11 +203,11 @@ narrow and explicit, and the self-test pins each one.
 
 Self-test, following the repository's seeded-defect convention (the site check "proves the checker rejects
 each seeded defect"): fixtures show a dead path failing; a bare name at the root passing and a bare name
-not at the root failing; an extensionless root file such as `Justfile` checked, and a misspelling of it
-failing only when it is on the closed list; a `:<digits>` suffix handled; a path inside a command line
+not at the root failing; an extensionless root file such as `Justfile` checked, and a listed name whose file is
+absent failing, and an unlisted name not checked at all; a `:<digits>` suffix handled; a path inside a command line
 checked; a placeholder, a URL and a git ref skipped; an ignored path whose shallowest ignored prefix has an
 existing parent skipped (`target/release/`) and one with a missing parent failing (a misspelt plugin
-directory above `bin/`); an ignored directory written without its trailing slash; a fenced block skipped,
+directory above `bin/`); an ignored directory written without its trailing slash, accepted like the same path with it; a fenced block skipped,
 tilde fences and a three-backtick fence nested in a four-backtick one included; an unbalanced fence
 failing with the line where it opened; a bare root file cited with a line suffix (`README.md:164`)
 checked; a token with a `..` segment failing, in each of the four positions listed above, including one
