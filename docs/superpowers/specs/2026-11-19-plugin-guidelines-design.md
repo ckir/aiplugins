@@ -91,9 +91,19 @@ Structure:
 1. **Orientation.** What a plugin is in this repository; the naming scheme `<name>-<suffix>` with the four
    suffixes; what a family is; how `shared/` engines differ from per-agent fronts; the published-name
    mapping in `agents.json` that lets a folder name and a published name differ.
-2. **Which kind are you adding.** Three kinds, because their wiring differs: a Rust binary plugin, a
-   skills-only plugin (no crate, flagged `skillsOnly` in `agents.json`), and an OpenCode TypeScript plugin.
-   A short decision table, then one section per kind.
+2. **Which kind are you adding.** The kinds follow what the checks key on, which is two properties:
+   whether the host's plugin folders are Cargo workspace members (Claude Code, Qwen and Antigravity are;
+   OpenCode is not), and whether `agents.json` flags the plugin `skillsOnly`. That gives four kinds,
+   measured against the repository today:
+   - a Rust front on a Cargo host (a workspace member crate with `[[bin]]` targets);
+   - a skills-only plugin on a Cargo host (no crate, listed in the root `Cargo.toml` `exclude` and flagged
+     `skillsOnly`);
+   - an OpenCode plugin with a `plugin.ts` and a `package.json` (never a Cargo member);
+   - an OpenCode skills-only plugin (a `package.json` and no `plugin.ts`, flagged `skillsOnly`, and no
+     `Cargo.toml` edit at all).
+
+   A short decision table, then one section per kind. The plan confirms the kind list against
+   `agents.json` and the root `Cargo.toml` before the text is written.
 3. **The wiring checklist, per kind.** A table per kind. Each row: the file, what to put in it, whether it is
    generated, and which check fails if the row is skipped (or "nothing fails", where that is the truth, as
    with the versions table). Each kind names a live exemplar to copy.
@@ -117,13 +127,20 @@ spec, not the author's notes), follows the document literally to add one throwaw
 scratch branch, then runs the gates the document names for that kind (wiring, marketplace manifests,
 package versions, the site check, the skills bundle checks, the footprint checks that apply). The author
 does not run it, because the author's own knowledge fills the document's gaps without noticing. Every file
-or step a gate demands that the document did not name is a defect in the document. The scratch branch and
-plugin are never committed or pushed.
+or step a gate demands that the document did not name is a defect in the document. The scratch branch may
+carry local commits, because the footprint gate fails on uncommitted footprint documents (`Justfile`,
+the `footprint` recipe) and the license-header check reads only tracked files; it is never merged or
+pushed, and is deleted afterwards.
 
-The Rust binary and OpenCode TypeScript kinds are verified by reading the exemplar's wiring against the
-checklist, because a full throwaway build is out of proportion. The guidelines say so themselves: each
-kind's section is marked either "checked by a walkthrough" or "checked by reading only", and the plan
-records which gates were run for each kind and which were not.
+A second throwaway covers the Rust front kind, since the repository's main archetype would otherwise pass
+unexercised: a minimal crate with one `[[bin]]` target, followed through the same document, running only
+the gates that need no build (`scripts/check-plugin-wiring.sh` reads `cargo metadata --no-deps`, not a
+compiled binary). The gates that need a built MCP server, such as the footprint probe and the bundle
+smoke, are not run and are reported as not run. The two OpenCode kinds are verified by reading an
+exemplar's wiring against the checklist.
+
+The guidelines say so themselves: each kind's section is marked either "checked by a walkthrough" or
+"checked by reading only", and the plan records which gates were run for each kind and which were not.
 
 ## 7. The path check
 
@@ -134,17 +151,28 @@ fails when it checked nothing, so a broken extraction cannot pass silently.
 Contract:
 - Inputs: `docs/PLUGIN_GUIDELINES.md` and `HACK.md`. Each is read with carriage returns removed, as the
   other check scripts do for tool output.
-- What counts as a path span: an inline backticked span with no whitespace that either contains `/`
-  (checked relative to the repository root) or has no `/` and ends in one of the extensions `md`, `json`,
-  `toml`, `sh`, `yml`, `yaml`, `lock`, `rs`, `ts`, `txt` (a bare file name, checked at the root only).
-  A trailing `:<digits>` is removed before the check. Consequence for the text: a file that is not at the
-  root is always written with its repository-relative path, never by its bare name.
-- What is skipped: a span containing `<`, `>`, `{`, `}` or `*`; and everything inside fenced code blocks
-  (both backtick and tilde fences).
-- A span that git ignores is skipped only when its parent directory exists, so build output such as
-  `bin/` or `target/`, absent from a fresh clone, does not fail, while a misspelt plugin directory
-  above an ignored `bin/` still does (measured: `.gitignore:65` ignores `qwen/plugins/*/bin/`, so
-  `qwen/plugins/typo-qwen/bin/` would otherwise pass).
+- Candidates: every inline backticked span is split on whitespace and each token is judged on its own,
+  so `bash scripts/gen-marketplaces.sh` checks `scripts/gen-marketplaces.sh` (measured: a whole-span rule
+  skips every command line, where the paths most likely to rot are). A token is a path candidate when it
+  contains `/` (checked relative to the repository root), or has no `/` and either ends in one of the
+  extensions `md`, `json`, `toml`, `sh`, `yml`, `yaml`, `lock`, `rs`, `ts`, `txt`, or is one of the
+  extensionless or dotted root files `Justfile`, `LICENSE`, `LICENSE-ADDENDUM`, `.gitignore`,
+  `.gitattributes` (a bare name, checked at the root only). A trailing `:<digits>` is removed before the
+  check. Consequence for the text: a file that is not at the root is always written with its
+  repository-relative path, never by its bare name, and the extensionless list is closed: a name outside
+  it is not checked.
+- What is skipped: a token containing `<`, `>`, `{`, `}` or `*`; a token that is not a repository path by
+  shape, namely one containing `://`, starting with `@`, `~`, `$`, `/` or `-`, or starting with
+  `origin/` or `refs/`; and everything inside fenced code blocks (both backtick and tilde fences). Any
+  other token with a `/` is asserted to be a repository path, so text such as a MIME type has to be
+  written outside backticks or reworded; the skip list stays short on purpose.
+- A token that git ignores is skipped only when the shallowest ignored prefix of it has an existing
+  parent. Build output absent from a fresh clone (`target/release/` has the ignored prefix `target`,
+  whose parent is the root) does not fail; a misspelt directory above an ignored `bin/` does (measured:
+  `.gitignore:65` ignores `qwen/plugins/*/bin/`, so `qwen/plugins/typo-qwen/bin/` is ignored, and its
+  shallowest ignored prefix has a parent that does not exist). The root `bin/` is not ignored
+  (`.gitignore` ignores `bin/` only under three plugin trees), so the text writes `<plugin dir>/bin/`,
+  which the placeholder rule skips.
 - It fails, naming the file and the span, on a path that does not exist; on an unbalanced code fence
   (an unclosed fence would otherwise silently disable the check for the rest of the file); and when any
   one input file yields zero checked paths, so losing every path from `HACK.md` cannot hide behind the
@@ -156,11 +184,20 @@ narrow and explicit, and the self-test pins each one.
 
 Self-test, following the repository's seeded-defect convention (the site check "proves the checker rejects
 each seeded defect"): fixtures show a dead path failing; a bare name at the root passing and a bare name
-not at the root failing; a `:<digits>` suffix handled; a placeholder skipped; a git-ignored path with an
-existing parent skipped and with a missing parent failing; a fenced block skipped, tilde fences included;
-an unbalanced fence failing; and an input file with no paths failing.
+not at the root failing; an extensionless root file such as `Justfile` checked, and a misspelling of it
+failing only when it is on the closed list; a `:<digits>` suffix handled; a path inside a command line
+checked; a placeholder, a URL and a git ref skipped; an ignored path whose shallowest ignored prefix has an
+existing parent skipped (`target/release/`) and one with a missing parent failing (a misspelt plugin
+directory above `bin/`); an ignored directory written without its trailing slash; a fenced block skipped,
+tilde fences included; an unbalanced fence failing; and an input file with no paths failing.
 
-Wiring: the `check` recipe, a `ci.yml` step, and the `lefthook.yml` `pre-push` block.
+Wiring: the `check` recipe, a `ci.yml` step, and the `lefthook.yml` `pre-push` block. The `wiring` job
+(`Plugin Wiring`) in `ci.yml` is the natural home, being the job that already runs the other static
+checks; the plan confirms it.
+
+Licensing: `scripts/check-license-headers.sh` covers `.sh` files (its scope is `.rs .sh .ts .js .py .ps1`)
+and not Markdown, so the new script carries the repository's license header and the two documents do not.
+The check reads tracked files only, so it sees the script once it is added.
 
 ## 8. Risks and what stays open
 
@@ -171,7 +208,20 @@ Wiring: the `check` recipe, a `ci.yml` step, and the `lefthook.yml` `pre-push` b
   The guidelines own "adding a plugin"; `HACK.md` owns maintainer procedure. Where a topic could sit in
   either, it stays in `HACK.md` and the guidelines link to it.
 
-Left for the plan, because they depend on code to be read then: the exact script name and shell idiom, how
-it extracts spans, which `ci.yml` job carries the step, whether `scripts/check-license-headers.sh` and the
-spell check apply to the new files, the self-test's file layout and recipe name, and the final wording of
+Left for the plan, because they depend on code to be read then: the exact script name and shell idiom, the
+extraction technique (the contract in section 7 is fixed; only how it is implemented is open), whether the
+spell check applies to the new files, the self-test's file layout and recipe name, and the final wording of
 every checklist row.
+
+## 9. Stand-downs
+
+Recorded from panel round 1 (agy, 2026-11-19):
+
+- `REJECTED: the peer's proposed fix for the ignored-path rule` (check whether any leading component is
+  ignored): measured against `.gitignore:65`, `qwen/plugins/typo-qwen/bin/` is ignored through its `bin`
+  component alone, so that fix lets the misspelt directory pass. Section 7 uses the shallowest ignored
+  prefix and its parent instead. The finding behind it (nested build paths such as `target/release/`
+  failing on a fresh clone) was real and is folded.
+- `DISCARDED-BELOW-FLOOR: a failing new check halts "just check" before later diagnostics` unreachable as
+  a distinct defect because `Justfile:360` is a plain dependency list in which any existing check can
+  already fail first; the new check adds no new ordering behaviour.
