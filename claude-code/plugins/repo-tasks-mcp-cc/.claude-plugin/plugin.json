@@ -1,6 +1,6 @@
 {
   "name": "repo-tasks-mcp-cc",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A per-repository task list for Claude Code over MCP: four tools to create, list, read and update tasks that outlive the session and are shared with other agents working in the same repository.",
   "author": {
     "name": "AI Plugins Marketplace Contributors"
