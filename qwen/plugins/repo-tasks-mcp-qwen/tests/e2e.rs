@@ -184,7 +184,9 @@ fn extension_manifest_declares_three_sources() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("qwen-extension.json");
     let v: Value = serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
     assert_eq!(v["name"], "repo-tasks-mcp-qwen");
-    assert_eq!(v["version"], "0.1.0");
+    // release-please bumps this file and Cargo.toml together, so pin the two to each other
+    // rather than to a literal that every release would have to edit.
+    assert_eq!(v["version"], env!("CARGO_PKG_VERSION"));
     assert_eq!(v["contextFileName"], "QWEN.md");
     let server = &v["mcpServers"]["repo-tasks-mcp-qwen"];
     assert_eq!(
