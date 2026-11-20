@@ -19,7 +19,7 @@
     and extracting the bundle directly into ~/.qwen/extensions/<name>/.
 
 .PARAMETER ExtensionName
-    The extension to install: re-ghidra-mcp-qwen, rtk-mcp-qwen, opencode-ctl-mcp-qwen or aiplugins-devtools-qwen
+    The extension to install: re-ghidra-mcp-qwen, rtk-mcp-qwen, opencode-ctl-mcp-qwen, aiplugins-devtools-qwen or repo-tasks-mcp-qwen
 
 .EXAMPLE
     # One-liner install (PowerShell):
@@ -31,7 +31,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('re-ghidra-mcp-qwen', 'rtk-mcp-qwen', 'opencode-ctl-mcp-qwen', 'aiplugins-devtools-qwen')]
+    [ValidateSet('re-ghidra-mcp-qwen', 'rtk-mcp-qwen', 'opencode-ctl-mcp-qwen', 'aiplugins-devtools-qwen', 'repo-tasks-mcp-qwen')]
     [string]$ExtensionName
 )
 
@@ -41,7 +41,7 @@ function Install-QwenExtension {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory, Position = 0)]
-        [ValidateSet('re-ghidra-mcp-qwen', 'rtk-mcp-qwen', 'opencode-ctl-mcp-qwen', 'aiplugins-devtools-qwen')]
+        [ValidateSet('re-ghidra-mcp-qwen', 'rtk-mcp-qwen', 'opencode-ctl-mcp-qwen', 'aiplugins-devtools-qwen', 'repo-tasks-mcp-qwen')]
         [string]$Name
     )
 
@@ -157,6 +157,7 @@ else {
     Write-Host "  rtk-mcp-qwen         RTK command rewriter hook"
     Write-Host "  opencode-ctl-mcp-qwen  OpenCode worker sessions (20 MCP tools)"
     Write-Host "  aiplugins-devtools-qwen  Devtools skills (code review, spec panel review, ...)"
+    Write-Host "  repo-tasks-mcp-qwen  Per-repository task list (4 MCP tools)"
     Write-Host ""
     Write-Host "Or use the function directly after piping:" -ForegroundColor Yellow
     Write-Host '  Install-QwenExtension re-ghidra-mcp-qwen'
