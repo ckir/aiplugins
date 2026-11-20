@@ -67,3 +67,11 @@ Spec: `docs/specs/2026-10-18-opencode-ctl-mcp-design.md`. After execution comes 
 ## just links fails where repo-tasks-mcp-opencode dependencies are installed
 
 **Status:** OPEN 2026-11-19 - the `links` recipe in the `Justfile` passes `mlc` an `--ignore-path` list that omits `./opencode/plugins/repo-tasks-mcp-opencode/node_modules`, which the lefthook pre-push `mlc` line lists. With that folder present `just links` exits 1 and prints 7900 lines, 7244 of them from it (measured 2026-11-19), and `links` is part of `just check`. Fix: add the path to the recipe. Found while measuring baselines for the plugin-guidelines plan.
+
+## No gate checks that the check scripts stay wired
+
+**Status:** OPEN 2026-11-20 - nothing in the repository fails when a gate is dropped from the `Justfile` `check` aggregate, from `.github/workflows/ci.yml` or from `lefthook.yml`: a grep of `scripts/` for those three file names finds only `scripts/check-doc-paths.sh` itself (its own header). The agy-test-audit of `docs/plugin-guidelines` measured this for `doc-paths` and `doc-paths-test` (`Justfile:98-103,369`, `ci.yml:159-163`, `lefthook.yml:28-29`), and the same holds for every other gate. A small parity script that names each expected gate and checks the three files still invoke it would close it; it is a repo-wide change, so it is not in the plugin-guidelines branch.
+
+## check-doc-paths selftest runs on Linux only in CI
+
+**Status:** OPEN 2026-11-20 - `.github/workflows/ci.yml:160` runs `bash scripts/check-doc-paths.sh --selftest` on `ubuntu-latest` only, while the script's header claims POSIX awk (BSD awk on macOS) and contributors run it through `just check` and lefthook on macOS and Windows Git Bash. Measured here: the 61 cases pass under gawk, mawk, `gawk --posix` and busybox awk. Not measured: macOS awk, and Git Bash's handling of `core.excludesFile=/dev/null` and CRLF from `git check-ignore`. Fix is to run the self-test on the existing three-OS matrix, or to measure once on each platform and record it.
