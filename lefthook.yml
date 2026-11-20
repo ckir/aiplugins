@@ -25,3 +25,5 @@ pre-push:
       run: mlc --offline --ignore-path "./node_modules,./opencode/plugins/re-ghidra-mcp-opencode/node_modules,./opencode/plugins/opencode-ctl-mcp-opencode/node_modules,./opencode/plugins/repo-tasks-mcp-opencode/node_modules,./opencode/plugins/rtk-mcp-opencode/node_modules,./opencode/plugins/todov2-opencode/node_modules,./target,./docs/site,./.clavity"
     license-headers:
       run: scripts/check-license-headers.sh
+    doc-paths:
+      run: bash scripts/check-doc-paths.sh

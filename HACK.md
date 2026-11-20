@@ -14,7 +14,7 @@ the Claude marketplace plus `opencode/plugins/*/`).
 
 ### To add an agent
 
-1. Copy the template front directory. `claude-code/example/` is the template
+1. Copy the template front directory. `claude-code/plugins/example/` is the template
    Rust plugin front end; duplicate the agent directory closest to the new
    host's format and rename it to the new agent's `dir`.
 2. Add one entry to `agents.json` with all eight fields:
@@ -25,11 +25,11 @@ the Claude marketplace plus `opencode/plugins/*/`).
    (plugin stems the checks skip, e.g. `example`).
 3. If the agent has a marketplace (`marketplace` is not `null`), regenerate
    the host manifests: `bash scripts/gen-marketplaces.sh`.
-4. Run the Task 6 gate command — `bash scripts/gen-marketplaces.sh --check`
+4. Run the gate command — `bash scripts/gen-marketplaces.sh --check`
    (the same step CI runs, plus the `just gen-marketplaces` recipe) — and the
    wiring checks (`just marketplace qwen-marketplace wiring opencode-wiring`).
    The registry-driven checks pick the new agent up with no script edits;
-   add its line to `check-package-versions.sh` and its footprint/smoke
+   add its line to `scripts/check-package-versions.sh` and its footprint/smoke
    coverage to the Justfile (see above).
 
 ### To remove an agent
@@ -75,7 +75,7 @@ package's own manifest by `bash scripts/gen-marketplaces.sh`. There is no
 
 After every release-please bump PR, the committed marketplaces are stale by
 construction (manifests moved, urls did not), and CI fails the bump PR on
-`gen-marketplaces.sh --check` plus the host wiring checks. Procedure: check
+`bash scripts/gen-marketplaces.sh --check` plus the host wiring checks. Procedure: check
 out the release-please branch (`release-please--branches--main`), run
 `bash scripts/gen-marketplaces.sh`, commit, push. Merge the bump PR only
 once that commit is green. The new marketplace points at the about-to-exist
