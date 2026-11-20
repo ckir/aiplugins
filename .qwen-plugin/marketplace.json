@@ -96,7 +96,7 @@
       "name": "repo-tasks-mcp-qwen",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/repo-tasks-mcp-qwen-v0.1.0/repo-tasks-mcp-qwen-extension.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/repo-tasks-mcp-qwen-v0.2.0/repo-tasks-mcp-qwen-extension.zip"
       },
       "description": "A task list kept per git repository, shared with other agents working in it: four MCP tools to create, list, read and update tasks, and a session-start line saying how many are open.",
       "author": {

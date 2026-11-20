@@ -1,6 +1,6 @@
 {
   "name": "repo-tasks-mcp-qwen",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "displayName": "repo-tasks-mcp-qwen — a per-repository task list for Qwen Code",
   "description": "A task list kept per git repository, shared with other agents working in it: four MCP tools to create, list, read and update tasks, and a session-start line saying how many are open.",
   "license": "PolyForm-Noncommercial-1.0.0",
