@@ -128,6 +128,8 @@ Fronted by all four agents: [`claude-code/plugins/re-ghidra-mcp-cc`](claude-code
 ## Documentation index
 
 - [User Guide (PDF)](docs/USER_GUIDE.pdf) — install and use the marketplace and its plugins, with verified examples.
+- [Plugin guidelines](docs/PLUGIN_GUIDELINES.md) — add a plugin: the wiring checklist for each kind and the standards the checks enforce.
+- [`HACK.md`](HACK.md) — maintainer notes: releases and tags, the footprint override, marketplace URLs, adding an agent.
 
 Plugin and example READMEs, by agent directory:
 
@@ -161,4 +163,4 @@ Plugin and example READMEs, by agent directory:
   - [`todov2-opencode`](opencode/plugins/todov2-opencode/) — the V2-removed `todowrite` session tool plus a live todo sidebar list.
   - [`repo-user-guide-opencode`](opencode/plugins/repo-user-guide-opencode/) — PDF user guides for a repository, with verified examples; published as `repo-user-guide`.
 
-*More details and plugin guidelines will be added soon.*
+Adding a plugin? Start with the [plugin guidelines](docs/PLUGIN_GUIDELINES.md). Releases, tags and the footprint override are in [`HACK.md`](HACK.md).
