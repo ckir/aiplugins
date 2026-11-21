@@ -8,7 +8,11 @@ name: Release Refresh
 # INSTALL.md, the Antigravity and Qwen READMEs). Without a refresh, every
 # release PR fails `gen-marketplaces.sh --check` and `check-install-pins.sh`
 # on its first CI run - red through no fault of the release content.
-# Footprint documents no longer carry a version stamp, so they need no refresh.
+# It also does not update the workspace Cargo.lock at the repository root (it
+# looks for a lock file inside each package folder), so the lock file kept the
+# old version of every crate a release bumped, and the next cargo build
+# rewrote a tracked file. Footprint documents no longer carry a version stamp,
+# so they need no refresh.
 #
 # This job runs both against the release branch and commits the
 # result back to it when it changes anything. It converges: the push
@@ -63,6 +67,17 @@ jobs:
         continue-on-error: true
         run: bash scripts/check-install-pins.sh --write
 
+      # Sets the version of each workspace crate in Cargo.lock to the one its
+      # Cargo.toml now carries, and changes nothing else (no dependency moves).
+      # It needs the registry index, so it needs the network: --offline fails
+      # on a runner with an empty cargo home. continue-on-error for the same
+      # reason as the step above; CI's `--locked` step catches a lock file this
+      # could not update.
+      - name: Refresh Cargo.lock
+        id: lock
+        continue-on-error: true
+        run: cargo update --workspace
+
       - name: Commit refresh
         env:
           # Passed through env, never spliced into the script text: head_ref is
@@ -70,8 +85,8 @@ jobs:
           # standing between it and the shell.
           HEAD_REF: ${{ github.head_ref }}
         run: |
-          # Only the generated marketplace manifests and the install
-          # documents whose pins the step above rewrites. A release branch never
+          # Only the generated marketplace manifests, the install documents
+          # whose pins a step above rewrites, and Cargo.lock. A release branch never
           # carries hand-written changes, but an unrestricted `git add -A`
           # would commit them silently if it ever did - and a refresh commit
           # must never smuggle content into a release.
@@ -82,7 +97,8 @@ jobs:
             .opencode-plugin/marketplace.json \
             opencode/plugins/*/INSTALL.md \
             antigravity/plugins/*/README.md \
-            qwen/plugins/*/README.md
+            qwen/plugins/*/README.md \
+            Cargo.lock
           if git diff --cached --quiet; then
             echo "Derived files already fresh; nothing to commit."
           else
@@ -98,4 +114,10 @@ jobs:
         if: steps.pins.outcome == 'failure'
         run: |
           echo "::error::The step 'Refresh install-document pins' failed: scripts/check-install-pins.sh --write found a problem that needs a hand edit. Its log lists each one."
+          exit 1
+
+      - name: Fail when Cargo.lock could not be refreshed
+        if: steps.lock.outcome == 'failure'
+        run: |
+          echo "::error::The step 'Refresh Cargo.lock' failed: cargo update --workspace did not complete. Its log has the reason; re-run this workflow once it is resolved."
           exit 1

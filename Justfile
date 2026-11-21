@@ -391,9 +391,15 @@ site-preview:
     @echo 'Check: 1) 320 px and desktop widths; 2) light, dark and the theme toggle; 3) a sparse card (todov2 has three greyed tabs); 4) a Qwen card shows Not measured; 5) an OpenCode card shows the setup bar and resident 0 B; 6) every copy button, and the page with JavaScript disabled'
     python3 -m http.server --bind 127.0.0.1 --directory target/preview 8000
 
+# Check that Cargo.lock agrees with every crate's Cargo.toml. It runs first in `check`: any
+# later cargo command would quietly rewrite a stale lock file and hide the problem.
+# `cargo update --workspace` fixes it and changes no dependency.
+lock:
+    cargo metadata --locked --format-version 1 > /dev/null
+
 # Run all pre-flight checks (what CI and lefthook run; see ci.yml — `links`
 # is hook-only and `gen-* --check` + opencode suites run in CI but not here)
-check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace agy-marketplace dispatch smoke footprint opencode-wiring bump-opencode-plugin-test rerun-runner-failures-test doc-paths-test doc-paths gate-wiring-test gate-wiring install-pins-test install-pins readme-coverage-test readme-coverage agy-wiring agy-validate footprint-budgets devtools-skills skills-bundles skills-release-wiring site-check
+check: lock fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace agy-marketplace dispatch smoke footprint opencode-wiring bump-opencode-plugin-test rerun-runner-failures-test doc-paths-test doc-paths gate-wiring-test gate-wiring install-pins-test install-pins readme-coverage-test readme-coverage agy-wiring agy-validate footprint-budgets devtools-skills skills-bundles skills-release-wiring site-check
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.
