@@ -20,8 +20,15 @@
 # this script). Each one must be:
 #   1. run by a Justfile recipe, and that recipe must be reached by `just check`
 #      (named in its dependencies, directly or through other recipes);
-#   2. run in CI: a workflow names `scripts/<gate>` in a run line, or runs a
+#   2. run in CI: a workflow line runs `scripts/<gate>`, or runs a
 #      `just <recipe>` that reaches the gate (`just check` reaches all of them).
+# A line RUNS a gate only when `scripts/<gate>` is the command on that line,
+# alone or after `bash` (a leading `@`, `- ` or `run:` is allowed), and no word
+# after it starts with `--` unless it is `--root`. So the plain run counts, with
+# or without positional arguments; `--selftest`, `--mutation-test`, `--write`
+# and any other mode do not, and neither does a line that only mentions the
+# script (an `echo`, a longer command). A gate whose self-test is wired still
+# needs its plain run wired beside it.
 # A line that is only a comment never counts, in the Justfile or in a workflow.
 #
 # Two lists below are closed and checked both ways:
@@ -29,8 +36,11 @@
 #                   An exception for a gate that IS wired there is stale and fails.
 #   LEFTHOOK_GATES  gates lefthook.yml must also run, by `scripts/<gate>`.
 #
-# Limits, by design: it proves a gate is named where it runs, not that the step
-# runs on the right branch or that its flags are right. A recipe header with a
+# Limits, by design: it proves a gate's plain run is written where it should
+# be, not that the step runs on the right branch, that the workflow is a pull
+# request check, or that the command's result is not discarded (`|| true`). A
+# gate started any other way (`cd x && bash scripts/<gate>`, a wrapper script)
+# is not seen: write the plain run on its own line. A recipe header with a
 # parameter default that contains a colon is not understood. Only scripts named
 # check-*.sh are gates.
 set -euo pipefail
@@ -108,6 +118,29 @@ ci_recipes() {
 
 in_list() { case " $2 " in *" $1 "*) return 0 ;; esac; return 1; }
 
+# is_run(LINE, GATE): LINE runs scripts/GATE in its check mode (see the header).
+# POSIX awk only: no intervals, no gensub, no match() arrays.
+AWK_RUNS=$(cat <<'AWK'
+function is_run(line, gate,   s, cmd, rest, n, w, i) {
+    s = line
+    sub(/\r$/, "", s)
+    sub(/^[ \t]*/, "", s)
+    sub(/^@[ \t]*/, "", s)
+    sub(/^-[ \t]+/, "", s)
+    sub(/^run:[ \t]*/, "", s)
+    sub(/^bash[ \t]+/, "", s)
+    cmd = "scripts/" gate
+    if (index(s, cmd) != 1) return 0
+    rest = substr(s, length(cmd) + 1)
+    if (rest != "" && rest !~ /^[ \t]/) return 0
+    n = split(rest, w, /[ \t]+/)
+    for (i = 1; i <= n; i++)
+        if (w[i] ~ /^--/ && w[i] != "--root" && index(w[i], "--root=") != 1) return 0
+    return 1
+}
+AWK
+)
+
 run_check() {
     local root=$1 tsv ci_text
     tsv=$(mktemp)
@@ -117,7 +150,7 @@ run_check() {
 }
 
 check_files() {
-    local root=$1 tsv=$2 ci_text=$3 f gate g_re recipes r skips entry egate eskips ereason
+    local root=$1 tsv=$2 ci_text=$3 f gate recipes r skips entry egate eskips ereason
     local check_set ci_set ci_seed gates=0 in_just in_check in_ci listed gate_names=""
 
     if [ ! -f "$root/Justfile" ]; then
@@ -155,7 +188,6 @@ check_files() {
         gate=$(basename "$f")
         gates=$((gates + 1))
         gate_names="$gate_names $gate"
-        g_re="scripts/${gate//./\\.}([^A-Za-z0-9_.-]|\$)"
 
         skips=""
         for entry in ${EXCEPTIONS[@]+"${EXCEPTIONS[@]}"}; do
@@ -165,11 +197,13 @@ check_files() {
             fi
         done
 
-        recipes=$(g_re="$g_re" awk -F'\t' '$1 == "B" && $3 ~ ENVIRON["g_re"] { print $2 }' "$tsv" | sort -u | tr '\n' ' ')
+        recipes=$(awk -F'\t' -v gate="$gate" "$AWK_RUNS"'
+            $1 == "B" && is_run($3, gate) { print $2 }' "$tsv" | sort -u | tr '\n' ' ')
         in_just=0; in_check=0; in_ci=0
         [ -n "${recipes// /}" ] && in_just=1
         for r in $recipes; do in_list "$r" "$check_set" && in_check=1; done
-        if grep -Eq "$g_re" "$ci_text"; then
+        if awk -v gate="$gate" "$AWK_RUNS"'
+            is_run($0, gate) { found = 1 } END { exit !found }' "$ci_text"; then
             in_ci=1
         else
             for r in $recipes; do in_list "$r" "$ci_set" && in_ci=1; done
@@ -182,7 +216,7 @@ check_files() {
                 fi ;;
             *)
                 if [ "$in_just" -eq 0 ]; then
-                    fail "$gate: not run by any Justfile recipe"
+                    fail "$gate: not run by any Justfile recipe (a run with a mode flag such as --selftest does not count)"
                 elif [ "$in_check" -eq 0 ]; then
                     fail "$gate: runs only in recipe(s) ${recipes% }, none of which \`just check\` reaches"
                 fi ;;
@@ -194,7 +228,7 @@ check_files() {
                 fi ;;
             *)
                 if [ "$in_ci" -eq 0 ]; then
-                    fail "$gate: not run in CI (no workflow names scripts/$gate or runs a \`just\` recipe that reaches it)"
+                    fail "$gate: not run in CI (no workflow line runs scripts/$gate in its check mode, or a \`just\` recipe that does)"
                 fi ;;
         esac
         if [ "$in_just" -eq 1 ] && [ "$in_check" -eq 1 ] && [ "$in_ci" -eq 1 ]; then
@@ -294,6 +328,35 @@ selftest() {
 
     tree; printf 'jobs:\n  x:\n    steps:\n      - run: just --quiet b\n      - run: bash scripts/check-a.sh\n' > "$fx/t/.github/workflows/ci.yml"
     case_run "just with a flag before the recipe passes" pass "ok       check-b.sh"
+
+    # What counts as a run: the plain command, not another mode and not a mention.
+    tree; printf 'check: a-test b-test\n\na-test:\n    bash scripts/check-a.sh\n\nb:\n    bash scripts/check-b.sh\n\nb-test:\n    bash scripts/check-b.sh --selftest\n' > "$fx/t/Justfile"
+    printf 'jobs:\n  x:\n    steps:\n      - run: bash scripts/check-a.sh\n      - run: bash scripts/check-b.sh\n' > "$fx/t/.github/workflows/ci.yml"
+    case_run "a self-test recipe in the aggregate does not stand in for the plain run" fail "check-b.sh: runs only in recipe(s) b, none of which \`just check\` reaches"
+
+    tree; printf 'check: a-test b\n\na-test:\n    bash scripts/check-a.sh\n\nb:\n    bash scripts/check-b.sh --selftest\n' > "$fx/t/Justfile"
+    printf 'jobs:\n  x:\n    steps:\n      - run: bash scripts/check-a.sh\n      - run: bash scripts/check-b.sh\n' > "$fx/t/.github/workflows/ci.yml"
+    case_run "a gate only its self-test recipe runs fails" fail "check-b.sh: not run by any Justfile recipe"
+
+    tree; printf 'jobs:\n  x:\n    steps:\n      - run: bash scripts/check-a.sh\n      - run: bash scripts/check-b.sh --selftest\n' > "$fx/t/.github/workflows/ci.yml"
+    printf 'check: a-test b\n\na-test:\n    bash scripts/check-a.sh\n\nb:\n    bash scripts/check-b.sh\n' > "$fx/t/Justfile"
+    case_run "a self-test step in CI does not stand in for the plain run" fail "check-b.sh: not run in CI"
+
+    tree; printf 'check: a-test b\n\na-test:\n    bash scripts/check-a.sh\n\nb:\n    bash scripts/check-b.sh\n\nb-test:\n    bash scripts/check-b.sh --selftest\n' > "$fx/t/Justfile"
+    printf 'jobs:\n  x:\n    steps:\n      - run: bash scripts/check-a.sh\n      - run: just b-test\n' > "$fx/t/.github/workflows/ci.yml"
+    case_run "CI reaching only the self-test recipe fails" fail "check-b.sh: not run in CI"
+
+    tree; printf 'jobs:\n  x:\n    steps:\n      - run: bash scripts/check-a.sh\n      - run: bash scripts/check-b.sh --mutation-test\n      - run: bash scripts/check-b.sh --write\n' > "$fx/t/.github/workflows/ci.yml"
+    printf 'check: a-test b\n\na-test:\n    bash scripts/check-a.sh\n\nb:\n    bash scripts/check-b.sh\n' > "$fx/t/Justfile"
+    case_run "another mode of the gate in CI is not its check" fail "check-b.sh: not run in CI"
+
+    tree; printf 'jobs:\n  x:\n    steps:\n      - run: bash scripts/check-a.sh\n      - run: echo "::error::run bash scripts/check-b.sh"\n      - run: |\n          echo scripts/check-b.sh\n' > "$fx/t/.github/workflows/ci.yml"
+    printf 'check: a-test b\n\na-test:\n    bash scripts/check-a.sh\n\nb:\n    @echo "bash scripts/check-b.sh"\n' > "$fx/t/Justfile"
+    case_run "a line that only mentions the gate is not a run" fail "check-b.sh: not run by any Justfile recipe" "check-b.sh: not run in CI"
+
+    tree; printf 'check: a-test b\n\na-test:\n    @bash scripts/check-a.sh --root .\n\nb:\n    bash scripts/check-b.sh target/out.json\n    bash scripts/check-b.sh --selftest\n' > "$fx/t/Justfile"
+    printf 'jobs:\n  x:\n    steps:\n      - run: scripts/check-a.sh {staged_files}\n      - run: |\n          bash scripts/check-b.sh --root=. target/out.json\n' > "$fx/t/.github/workflows/ci.yml"
+    case_run "positional arguments, --root, @ and a run block still count" pass "ok       check-a.sh" "ok       check-b.sh"
 
     tree; rm "$fx/t/lefthook.yml"
     case_run "a lefthook gate with no lefthook.yml fails" fail "lefthook.yml does not run scripts/check-a.sh"

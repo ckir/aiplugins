@@ -506,6 +506,14 @@ MD
     bad missing-document "opencode/plugins/t-opencode/INSTALL.md: the file does not exist"
     fresh s12; printf '{ not json\n' > "$t/opencode/plugins/a-opencode/opencode.jsonc"; go
     bad invalid-jsonc "opencode/plugins/a-opencode/opencode.jsonc: not valid JSON"
+    # the sibling paths: its release URL under a tag that is not a version, a second CC_VERSION= line,
+    # and a sibling manifest whose version is not x.y.z
+    fresh s15; printf 'https://github.com/ckir/aiplugins/releases/download/a-cc-vNEXT/a-cc-plugin.zip\n' >> "$t/$A"; go
+    bad sibling-url-wrong-tag "$A: line 21: a release URL for a-cc is under the tag \`a-cc-vNEXT\`"
+    fresh s16; printf 'CC_VERSION=4.5.6\n' >> "$t/$A"; go
+    bad duplicate-cc-version-line "$A: 2 lines start with CC_VERSION="
+    fresh s17; printf '{"version": "4.5"}\n' > "$t/claude-code/plugins/a-cc/.claude-plugin/plugin.json"; go
+    bad non-semver-sibling-version "claude-code/plugins/a-cc/.claude-plugin/plugin.json: version '4.5'"
     fresh s13; sed 's/^VERSION=.*/VERSION="2.0.0"/' "$t/opencode/plugins/s-opencode/INSTALL.md" > "$t/x" && mv "$t/x" "$t/opencode/plugins/s-opencode/INSTALL.md"; go
     bad version-line-not-semver 'opencode/plugins/s-opencode/INSTALL.md: line 4: the value after VERSION= is not an x.y.z version'
 
