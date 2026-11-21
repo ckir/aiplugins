@@ -103,12 +103,16 @@ targets=$(sed -n 's/^targets = \[\(.*\)\]$/\1/p' "$repo/dist-workspace.toml" |
 # from the manifest, rather than from whatever the archives happen to contain,
 # makes this the same contract every installer enforces: every
 # `${extensionPath}/bin/X` reference has to end up as a real file in bin/.
+# A hook's `command` may carry arguments after the binary
+# (`${extensionPath}${/}bin${/}X reminder --event qwen`); the first sed expression
+# drops them, as bundle-plugin.sh and bundle-agy-plugin.sh do, or the unquoted
+# loops below would split them into binary names.
 binaries=$(
     jq -r '
         ([.. | objects | .command? // empty] | .[] | select(type == "string" and contains("bin")))
         | select(contains("extensionPath") or contains("${extensionPath}"))
     ' "$src/qwen-extension.json" |
-    sed 's#.*\${/}##; s#\.exe$##' |
+    sed 's#[[:space:]].*##; s#.*\${/}##; s#\.exe$##' |
     tr -d '\r' |
     sort -u
 )
