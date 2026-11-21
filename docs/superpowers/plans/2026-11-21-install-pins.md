@@ -13,13 +13,14 @@
 ## Global Constraints
 
 - **Exactly two commits, in this order** (spec 4.5). Task 1 ends with commit 1. Tasks 2 to 6 build commit 2 and only Task 6 commits. Do not commit at the end of Tasks 2 to 5: `scripts/check-gate-wiring.sh` fails `just check` for a `scripts/check-*.sh` that has no wiring, and `scripts/check-doc-paths.sh` fails for a path that `docs/PLUGIN_GUIDELINES.md` names before it exists.
-- **Commit subjects, exactly:** commit 1 `docs: reword stale version claims and list every OpenCode plugin in the root README`; commit 2 `chore: generate and gate the install-document release pins`. Neither is `feat` or `fix`, so release-please should cut no release for the plugin folders these commits touch (the spec relies on the same rule for the workflow's own `chore:` commit, and this repository already uses `docs(...)` for document-only commits, for example `b8eb834`). This was reasoned, not measured: if the release PR that follows the merge proposes a version bump caused only by these two commits, stop and tell the owner.
+- **Commit subjects, exactly:** commit 1 `docs: reword stale version claims and list every OpenCode plugin in the root README`; commit 2 `chore: generate and gate the install-document release pins`. Neither is `feat` or `fix`, so release-please cuts no release for the plugin folders these commits touch. Measured in this repository's history: the document-only commit `b8eb834` (`docs(repo-tasks): ...`) touched plugin folders and appears in no `CHANGELOG.md`, and the changelog sections release-please has written here are only Features, Bug Fixes and Reverts. If the release PR that follows the merge still proposes a version bump caused only by these two commits, stop and tell the owner.
 - **Commit trailer:** end each commit message with the `Co-Authored-By:` line that the session's attribution reminder names at commit time.
 - **Branch:** work on `docs/install-pins`, which already carries the spec and this plan and was cut from `origin/main` at `7d1656a`. Before Task 1 run `git fetch origin main && git rev-parse --short origin/main`; if it no longer prints `7d1656a`, rebase onto it and re-run Step 0 of every task, because the line numbers below were read at that commit.
 - **Never type a version number into a document.** The numbers in Task 6 come from `bash scripts/check-install-pins.sh --write`. The spec section 1 tables say what they must be.
 - **Portability:** `just check` runs on macOS (BSD awk and sed) and Git Bash. Both scripts use POSIX awk only (no intervals, no `gensub`, no `match()` arrays), no `sed -i`, no `\b`, no `grep -P`. Do not "simplify" them with GNU-only features.
 - **License header:** both new scripts start with the 8-line header every script here carries; the lefthook pre-commit hook runs `scripts/check-license-headers.sh` on staged files. The file contents below already include it.
 - **The repository's gate as it is:** `just check`, with no added flags. Do not make any check stricter than the repository does.
+- **Scratch files** go in a directory outside the repository. The steps write it as `$SCRATCH`; set it once with `SCRATCH=$(mktemp -d)`.
 - **Shape rule for implementers:** paste the file contents and the replacement blocks below unchanged. If something does not apply or does not pass, stop and report it as `STATE_MISMATCH: <what differs>` or `[original] -> [yours] because <reason>`. Do not adapt the text to make a check pass, and do not edit a selftest to match the code: the spec is the oracle.
 
 ## How this plan was verified
@@ -29,7 +30,8 @@ The plan was written against the repository at `00c6d87` and replayed before it 
 - both selftests pass (30 and 16 cases), under GNU awk, `gawk --posix`, mawk and busybox awk;
 - 25 line-level mutants each turn a named selftest case red (Task 2 Step 4 and Task 3 Step 4);
 - `shellcheck -x` is clean on both scripts, and `typos` is clean;
-- after commit 1 and again after commit 2: `scripts/check-doc-paths.sh`, `scripts/check-gate-wiring.sh` (and its selftest), `scripts/check-opencode-wiring.sh`, `scripts/check-agy-wiring.sh`, `scripts/check-skills-bundles.sh`, `scripts/check-skills-release-wiring.sh`, `scripts/gen-marketplaces.sh --check`, `typos` and `just links` all pass;
+- after commit 1 and again after commit 2, each of these passes: `just doc-paths`, `just spellcheck`, `just links`, `just opencode-wiring`, `just agy-wiring`, `scripts/check-gate-wiring.sh` and its selftest, `scripts/check-skills-bundles.sh`, `scripts/check-skills-release-wiring.sh`, `scripts/gen-marketplaces.sh --check`, the three marketplace checks, `scripts/check-package-versions.sh`, `scripts/check-release-manifest.sh` and `scripts/check-devtools-skills.sh`; `just site-check` passes after commit 2 (it was not run after commit 1);
+- the verification commands of Task 1 Step 3, Task 4 Step 4, Task 5 Step 2 and Task 6 Steps 1 and 2 were run as written, and their expected output below is what they printed;
 - `actionlint` reports nothing for `.github/workflows/release-refresh.yml`. It reports three `SC2086` notes at `.github/workflows/ci.yml:344`, a step this plan does not touch, with or without this change.
 
 Not measured, and so the plan measures them during execution: the full `just check` (it builds the Rust workspace), `just footprint` and `just footprint-budgets`, a real macOS or Git Bash run, and a live run of the release-refresh workflow (it only runs on the release-please branch).
@@ -338,7 +340,7 @@ Then run the document gates:
 just doc-paths && just spellcheck && just links && just opencode-wiring && just agy-wiring
 ```
 
-Expected: each ends with its success line (`All documented paths exist.`, no spelling output, `Errors   0` in the link summary, `All 41 opencode reference(s) resolve.`, `All 43 antigravity reference(s) resolve.`), exit 0.
+Expected: each ends with its success line (`All documented paths exist.`, only the echoed command `typos` from the spelling check, `Errors   0` in the link summary, `All 41 opencode reference(s) resolve.`, `All 43 antigravity reference(s) resolve.`), exit 0.
 
 - [ ] **Step 4: Run the repository gate**
 
@@ -386,7 +388,16 @@ Expected: `No such file or directory`, and the head commit is Task 1's. Otherwis
 
 - [ ] **Step 1: Create the script**
 
-The selftest lives in the same file, as in `scripts/bump-opencode-plugin.sh` and `scripts/check-gate-wiring.sh`, so the tests are already written: create the file with exactly this content and make it executable (`chmod +x scripts/check-install-pins.sh`; the other gate scripts are mode `100755`).
+The selftest lives in the same file, as in `scripts/bump-opencode-plugin.sh` and `scripts/check-gate-wiring.sh`, so the tests are already written: create the file with exactly the content of the block below and make it executable (the other gate scripts are mode `100755`). Do not retype it. This extracts the block from this plan and proves the copy is exact:
+
+```bash
+awk '/^### Task 2:/ { t = 1 } t && /^````bash$/ { on = 1; next } on && /^````$/ { exit } on' \
+  docs/superpowers/plans/2026-11-21-install-pins.md > scripts/check-install-pins.sh
+chmod +x scripts/check-install-pins.sh
+sha256sum scripts/check-install-pins.sh
+```
+
+Expected: `4bca0aeae517bdc64e6198f5eaa693684fcdf0b6c6d6f979dc9d0a68b0ec3402  scripts/check-install-pins.sh` (on macOS use `shasum -a 256`). A different sum means the copy is not the script that was tested: stop and report it.
 
 ````bash
 #!/usr/bin/env bash
@@ -943,7 +954,7 @@ If a `FAIL` line appears, Task 1 left a `current as of this writing` behind or t
 
 - [ ] **Step 4: Mutation run**
 
-The spec asks for one line-level mutant per guard, each turning a named case red. Save this as a scratch file outside the repository (for example `/tmp/mutants.sh`) and run `bash /tmp/mutants.sh` from the repository root. It covers this script and the one from Task 3, so run it after Task 3 Step 2; it takes about three minutes.
+The spec asks for one line-level mutant per guard, each turning a named case red. Save the block below as `$SCRATCH/mutants.sh` and run `bash "$SCRATCH/mutants.sh"` from the repository root. It covers this script and the one from Task 3, so run it after Task 3 Step 2. It runs 25 selftests and takes about three and a half minutes: run it in the background, or with a command timeout of at least 300 seconds. A run cut off by a shorter timeout leaves `scripts/mut.sh` behind; delete it and run again.
 
 ````bash
 # Run from the repository root. Each line applies one edit to a copy of a gate
@@ -1038,7 +1049,16 @@ Expected: `No such file or directory`, then `15:## Installing` and `63:## What e
 
 - [ ] **Step 1: Create the script**
 
-Create the file with exactly this content and `chmod +x scripts/check-readme-coverage.sh`.
+Create the file with exactly the content of the block below. Do not retype it:
+
+```bash
+awk '/^### Task 3:/ { t = 1 } t && /^````bash$/ { on = 1; next } on && /^````$/ { exit } on' \
+  docs/superpowers/plans/2026-11-21-install-pins.md > scripts/check-readme-coverage.sh
+chmod +x scripts/check-readme-coverage.sh
+sha256sum scripts/check-readme-coverage.sh
+```
+
+Expected: `c035f6a6e29eda3d421f360397aba0cc5bfff279ff41eed8e7e458019aa32c48  scripts/check-readme-coverage.sh`. A different sum: stop and report it.
 
 ````bash
 #!/usr/bin/env bash
@@ -1327,9 +1347,10 @@ Expected: `check-readme-coverage: 7 OpenCode plugin(s) each have a row, a bullet
 To see it catch the defect it exists for, run it on the README as it was before Task 1, in a throwaway root:
 
 ```bash
-mkdir -p /tmp/cov && cp agents.json /tmp/cov/ && cp -R opencode /tmp/cov/
-git show HEAD~1:README.md > /tmp/cov/README.md
-bash scripts/check-readme-coverage.sh --root /tmp/cov; echo "exit $?"
+mkdir -p "$SCRATCH/cov/opencode/plugins" && cp agents.json "$SCRATCH/cov/"
+for p in opencode/plugins/*/; do mkdir -p "$SCRATCH/cov/$p" && cp "$p/INSTALL.md" "$SCRATCH/cov/$p"; done
+git show HEAD~1:README.md > "$SCRATCH/cov/README.md"
+bash scripts/check-readme-coverage.sh --root "$SCRATCH/cov"; echo "exit $?"
 ```
 
 Expected: six `FAIL` lines (a missing row and a missing bullet for each of `repo-user-guide-opencode`, `opencode-ctl-mcp-opencode` and `repo-tasks-mcp-opencode`), then `exit 1`.
@@ -1725,7 +1746,7 @@ Replace with:
 - [ ] **Step 2: Verify**
 
 Run: `bash scripts/check-doc-paths.sh | tail -1 && bash scripts/check-doc-paths.sh --selftest | tail -1 && just spellcheck && grep -c 'check-install-pins\|check-readme-coverage' docs/PLUGIN_GUIDELINES.md`
-Expected: `All documented paths exist.`, `All 61 self-test cases passed.`, no spelling output, and `7`.
+Expected: `All documented paths exist.`, `All 61 self-test cases passed.`, the echoed command `typos` with nothing after it, and `7`.
 
 ---
 
@@ -1785,7 +1806,7 @@ Expected: these 22 changed values, which are the "Current release" columns of sp
 
 Also run `git diff --stat -- opencode antigravity qwen | tail -1`; expected `14 files changed, 22 insertions(+), 22 deletions(-)`. Any other changed line in those folders is a defect in the script: stop and report it. A manifest version that has moved since the plan was written (a release merged in between) changes the numbers, not the count; in that case the manifest wins and the table above is out of date.
 
-Then `grep -rn 'releases/download/v[0-9]' qwen antigravity opencode --include=*.md | grep -v CHANGELOG`; expected: no output (no legacy lockstep tag remains).
+Then `grep -n 'releases/download/v[0-9]' opencode/plugins/*/INSTALL.md antigravity/plugins/*/README.md qwen/plugins/*/README.md`; expected: no output and exit 1 (no legacy lockstep tag remains; before this step it prints four lines, two in each of the `rtk-mcp-qwen` and `re-ghidra-mcp-qwen` READMEs).
 
 - [ ] **Step 3: Run the repository gate**
 
