@@ -27,3 +27,5 @@ pre-push:
       run: scripts/check-license-headers.sh
     doc-paths:
       run: bash scripts/check-doc-paths.sh
+    gate-wiring:
+      run: bash scripts/check-gate-wiring.sh
