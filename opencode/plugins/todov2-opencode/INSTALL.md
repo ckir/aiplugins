@@ -7,10 +7,10 @@
 > that change what gets installed.
 >
 > Everything below comes from versioned release assets — no branch files,
-> no unpinned URLs. Agree the version with the user first (`0.3.0` is
-> current as of this writing; check
-> https://github.com/ckir/aiplugins/releases for what is newest) and use it
-> for every URL below.
+> no unpinned URLs. Agree the version with the user first (the `VERSION=`
+> line in Step 2 holds the release this document was last refreshed for;
+> check https://github.com/ckir/aiplugins/releases for what is newest) and
+> use it for every URL below.
 
 You will install `todov2-opencode`: the `todowrite` session tool that V2
 removed, plus an optional live todo list in the session sidebar. Install is
@@ -52,7 +52,7 @@ key is legacy and will **not** load this plugin.
 Set the agreed version once:
 
 ```bash
-VERSION=0.3.0
+VERSION=0.6.1
 ```
 
 Download the versioned plugin bundle — asset

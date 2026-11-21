@@ -97,15 +97,15 @@ That stages `re-ghidra-agy-mcp` and `re-ghidra-agy-hook` into the target directo
 
 ## Installing
 
-Pick the version you want (`0.7.2` is current as of this writing) and
-fetch its `-agy-plugin.zip` — the doubled name is
+Pick the version you want (the URL below names the release this document
+was last refreshed for) and fetch its `-agy-plugin.zip` — the doubled name is
 `<package>-agy-plugin.zip` for package `re-ghidra-mcp-agy`. The zip
 carries the plugin files plus the binaries for every supported platform,
 so nothing is compiled at install time:
 
 ```bash
 curl -fsSL -o /tmp/re-ghidra-mcp-agy-agy-plugin.zip \
-  https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-agy-v0.7.2/re-ghidra-mcp-agy-agy-plugin.zip
+  https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-agy-v0.11.0/re-ghidra-mcp-agy-agy-plugin.zip
 unzip -q -o /tmp/re-ghidra-mcp-agy-agy-plugin.zip -d /tmp/re-ghidra-mcp-agy
 ```
 

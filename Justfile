@@ -111,6 +111,24 @@ gate-wiring:
 gate-wiring-test:
     bash scripts/check-gate-wiring.sh --selftest
 
+# Check that the release pins in the install documents (OpenCode INSTALL.md, Antigravity and Qwen
+# README.md) equal the plugin manifests. `bash scripts/check-install-pins.sh --write` fixes a stale
+# pin; the release branch runs that itself (.github/workflows/release-refresh.yml).
+install-pins:
+    bash scripts/check-install-pins.sh
+
+# Self-test of that check: seeded defects in throwaway trees.
+install-pins-test:
+    bash scripts/check-install-pins.sh --selftest
+
+# Check that the root README's install section has a row and a URL for every OpenCode plugin.
+readme-coverage:
+    bash scripts/check-readme-coverage.sh
+
+# Self-test of that check: seeded defects in throwaway trees.
+readme-coverage-test:
+    bash scripts/check-readme-coverage.sh --selftest
+
 # Verify antigravity/plugins/ plugin configs, ids, binary resolution, and skill copies.
 agy-wiring:
     bash scripts/check-agy-wiring.sh
@@ -375,7 +393,7 @@ site-preview:
 
 # Run all pre-flight checks (what CI and lefthook run; see ci.yml — `links`
 # is hook-only and `gen-* --check` + opencode suites run in CI but not here)
-check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace agy-marketplace dispatch smoke footprint opencode-wiring bump-opencode-plugin-test rerun-runner-failures-test doc-paths-test doc-paths gate-wiring-test gate-wiring agy-wiring agy-validate footprint-budgets devtools-skills skills-bundles skills-release-wiring site-check
+check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace agy-marketplace dispatch smoke footprint opencode-wiring bump-opencode-plugin-test rerun-runner-failures-test doc-paths-test doc-paths gate-wiring-test gate-wiring install-pins-test install-pins readme-coverage-test readme-coverage agy-wiring agy-validate footprint-budgets devtools-skills skills-bundles skills-release-wiring site-check
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.

@@ -39,6 +39,9 @@ TypeScript itself. Per plugin (full steps in its README):
 | [`rtk-mcp-opencode`](opencode/plugins/rtk-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/`, `skills/*` → `.opencode/skills/` | `just build-rtk-mcp-opencode` |
 | [`re-ghidra-mcp-opencode`](opencode/plugins/re-ghidra-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/`, `skills/*` → `.opencode/skills/`, `agents/*` → `.opencode/agents/` | `just build-re-ghidra-mcp-opencode` |
 | [`todov2-opencode`](opencode/plugins/todov2-opencode/) | whole folder → `.opencode/plugins/todov2-opencode/` (multi-file: `plugin.ts`, `tui.tsx`, `tool/`) | none (pure TypeScript, no binary) |
+| [`opencode-ctl-mcp-opencode`](opencode/plugins/opencode-ctl-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/opencode-ctl-mcp-opencode.ts`, `skills/*` → `.opencode/skills/` | `just build-opencode-ctl-mcp-opencode` |
+| [`repo-tasks-mcp-opencode`](opencode/plugins/repo-tasks-mcp-opencode/) | `plugin.ts` → `.opencode/plugins/repo-tasks-mcp-opencode.ts`; the install guide also creates `.opencode/command/repo-tasks.md` | `just build-repo-tasks-mcp-opencode` |
+| [`repo-user-guide-opencode`](opencode/plugins/repo-user-guide-opencode/) | `skills/repo-user-guide/` → `.opencode/skills/repo-user-guide/` | none (a skill, no binary) |
 
 Merge each plugin's `opencode.jsonc` into `.opencode/opencode.jsonc`; the
 `./bin/<name>` command in it is relative to the installed plugin copy, so
@@ -53,6 +56,9 @@ verification) and asks whether to install project-local or global first:
 - `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/plugins/rtk-mcp-opencode/INSTALL.md`
 - `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/plugins/re-ghidra-mcp-opencode/INSTALL.md`
 - `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/plugins/todov2-opencode/INSTALL.md`
+- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/plugins/opencode-ctl-mcp-opencode/INSTALL.md`
+- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/plugins/repo-tasks-mcp-opencode/INSTALL.md`
+- `https://raw.githubusercontent.com/ckir/aiplugins/refs/heads/main/opencode/plugins/repo-user-guide-opencode/INSTALL.md`
 
 ## What each plugin costs a context window
 

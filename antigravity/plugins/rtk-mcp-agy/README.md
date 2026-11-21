@@ -35,13 +35,13 @@ This crate provides two main binaries:
 ## Installation and Configuration
 
 1. **Download the versioned plugin bundle**:
-   pick the version you want (`0.7.2` is current as of this writing) and
-   fetch its `-agy-plugin.zip` — the doubled name is
+   pick the version you want (the URL below names the release this document
+   was last refreshed for) and fetch its `-agy-plugin.zip` — the doubled name is
    `<package>-agy-plugin.zip` for package `rtk-mcp-agy`:
 
    ```bash
    curl -fsSL -o /tmp/rtk-mcp-agy-agy-plugin.zip \
-     https://github.com/ckir/aiplugins/releases/download/rtk-mcp-agy-v0.7.2/rtk-mcp-agy-agy-plugin.zip
+     https://github.com/ckir/aiplugins/releases/download/rtk-mcp-agy-v0.9.1/rtk-mcp-agy-agy-plugin.zip
    unzip -q -o /tmp/rtk-mcp-agy-agy-plugin.zip -d /tmp/rtk-mcp-agy
    ```
 

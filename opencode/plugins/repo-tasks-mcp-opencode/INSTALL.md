@@ -22,8 +22,8 @@ proceed on an assumed default.
 ## Step 2 - fetch the plugin and the binary
 
 ```bash
-VERSION=0.1.0
-CC_VERSION=0.1.0
+VERSION=0.2.0
+CC_VERSION=0.2.0
 mkdir -p "$DEST/plugins" "$DEST/bin"
 curl -fsSL -o /tmp/repo-tasks-opencode.zip \
   "https://github.com/ckir/aiplugins/releases/download/repo-tasks-mcp-opencode-v$VERSION/repo-tasks-mcp-opencode-opencode.zip"

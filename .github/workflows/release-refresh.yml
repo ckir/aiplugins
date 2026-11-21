@@ -4,12 +4,13 @@ name: Release Refresh
 #
 # Release-please bumps versions (plugin manifests, CHANGELOGs) but does not
 # regenerate the tag-pinned source URLs in the generated marketplace
-# manifests. Without a refresh, every release PR fails
-# `gen-marketplaces.sh --check` on its first CI run - red through no fault of
-# the release content. Footprint documents no longer carry a version stamp,
-# so they need no refresh.
+# manifests, nor the release pins in the install documents (each OpenCode
+# INSTALL.md, the Antigravity and Qwen READMEs). Without a refresh, every
+# release PR fails `gen-marketplaces.sh --check` and `check-install-pins.sh`
+# on its first CI run - red through no fault of the release content.
+# Footprint documents no longer carry a version stamp, so they need no refresh.
 #
-# This job runs the generator against the release branch and commits the
+# This job runs both against the release branch and commits the
 # result back to it when it changes anything. It converges: the push
 # retriggers this workflow, regeneration finds no diff, and nothing is
 # pushed. Scoped to the release-please branch only - every other PR is
@@ -54,6 +55,14 @@ jobs:
       - name: Regenerate marketplace manifests
         run: bash scripts/gen-marketplaces.sh
 
+      # continue-on-error: a document this cannot rewrite (it writes nothing
+      # then) must not stop the marketplace refresh below from committing.
+      # The last step of the job turns the run red and names this step.
+      - name: Refresh install-document pins
+        id: pins
+        continue-on-error: true
+        run: bash scripts/check-install-pins.sh --write
+
       - name: Commit refresh
         env:
           # Passed through env, never spliced into the script text: head_ref is
@@ -61,7 +70,8 @@ jobs:
           # standing between it and the shell.
           HEAD_REF: ${{ github.head_ref }}
         run: |
-          # Only the generated marketplace manifests. A release branch never
+          # Only the generated marketplace manifests and the install
+          # documents whose pins the step above rewrites. A release branch never
           # carries hand-written changes, but an unrestricted `git add -A`
           # would commit them silently if it ever did - and a refresh commit
           # must never smuggle content into a release.
@@ -69,7 +79,10 @@ jobs:
             .claude-plugin/marketplace.json \
             .qwen-plugin/marketplace.json \
             .agy-plugin/marketplace.json \
-            .opencode-plugin/marketplace.json
+            .opencode-plugin/marketplace.json \
+            opencode/plugins/*/INSTALL.md \
+            antigravity/plugins/*/README.md \
+            qwen/plugins/*/README.md
           if git diff --cached --quiet; then
             echo "Derived files already fresh; nothing to commit."
           else
@@ -78,3 +91,11 @@ jobs:
             git commit -m "chore: refresh derived files on release branch"
             git push origin "HEAD:${HEAD_REF}"
           fi
+
+      # `outcome`, not `conclusion`: under continue-on-error the conclusion of
+      # a failed step reads `success`.
+      - name: Fail when the install-document pins could not be refreshed
+        if: steps.pins.outcome == 'failure'
+        run: |
+          echo "::error::The step 'Refresh install-document pins' failed: scripts/check-install-pins.sh --write found a problem that needs a hand edit. Its log lists each one."
+          exit 1

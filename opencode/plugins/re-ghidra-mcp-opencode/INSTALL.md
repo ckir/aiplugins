@@ -8,10 +8,10 @@
 >
 > Everything below comes from versioned release assets — no branch files,
 > no unpinned URLs. Agree the versions with the user first (plugin
-> and MCP server binary version independently — `0.7.3` / `0.8.0` are
-> current as of this writing; check
-> https://github.com/ckir/aiplugins/releases for what is newest) and use
-> them for every URL below.
+> and MCP server binary version independently — the `VERSION=` and
+> `CC_VERSION=` lines in Step 2 hold the releases this document was last
+> refreshed for; check https://github.com/ckir/aiplugins/releases for what
+> is newest) and use them for every URL below.
 
 You will install `re-ghidra-mcp-opencode`: a persistent headless Ghidra JVM
 exposed as 19 reverse-engineering tools over MCP, plus two session hooks
@@ -63,13 +63,13 @@ Do not proceed on an assumed default.
 ## Step 2 — fetch the plugin bundle and the MCP server binary
 
 Set the agreed versions once. The plugin bundle and the MCP server
-binary below come from different packages on independent versions (shown
-with the versions current as of this writing — substitute the agreed
-versions everywhere `VERSION` and `CC_VERSION` appear):
+binary below come from different packages on independent versions (the
+two lines below hold the releases this document was last refreshed for —
+substitute the agreed versions everywhere `VERSION` and `CC_VERSION` appear):
 
 ```bash
-VERSION=0.7.3
-CC_VERSION=0.8.0
+VERSION=0.10.1
+CC_VERSION=0.9.1
 ```
 
 ### The plugin files

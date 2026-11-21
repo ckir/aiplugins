@@ -7,9 +7,10 @@
 > that change what gets installed.
 >
 > Everything below comes from a versioned release asset: no branch files, no
-> unpinned URLs. Agree the version with the user first (`0.1.0` is current as
-> of this writing; check https://github.com/ckir/aiplugins/releases for what
-> is newest) and use it for every URL below.
+> unpinned URLs. Agree the version with the user first (the `VERSION=` line
+> in Step 2 holds the release this document was last refreshed for; check
+> https://github.com/ckir/aiplugins/releases for what is newest) and use it
+> for every URL below.
 
 You will install `aiplugins-devtools-opencode`: a pure skills plugin that
 ships three skills (a multi-axis code review, an adversarial spec or plan
@@ -44,7 +45,7 @@ Do not proceed on an assumed default.
 Set the agreed version once:
 
 ```bash
-VERSION=0.1.0
+VERSION=0.5.0
 ```
 
 Download the versioned bundle: asset `aiplugins-devtools-opencode-opencode.zip`
