@@ -1014,7 +1014,7 @@ dependencies = [
 
 [[package]]
 name = "repo-tasks-mcp-agy"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "repo-tasks",
  "rmcp",
@@ -1024,7 +1024,7 @@ dependencies = [
 
 [[package]]
 name = "repo-tasks-mcp-cc"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "repo-tasks",
  "rmcp",
@@ -1034,7 +1034,7 @@ dependencies = [
 
 [[package]]
 name = "repo-tasks-mcp-qwen"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "repo-tasks",
  "rmcp",
