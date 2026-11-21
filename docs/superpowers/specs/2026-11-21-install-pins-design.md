@@ -188,18 +188,22 @@ neither.
 
 ### 4.5 One-time catch-up
 
-The first `--write` run, committed with the README fix and the header-prose rewording, brings the 14 documents to
-the tables in section 1. The hand rewording comes first and is committed before that run, because the
-`current as of this writing` guard makes `--write` abort until every occurrence is gone. Measured, there are ten
-occurrences in eight documents: the six INSTALL.md headers and two agy READMEs (`rtk-mcp-agy/README.md:38`,
-`re-ghidra-mcp-agy/README.md:100`), plus a second sentence in the step body of `rtk-mcp-opencode/INSTALL.md:57`
-and `re-ghidra-mcp-opencode/INSTALL.md:67`; two of them are the wrapped ones above. 
-
 Work happens on a fresh branch off `origin/main`, not on `fix/dist-macos-runner` (that branch's fix already merged
-as PR #162). It lands as two commits, in this order. First, the hand rewording of the ten occurrences and the
-root README rows. Second, the two scripts, their `Justfile`, CI and workflow wiring, and the first `--write` run.
-The second is one commit because `scripts/check-gate-wiring.sh` requires every `scripts/check-*.sh` to be run by a
-`Justfile` recipe that `just check` reaches (its header, point 1), so a script cannot land before its wiring.
+as PR #162). It lands as two commits, in this order.
+
+1. **Hand edits.** The hand rewording of the ten `current as of this writing` occurrences, and the three missing
+   rows and bullets in the root README. This goes first because the guard makes `--write` abort until every
+   occurrence is gone. Measured, there are ten occurrences in eight documents: the six INSTALL.md headers and two
+   agy READMEs (`rtk-mcp-agy/README.md:38`, `re-ghidra-mcp-agy/README.md:100`), plus a second sentence in the step
+   body of `rtk-mcp-opencode/INSTALL.md:57` and `re-ghidra-mcp-opencode/INSTALL.md:67`; two of them are the
+   wrapped ones in 4.1.
+2. **The scripts.** `scripts/check-install-pins.sh`, `scripts/check-readme-coverage.sh`, their `Justfile`, CI and
+   workflow wiring, the `docs/PLUGIN_GUIDELINES.md` edit from 4.3, and the first `--write` run, which brings the 14
+   documents to the tables in section 1. This is one commit for two reasons. `scripts/check-gate-wiring.sh`
+   requires every `scripts/check-*.sh` to be run by a `Justfile` recipe that `just check` reaches (its header,
+   point 1), so a script cannot land before its wiring. And `scripts/check-doc-paths.sh` reads
+   `docs/PLUGIN_GUIDELINES.md` by default and requires every backticked path in it to exist, so that edit cannot
+   land before the scripts it names.
 
 ## 5. Testing
 
@@ -378,6 +382,22 @@ Reader) returned PANEL VERDICT: FINDINGS-3. Its edits (a), (b), (d) and (e) audi
   spec states the contract (a census of zero pins fails; the final step fails when the pins step failed), and its
   header says the line-level plan waits for the owner's review of this spec.
 
-Round 6 is the hard cap at which the panel skill asks the owner whether to continue or ship. It had not been run
-when this section was written.
+Round 6 (the owner chose to run it; a fresh agy chat, so the brief stood alone; Fold Auditor on the round-5 edits,
+a bespoke Gate Walker over every existing gate that reads these documents, and Boundary Smuggler) returned PANEL
+VERDICT: FINDINGS-2. Boundary Smuggler reported no new findings. Measured and disposed:
+
+- FOLDED, a residual of my own round-5 edit: the opening sentence of 4.5 still said the `--write` run is
+  committed with the rewording, against the two-commit order below it. Section 4.5 is rewritten as one numbered
+  list, and the driver re-read it end to end.
+- FOLDED, 4.5 did not say which commit carries the `docs/PLUGIN_GUIDELINES.md` edit. Measured:
+  `scripts/check-doc-paths.sh` reads that file by default (header, lines 17-19) and requires its backticked paths
+  to exist, so the edit would turn `just doc-paths` red in commit 1. It is assigned to commit 2.
+- The Gate Walker reported every other gate green across both commits. The driver sampled its citations and they
+  hold (`scripts/smoke-opencode-bundle.sh:52-54` checks only that `INSTALL.md` exists in a bundle; the
+  `doc_pins` patterns in `scripts/check-opencode-wiring.sh:28-40` match only `@opencode/plugin` claims). That is a
+  coverage claim by a peer, not a proof; the plan runs `just check` on both commits to measure it.
+
+The panel stops here, at the round cap, pending the owner's review of this spec; no round 7 has been run. The
+round-6 folds were not re-audited by an independent round; the driver's own re-read of 4.5 is the only check on them. Findings had narrowed from design
+defects (rounds 1 to 4) to text consistency (rounds 5 and 6).
 
