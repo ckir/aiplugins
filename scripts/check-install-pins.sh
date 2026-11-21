@@ -530,12 +530,17 @@ MD
     awk '{ printf "%s\r\n", $0 }' "$t/$A" > "$t/x" && mv "$t/x" "$t/$A"
     printf '%s' "$(cat "$t/opencode/plugins/t-opencode/INSTALL.md")" > "$t/x" && mv "$t/x" "$t/opencode/plugins/t-opencode/INSTALL.md"
     lines=$(wc -l < "$t/$A")
+    crs_before=$(tr -cd '\r' < "$t/$A" | wc -c)
     go --write
     ok=0
     [ "$rc" -eq 0 ] || ok=1
-    [ "$(grep -c $'\r$' "$t/$A")" -eq "$lines" ] || ok=1
-    grep -q $'^VERSION=1.2.3\r$' "$t/$A" || ok=1
-    check crlf-kept "$ok" "a CRLF line ending was lost, or the pin did not move"
+    # Carriage returns are counted with tr, byte for byte, so the count does not
+    # depend on how this system's grep treats a carriage return.
+    crs=$(tr -cd '\r' < "$t/$A" | wc -c)
+    [ "$crs_before" -eq "$lines" ] || ok=1
+    [ "$crs" -eq "$lines" ] || ok=1
+    tr -d '\r' < "$t/$A" | grep -qx 'VERSION=1.2.3' || ok=1
+    check crlf-kept "$ok" "a CRLF line ending was lost, or the pin did not move ($lines lines; carriage returns before: $crs_before, after: $crs)"
     check no-final-newline-kept "$([ -n "$(tail -c 1 "$t/opencode/plugins/t-opencode/INSTALL.md")" ] && grep -q '^VERSION=3.10.1$' "$t/opencode/plugins/t-opencode/INSTALL.md" && echo 0 || echo 1)" "a final newline was added"
 
     # --- 8: a tree with no pin anywhere is refused (a wrong --root must not pass)
