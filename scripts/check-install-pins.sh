@@ -119,8 +119,6 @@ function urlcheck(s,   p, i, j, tag, asset) {
 BEGIN { pins = 0; vlines = 0; cclines = 0 }
 {
     line = $0
-    cr = ""
-    if (sub(/\r$/, "", line)) cr = "\r"
     if (style == "var") {
         if (line ~ /^VERSION=/) {
             vlines++; pins++
@@ -134,7 +132,7 @@ BEGIN { pins = 0; vlines = 0; cclines = 0 }
     if (style == "var" && ccver != "") line = retag(line, cc "-v", ccver)
     line = relegacy(line)
     urlcheck(line)
-    printf "%s%s\n", line, cr
+    print line
 }
 END { print "COUNT\t" pins "\t" vlines "\t" cclines > report }
 AWK
@@ -167,7 +165,7 @@ problem() { structural+=("$1"); }
 # scan ROOT REL STYLE PLUGIN VER CC CCVER NEED_CC: one document.
 scan() {
     local root=$1 rel=$2 style=$3 plugin=$4 ver=$5 cc=$6 ccver=$7 need_cc=$8
-    local doc=$root/$rel out rep kind a b c
+    local doc=$root/$rel out rep kind a b c crlf last
     if [ ! -f "$doc" ]; then
         problem "$rel: the file does not exist; every registry plugin on this host needs it"
         return 0
@@ -176,11 +174,30 @@ scan() {
     out=$work/$documents.out
     rep=$work/$documents.rep
     : > "$rep"
-    awk -v style="$style" -v plugin="$plugin" -v ver="$ver" -v cc="$cc" -v ccver="$ccver" \
-        -v report="$rep" "$AWK_PINS" "$doc" > "$out"
+    # A document whose every line ends in CRLF is rewritten without its carriage
+    # returns, which are put back afterwards. The awk on Git Bash drops a
+    # carriage return as it reads a line (measured in CI: 20 before, 0 after),
+    # so they cannot be carried through the program. tr and awk's own output
+    # are byte-exact on every system.
+    crlf=0
+    if [ "$(tr -cd '\r' < "$doc" | wc -c)" -gt 0 ] \
+        && [ "$(tr -cd '\r' < "$doc" | wc -c)" -eq "$(tr -cd '\n' < "$doc" | wc -c)" ]; then
+        crlf=1
+    fi
+    if [ "$crlf" -eq 1 ]; then
+        tr -d '\r' < "$doc" \
+            | awk -v style="$style" -v plugin="$plugin" -v ver="$ver" -v cc="$cc" -v ccver="$ccver" \
+                -v report="$rep" "$AWK_PINS" \
+            | awk '{ printf "%s\r\n", $0 }' > "$out"
+    else
+        awk -v style="$style" -v plugin="$plugin" -v ver="$ver" -v cc="$cc" -v ccver="$ccver" \
+            -v report="$rep" "$AWK_PINS" "$doc" > "$out"
+    fi
     # awk ends its last line with a newline; a file that had none keeps none.
     if [ -s "$doc" ] && [ -n "$(tail -c 1 "$doc")" ]; then
-        printf '%s' "$(cat "$out")" > "$out.n" && mv "$out.n" "$out"
+        last=$(cat "$out")
+        [ "$crlf" -eq 1 ] && last=${last%$'\r'}
+        printf '%s' "$last" > "$out.n" && mv "$out.n" "$out"
     fi
     while IFS=$'\t' read -r kind a b c; do
         case $kind in
@@ -529,6 +546,10 @@ MD
     t=$fx/t7; tree 0.1.0
     awk '{ printf "%s\r\n", $0 }' "$t/$A" > "$t/x" && mv "$t/x" "$t/$A"
     printf '%s' "$(cat "$t/opencode/plugins/t-opencode/INSTALL.md")" > "$t/x" && mv "$t/x" "$t/opencode/plugins/t-opencode/INSTALL.md"
+    # s-opencode: CRLF on every line but the last, which has no line ending at all
+    awk '{ printf "%s\r\n", $0 }' "$t/opencode/plugins/s-opencode/INSTALL.md" > "$t/x"
+    last=$(cat "$t/x"); printf '%s' "${last%$'\r'}" > "$t/opencode/plugins/s-opencode/INSTALL.md"; rm "$t/x"
+    s_crs=$(tr -cd '\r' < "$t/opencode/plugins/s-opencode/INSTALL.md" | wc -c)
     lines=$(wc -l < "$t/$A")
     crs_before=$(tr -cd '\r' < "$t/$A" | wc -c)
     go --write
@@ -542,6 +563,12 @@ MD
     tr -d '\r' < "$t/$A" | grep -qx 'VERSION=1.2.3' || ok=1
     check crlf-kept "$ok" "a CRLF line ending was lost, or the pin did not move ($lines lines; carriage returns before: $crs_before, after: $crs)"
     check no-final-newline-kept "$([ -n "$(tail -c 1 "$t/opencode/plugins/t-opencode/INSTALL.md")" ] && grep -q '^VERSION=3.10.1$' "$t/opencode/plugins/t-opencode/INSTALL.md" && echo 0 || echo 1)" "a final newline was added"
+    ok=0
+    [ "$(tr -cd '\r' < "$t/opencode/plugins/s-opencode/INSTALL.md" | wc -c)" -eq "$s_crs" ] || ok=1
+    [ -n "$(tail -c 1 "$t/opencode/plugins/s-opencode/INSTALL.md")" ] || ok=1
+    [ "$(tail -c 1 "$t/opencode/plugins/s-opencode/INSTALL.md")" != $'\r' ] || ok=1
+    tr -d '\r' < "$t/opencode/plugins/s-opencode/INSTALL.md" | grep -qx 'VERSION=2.0.0' || ok=1
+    check crlf-without-final-newline-kept "$ok" "a CRLF file with no final line ending gained or lost a byte at its end"
 
     # --- 8: a tree with no pin anywhere is refused (a wrong --root must not pass)
     t=$fx/t8; mkdir -p "$t"
