@@ -96,12 +96,12 @@ Release tags are never pushed by hand; see `HACK.md`.
 | Hooks and MCP configs | Every binary named in `<plugin folder>/hooks/hooks.json` or `<plugin folder>/.mcp.json` must be a `[[bin]]` target. | no | `scripts/check-plugin-wiring.sh`. |
 | `scripts/install-qwen-extension.sh`, `scripts/install-qwen-extension.ps1` | Qwen only: add the extension to the usage list in the shell script and to both `ValidateSet` lists in the PowerShell script, which rejects any name not in them. | no | Nothing checks the lists; the PowerShell installer rejects a name that is missing. |
 | Antigravity configs | Antigravity only: binaries named in its configs must resolve. | no | `scripts/check-agy-wiring.sh`, and `just agy-validate` where `agy` is installed. |
-| `<plugin folder>/README.md` | Antigravity and Qwen only, and only if the README gives a download URL: write its tag as `releases/download/<plugin>-v<x.y.z>/<asset>`. Do not edit the number afterwards: `bash scripts/check-install-pins.sh --write` sets it from the manifest, and the release branch runs that itself. | the version in the URL | `bash scripts/check-install-pins.sh`, the CI step "Check install-document pins are current". |
+| `<plugin folder>/README.md` | Antigravity and Qwen only, and only if the README gives a download URL: write its tag as `releases/download/<plugin>-v<x.y.z>/<asset>`. Do not edit the number afterwards: `bash scripts/check-install-pins.sh --write` sets it from the manifest, and the release branch runs that itself. It rewrites every `<plugin>-v<x.y.z>` in the README, so do not use that form to name an older release. | the version in the URL | `bash scripts/check-install-pins.sh`, the CI step "Check install-document pins are current". |
 
 Mark Windows and macOS as `not measured` in the plugin's README unless you ran it there, as
 `claude-code/plugins/repo-tasks-mcp-cc/README.md` does.
 
-Verification status: checked by a walkthrough of the gates that need no build; the footprint probe, the bundle smoke and the binary build were not run.
+Verification status: checked by a walkthrough of the gates that need no build; the footprint probe, the bundle smoke and the binary build were not run. The README download-URL row was added later and checked by running `bash scripts/check-install-pins.sh`.
 
 ### 3.3 Kind B: skills-only on a Cargo host
 
@@ -120,7 +120,7 @@ There is no `Cargo.toml` and no folder of binaries.
 | `scripts/check-skills-bundles.sh` | Add a `<host id>:<plugin>` line to the `pairs` list. | no | Nothing: the bundle is not built or checked. |
 | The bundle itself | `scripts/bundle-skills-plugin.sh` builds the zip and rejects it without the manifest, `README.md`, a `skills/*/SKILL.md`, or if it holds a folder of binaries. It copies the repository's `LICENSE` in itself, so the plugin folder needs none. A plugin must ship `skills/<skill>/THIRD-PARTY-NOTICE.md`; the exemption for this repository's own skills is hardcoded to the `repo-user-guide-` prefix. For a skill of your own, add a notice that says it carries no third-party material, or widen that exemption in the script. | no | `just skills-bundles`, which prints only `bundler failed`. To see what is missing, run `bash scripts/bundle-skills-plugin.sh <host id> <plugin> <scratch dir>`. The script refuses to run from a Windows shell; use WSL, Linux or macOS. |
 | `scripts/check-package-versions.sh` | As in 3.1, with the manifest named twice. | no | Nothing. |
-| `<plugin folder>/README.md` | Antigravity and Qwen only, and only if the README gives a download URL: write its tag as `releases/download/<plugin>-v<x.y.z>/<asset>`. Do not edit the number afterwards: `bash scripts/check-install-pins.sh --write` sets it from the manifest, and the release branch runs that itself. | the version in the URL | `bash scripts/check-install-pins.sh`, the CI step "Check install-document pins are current". |
+| `<plugin folder>/README.md` | Antigravity and Qwen only, and only if the README gives a download URL: write its tag as `releases/download/<plugin>-v<x.y.z>/<asset>`. Do not edit the number afterwards: `bash scripts/check-install-pins.sh --write` sets it from the manifest, and the release branch runs that itself. It rewrites every `<plugin>-v<x.y.z>` in the README, so do not use that form to name an older release. | the version in the URL | `bash scripts/check-install-pins.sh`, the CI step "Check install-document pins are current". |
 
 A **new family** also needs the release plumbing, because tags for crate-less plugins must not reach the
 Rust release workflow: add the tag pattern `'<family>-*-v*'` to `.github/workflows/skills-bundles.yml`, add
@@ -133,7 +133,7 @@ your plugin's tag or `.github/workflows/release.yml` does not exclude it. It ver
 what makes it verify yours. A new host's plugin in an existing
 family needs none of this: the family's patterns already match.
 
-Verification status: checked by a walkthrough, including the footprint run and the release-plumbing rows for a new family.
+Verification status: checked by a walkthrough, including the footprint run and the release-plumbing rows for a new family. The README download-URL row was added later and checked by running `bash scripts/check-install-pins.sh`.
 
 ### 3.4 Kind C: an OpenCode plugin
 
@@ -162,7 +162,7 @@ Verification status: checked by a walkthrough, including the footprint run and t
 | `Justfile`, `lefthook.yml` | Add `./opencode/plugins/<plugin>/node_modules` to the `--ignore-path` list of the `links` recipe and of the pre-push `mlc` line, if the plugin has dependencies. | no | Nothing on a clean checkout. Once the plugin's dependencies are installed, `just links` scans them and fails (measured on `repo-tasks-mcp-opencode`, whose entry is missing from the `Justfile` list). |
 | `Justfile`, `.github/workflows/ci.yml`, `.github/workflows/footprint-freshness.yml` | Only if the plugin stages a binary: the same `build-<plugin>` recipe and build-list lines as kind A. | no | As kind A. |
 | `scripts/check-package-versions.sh` | As in 3.1, with `package.json` named twice. | no | Nothing. |
-| The install guide | Give it exactly one line that starts with `VERSION=`, in the Step 2 code block, and write every download URL with `$VERSION`. If `opencode.jsonc` declares a local MCP server, add exactly one line that starts with `CC_VERSION=` (the version of the Claude Code sibling whose release carries the binary); otherwise have none. Do not edit the number afterwards: `bash scripts/check-install-pins.sh --write` sets it from `package.json`, and the release branch runs that itself. Do not write that a version is "current as of this writing"; the check rejects the phrase. | the version on those lines | `bash scripts/check-install-pins.sh`, the CI step "Check install-document pins are current". |
+| The install guide | Give it exactly one line that starts with `VERSION=`, in the Step 2 code block, and write the plugin's own download URL with `$VERSION`. If `opencode.jsonc` declares a local MCP server, add exactly one line that starts with `CC_VERSION=` (the version of the Claude Code sibling whose release carries the binary) and write the binary's download URL with `$CC_VERSION`; otherwise have none. Do not edit the numbers afterwards: `bash scripts/check-install-pins.sh --write` sets them from `package.json` and from the sibling's manifest, and the release branch runs that itself. Do not write that a version is "current as of this writing"; the check rejects the phrase. | the version on those lines | `bash scripts/check-install-pins.sh`, the CI step "Check install-document pins are current". |
 | `README.md` at the repository root | In its `## Installing` section, add a row to the OpenCode table that links the plugin folder, and a bullet with the raw URL of the install guide. | no | `bash scripts/check-readme-coverage.sh`, the CI step "Check the root README covers every OpenCode plugin". |
 
 No `Cargo.toml` edit is needed, and `.gitignore` already ignores `opencode/plugins/*/bin/`. The bundler

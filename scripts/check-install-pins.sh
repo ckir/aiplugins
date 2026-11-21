@@ -34,7 +34,7 @@
 # `$VERSION` and `$CC_VERSION` in a URL are not literals and are left alone.
 #
 # A stale pin is fixed by --write. A structural problem (a missing or duplicated
-# line, a bad manifest version, the phrase `current as of this writing`) needs a
+# line, a bad manifest version, a pin line whose value is not x.y.z, the phrase `current as of this writing`) needs a
 # hand edit, and --write writes nothing while one exists.
 #
 # POSIX awk and sed only: this runs on macOS (BSD awk) and Git Bash too.
@@ -54,6 +54,15 @@ function verlen(s, pos,   rest) {
     rest = substr(s, pos)
     if (match(rest, /^[0-9]+\.[0-9]+\.[0-9]+/)) return RLENGTH
     return 0
+}
+# A pin line: only the x.y.z right after NAME= is replaced; the rest of the line stays.
+function repin(s, name, want,   n) {
+    n = verlen(s, length(name) + 1)
+    if (n == 0) {
+        print "ERR\tline " NR ": the value after " name " is not an x.y.z version; write `" name want "`" > report
+        return s
+    }
+    return name want substr(s, length(name) + 1 + n)
 }
 # Every `prefix<x.y.z>` that starts a token becomes `prefix want`.
 function retag(s, prefix, want,   out, i, n, pch, start) {
@@ -102,7 +111,7 @@ function urlcheck(s,   p, i, j, tag, asset) {
         tag = substr(s, 1, j - 1)
         asset = substr(s, j + 1)
         if (index(asset, plugin "-") == 1 && tag != plugin "-v" ver && !(style == "var" && tag == plugin "-v$VERSION"))
-            print "ERR\tline " NR ": a release URL for " plugin " is under the tag `" tag "`; write the tag as " plugin "-v<x.y.z>" > report
+            print "ERR\tline " NR ": a release URL for " plugin " is under the tag `" tag "`; write the tag as " plugin (style == "var" ? "-v$VERSION" : "-v<x.y.z>") > report
         if (style == "var" && ccver != "" && index(asset, cc "-") == 1 && tag != cc "-v" ccver && tag != cc "-v$CC_VERSION")
             print "ERR\tline " NR ": a release URL for " cc " is under the tag `" tag "`; write the tag as " cc "-v$CC_VERSION" > report
     }
@@ -115,10 +124,10 @@ BEGIN { pins = 0; vlines = 0; cclines = 0 }
     if (style == "var") {
         if (line ~ /^VERSION=/) {
             vlines++; pins++
-            sub(/^VERSION=[^ \t]*/, "VERSION=" ver, line)
+            line = repin(line, "VERSION=", ver)
         } else if (line ~ /^CC_VERSION=/) {
             cclines++; pins++
-            if (ccver != "") sub(/^CC_VERSION=[^ \t]*/, "CC_VERSION=" ccver, line)
+            if (ccver != "") line = repin(line, "CC_VERSION=", ccver)
         }
     }
     line = retag(line, plugin "-v", ver)
@@ -457,6 +466,11 @@ MD
     go --write
     check literal-in-install-rewritten "$(grep -qF 'download/a-opencode-v1.2.3/a-opencode-opencode.zip' "$t/$A" && echo 0 || echo 1)" "the literal URL was not rewritten"
     check literal-sibling-tag-rewritten "$(grep -qF 'download/a-cc-v4.5.6/a-cc-plugin.zip' "$t/$A" && echo 0 || echo 1)" "the literal sibling URL was not rewritten"
+    # only the version on a pin line moves; whatever follows it stays
+    t=$fx/t4b; tree 0.1.0
+    sed 's/^VERSION=0.1.0$/VERSION=0.1.0; echo "using $VERSION"/' "$t/opencode/plugins/t-opencode/INSTALL.md" > "$t/x" && mv "$t/x" "$t/opencode/plugins/t-opencode/INSTALL.md"
+    go --write
+    check pin-line-tail-kept "$([ "$rc" -eq 0 ] && grep -qxF 'VERSION=3.10.1; echo "using $VERSION"' "$t/opencode/plugins/t-opencode/INSTALL.md" && echo 0 || echo 1)" "the text after the version on the VERSION= line was lost"
 
     # --- 5: structural problems. Each fails, names the file, and does not offer --write.
     # bad NAME FILE-NAMED: judge the last `go`.
@@ -486,10 +500,14 @@ MD
     bad stale-claim-guard-wrapped "$A: says \`current as of this writing\`"
     fresh s10; printf 'https://github.com/ckir/aiplugins/releases/download/nightly/a-agy-agy-plugin.zip\n' >> "$t/antigravity/plugins/a-agy/README.md"; go
     bad unknown-tag-url "antigravity/plugins/a-agy/README.md: line 8: a release URL for a-agy is under the tag \`nightly\`"
+    fresh s14; printf 'https://github.com/ckir/aiplugins/releases/download/a-opencode-v${VERSION}/a-opencode-opencode.zip\n' >> "$t/opencode/plugins/a-opencode/INSTALL.md"; go
+    bad unknown-tag-url-install 'write the tag as a-opencode-v$VERSION'
     fresh s11; rm "$t/opencode/plugins/t-opencode/INSTALL.md"; go
     bad missing-document "opencode/plugins/t-opencode/INSTALL.md: the file does not exist"
     fresh s12; printf '{ not json\n' > "$t/opencode/plugins/a-opencode/opencode.jsonc"; go
     bad invalid-jsonc "opencode/plugins/a-opencode/opencode.jsonc: not valid JSON"
+    fresh s13; sed 's/^VERSION=.*/VERSION="2.0.0"/' "$t/opencode/plugins/s-opencode/INSTALL.md" > "$t/x" && mv "$t/x" "$t/opencode/plugins/s-opencode/INSTALL.md"; go
+    bad version-line-not-semver 'opencode/plugins/s-opencode/INSTALL.md: line 4: the value after VERSION= is not an x.y.z version'
 
     # --- 6: --write is all-or-nothing, and a mixed tree lists the hand edits first
     t=$fx/t6; tree 0.1.0
