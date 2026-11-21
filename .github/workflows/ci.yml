@@ -120,6 +120,13 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
+      # A cargo build quietly rewrites a Cargo.lock that disagrees with the crate
+      # manifests, so a stale one fails nothing by itself. release-refresh.yml
+      # updates it on the release branch; this catches a crate version changed
+      # anywhere else without its lock entry.
+      - name: Check Cargo.lock matches the crate manifests
+        run: cargo metadata --locked --format-version 1 > /dev/null
+
       # Confirms every binary named in a plugin's hooks.json / .mcp.json is a
       # [[bin]] target this workspace builds. Those are plain strings that no
       # compiler or test validates.

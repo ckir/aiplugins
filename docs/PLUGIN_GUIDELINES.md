@@ -87,7 +87,7 @@ Release tags are never pushed by hand; see `HACK.md`.
 
 | File | What to do | Generated | What fails if you skip it |
 |---|---|---|---|
-| `Cargo.lock` | Run `cargo metadata --format-version 1 > /dev/null`; it adds the crate to `Cargo.lock`. Commit that change. | yes | Nothing: no build here passes `--locked`, so the next contributor's build rewrites it. |
+| `Cargo.lock` | Run `cargo metadata --format-version 1 > /dev/null`; it adds the crate to `Cargo.lock`. Commit that change. On a release the release branch updates each crate's version in it for you. | yes | `just lock`, and the CI step "Check Cargo.lock matches the crate manifests". |
 | `scripts/check-package-versions.sh` | As in 3.1, and add the crate's `Cargo.toml` to the list of crates that must not inherit the workspace version. | no | Nothing: the list is hardcoded. |
 | `<plugin folder>/.gitignore` | Claude Code and Antigravity: a file holding the line `/bin/`, with the leading slash, so that the binary sources inside the crate stay tracked; copy `claude-code/plugins/repo-tasks-mcp-cc/.gitignore`. The root `.gitignore` already covers the Qwen and OpenCode staging folders. | no | Nothing: a built binary shows as untracked. |
 | `Cargo.toml` release metadata | Copy the exemplar's `[package.metadata.release]`, which rewrites the version in the host manifest in the same commit as a crate version bump, and `[package.metadata.dist.binaries]`. | no | Nothing in this repository checks either. |
