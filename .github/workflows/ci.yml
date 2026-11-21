@@ -262,6 +262,28 @@ jobs:
       - name: Check the paths named in the contributor documents
         run: bash scripts/check-doc-paths.sh
 
+      # The same reasoning covers the other gates written in bash, awk and jq
+      # that contributors run through `just check` on all three systems. The
+      # wiring job above runs them on Linux; these steps measure macOS (bash
+      # 3.2, BSD awk and sed) and Git Bash, where they had never been run.
+      - name: Self-test the install-pins check
+        run: bash scripts/check-install-pins.sh --selftest
+
+      - name: Check install-document pins are current
+        run: bash scripts/check-install-pins.sh
+
+      - name: Self-test the README coverage check
+        run: bash scripts/check-readme-coverage.sh --selftest
+
+      - name: Check the root README covers every OpenCode plugin
+        run: bash scripts/check-readme-coverage.sh
+
+      - name: Self-test the gate-wiring check
+        run: bash scripts/check-gate-wiring.sh --selftest
+
+      - name: Check that every gate script is wired in
+        run: bash scripts/check-gate-wiring.sh
+
   # Stages the Pages tree on pull requests so a staging failure is seen before
   # the merge. On push to main docs.yml already stages, so this skips there.
   site-stage:
