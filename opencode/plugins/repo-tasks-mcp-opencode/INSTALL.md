@@ -23,7 +23,7 @@ proceed on an assumed default.
 
 ```bash
 VERSION=0.2.0
-CC_VERSION=0.2.0
+CC_VERSION=0.3.0
 mkdir -p "$DEST/plugins" "$DEST/bin"
 curl -fsSL -o /tmp/repo-tasks-opencode.zip \
   "https://github.com/ckir/aiplugins/releases/download/repo-tasks-mcp-opencode-v$VERSION/repo-tasks-mcp-opencode-opencode.zip"

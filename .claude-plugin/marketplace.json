@@ -116,7 +116,7 @@
       "name": "repo-tasks-mcp-cc",
       "source": {
         "source": "archive",
-        "url": "https://github.com/ckir/aiplugins/releases/download/repo-tasks-mcp-cc-v0.2.0/repo-tasks-mcp-cc-plugin.zip"
+        "url": "https://github.com/ckir/aiplugins/releases/download/repo-tasks-mcp-cc-v0.3.0/repo-tasks-mcp-cc-plugin.zip"
       },
       "description": "A per-repository task list for Claude Code over MCP: four tools to create, list, read and update tasks that outlive the session and are shared with other agents working in the same repository.",
       "author": {
