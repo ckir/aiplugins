@@ -12,3 +12,12 @@ installers = []
 # Target platforms to build apps for (Rust target-triple syntax)
 targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
 allow-dirty = ["ci"]
+
+# GitHub no longer provides the runner dist 0.32.0 defaults aarch64-apple-darwin
+# to (`macos-14`): the job is cancelled at once with "The configuration
+# 'macos-14-arm64-us-default' is not supported", and the whole Release run dies
+# with it. x86_64-apple-darwin already defaults to `macos-15-intel`. dist reads
+# this file from the tagged tree, so a fix only reaches a release when it is in
+# the tagged commit.
+[dist.github-custom-runners]
+aarch64-apple-darwin = "macos-15"
