@@ -42,7 +42,7 @@ Do not proceed on an assumed default.
 Set the agreed version once:
 
 ```bash
-VERSION=0.2.0
+VERSION=0.3.0
 ```
 
 Download the versioned bundle: asset `repo-user-guide-opencode-opencode.zip`

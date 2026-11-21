@@ -40,8 +40,8 @@ Do not proceed on an assumed default.
 ## Step 2 - fetch the plugin bundle and the MCP server binary
 
 ```bash
-VERSION=0.1.0
-CC_VERSION=0.1.0
+VERSION=0.2.1
+CC_VERSION=0.2.0
 ```
 
 ### The plugin files

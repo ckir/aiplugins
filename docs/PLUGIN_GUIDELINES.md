@@ -96,6 +96,7 @@ Release tags are never pushed by hand; see `HACK.md`.
 | Hooks and MCP configs | Every binary named in `<plugin folder>/hooks/hooks.json` or `<plugin folder>/.mcp.json` must be a `[[bin]]` target. | no | `scripts/check-plugin-wiring.sh`. |
 | `scripts/install-qwen-extension.sh`, `scripts/install-qwen-extension.ps1` | Qwen only: add the extension to the usage list in the shell script and to both `ValidateSet` lists in the PowerShell script, which rejects any name not in them. | no | Nothing checks the lists; the PowerShell installer rejects a name that is missing. |
 | Antigravity configs | Antigravity only: binaries named in its configs must resolve. | no | `scripts/check-agy-wiring.sh`, and `just agy-validate` where `agy` is installed. |
+| `<plugin folder>/README.md` | Antigravity and Qwen only, and only if the README gives a download URL: write its tag as `releases/download/<plugin>-v<x.y.z>/<asset>`. Do not edit the number afterwards: `bash scripts/check-install-pins.sh --write` sets it from the manifest, and the release branch runs that itself. | the version in the URL | `bash scripts/check-install-pins.sh`, the CI step "Check install-document pins are current". |
 
 Mark Windows and macOS as `not measured` in the plugin's README unless you ran it there, as
 `claude-code/plugins/repo-tasks-mcp-cc/README.md` does.
@@ -119,6 +120,7 @@ There is no `Cargo.toml` and no folder of binaries.
 | `scripts/check-skills-bundles.sh` | Add a `<host id>:<plugin>` line to the `pairs` list. | no | Nothing: the bundle is not built or checked. |
 | The bundle itself | `scripts/bundle-skills-plugin.sh` builds the zip and rejects it without the manifest, `README.md`, a `skills/*/SKILL.md`, or if it holds a folder of binaries. It copies the repository's `LICENSE` in itself, so the plugin folder needs none. A plugin must ship `skills/<skill>/THIRD-PARTY-NOTICE.md`; the exemption for this repository's own skills is hardcoded to the `repo-user-guide-` prefix. For a skill of your own, add a notice that says it carries no third-party material, or widen that exemption in the script. | no | `just skills-bundles`, which prints only `bundler failed`. To see what is missing, run `bash scripts/bundle-skills-plugin.sh <host id> <plugin> <scratch dir>`. The script refuses to run from a Windows shell; use WSL, Linux or macOS. |
 | `scripts/check-package-versions.sh` | As in 3.1, with the manifest named twice. | no | Nothing. |
+| `<plugin folder>/README.md` | Antigravity and Qwen only, and only if the README gives a download URL: write its tag as `releases/download/<plugin>-v<x.y.z>/<asset>`. Do not edit the number afterwards: `bash scripts/check-install-pins.sh --write` sets it from the manifest, and the release branch runs that itself. | the version in the URL | `bash scripts/check-install-pins.sh`, the CI step "Check install-document pins are current". |
 
 A **new family** also needs the release plumbing, because tags for crate-less plugins must not reach the
 Rust release workflow: add the tag pattern `'<family>-*-v*'` to `.github/workflows/skills-bundles.yml`, add
@@ -160,6 +162,8 @@ Verification status: checked by a walkthrough, including the footprint run and t
 | `Justfile`, `lefthook.yml` | Add `./opencode/plugins/<plugin>/node_modules` to the `--ignore-path` list of the `links` recipe and of the pre-push `mlc` line, if the plugin has dependencies. | no | Nothing on a clean checkout. Once the plugin's dependencies are installed, `just links` scans them and fails (measured on `repo-tasks-mcp-opencode`, whose entry is missing from the `Justfile` list). |
 | `Justfile`, `.github/workflows/ci.yml`, `.github/workflows/footprint-freshness.yml` | Only if the plugin stages a binary: the same `build-<plugin>` recipe and build-list lines as kind A. | no | As kind A. |
 | `scripts/check-package-versions.sh` | As in 3.1, with `package.json` named twice. | no | Nothing. |
+| The install guide | Give it exactly one line that starts with `VERSION=`, in the Step 2 code block, and write every download URL with `$VERSION`. If `opencode.jsonc` declares a local MCP server, add exactly one line that starts with `CC_VERSION=` (the version of the Claude Code sibling whose release carries the binary); otherwise have none. Do not edit the number afterwards: `bash scripts/check-install-pins.sh --write` sets it from `package.json`, and the release branch runs that itself. Do not write that a version is "current as of this writing"; the check rejects the phrase. | the version on those lines | `bash scripts/check-install-pins.sh`, the CI step "Check install-document pins are current". |
+| `README.md` at the repository root | In its `## Installing` section, add a row to the OpenCode table that links the plugin folder, and a bullet with the raw URL of the install guide. | no | `bash scripts/check-readme-coverage.sh`, the CI step "Check the root README covers every OpenCode plugin". |
 
 No `Cargo.toml` edit is needed, and `.gitignore` already ignores `opencode/plugins/*/bin/`. The bundler
 `scripts/bundle-opencode-plugin.sh` copies the plugin module, the manifest, the skills, the commands and any
@@ -186,6 +190,8 @@ the skills.
 | `scripts/check-skills-bundles.sh` | Add an `opencode:<plugin>` line to the `pairs` list. | no | Nothing: the bundle is not built or checked. |
 | The bundle itself | As kind B, and the bundle must also contain the install guide. | no | `just skills-bundles`. |
 | `scripts/check-package-versions.sh` | As in 3.1, with `package.json` named twice. | no | Nothing. |
+| The install guide | Give it exactly one line that starts with `VERSION=`, in the Step 2 code block, and write every download URL with `$VERSION`. Have no line that starts with `CC_VERSION=`: there is no binary. Do not edit the number afterwards: `bash scripts/check-install-pins.sh --write` sets it from `package.json`, and the release branch runs that itself. Do not write that a version is "current as of this writing"; the check rejects the phrase. | the version on those lines | `bash scripts/check-install-pins.sh`, the CI step "Check install-document pins are current". |
+| `README.md` at the repository root | In its `## Installing` section, add a row to the OpenCode table that links the plugin folder, and a bullet with the raw URL of the install guide. | no | `bash scripts/check-readme-coverage.sh`, the CI step "Check the root README covers every OpenCode plugin". |
 
 A new family needs the release plumbing described in 3.3. There is no `Cargo.toml` edit.
 
@@ -211,8 +217,9 @@ Verification status: checked by reading only.
 - **Generated files.** Never edit these by hand; run the command: the four marketplace manifests
   (`bash scripts/gen-marketplaces.sh`), the `packages` table in `release-please-config.json`
   (`bash scripts/gen-release-please-packages.sh`), everything under `docs/footprints/` and the footprint
-  regions of the READMEs (`just footprint-regen`), and the skill copies emitted by
-  `just emit-devtools-skills`.
+  regions of the READMEs (`just footprint-regen`), the skill copies emitted by
+  `just emit-devtools-skills`, and the release version pinned in each OpenCode install guide and in the
+  Antigravity and Qwen READMEs (`bash scripts/check-install-pins.sh --write`).
 - **Names in text.** In documents, write a file that is not at the repository root by its full path, so
   `scripts/check-doc-paths.sh` can check it.
 
@@ -229,6 +236,7 @@ Run the checks that cover what you touched; `just check` runs all of them and ne
 | Footprint or budgets | `just footprint-regen`, then `just footprint` and `just footprint-budgets` |
 | The catalog or families | `just site-check` |
 | Documents | `just links` (see below), `just spellcheck`, `bash scripts/check-doc-paths.sh` |
+| An install guide, a plugin README with a download URL, the root README's install section | `just install-pins`, `just readme-coverage` |
 | Anything | `just check` |
 
 `just links` exits 1 wherever the dependencies of `opencode/plugins/repo-tasks-mcp-opencode/` are installed, because its ignore list omits that `node_modules` folder; that is an existing defect, not yours. Run the `mlc` command from the `pre-push` block of `lefthook.yml` instead.

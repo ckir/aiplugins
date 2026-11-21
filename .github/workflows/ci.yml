@@ -147,6 +147,24 @@ jobs:
       - name: Check generated marketplaces are current
         run: bash scripts/gen-marketplaces.sh --check
 
+      # The install documents (each OpenCode INSTALL.md, the Antigravity and
+      # Qwen READMEs) pin a release, and release-refresh.yml rewrites the pin
+      # on the release branch. A pin that does not equal its manifest fails
+      # here, and the self-test proves the check rejects each seeded defect.
+      - name: Self-test the install-pins check
+        run: bash scripts/check-install-pins.sh --selftest
+
+      - name: Check install-document pins are current
+        run: bash scripts/check-install-pins.sh
+
+      # The root README's OpenCode table and URL list are written by hand;
+      # three of seven plugins were once missing from both with CI green.
+      - name: Self-test the README coverage check
+        run: bash scripts/check-readme-coverage.sh --selftest
+
+      - name: Check the root README covers every OpenCode plugin
+        run: bash scripts/check-readme-coverage.sh
+
       # Confirms each opencode/plugins/ plugin's id, opencode.jsonc, MCP commands,
       # and skill copies still agree with the sources they copy.
       - name: Check opencode wiring

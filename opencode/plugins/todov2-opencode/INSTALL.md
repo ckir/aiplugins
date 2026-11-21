@@ -52,7 +52,7 @@ key is legacy and will **not** load this plugin.
 Set the agreed version once:
 
 ```bash
-VERSION=0.3.0
+VERSION=0.6.1
 ```
 
 Download the versioned plugin bundle — asset

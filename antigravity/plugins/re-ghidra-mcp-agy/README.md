@@ -105,7 +105,7 @@ so nothing is compiled at install time:
 
 ```bash
 curl -fsSL -o /tmp/re-ghidra-mcp-agy-agy-plugin.zip \
-  https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-agy-v0.7.2/re-ghidra-mcp-agy-agy-plugin.zip
+  https://github.com/ckir/aiplugins/releases/download/re-ghidra-mcp-agy-v0.11.0/re-ghidra-mcp-agy-agy-plugin.zip
 unzip -q -o /tmp/re-ghidra-mcp-agy-agy-plugin.zip -d /tmp/re-ghidra-mcp-agy
 ```
 

@@ -68,8 +68,8 @@ two lines below hold the releases this document was last refreshed for —
 substitute the agreed versions everywhere `VERSION` and `CC_VERSION` appear):
 
 ```bash
-VERSION=0.7.3
-CC_VERSION=0.8.0
+VERSION=0.10.1
+CC_VERSION=0.9.1
 ```
 
 ### The plugin files

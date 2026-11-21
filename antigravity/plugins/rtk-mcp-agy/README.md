@@ -41,7 +41,7 @@ This crate provides two main binaries:
 
    ```bash
    curl -fsSL -o /tmp/rtk-mcp-agy-agy-plugin.zip \
-     https://github.com/ckir/aiplugins/releases/download/rtk-mcp-agy-v0.7.2/rtk-mcp-agy-agy-plugin.zip
+     https://github.com/ckir/aiplugins/releases/download/rtk-mcp-agy-v0.9.1/rtk-mcp-agy-agy-plugin.zip
    unzip -q -o /tmp/rtk-mcp-agy-agy-plugin.zip -d /tmp/rtk-mcp-agy
    ```
 
