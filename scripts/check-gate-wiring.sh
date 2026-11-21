@@ -336,11 +336,11 @@ selftest() {
 
     tree; printf 'check: a-test b\n\na-test:\n    bash scripts/check-a.sh\n\nb:\n    bash scripts/check-b.sh --selftest\n' > "$fx/t/Justfile"
     printf 'jobs:\n  x:\n    steps:\n      - run: bash scripts/check-a.sh\n      - run: bash scripts/check-b.sh\n' > "$fx/t/.github/workflows/ci.yml"
-    case_run "a gate only its self-test recipe runs fails" fail "check-b.sh: not run by any Justfile recipe"
+    case_run "a gate only its self-test recipe runs fails" fail "check-b.sh: not run by any Justfile recipe (a run with a mode flag such as --selftest does not count)"
 
     tree; printf 'jobs:\n  x:\n    steps:\n      - run: bash scripts/check-a.sh\n      - run: bash scripts/check-b.sh --selftest\n' > "$fx/t/.github/workflows/ci.yml"
     printf 'check: a-test b\n\na-test:\n    bash scripts/check-a.sh\n\nb:\n    bash scripts/check-b.sh\n' > "$fx/t/Justfile"
-    case_run "a self-test step in CI does not stand in for the plain run" fail "check-b.sh: not run in CI"
+    case_run "a self-test step in CI does not stand in for the plain run" fail "check-b.sh: not run in CI (no workflow line runs scripts/check-b.sh in its check mode, or a \`just\` recipe that does)"
 
     tree; printf 'check: a-test b\n\na-test:\n    bash scripts/check-a.sh\n\nb:\n    bash scripts/check-b.sh\n\nb-test:\n    bash scripts/check-b.sh --selftest\n' > "$fx/t/Justfile"
     printf 'jobs:\n  x:\n    steps:\n      - run: bash scripts/check-a.sh\n      - run: just b-test\n' > "$fx/t/.github/workflows/ci.yml"
@@ -357,6 +357,9 @@ selftest() {
     tree; printf 'check: a-test b\n\na-test:\n    @bash scripts/check-a.sh --root .\n\nb:\n    bash scripts/check-b.sh target/out.json\n    bash scripts/check-b.sh --selftest\n' > "$fx/t/Justfile"
     printf 'jobs:\n  x:\n    steps:\n      - run: scripts/check-a.sh {staged_files}\n      - run: |\n          bash scripts/check-b.sh --root=. target/out.json\n' > "$fx/t/.github/workflows/ci.yml"
     case_run "positional arguments, --root, @ and a run block still count" pass "ok       check-a.sh" "ok       check-b.sh"
+
+    tree; printf 'jobs:\r\n  x:\r\n    steps:\r\n      - run: bash scripts/check-a.sh\r\n      - run: bash scripts/check-b.sh\r\n' > "$fx/t/.github/workflows/ci.yml"
+    case_run "a workflow with CRLF line endings still counts its runs" pass "ok       check-a.sh" "ok       check-b.sh"
 
     tree; rm "$fx/t/lefthook.yml"
     case_run "a lefthook gate with no lefthook.yml fails" fail "lefthook.yml does not run scripts/check-a.sh"
