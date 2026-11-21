@@ -1855,3 +1855,9 @@ After the capstone is green, run the `clavity:agy-test-audit` skill on the two s
 - [ ] **Step 4: Hand back**
 
 Use superpowers:finishing-a-development-branch. Pushing the branch and opening a pull request need the owner's go-ahead. Tell the owner what the first release PR after the merge will show: the release-refresh job gains the step "Refresh install-document pins", and its first live run is the first real test of that workflow change.
+
+## Stand-downs
+
+Panel round 1 on this plan (adversarial-panel-review; seats Axiom Breaker, Cascade Analyst, Literal Implementer, Protocol Pedant, Activation Auditor, Mechanism Gamer, Dependency Cynic; dropped State Corruptor, Resource Vampire, Boundary Smuggler and Blindspot Auditor, which the spec's six rounds covered and this plan adds no surface for). The agy peer (cascade `4d0eb080-ad93-4649-a718-667d1d0362e8`, analysis in `.clavity/scratch/install-pins/plan-r1.md`) re-ran the checksums, the citations, the verification commands and the 25 mutants in the scratch tree and returned PANEL VERDICT: CLEAN. What that round did not examine: a live run of the release-refresh workflow, and a real macOS or Git Bash run.
+
+- `DISCARDED-BELOW-FLOOR` (driver's solo pass): the stale-pin message names `bash scripts/check-install-pins.sh --write` without repeating `--root`. Unreachable for a contributor because `--root` is passed only by the selftest (the `go` helper in `scripts/check-install-pins.sh`); the recipes, the CI steps and the workflow all run the script with the default root.
