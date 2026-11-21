@@ -8,7 +8,8 @@
 >
 > Everything below comes from versioned release assets. Agree the versions
 > with the user first (plugin and MCP server binary version independently;
-> `0.1.0` / `0.1.0` are current as of this writing; check
+> the `VERSION=` and `CC_VERSION=` lines in Step 2 hold the releases this
+> document was last refreshed for; check
 > https://github.com/ckir/aiplugins/releases for what is newest) and use
 > them for every URL below.
 
