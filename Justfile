@@ -102,6 +102,15 @@ doc-paths:
 doc-paths-test:
     bash scripts/check-doc-paths.sh --selftest
 
+# Check that every scripts/check-*.sh gate is run by a recipe `just check` reaches
+# and in CI. A gate nothing runs fails nothing, and dropping one leaves the rest green.
+gate-wiring:
+    bash scripts/check-gate-wiring.sh
+
+# Self-test of that check: seeded wiring defects in a throwaway tree.
+gate-wiring-test:
+    bash scripts/check-gate-wiring.sh --selftest
+
 # Verify antigravity/plugins/ plugin configs, ids, binary resolution, and skill copies.
 agy-wiring:
     bash scripts/check-agy-wiring.sh
@@ -366,7 +375,7 @@ site-preview:
 
 # Run all pre-flight checks (what CI and lefthook run; see ci.yml — `links`
 # is hook-only and `gen-* --check` + opencode suites run in CI but not here)
-check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace agy-marketplace dispatch smoke footprint opencode-wiring bump-opencode-plugin-test rerun-runner-failures-test doc-paths-test doc-paths agy-wiring agy-validate footprint-budgets devtools-skills skills-bundles skills-release-wiring site-check
+check: fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace agy-marketplace dispatch smoke footprint opencode-wiring bump-opencode-plugin-test rerun-runner-failures-test doc-paths-test doc-paths gate-wiring-test gate-wiring agy-wiring agy-validate footprint-budgets devtools-skills skills-bundles skills-release-wiring site-check
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.

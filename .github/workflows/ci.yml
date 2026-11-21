@@ -138,6 +138,12 @@ jobs:
       - name: Check marketplace manifest
         run: bash scripts/check-marketplace.sh
 
+      # The Qwen marketplace is a copy of each extension's own manifest, and a
+      # stale copy installs happily while advertising the wrong thing. This gate
+      # ran only in `just check` until check-gate-wiring.sh found CI never did.
+      - name: Check Qwen marketplace manifest
+        run: bash scripts/check-qwen-marketplace.sh
+
       - name: Check generated marketplaces are current
         run: bash scripts/gen-marketplaces.sh --check
 
@@ -152,15 +158,15 @@ jobs:
       - name: Self-test the runner-failure re-run decision
         run: bash scripts/rerun-runner-failures.sh --selftest
 
-      # mlc checks Markdown links, not paths written in backticks, so a document
-      # could name a path that no longer exists and fail nothing. This requires
-      # every path the contributor documents name to exist, and the self-test
-      # proves the check rejects each seeded defect.
-      - name: Self-test the documented-paths check
-        run: bash scripts/check-doc-paths.sh --selftest
+      # A gate nothing runs fails nothing, and dropping one from the `check`
+      # recipe, this file or lefthook.yml leaves every other check green. This
+      # requires every scripts/check-*.sh to be run by a recipe `just check`
+      # reaches and by CI, and the self-test proves it rejects each seeded defect.
+      - name: Self-test the gate-wiring check
+        run: bash scripts/check-gate-wiring.sh --selftest
 
-      - name: Check the paths named in the contributor documents
-        run: bash scripts/check-doc-paths.sh
+      - name: Check that every gate script is wired in
+        run: bash scripts/check-gate-wiring.sh
 
       - name: Check antigravity wiring
         run: bash scripts/check-agy-wiring.sh
@@ -211,6 +217,32 @@ jobs:
       # own rejection of seeded defects.
       - name: Check the Pages catalog and staging logic
         run: just site-check
+
+  # mlc checks Markdown links, not paths written in backticks, so a document
+  # could name a path that no longer exists and fail nothing. This requires every
+  # path the contributor documents name to exist, and the self-test proves the
+  # check rejects each seeded defect. The check is bash, awk and git, and
+  # contributors run it through `just check` and lefthook on all three systems, so
+  # it runs on all three here: macOS has BSD awk and Windows runs Git Bash, and a
+  # Linux-only run would leave both unmeasured.
+  doc-paths:
+    name: Documented paths (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Self-test the documented-paths check
+        run: bash scripts/check-doc-paths.sh --selftest
+
+      - name: Check the paths named in the contributor documents
+        run: bash scripts/check-doc-paths.sh
 
   # Stages the Pages tree on pull requests so a staging failure is seen before
   # the merge. On push to main docs.yml already stages, so this skips there.
