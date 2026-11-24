@@ -634,7 +634,10 @@ fn clippy_lints_every_target_and_denies_warnings_in_each_command() {
         .map(str::trim)
         .filter(|line| line.starts_with("cargo clippy"))
         .collect();
-    assert!(!commands.is_empty(), "the clippy recipe runs no clippy: {body}");
+    assert!(
+        !commands.is_empty(),
+        "the clippy recipe runs no clippy: {body}"
+    );
     for command in commands {
         assert!(
             command.contains(" --all-targets "),
