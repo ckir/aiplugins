@@ -141,6 +141,12 @@ OS package manager. A pinned download is the default, because the pins above req
 plan confirms it on all three runners. The Bun skill's
 `.claude/recommended-tools.json` is dropped: it is one user's convention, not something four agents share.
 
+First run on existing code. A repository that already has code will often fail `cargo fmt --check` or clippy with
+`-D warnings` the first time `just check` runs. As in the Bun skill's step 5, `SKILL.md` tells the agent to run
+`just fmt` (it fixes formatting), to report the clippy and test failures, and to let the user choose between
+fixing the code and relaxing a setting. It must not quietly loosen a gate to reach green, and a gate that is
+loosened gets the test that pins it updated and shown failing against the old setting.
+
 ### 4.3 Hook runner (agreed by the owner, agy and the driver)
 
 lefthook from `PATH`, hardened:
@@ -409,3 +415,12 @@ spec (4.4, section 7); FOLDED, the same-named-job precaution is recorded as unve
 The census inspected 16 of the 24 statements that use the word "measured"; the cited lines were checked and exist
 and hold the facts, except that one figure. Not a finding: a compile failure of the suite in pre-push is not a
 distinct case, because any non-zero job exit blocks the push. Nothing is unverified-accepted.
+
+Round 4 (agy, narrow: Fold Auditor on the round 3 edits and a Release Mechanic walk of sections 5 and 10).
+PANEL VERDICT: CLEAN, with no findings. The driver checked the cited lines before crediting it (the devtools entry
+in `release-please-config.json`, the `$ARGUMENTS` check in `scripts/check-devtools-skills.sh`, the Justfile recipe
+lines, the existence of every cited script) and they hold. One answer was wrong: agy said the first-run failure of
+existing code under `-D warnings` was "already anticipated in section 4.2", and it was not in the spec (the Bun
+skill covers it in step 5). FOLDED: the "First run on existing code" paragraph in 4.2. That one-paragraph fold was
+ported from the Bun skill and was not put through a further round. Nothing is discarded below the floor; nothing is
+unverified-accepted.
