@@ -137,7 +137,11 @@ Machine prerequisites: `just`, `cargo`, `lefthook`, `gitleaks`, `git`. `cargo-ne
 `just setup` and the README snippet give a per-OS install command for each. For CI, `taiki-e/install-action` (which
 this repository's CI already uses) lists `just`, `cargo-nextest`, `cargo-deny` and `typos` in its `manifests/` but
 neither `gitleaks` nor `lefthook` (measured), so those two need a pinned release download with a checksum check or an
-OS package manager. A pinned download is the default, because the pins above require a version to be nameable; the
+OS package manager. The scaffold's own `ci.yml` (Ubuntu only) uses a pinned download with a checksum check, built and linted with
+actionlint. This repository's end-to-end job (section 4.5) runs on three systems and uses a version-pinned
+`go install` instead, because Go is preinstalled on every GitHub-hosted runner and the module checksum database
+verifies it; gitleaks declares its module path under the old organization name
+(`github.com/zricethezav/gitleaks/v8`). The
 plan confirms it on all three runners. The Bun skill's
 `.claude/recommended-tools.json` is dropped: it is one user's convention, not something four agents share.
 
@@ -190,10 +194,12 @@ The tests live in `toolchain-tests/`, an excluded standalone crate: its `Cargo.t
 the target's root `Cargo.toml` and `Cargo.lock` untouched (measured, section 6) and lets the tests use a YAML crate
 (`yaml-rust2`), which a std-only Rust test cannot.
 
-- `gate` tests (fast: the target is under a second, not yet measured) read the workflow, CODEOWNERS, `deny.toml`, `typos.toml`, `lefthook.yml`,
+- `gate` tests (fast: 26 tests ran in 0.107 s against a scaffolded repository, one run) read the workflow, CODEOWNERS, `deny.toml`, `typos.toml`, `lefthook.yml`,
   `.gitattributes` and the justfile. The workflow rules are tiered (decision 6, section 2). In EVERY file under
-  `.github/workflows/`: no `env:` key at workflow, job or step level that `just` itself reads (`JUST_DRY_RUN` makes
-  `just check` exit 0 without running anything, measured; the plan takes the full list from `just --help`), and no
+  `.github/workflows/`: no `env:` key at workflow, job or step level whose name starts with `JUST_` (`just` reads
+  only those, 39 of them today per `just --help`, and a prefix rule also covers one a later release adds;
+  `JUST_DRY_RUN` makes `just check` exit 0 without running anything, measured; the CI tool pins are named `TOOL_*`
+  for this reason), and no
   job id or `name:` equal to the gate job's, so a second workflow cannot present a green check under the gate's
   name. In `ci.yml` ONLY: actions pinned to a 40-hex SHA, read-only permissions, the default shell, no
   `continue-on-error`, `if`, `container`, `services`, `||` or `set +` in a workflow script, and CI runs `just check`,
@@ -221,9 +227,9 @@ the target's root `Cargo.toml` and `Cargo.lock` untouched (measured, section 6) 
   a developer's global `core.hooksPath` makes `lefthook install` fail (measured, section 6).
 - The suite is not split into a smaller target-side set. A fresh no-dependency crate costs about 0.14 s for
   `cargo fmt --check`, 0.4 to 0.6 s for a cold clippy and 1.3 to 1.4 s for a cold nextest run (section 6), so
-  throwaway repositories are affordable. The total suite time is not known until it is built. The Bun skill's
-  `lefthook.yml` says its own suite takes about 12 seconds in pre-push; the plan measures this one, and if the
-  pre-push job is slower than the owner accepts it becomes CI-only.
+  throwaway repositories are affordable. The 27 toolchain tests ran in 14.7 s of wall time on an 8-CPU machine (one run, background load not controlled). The Bun skill's
+  `lefthook.yml` says its own suite takes about 12 seconds in pre-push; if this one proves slower than the owner
+  accepts on a slower machine, the pre-push job becomes CI-only.
 - `toolchain-tests/` is a private crate (`publish = false`). `apply` runs `cargo generate-lockfile` for it and the
   lock is committed, so CI resolves the crates the scaffold resolved. A nested crate builds into its own `target/`
   (measured), and the root `.gitignore` does not cover it: `apply.sh` skips a root `.gitignore` that exists, and the
@@ -282,6 +288,8 @@ the target's root `Cargo.toml` and `Cargo.lock` untouched (measured, section 6) 
   the budget file itself is not edited to make room. The short description still has to
   name Rust and Cargo and the verbs that should trigger it (set up, bootstrap, harden hooks, CI, secret scanning),
   because it competes with the owner's Bun skill and with generic tooling skills for the same request.
+- **Line endings:** `.gitattributes` already pins `shared/devtools/skills/**` and every emitted copy to LF, which
+  covers the `.tmpl` files, so no new rule is needed; the static gate guards that line.
 - **Cargo workspace:** the root `Cargo.toml` already excludes `shared/devtools`, so nothing under the skill folder
   joins the workspace.
 - **Markdown checks:** this repository runs typos, mlc and a doc-path check (`lefthook.yml`, `Justfile`). Which of
@@ -333,6 +341,16 @@ Each was measured or read on 2026-11-24 and is reproducible.
   antigravity and opencode devtools packages.
 - The Bun skill's hook jobs and recipe composition (section 4.2) were read in its `assets/template/lefthook.yml` and
   `justfile`.
+- Prototype run on Linux while the plan was written (scratch directory, not committed): applying the templates to a fresh
+  repository and running its own `just check` passes (26 gate tests, 27 toolchain tests, real `cargo deny`, typos and
+  gitleaks); nine seeded weakenings each turn the named gate test red; a second `apply.sh` run copies nothing and reports
+  the one differing file; `go install` of lefthook 2.1.17 and gitleaks 8.30.1 takes about 25 s each. Windows and macOS
+  were not run.
+- `just --help` lists 39 `JUST_*` variables; `just` accepts the justfile name in any case (`JUSTFILE` ran).
+- `scripts/check-devtools-skills.sh` requires per skill: `name: <folder>` and `description:` in the frontmatter, and every
+  backticked `references/<file>` to exist; per command file: `$ARGUMENTS` and the prefixed skill name in the body.
+  `scripts/check-footprint-budgets.sh` and `plugin-footprint measure` count frontmatter bytes: the candidate adds 341 bytes
+  on Claude Code and Antigravity and 418 on OpenCode, against `deltaBytes` 500.
 - The repository's gates and conventions named in section 5 were read in `scripts/check-license-headers.sh`,
   `shared/devtools/README.md`, the `emit-devtools-skills` recipe and the root `Cargo.toml`.
 
@@ -353,7 +371,6 @@ Each was measured or read on 2026-11-24 and is reproducible.
 - Whether GitHub lets a same-named job in a second workflow satisfy a required status check. The tiered rule in
   section 4.4 forbids the collision as a precaution; whether the collision is exploitable needs a throwaway GitHub
   repository with a required check, which cannot be done from this machine.
-- How long the `gate` tests take; "under a second" is a target.
 
 ## 8. Plan discipline
 
