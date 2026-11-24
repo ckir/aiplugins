@@ -1,0 +1,56 @@
+# Accepted boundaries
+
+Behaviours the tests deliberately do not cover, each accepted by the owner, with what compensates for
+it. A test audit does not re-raise these while the compensation still exists. Remove an entry when it
+is closed. The entries below are the scaffold's examples: edit them to match this repository, keep only
+what you accept, and add your own name and the date to each if you want that on record.
+
+## Secret scan
+
+- **Binary files, annotated tag messages, submodule contents, and a secret split across several
+  commits are not scanned.** Compensation: none in this repository; accepted as limits of the scan.
+  Anchor: `justfile`, recipe `secrets`.
+- **`gitleaks:allow` comments are honoured.** Compensation: each use is visible in review. Anchor:
+  `justfile`, recipe `secrets`.
+- **Further `git log` options that would narrow the history scan are not each tested.** The suite pins
+  depth, merges, commit-message bodies and unstaged changes; the set of possible narrowing options is
+  open-ended. Compensation: a change to the `secrets` recipe is a one-line diff in review. Anchor:
+  `toolchain-tests/tests/toolchain.rs`.
+
+## Hooks
+
+- **The local hooks check the working tree, not the exact commit, and can be skipped** (`--no-verify`,
+  `LEFTHOOK=0`). Compensation: CI runs `just check` on every pull request and push to `main`. Anchor:
+  `.github/workflows/ci.yml`, step `Check`.
+- **A lefthook on `PATH` is trusted.** The hooks find `lefthook` on `PATH`, with `min_version` as a floor
+  and `assert_lefthook_installed` as the fail-closed setting; a spoofed `PATH`, an older lefthook that
+  does not know `min_version`, and a local deletion of `.lefthook/rc.sh` (which removes the unset of
+  `LEFTHOOK_BIN`, `LEFTHOOK_CONFIG` and `LEFTHOOK_EXCLUDE`) are not blocked. Compensation: the same CI run. Anchor:
+  `lefthook.yml`.
+- **Hooks are not installed until `just setup` runs, and a global `core.hooksPath` stops
+  `lefthook install`.** Compensation: the same CI run. Anchor: `justfile`, recipe `setup`.
+- **The conditional `toolchain-tests` pre-push job is skipped for a deletion-only tooling commit, for
+  uncommitted tooling edits, and when pushing a ref other than the checked-out one.** Compensation: the
+  same CI run. Anchor: `lefthook.yml`, job `toolchain-tests`.
+
+## Toolchain suite
+
+- **A config file that a tool reads automatically is not covered until it is added to
+  `TOOLCHAIN_FILES` and the hook's glob.** Compensation: documented in the agent instructions file,
+  section Tests. Anchor: `toolchain-tests/tests/common/mod.rs`, `TOOLCHAIN_FILES`.
+- **A tool configuration file that can switch a gate off is protected by review, not by a test.** That
+  covers `.gitleaks.toml`, `.gitleaksignore`, `rustfmt.toml`, `.rustfmt.toml`, `clippy.toml`,
+  `.clippy.toml`, `_typos.toml`, `.typos.toml`, `.cargo/` and `.config/`: a test cannot tell a legitimate
+  setting from one that disables the check. Compensation: CODEOWNERS routes each of them to the owner,
+  which takes effect only with branch protection requiring Code Owner review. Anchor:
+  `.github/CODEOWNERS`.
+- **The CI workflow is checked by reading it, not by running it.** Compensation: it runs on every pull
+  request. Anchor: `toolchain-tests/tests/gate.rs`.
+- **Workflows other than `ci.yml` are checked only for an env key from the `JUST_`, `GITLEAKS_`, `LEFTHOOK`,
+  `HOOK_ARG_`, `NEXTEST_` and `TYPOS_` families and for a job named `check`.**
+  Compensation: review of workflow changes through CODEOWNERS. Anchor: `toolchain-tests/tests/gate.rs`.
+- **Whether GitHub lets a same-named job in another workflow satisfy a required check is not tested.**
+  Compensation: the shadowing rule forbids the collision. Anchor: `toolchain-tests/tests/gate.rs`.
+- **The tests that build a `PATH` without lefthook run on Unix only.** Compensation: the Windows run of
+  the end-to-end job in the repository that ships this scaffold. Anchor:
+  `toolchain-tests/tests/toolchain.rs`, module `missing_runner`.

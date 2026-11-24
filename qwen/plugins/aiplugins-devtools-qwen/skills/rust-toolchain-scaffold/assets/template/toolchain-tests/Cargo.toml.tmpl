@@ -1,0 +1,14 @@
+# The scaffold's tests. This crate is deliberately outside the workspace of the
+# repository it guards: the empty [workspace] table below keeps it out of the
+# root Cargo.toml and Cargo.lock, so adding it changes neither. The justfile runs
+# it with --manifest-path.
+[package]
+name = "toolchain-tests"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dev-dependencies]
+yaml-rust2 = "0.13"

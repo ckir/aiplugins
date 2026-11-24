@@ -1,0 +1,96 @@
+# Project tasks. Run `just` to list them.
+
+# Run recipe lines with bash in strict mode. `pipefail` matters for `secrets`:
+# without it a failing `git log` piped into gitleaks would be reported as clean.
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+# List available recipes
+default:
+    @just --list
+
+# Check the tools, then install the git hooks. The tools are not installed for you:
+# see README.md (Development) for one install command per OS. lefthook is checked
+# against the `min_version` in lefthook.yml, because `lefthook install` itself does
+# not enforce it.
+setup:
+    @for tool in cargo gitleaks lefthook; do command -v "$tool" >/dev/null || { echo "$tool is not installed; see README.md (Development)" >&2; exit 1; }; done
+    @floor="$(sed -n 's/^min_version:[[:space:]]*"\{0,1\}\([0-9][0-9.]*\)"\{0,1\}[[:space:]]*$/\1/p' lefthook.yml | tr -d '\r')"; test -n "$floor" || { echo "setup: lefthook.yml has no min_version" >&2; exit 1; }; have="$(lefthook version | tr -d '\r' | grep -oE '[0-9]+(\.[0-9]+)+' | head -n1)"; test -n "$have" || { echo "setup: cannot read the lefthook version" >&2; exit 1; }; [ "$(printf '%s\n%s\n' "$floor" "$have" | sort -V | head -n1)" = "$floor" ] || { echo "setup: lefthook $have is older than the $floor that lefthook.yml requires" >&2; exit 1; }
+    lefthook install
+
+# Apply rustfmt (the workspace and the test crate, which the workspace excludes)
+fmt:
+    cargo fmt --all
+    cargo fmt --manifest-path toolchain-tests/Cargo.toml
+
+# Check formatting without changing anything
+fmt-check:
+    cargo fmt --all -- --check
+    cargo fmt --manifest-path toolchain-tests/Cargo.toml -- --check
+
+# Clippy with warnings as errors, over the workspace and the excluded test crate
+clippy:
+    cargo clippy --workspace --all-targets -- -D warnings
+    cargo clippy --manifest-path toolchain-tests/Cargo.toml --all-targets -- -D warnings
+
+# Formatting and clippy
+lint: fmt-check clippy
+
+# Run every test except the toolchain suite, which is slow and only matters when
+# a tooling file changes. `--no-tests=warn` keeps a repository that has no tests
+# yet from failing its first run.
+test:
+    cargo nextest run --workspace --no-tests=warn
+    cargo nextest run --manifest-path toolchain-tests/Cargo.toml --test gate
+
+# Run the toolchain suite: proves each gate in this file, the hooks and the
+# config blocks what it should
+test-toolchain:
+    cargo nextest run --manifest-path toolchain-tests/Cargo.toml --test toolchain
+
+# Dependency licences, bans and sources (the workspace and the test crate)
+deny:
+    cargo deny check
+    cargo deny --manifest-path toolchain-tests/Cargo.toml check
+
+# Spelling
+spellcheck:
+    typos
+
+# Scan for secrets: staged changes, the history of the current commit (patches,
+# then commit messages), and unstaged changes to tracked files. Untracked files
+# are scanned once they are staged. Only the current commit's history is
+# scanned, not other branches or stashes. `-m` makes git show merge commits as
+# patches; without it, content added in a merge commit is never scanned. The diff
+# filter skips deletions and unmerged, unknown and broken entries.
+secrets: secrets-staged
+    gitleaks git --log-opts="--full-history -m --diff-filter=uxdb" --no-banner --redact .
+    git log --full-history --format=%B | gitleaks stdin --no-banner --redact
+    gitleaks git --pre-commit --no-banner --redact .
+
+# Scan only staged changes for secrets (used by the pre-commit hook)
+secrets-staged:
+    gitleaks git --staged --no-banner --redact .
+
+# Scan the commit message file for secrets (used by the commit-msg hook).
+# The path arrives in HOOK_ARG_1, exported by .lefthook/rc.sh, never as text
+# pasted into a command: a path containing shell syntax is then not run.
+# Without it there is nothing to scan, so the recipe fails rather than passes.
+# It also fails when rc.sh is missing: lefthook skips a missing rc file
+# silently, and HOOK_ARG_1 could then be a stale value from the caller's
+# environment rather than the file git is about to commit. For the same
+# reason the path must be a regular file inside the git directory, which is
+# where git keeps every commit message file, linked worktrees included.
+# CDPATH is unset for the comparison because with it set `cd` prints the
+# directory it chose, which would end up in the captured path.
+secrets-message:
+    @test -f .lefthook/rc.sh || { echo "secrets-message: .lefthook/rc.sh is missing, so the message file cannot be identified" >&2; exit 1; }
+    @test -n "${HOOK_ARG_1:-}" || { echo "secrets-message: HOOK_ARG_1 is not set; this recipe runs from the commit-msg hook" >&2; exit 1; }
+    @test -f "$HOOK_ARG_1" && ! test -L "$HOOK_ARG_1" || { echo "secrets-message: HOOK_ARG_1 does not name a regular file" >&2; exit 1; }
+    @unset CDPATH; dir="$(cd -- "$(dirname -- "$HOOK_ARG_1")" && pwd -P)"; common="$(cd -- "$(git rev-parse --git-common-dir)" && pwd -P)"; case "$dir/" in "$common"/*) ;; *) echo "secrets-message: HOOK_ARG_1 is outside the git directory, so it is not a commit message file" >&2; exit 1 ;; esac
+    gitleaks stdin --no-banner --redact < "$HOOK_ARG_1"
+
+# The fast gate: what the pre-push hook always runs
+check-fast: lint test deny spellcheck secrets
+
+# The full gate: everything CI runs
+check: check-fast test-toolchain

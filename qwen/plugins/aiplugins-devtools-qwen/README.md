@@ -1,6 +1,6 @@
 # aiplugins-devtools-qwen
 
-A Qwen Code extension that ships four dev-tool skills:
+A Qwen Code extension that ships five dev-tool skills:
 
 - `code-review-and-quality`, a multi-axis code review (correctness, readability,
   architecture, security, performance) with security and performance checklists.
@@ -12,8 +12,11 @@ A Qwen Code extension that ships four dev-tool skills:
 - `license-headers`, adds or enforces per-file license headers with google/addlicense for
   custom or source-available licenses (header text read from your template file), with a
   `LICENSE-ADDENDUM` template for extra terms. Bundles a wrapper script; needs `addlicense`.
+- `rust-toolchain-scaffold`, scaffolds a tested quality toolchain into a Rust repository: just
+  recipes, lefthook hooks, rustfmt, clippy, nextest, cargo-deny, typos, gitleaks, SHA-pinned CI and
+  CODEOWNERS, plus tests that prove each gate blocks. Its checks need `just`, `lefthook`, `gitleaks`, `cargo-nextest`, `cargo-deny` and `typos`.
 
-Slash commands: `/aiplugins-devtools:spec-panel-review <path>` and `/aiplugins-devtools:human-friendly <path>`.
+Slash commands: `/aiplugins-devtools:spec-panel-review <path>`, `/aiplugins-devtools:human-friendly <path>` and `/aiplugins-devtools:rust-toolchain-scaffold <request>`.
 
 ## Installation
 

@@ -1,6 +1,6 @@
 # aiplugins-devtools-agy
 
-An Antigravity plugin that ships four dev-tool skills:
+An Antigravity plugin that ships five dev-tool skills:
 
 - `code-review-and-quality`, a multi-axis code review (correctness, readability,
   architecture, security, performance) with security and performance checklists.
@@ -12,8 +12,11 @@ An Antigravity plugin that ships four dev-tool skills:
 - `license-headers`, adds or enforces per-file license headers with google/addlicense for
   custom or source-available licenses (header text read from your template file), with a
   `LICENSE-ADDENDUM` template for extra terms. Bundles a wrapper script; needs `addlicense`.
+- `rust-toolchain-scaffold`, scaffolds a tested quality toolchain into a Rust repository: just
+  recipes, lefthook hooks, rustfmt, clippy, nextest, cargo-deny, typos, gitleaks, SHA-pinned CI and
+  CODEOWNERS, plus tests that prove each gate blocks. Its checks need `just`, `lefthook`, `gitleaks`, `cargo-nextest`, `cargo-deny` and `typos`.
 
-Slash commands: `/spec-panel-review <path>` and `/human-friendly <path>`.
+Slash commands: `/spec-panel-review <path>`, `/human-friendly <path>` and `/rust-toolchain-scaffold <request>`.
 It carries only skills: no hooks, no MCP servers, no binaries.
 
 ## Installation
@@ -51,12 +54,12 @@ here by `just emit-devtools-skills`.
 <!-- footprint:begin -->
 ### Context footprint
 
-Installing this plugin adds **≥ 1,157 bytes** to every request, for the whole session. A further **≥ 42,916 bytes** load only when one of its skills or agents is actually invoked.
+Installing this plugin adds **≥ 1,498 bytes** to every request, for the whole session. A further **≥ 51,905 bytes** load only when one of its skills or agents is actually invoked.
 
 | Tier | Bytes | When you pay it |
 |---|---|---|
-| Resident | ≥ 1,157 | Every request, for the whole session |
-| Invocation | ≥ 42,916 | Only when that skill or agent runs |
+| Resident | ≥ 1,498 | Every request, for the whole session |
+| Invocation | ≥ 51,905 | Only when that skill or agent runs |
 
 **Bytes, not tokens.** This is the exact serialised size of what the host loads, measured by probing the plugin's own MCP server and reading its skill and agent frontmatter. It is not a token count and does not convert to one at a fixed rate — treat it as a figure you can compare between plugins, not as a context budget.
 

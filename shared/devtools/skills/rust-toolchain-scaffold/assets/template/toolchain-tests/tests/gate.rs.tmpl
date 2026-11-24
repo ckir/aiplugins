@@ -1,0 +1,848 @@
+//! Gate tests: fast tests that read the CI workflow, CODEOWNERS and the tool
+//! settings and pin the lines that make them gates. The workflow cannot be run
+//! locally, so these read the file: they catch an edit that quietly weakens it,
+//! not a fault in GitHub Actions itself.
+//!
+//! They live apart from the toolchain tests on purpose. They are fast, so `just
+//! test` runs them and therefore so does `check-fast`: a pull request that
+//! downgrades the workflow to the fast gate still runs them, and fails.
+
+mod common;
+
+use common::{justfile_name, read, repo_root, run, TOOLCHAIN_FILES};
+use std::collections::HashMap;
+use std::fs;
+use yaml_rust2::{Yaml, YamlLoader};
+
+// ---- reading files -------------------------------------------------------
+
+fn load(text: &str) -> Yaml {
+    YamlLoader::load_from_str(text)
+        .expect("valid YAML")
+        .into_iter()
+        .next()
+        .expect("one YAML document")
+}
+
+fn ci() -> Yaml {
+    load(&read(".github/workflows/ci.yml"))
+}
+
+fn steps(workflow: &Yaml) -> Vec<&Yaml> {
+    workflow["jobs"]["check"]["steps"]
+        .as_vec()
+        .expect("ci.yml has a `check` job with steps")
+        .iter()
+        .collect()
+}
+
+/// The steps of every job, in file order. The strict checks read these, so a job
+/// added to ci.yml later cannot carry an unpinned action or a swallowed failure.
+fn all_steps(workflow: &Yaml) -> Vec<&Yaml> {
+    workflow["jobs"]
+        .as_hash()
+        .expect("ci.yml has jobs")
+        .values()
+        .filter_map(|job| job["steps"].as_vec())
+        .flatten()
+        .collect()
+}
+
+fn step_using<'a>(all: &[&'a Yaml], action: &str) -> &'a Yaml {
+    let prefix = format!("{action}@");
+    all.iter()
+        .copied()
+        .find(|step| {
+            step["uses"]
+                .as_str()
+                .is_some_and(|uses| uses.starts_with(&prefix))
+        })
+        .unwrap_or_else(|| panic!("ci.yml has no {action} step"))
+}
+
+fn step_named<'a>(all: &[&'a Yaml], name: &str) -> &'a Yaml {
+    all.iter()
+        .copied()
+        .find(|step| step["name"].as_str() == Some(name))
+        .unwrap_or_else(|| panic!("ci.yml has no step named {name}"))
+}
+
+fn script(step: &Yaml) -> &str {
+    step["run"].as_str().unwrap_or("")
+}
+
+/// Every workflow file, as (file name, parsed document), in name order.
+fn workflows() -> Vec<(String, Yaml)> {
+    let directory = repo_root().join(".github/workflows");
+    let mut found: Vec<(String, Yaml)> = fs::read_dir(&directory)
+        .expect("the repository has .github/workflows")
+        .map(|entry| {
+            entry
+                .expect("a directory entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .filter(|name| name.ends_with(".yml") || name.ends_with(".yaml"))
+        .map(|name| {
+            let text = read(&format!(".github/workflows/{name}"));
+            (name, load(&text))
+        })
+        .collect();
+    found.sort_by(|a, b| a.0.cmp(&b.0));
+    found
+}
+
+/// The names of every `env:` entry anywhere in a document: workflow, job and step level.
+fn env_keys(node: &Yaml, found: &mut Vec<String>) {
+    match node {
+        Yaml::Hash(map) => {
+            for (key, value) in map {
+                if key.as_str() == Some("env") {
+                    if let Yaml::Hash(env) = value {
+                        found.extend(env.keys().filter_map(Yaml::as_str).map(str::to_owned));
+                    }
+                }
+                env_keys(value, found);
+            }
+        }
+        Yaml::Array(items) => items.iter().for_each(|item| env_keys(item, found)),
+        _ => {}
+    }
+}
+
+// ---- the CI workflow (ci.yml only: the strict rules) ----------------------
+
+#[test]
+fn ci_runs_on_pushes_to_main_and_on_pull_requests_including_a_changed_base() {
+    let workflow = ci();
+    let branches = workflow["on"]["push"]["branches"]
+        .as_vec()
+        .expect("push branches");
+    assert!(branches
+        .iter()
+        .any(|branch| branch.as_str() == Some("main")));
+    let types: Vec<&str> = workflow["on"]["pull_request"]["types"]
+        .as_vec()
+        .expect("pull_request types")
+        .iter()
+        .filter_map(Yaml::as_str)
+        .collect();
+    for wanted in ["opened", "synchronize", "reopened", "edited"] {
+        assert!(
+            types.contains(&wanted),
+            "pull_request does not run on {wanted}"
+        );
+    }
+}
+
+#[test]
+fn ci_has_read_only_access_to_the_repository() {
+    let workflow = ci();
+    let permissions = workflow["permissions"]
+        .as_hash()
+        .expect("workflow permissions");
+    assert_eq!(permissions.len(), 1);
+    assert_eq!(workflow["permissions"]["contents"].as_str(), Some("read"));
+}
+
+#[test]
+fn ci_checks_out_the_full_history_which_the_secret_scan_needs() {
+    let workflow = ci();
+    let checkout = step_using(&steps(&workflow), "actions/checkout");
+    assert_eq!(checkout["with"]["fetch-depth"].as_i64(), Some(0));
+}
+
+#[test]
+fn ci_runs_the_full_gate_not_the_fast_one() {
+    let workflow = ci();
+    let runs: Vec<&str> = steps(&workflow)
+        .iter()
+        .map(|step| script(step).trim())
+        .collect();
+    assert!(
+        runs.contains(&"just check"),
+        "no step runs exactly `just check`"
+    );
+    assert!(!runs.contains(&"just check-fast"));
+}
+
+#[test]
+fn ci_pins_every_action_to_a_full_commit_sha() {
+    // A version tag can be moved to different code; a commit SHA cannot.
+    let workflow = ci();
+    let used: Vec<&str> = all_steps(&workflow)
+        .iter()
+        .filter_map(|step| step["uses"].as_str())
+        .collect();
+    assert!(!used.is_empty());
+    for uses in used {
+        let (_, sha) = uses
+            .rsplit_once('@')
+            .unwrap_or_else(|| panic!("{uses} has no @ref"));
+        let pinned = sha.len() == 40 && sha.chars().all(|c| matches!(c, '0'..='9' | 'a'..='f'));
+        assert!(pinned, "{uses} is not pinned to a 40-hex commit SHA");
+    }
+}
+
+#[test]
+fn ci_pins_the_version_of_every_tool_it_installs() {
+    let workflow = ci();
+    let all = steps(&workflow);
+    let names = [
+        "TOOL_LEFTHOOK_VERSION",
+        "TOOL_GITLEAKS_VERSION",
+        "TOOL_JUST_VERSION",
+        "TOOL_NEXTEST_VERSION",
+        "TOOL_DENY_VERSION",
+        "TOOL_TYPOS_VERSION",
+    ];
+    for name in names {
+        let value = workflow["env"][name]
+            .as_str()
+            .unwrap_or_else(|| panic!("env {name} is not set"));
+        let parts: Vec<&str> = value.split('.').collect();
+        let numeric = parts.len() == 3
+            && parts
+                .iter()
+                .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()));
+        assert!(numeric, "{name} is {value}, not an exact x.y.z version");
+    }
+    let tool = step_using(&all, "taiki-e/install-action")["with"]["tool"]
+        .as_str()
+        .expect("install-action tool list");
+    for (name, tool_name) in [
+        ("TOOL_JUST_VERSION", "just"),
+        ("TOOL_NEXTEST_VERSION", "cargo-nextest"),
+        ("TOOL_DENY_VERSION", "cargo-deny"),
+        ("TOOL_TYPOS_VERSION", "typos"),
+    ] {
+        let expected = format!("{tool_name}@${{{{ env.{name} }}}}");
+        assert!(
+            tool.contains(&expected),
+            "install-action does not install {expected}"
+        );
+    }
+}
+
+#[test]
+fn ci_downloads_each_binary_at_its_pinned_version_and_verifies_its_checksum() {
+    let workflow = ci();
+    let all = steps(&workflow);
+    for (name, variable) in [
+        ("Install lefthook", "TOOL_LEFTHOOK_VERSION"),
+        ("Install gitleaks", "TOOL_GITLEAKS_VERSION"),
+    ] {
+        let text = script(step_named(&all, name));
+        assert!(
+            text.contains(&format!("${{{variable}}}")),
+            "{name} does not use the pinned {variable}"
+        );
+        assert!(
+            text.contains("sha256sum -c"),
+            "{name} does not verify a checksum"
+        );
+        assert!(!text.contains("latest"), "{name} downloads `latest`");
+    }
+}
+
+#[test]
+fn nothing_in_the_ci_job_lets_a_failing_step_pass_or_be_skipped() {
+    let workflow = ci();
+    for key in ["defaults", "container", "services"] {
+        assert!(workflow[key].is_badvalue(), "the workflow sets `{key}`");
+        assert!(
+            workflow["jobs"]["check"][key].is_badvalue(),
+            "the check job sets `{key}`"
+        );
+    }
+    assert!(workflow["jobs"]["check"]["continue-on-error"].is_badvalue());
+    assert!(workflow["jobs"]["check"]["if"].is_badvalue());
+    for step in all_steps(&workflow) {
+        for key in ["continue-on-error", "if", "shell"] {
+            assert!(step[key].is_badvalue(), "a step sets `{key}`: {step:?}");
+        }
+    }
+}
+
+#[test]
+fn the_ci_job_does_not_widen_the_workflows_read_only_access() {
+    let workflow = ci();
+    for (name, job) in workflow["jobs"].as_hash().expect("jobs") {
+        assert!(
+            job["permissions"].is_badvalue(),
+            "job {name:?} sets its own permissions"
+        );
+    }
+}
+
+#[test]
+fn no_ci_script_swallows_a_failing_command() {
+    // `|| true` after the checksum check, or `set +e`, would let a tampered
+    // download through. No script here needs `||` or `set +...` at all; a future
+    // one that does should change this test.
+    let workflow = ci();
+    for step in &all_steps(&workflow) {
+        let text = script(step);
+        assert!(!text.contains("||"), "a script contains ||: {text}");
+        assert!(!text.contains("set +"), "a script contains `set +`: {text}");
+        assert!(
+            !text.contains("; true"),
+            "a script contains `; true`: {text}"
+        );
+    }
+    let all = steps(&workflow);
+    for name in ["Install lefthook", "Install gitleaks"] {
+        let checks: Vec<&str> = script(step_named(&all, name))
+            .lines()
+            .map(str::trim)
+            .filter(|line| line.contains("sha256sum -c"))
+            .collect();
+        assert_eq!(
+            checks.len(),
+            1,
+            "{name} must have exactly one checksum line"
+        );
+        assert!(
+            checks[0].ends_with("| sha256sum -c -"),
+            "{name}: {}",
+            checks[0]
+        );
+        assert!(!checks[0].starts_with('#'));
+    }
+}
+
+// ---- every workflow file: the two shadowing rules --------------------------
+
+#[test]
+fn no_workflow_sets_an_env_key_that_just_reads() {
+    // `JUST_DRY_RUN=true` makes `just check` print the recipe and exit 0 without
+    // running it, and `GITLEAKS_CONFIG_TOML` with an empty rule set makes the
+    // secret scan exit 0 on a committed token: either turns the gate into a green
+    // no-op. The rule is every key starting with one of the prefixes below (each
+    // tool reads only its own), so a variable added to a future release is covered
+    // too. The pins in ci.yml are TOOL_*. These six are the tool-configuration
+    // families the gate's tools read; RUSTFLAGS, CARGO_* and RUSTUP_* are not
+    // listed because CI legitimately sets them.
+    const SWITCH_OFF_PREFIXES: &[&str] = &[
+        "JUST_",
+        "GITLEAKS_",
+        "LEFTHOOK",
+        "HOOK_ARG_",
+        "NEXTEST_",
+        "TYPOS_",
+    ];
+    for (file, workflow) in workflows() {
+        let mut keys = Vec::new();
+        env_keys(&workflow, &mut keys);
+        for key in keys {
+            let upper = key.to_ascii_uppercase();
+            assert!(
+                !SWITCH_OFF_PREFIXES
+                    .iter()
+                    .any(|prefix| upper.starts_with(prefix)),
+                "{file} sets env {key}, a tool-configuration variable that can switch a gate off"
+            );
+        }
+    }
+}
+
+#[test]
+fn no_other_workflow_has_a_job_that_shadows_the_gate_job() {
+    // A required status check is matched by the check's name. A second workflow
+    // with a job called `check` could report green under the gate's name.
+    let gate = ci();
+    let gate_job = gate["jobs"]["check"]["name"]
+        .as_str()
+        .unwrap_or("check")
+        .to_owned();
+    for (file, workflow) in workflows() {
+        if file == "ci.yml" {
+            continue;
+        }
+        for (id, job) in workflow["jobs"].as_hash().expect("jobs") {
+            let id = id.as_str().unwrap_or_default();
+            let name = job["name"].as_str().unwrap_or(id);
+            assert!(
+                id != "check" && name != gate_job,
+                "{file} has a job {id:?} named {name:?}, shadowing the gate"
+            );
+        }
+    }
+}
+
+// ---- CODEOWNERS ------------------------------------------------------------
+
+/// The owned paths in CODEOWNERS in file order, each with its owners.
+fn code_owners() -> Vec<(String, Vec<String>)> {
+    read(".github/CODEOWNERS")
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .map(|line| {
+            let mut parts = line.split_whitespace();
+            let path = parts.next().expect("a path").to_owned();
+            (path, parts.map(str::to_owned).collect())
+        })
+        .collect()
+}
+
+/// `*` and `?` inside one path segment.
+fn glob(pattern: &[char], text: &[char]) -> bool {
+    match pattern.split_first() {
+        None => text.is_empty(),
+        Some(('*', rest)) => (0..=text.len()).any(|skip| glob(rest, &text[skip..])),
+        Some(('?', rest)) => !text.is_empty() && glob(rest, &text[1..]),
+        Some((c, rest)) => text.first() == Some(c) && glob(rest, &text[1..]),
+    }
+}
+
+fn segments_match(pattern: &[&str], file: &[&str], directory: bool) -> bool {
+    match pattern.split_first() {
+        // The pattern is used up: what is left of the path is below it. A
+        // directory pattern owns only what is inside it, a file pattern also itself.
+        None => !directory || !file.is_empty(),
+        Some((&"**", rest)) => {
+            (0..=file.len()).any(|skip| segments_match(rest, &file[skip..], directory))
+        }
+        Some((segment, rest)) => match file.split_first() {
+            Some((name, below)) => {
+                let segment: Vec<char> = segment.chars().collect();
+                let name: Vec<char> = name.chars().collect();
+                glob(&segment, &name) && segments_match(rest, below, directory)
+            }
+            None => false,
+        },
+    }
+}
+
+/// Whether a CODEOWNERS pattern applies to a repository-relative file path.
+fn owns(pattern: &str, file: &str) -> bool {
+    let directory = pattern.ends_with('/');
+    let body = pattern.trim_start_matches('/').trim_end_matches('/');
+    let anchored = pattern.starts_with('/') || body.contains('/');
+    let pattern_segments: Vec<&str> = body.split('/').collect();
+    let file_segments: Vec<&str> = file.split('/').collect();
+    let starts: Vec<usize> = if anchored {
+        vec![0]
+    } else {
+        (0..file_segments.len()).collect()
+    };
+    starts
+        .into_iter()
+        .any(|start| segments_match(&pattern_segments, &file_segments[start..], directory))
+}
+
+#[test]
+fn the_ci_workflow_the_recipes_the_hooks_the_tool_settings_their_tests_and_codeowners_each_have_an_owner(
+) {
+    let owned: HashMap<String, Vec<String>> = code_owners().into_iter().collect();
+    for path in [
+        "/.github/workflows/",
+        "/.github/CODEOWNERS",
+        "/toolchain-tests/",
+        "/justfile",
+        "/Justfile",
+        "/.justfile",
+        "/lefthook.yml",
+        "/.lefthook/",
+        "/Cargo.toml",
+        "/Cargo.lock",
+        "/rust-toolchain.toml",
+        "/deny.toml",
+        "/typos.toml",
+        "/.gitattributes",
+        "/.gitleaks.toml",
+        "/.gitleaksignore",
+        "/rustfmt.toml",
+        "/.rustfmt.toml",
+        "/clippy.toml",
+        "/.clippy.toml",
+        "/_typos.toml",
+        "/.typos.toml",
+        "/.cargo/",
+        "/.config/",
+    ] {
+        let owners = owned
+            .get(path)
+            .unwrap_or_else(|| panic!("CODEOWNERS has no entry for {path}"));
+        assert!(!owners.is_empty(), "{path} has no owner");
+        for owner in owners {
+            let handle = owner.strip_prefix('@').unwrap_or("");
+            let valid = !handle.is_empty()
+                && handle.matches('/').count() <= 1
+                && handle
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || matches!(c, '_' | '-' | '/'));
+            assert!(valid, "{path}: {owner} is not an @user or @org/team handle");
+        }
+    }
+}
+
+#[test]
+fn no_later_codeowners_rule_takes_a_protected_file_away_from_its_entry() {
+    // GitHub uses the LAST matching rule, so a `*` line added at the end would
+    // replace or clear the owners of everything above it.
+    let rules: Vec<String> = code_owners().into_iter().map(|(path, _)| path).collect();
+    for (file, entry) in [
+        (".github/workflows/ci.yml", "/.github/workflows/"),
+        (".github/CODEOWNERS", "/.github/CODEOWNERS"),
+        ("toolchain-tests/tests/gate.rs", "/toolchain-tests/"),
+        ("justfile", "/justfile"),
+        ("Justfile", "/Justfile"),
+        (".justfile", "/.justfile"),
+        ("lefthook.yml", "/lefthook.yml"),
+        (".lefthook/rc.sh", "/.lefthook/"),
+        (".lefthook/pre-push/check.sh", "/.lefthook/"),
+        ("Cargo.toml", "/Cargo.toml"),
+        ("Cargo.lock", "/Cargo.lock"),
+        ("rust-toolchain.toml", "/rust-toolchain.toml"),
+        ("deny.toml", "/deny.toml"),
+        ("typos.toml", "/typos.toml"),
+        (".gitattributes", "/.gitattributes"),
+        (".gitleaks.toml", "/.gitleaks.toml"),
+        (".gitleaksignore", "/.gitleaksignore"),
+        ("rustfmt.toml", "/rustfmt.toml"),
+        (".rustfmt.toml", "/.rustfmt.toml"),
+        ("clippy.toml", "/clippy.toml"),
+        (".clippy.toml", "/.clippy.toml"),
+        ("_typos.toml", "/_typos.toml"),
+        (".typos.toml", "/.typos.toml"),
+        (".cargo/config.toml", "/.cargo/"),
+        (".config/nextest.toml", "/.config/"),
+    ] {
+        let decided_by = rules.iter().rfind(|rule| owns(rule, file));
+        assert_eq!(
+            decided_by.map(String::as_str),
+            Some(entry),
+            "{file} is decided by the wrong rule"
+        );
+    }
+}
+
+#[test]
+fn the_codeowners_matcher_follows_github_for_the_cases_these_tests_rely_on() {
+    assert!(owns("/justfile", "justfile"));
+    assert!(!owns("/justfile", "sub/justfile"));
+    assert!(owns("justfile", "sub/justfile"));
+    assert!(owns("/.lefthook/", ".lefthook/rc.sh"));
+    assert!(!owns("/.lefthook/", ".lefthook"));
+    assert!(owns("**/justfile", "justfile"));
+    assert!(owns("/docs/*.md", "docs/a.md"));
+    assert!(!owns("/docs/*.md", "docs/sub/a.md"));
+    assert!(owns("*", "anything/at/all"));
+}
+
+// ---- the recipes -----------------------------------------------------------
+
+/// The recipes of the justfile: name to (header line, indented body lines joined).
+fn recipes() -> HashMap<String, (String, String)> {
+    let text = read(justfile_name());
+    let mut found: HashMap<String, (String, String)> = HashMap::new();
+    let mut current: Option<String> = None;
+    for line in text.lines() {
+        let indented = line.starts_with(' ') || line.starts_with('\t');
+        let header = !indented
+            && !line.starts_with('#')
+            && !line.starts_with("set ")
+            && !line.contains(":=")
+            && line.contains(':');
+        if header {
+            let name = line
+                .split(':')
+                .next()
+                .unwrap_or("")
+                .split_whitespace()
+                .next()
+                .unwrap_or("")
+                .to_owned();
+            found.insert(name.clone(), (line.trim().to_owned(), String::new()));
+            current = Some(name);
+        } else if indented {
+            if let Some((_, body)) = current.as_ref().and_then(|name| found.get_mut(name)) {
+                body.push_str(line);
+                body.push('\n');
+            }
+        } else if line.trim().is_empty() {
+            current = None;
+        }
+    }
+    found
+}
+
+#[test]
+fn the_recipes_the_tests_and_the_hooks_name_exist() {
+    let found = recipes();
+    for name in [
+        "setup",
+        "fmt",
+        "fmt-check",
+        "clippy",
+        "lint",
+        "test",
+        "test-toolchain",
+        "deny",
+        "spellcheck",
+        "secrets",
+        "secrets-staged",
+        "secrets-message",
+        "check-fast",
+        "check",
+    ] {
+        assert!(
+            found.contains_key(name),
+            "the justfile has no recipe `{name}`"
+        );
+    }
+    assert_eq!(found["check"].0, "check: check-fast test-toolchain");
+    assert_eq!(
+        found["check-fast"].0,
+        "check-fast: lint test deny spellcheck secrets"
+    );
+    assert!(
+        read(justfile_name()).contains("set shell := [\"bash\", \"-euo\", \"pipefail\", \"-c\"]")
+    );
+}
+
+#[test]
+fn every_cargo_recipe_also_covers_the_excluded_test_crate() {
+    // The test crate is outside the workspace, so `--workspace` and `--all` skip it.
+    let found = recipes();
+    for name in [
+        "fmt",
+        "fmt-check",
+        "clippy",
+        "test",
+        "test-toolchain",
+        "deny",
+    ] {
+        assert!(
+            found[name].1.contains("toolchain-tests/Cargo.toml"),
+            "`{name}` does not cover toolchain-tests"
+        );
+    }
+}
+
+#[test]
+fn clippy_lints_every_target_and_denies_warnings_in_each_command() {
+    // Without `--all-targets` clippy skips tests, benches and examples; without
+    // `-D warnings` a lint is only printed. Each command is read on its own, so a
+    // flag left in a comment or on another line does not count for it.
+    let body = recipes()["clippy"].1.clone();
+    let commands: Vec<&str> = body
+        .lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with("cargo clippy"))
+        .collect();
+    assert!(
+        !commands.is_empty(),
+        "the clippy recipe runs no clippy: {body}"
+    );
+    for command in commands {
+        assert!(
+            command.contains(" --all-targets "),
+            "`{command}` does not lint every target"
+        );
+        assert!(
+            command.ends_with("-- -D warnings"),
+            "`{command}` does not deny warnings"
+        );
+    }
+}
+
+// ---- the hooks -------------------------------------------------------------
+
+fn lefthook() -> Yaml {
+    load(&read("lefthook.yml"))
+}
+
+#[test]
+fn lefthook_fails_closed_and_loads_the_rc_file() {
+    let config = lefthook();
+    assert_eq!(config["assert_lefthook_installed"].as_bool(), Some(true));
+    assert_eq!(config["rc"].as_str(), Some(".lefthook/rc.sh"));
+    let floor = config["min_version"]
+        .as_str()
+        .expect("min_version is a string");
+    assert!(
+        floor.split('.').count() == 3 && floor.split('.').all(|p| p.parse::<u32>().is_ok()),
+        "min_version {floor}"
+    );
+    assert!(
+        config["lefthook"].is_badvalue(),
+        "lefthook.yml pins a `lefthook:` path, which has nothing to pin into"
+    );
+}
+
+#[test]
+fn the_rc_file_exports_the_hook_argument_and_drops_the_override_variables() {
+    let rc = read(".lefthook/rc.sh");
+    let lines: Vec<&str> = rc.lines().map(str::trim).collect();
+    assert!(lines.contains(&"HOOK_ARG_1=\"${1:-}\""));
+    assert!(lines.contains(&"export HOOK_ARG_1"));
+    assert!(lines.contains(&"unset LEFTHOOK_BIN LEFTHOOK_CONFIG LEFTHOOK_EXCLUDE"));
+}
+
+#[test]
+fn lefthook_yml_never_pastes_a_hook_argument_into_a_command() {
+    // lefthook pastes {0}, {1} and so on into `sh -c` unescaped. Comment lines
+    // may mention the placeholders (this file's own comments do); commands may not.
+    for line in read("lefthook.yml")
+        .lines()
+        .filter(|line| !line.trim_start().starts_with('#'))
+    {
+        let mut rest = line;
+        while let Some(open) = rest.find('{') {
+            let after = &rest[open + 1..];
+            let digits: String = after.chars().take_while(char::is_ascii_digit).collect();
+            assert!(
+                digits.is_empty() || !after[digits.len()..].starts_with('}'),
+                "lefthook.yml uses the numbered placeholder {{{digits}}}: {line}"
+            );
+            rest = after;
+        }
+    }
+}
+
+#[test]
+fn the_lefthook_floor_is_written_once_and_setup_reads_it_from_there() {
+    let found = recipes();
+    let body = &found["setup"].1;
+    assert!(
+        body.contains("min_version"),
+        "`setup` does not read min_version"
+    );
+    assert!(body.contains("lefthook.yml"));
+    let digits_dotted = body
+        .split(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .any(|word| {
+            let parts: Vec<&str> = word.split('.').collect();
+            parts.len() == 3 && parts.iter().all(|p| !p.is_empty())
+        });
+    assert!(!digits_dotted, "`setup` writes a version number of its own");
+}
+
+#[test]
+fn lefthook_yml_is_the_only_tracked_lefthook_configuration() {
+    // lefthook merges `lefthook-local.yml` over `lefthook.yml`. Committed, a line
+    // such as `commit-msg: { skip: true }` there switches a hook off for everyone.
+    let listing = run(&repo_root(), "git", &["ls-files"]);
+    assert_eq!(listing.code, 0, "{}", listing.output);
+    let configs: Vec<&str> = listing
+        .output
+        .lines()
+        .filter(|path| {
+            let name = path
+                .rsplit('/')
+                .next()
+                .unwrap_or(path)
+                .trim_start_matches('.');
+            let stem = name.split('.').next().unwrap_or("");
+            let extension = name.rsplit('.').next().unwrap_or("");
+            (stem == "lefthook" || stem == "lefthook-local")
+                && ["yml", "yaml", "toml", "json", "jsonc"].contains(&extension)
+        })
+        .collect();
+    assert_eq!(configs, ["lefthook.yml"]);
+}
+
+#[test]
+fn the_pre_push_fast_gate_is_an_unconditional_script_job() {
+    // lefthook skips a `run:` job that has a glob when no pushed file matches it; a
+    // `script:` job is not skipped. The fast gate has to run on every push, so it is a
+    // script job with nothing that can switch it off.
+    let config = lefthook();
+    let job = config["pre-push"]["jobs"]
+        .as_vec()
+        .expect("pre-push jobs")
+        .iter()
+        .find(|job| job["name"].as_str() == Some("check"))
+        .expect("pre-push has a check job");
+    assert_eq!(job["script"].as_str(), Some("check.sh"));
+    assert_eq!(job["runner"].as_str(), Some("sh"));
+    for key in ["run", "glob", "files", "only", "skip", "exclude"] {
+        assert!(job[key].is_badvalue(), "the fast gate sets `{key}`");
+    }
+    let script = read(".lefthook/pre-push/check.sh");
+    assert!(
+        script
+            .lines()
+            .map(str::trim)
+            .any(|line| line == "exec just check-fast"),
+        "the script does not run the fast gate: {script}"
+    );
+}
+
+#[test]
+fn the_pre_push_toolchain_job_covers_every_file_the_suite_copies() {
+    let config = lefthook();
+    let job = config["pre-push"]["jobs"]
+        .as_vec()
+        .expect("pre-push jobs")
+        .iter()
+        .find(|job| job["name"].as_str() == Some("toolchain-tests"))
+        .expect("pre-push has a toolchain-tests job");
+    let globs: Vec<&str> = job["glob"]
+        .as_vec()
+        .expect("a glob list")
+        .iter()
+        .filter_map(Yaml::as_str)
+        .collect();
+    let mut wanted: Vec<&str> = TOOLCHAIN_FILES.to_vec();
+    wanted.extend([justfile_name(), "rust-toolchain.toml", "toolchain-tests"]);
+    for file in wanted {
+        let covered = globs.iter().any(|glob| {
+            *glob == file
+                || glob.strip_suffix("/**").is_some_and(|directory| {
+                    directory == file || file.starts_with(&format!("{directory}/"))
+                })
+        });
+        assert!(covered, "no glob of the toolchain-tests job covers {file}");
+    }
+}
+
+// ---- the settings ----------------------------------------------------------
+
+#[test]
+fn the_toolchain_is_pinned_with_rustfmt_and_clippy() {
+    let text = read("rust-toolchain.toml");
+    assert!(
+        text.lines()
+            .any(|line| line.trim_start().starts_with("channel = \"")),
+        "no pinned channel"
+    );
+    assert!(text.contains("\"rustfmt\"") && text.contains("\"clippy\""));
+}
+
+#[test]
+fn the_private_test_crate_passes_the_licence_check_by_configuration() {
+    let deny = read("deny.toml");
+    assert!(deny.contains("[licenses.private]"));
+    let after = deny.split("[licenses.private]").nth(1).expect("a section");
+    let section = after.split("\n[").next().unwrap_or("");
+    assert!(section.lines().any(|line| line.trim() == "ignore = true"));
+    assert!(read("toolchain-tests/Cargo.toml").contains("publish = false"));
+    assert!(read("toolchain-tests/.gitignore")
+        .lines()
+        .any(|line| line.trim() == "/target/"));
+}
+
+#[test]
+fn the_hooks_and_the_recipes_keep_lf_line_endings() {
+    let text = read(".gitattributes");
+    let lines: Vec<&str> = text.lines().map(str::trim).collect();
+    for wanted in [
+        "*.sh text eol=lf",
+        "lefthook.yml text eol=lf",
+        ".lefthook/** text eol=lf",
+        "toolchain-tests/** text eol=lf",
+    ] {
+        assert!(
+            lines.contains(&wanted),
+            ".gitattributes does not pin `{wanted}`"
+        );
+    }
+    assert!(lines
+        .iter()
+        .any(|line| line.ends_with("text eol=lf") && line.starts_with(justfile_name())));
+}

@@ -1,0 +1,31 @@
+# Changes to the CI workflow, to the recipes and hooks it and the developers
+# run, to the tool settings and pinned dependencies they rely on, to the tests
+# that guard them, or to this file need the owner's review. This only takes
+# effect once branch protection on `main` has "Require review from Code
+# Owners" switched on. The three justfile spellings are listed because paths
+# here are case-sensitive and a repository has only one of them.
+
+/.github/workflows/ @OWNER
+/.github/CODEOWNERS @OWNER
+/toolchain-tests/ @OWNER
+/justfile @OWNER
+/Justfile @OWNER
+/.justfile @OWNER
+/lefthook.yml @OWNER
+/.lefthook/ @OWNER
+/Cargo.toml @OWNER
+/Cargo.lock @OWNER
+/rust-toolchain.toml @OWNER
+/deny.toml @OWNER
+/typos.toml @OWNER
+/.gitattributes @OWNER
+/.gitleaks.toml @OWNER
+/.gitleaksignore @OWNER
+/rustfmt.toml @OWNER
+/.rustfmt.toml @OWNER
+/clippy.toml @OWNER
+/.clippy.toml @OWNER
+/_typos.toml @OWNER
+/.typos.toml @OWNER
+/.cargo/ @OWNER
+/.config/ @OWNER

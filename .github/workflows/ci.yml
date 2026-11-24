@@ -210,6 +210,14 @@ jobs:
       - name: Check devtools skills gate against seeded defects
         run: bash scripts/check-devtools-skills.sh --mutation-test
 
+      - name: Check the Rust scaffold skill
+        run: bash scripts/check-rust-scaffold.sh
+
+      # The gate must fail on each seeded defect, or an edit to it could turn a
+      # failure branch into a no-op and leave it green.
+      - name: Check the Rust scaffold gate against seeded defects
+        run: bash scripts/check-rust-scaffold.sh --mutation-test
+
       # The gate only compares the committed copies; this runs the emitter that
       # writes them and requires it to change nothing in a clean checkout.
       - name: Install just
@@ -290,6 +298,51 @@ jobs:
 
       - name: Check that every gate script is wired in
         run: bash scripts/check-gate-wiring.sh
+
+  # The Rust scaffold ships to other repositories and works through bash scripts,
+  # git hooks, lefthook and gitleaks, all of which behave differently on Git Bash
+  # and on macOS. This applies it to throwaway repositories on all three systems,
+  # runs its own `just check` there, and weakens each gate once to see its test
+  # fail; a Linux-only run would leave Windows and macOS unmeasured.
+  rust-scaffold:
+    name: Rust scaffold (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install just, cargo-nextest, cargo-deny and typos
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just,cargo-nextest,cargo-deny,typos
+
+      # The macOS runner has no Go on PATH (the first run failed with `go: command not
+      # found`), so Go is installed on all three runners rather than assumed.
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache: false
+
+      # lefthook and gitleaks have no cargo or install-action route. A version-pinned
+      # `go install` works the same on all three runners and is verified by Go's
+      # module checksum database. gitleaks declares its module path under the old
+      # organization name.
+      - name: Install lefthook and gitleaks
+        run: |
+          go install github.com/evilmartians/lefthook/v2@v2.1.17
+          go install github.com/zricethezav/gitleaks/v8@v8.30.1
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Test the Rust scaffold
+        run: bash scripts/test-rust-scaffold.sh
 
   # Stages the Pages tree on pull requests so a staging failure is seen before
   # the merge. On push to main docs.yml already stages, so this skips there.

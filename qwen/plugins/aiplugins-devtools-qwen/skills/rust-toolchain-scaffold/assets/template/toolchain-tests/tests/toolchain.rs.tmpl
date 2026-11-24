@@ -1,0 +1,630 @@
+//! Toolchain tests: slow tests that build throwaway git repositories holding a
+//! copy of the tooling, then run the real hooks and recipes in them to prove each
+//! gate blocks what it should. They need `just`, `lefthook`, `gitleaks`, `cargo`
+//! and `typos` on `PATH`; a missing tool fails the test instead of skipping it.
+//!
+//! `just test` leaves these out and `just test-toolchain` runs them. CI runs them
+//! on every change; the pre-push hook runs them when a tooling file changed.
+
+mod common;
+
+use common::{
+    add_remote, append, build_repo, commit_count, fake_token, install_hooks, make_repo, must, run,
+    run_env, write, write_script, Ran, TempDir, LEAK,
+};
+use std::fs;
+use std::path::{Path, PathBuf};
+
+const UNFORMATTED: &str = "pub fn  twice(n:i32)->i32{n*2}\n";
+const CLIPPY_FAILURE: &str =
+    "\n/// Counts.\npub fn count(items: &Vec<i32>) -> usize {\n    items.len()\n}\n";
+const CLEAN_ADDITION: &str =
+    "\n/// Doubles a number.\npub fn double(n: i32) -> i32 {\n    n * 2\n}\n";
+
+/// A repository with the hooks installed.
+fn hooked_repo() -> TempDir {
+    let dir = make_repo();
+    install_hooks(dir.path());
+    dir
+}
+
+/// Stage everything and try to commit it through the hooks.
+fn commit(dir: &Path, message: &str) -> Ran {
+    must(dir, "git", &["add", "--all"]);
+    run(dir, "git", &["commit", "--quiet", "-m", message])
+}
+
+fn blocked(ran: &Ran) -> bool {
+    ran.code != 0
+}
+
+// ---- pre-commit -------------------------------------------------------------
+
+#[test]
+fn pre_commit_blocks_unformatted_code() {
+    let dir = hooked_repo();
+    append(dir.path(), "src/lib.rs", UNFORMATTED);
+    let ran = commit(dir.path(), "unformatted");
+    assert!(blocked(&ran), "{}", ran.output);
+    assert!(
+        ran.output.contains("Diff in"),
+        "rustfmt did not report a diff: {}",
+        ran.output
+    );
+    assert_eq!(commit_count(dir.path()), 1);
+}
+
+#[test]
+fn pre_commit_blocks_a_clippy_failure() {
+    let dir = hooked_repo();
+    append(dir.path(), "src/lib.rs", CLIPPY_FAILURE);
+    let ran = commit(dir.path(), "clippy");
+    assert!(blocked(&ran), "{}", ran.output);
+    assert!(
+        ran.output.contains("ptr_arg"),
+        "clippy did not report the lint: {}",
+        ran.output
+    );
+    assert_eq!(commit_count(dir.path()), 1);
+}
+
+#[test]
+fn pre_commit_blocks_a_typo() {
+    // The misspelling is assembled at run time: written out, it would fail this
+    // repository's own spell check, which is the gate being tested.
+    let typo = ["rec", "ieve"].concat();
+    let dir = hooked_repo();
+    append(
+        dir.path(),
+        "src/lib.rs",
+        &format!("\n// we {typo} the value here\n"),
+    );
+    let ran = commit(dir.path(), "typo");
+    assert!(blocked(&ran), "{}", ran.output);
+    assert!(
+        ran.output.contains(&typo),
+        "typos did not name the word: {}",
+        ran.output
+    );
+    assert_eq!(commit_count(dir.path()), 1);
+}
+
+#[test]
+fn pre_commit_blocks_a_token_in_a_staged_file() {
+    let dir = hooked_repo();
+    append(
+        dir.path(),
+        "src/lib.rs",
+        &format!("\npub const KEY: &str = \"{}\";\n", fake_token()),
+    );
+    let ran = commit(dir.path(), "token");
+    assert!(blocked(&ran), "{}", ran.output);
+    assert!(
+        ran.output.contains(LEAK),
+        "gitleaks did not report a leak: {}",
+        ran.output
+    );
+    assert_eq!(commit_count(dir.path()), 1);
+}
+
+#[test]
+fn pre_commit_lets_a_clean_change_through() {
+    let dir = hooked_repo();
+    append(dir.path(), "src/lib.rs", CLEAN_ADDITION);
+    let ran = commit(dir.path(), "add double");
+    assert!(!blocked(&ran), "{}", ran.output);
+    assert_eq!(commit_count(dir.path()), 2);
+}
+
+// ---- commit-msg -------------------------------------------------------------
+
+#[test]
+fn commit_msg_blocks_a_token_in_the_message() {
+    let dir = hooked_repo();
+    append(dir.path(), "src/lib.rs", CLEAN_ADDITION);
+    let ran = commit(dir.path(), &format!("leak {}", fake_token()));
+    assert!(blocked(&ran), "{}", ran.output);
+    assert!(ran.output.contains(LEAK), "{}", ran.output);
+    assert_eq!(commit_count(dir.path()), 1);
+}
+
+#[test]
+fn commit_msg_lets_a_clean_message_through() {
+    let dir = hooked_repo();
+    append(dir.path(), "src/lib.rs", CLEAN_ADDITION);
+    assert!(!blocked(&commit(dir.path(), "add double")));
+}
+
+#[test]
+fn a_linked_worktree_named_with_shell_syntax_is_not_executed() {
+    // lefthook pastes `{1}` into the command it runs, unescaped. In a linked
+    // worktree git gives the commit-msg hook an absolute path that contains the
+    // worktree's name, so a name with shell syntax in it would be run. The recipe
+    // reads the path from HOOK_ARG_1 instead, and the message is still scanned.
+    let dir = hooked_repo();
+    let parent = TempDir::new();
+    let worktree = parent.path().join("wt$(touch pwned)");
+    let worktree_arg = worktree.to_string_lossy().into_owned();
+    must(
+        dir.path(),
+        "git",
+        &["worktree", "add", "--quiet", "-b", "side", &worktree_arg],
+    );
+    append(&worktree, "src/lib.rs", CLEAN_ADDITION);
+    let ok = commit(&worktree, "add double");
+    assert!(!blocked(&ok), "{}", ok.output);
+    assert!(
+        !worktree.join("pwned").exists() && !parent.path().join("pwned").exists(),
+        "the worktree name was executed"
+    );
+    append(&worktree, "src/lib.rs", "\n// more\n");
+    let leak = commit(&worktree, &format!("leak {}", fake_token()));
+    assert!(blocked(&leak), "{}", leak.output);
+    assert!(leak.output.contains(LEAK), "{}", leak.output);
+}
+
+// ---- the secret scan (`just secrets`) ------------------------------------------
+
+fn token_file(dir: &Path, name: &str) {
+    write(
+        dir,
+        name,
+        &format!("pub const KEY: &str = \"{}\";\n", fake_token()),
+    );
+}
+
+fn commit_unchecked(dir: &Path, message: &str) {
+    must(dir, "git", &["add", "--all"]);
+    must(
+        dir,
+        "git",
+        &["commit", "--quiet", "--no-verify", "-m", message],
+    );
+}
+
+fn secrets(dir: &Path) -> Ran {
+    run(dir, "just", &["secrets"])
+}
+
+#[test]
+fn secrets_pass_on_a_clean_repository() {
+    let dir = make_repo();
+    let ran = secrets(dir.path());
+    assert_eq!(ran.code, 0, "{}", ran.output);
+}
+
+#[test]
+fn secrets_find_a_token_buried_in_history_and_since_removed() {
+    let dir = make_repo();
+    token_file(dir.path(), "old.rs");
+    commit_unchecked(dir.path(), "add");
+    must(dir.path(), "git", &["rm", "--quiet", "old.rs"]);
+    commit_unchecked(dir.path(), "remove");
+    append(dir.path(), "src/lib.rs", CLEAN_ADDITION);
+    commit_unchecked(dir.path(), "later");
+    let ran = secrets(dir.path());
+    assert!(blocked(&ran) && ran.output.contains(LEAK), "{}", ran.output);
+}
+
+#[test]
+fn secrets_find_a_token_added_by_a_merge_commit() {
+    // Without `-m`, git shows a merge commit with no patch and its content is never scanned.
+    let dir = make_repo();
+    must(dir.path(), "git", &["checkout", "--quiet", "-b", "side"]);
+    write(dir.path(), "side.txt", "side\n");
+    commit_unchecked(dir.path(), "side");
+    must(dir.path(), "git", &["checkout", "--quiet", "main"]);
+    write(dir.path(), "main.txt", "main\n");
+    commit_unchecked(dir.path(), "main");
+    must(
+        dir.path(),
+        "git",
+        &["merge", "--quiet", "--no-ff", "--no-commit", "side"],
+    );
+    token_file(dir.path(), "evil.rs");
+    commit_unchecked(dir.path(), "merge");
+    let ran = secrets(dir.path());
+    assert!(blocked(&ran) && ran.output.contains(LEAK), "{}", ran.output);
+}
+
+#[test]
+fn secrets_find_a_token_in_a_commit_message_body() {
+    let dir = make_repo();
+    append(dir.path(), "src/lib.rs", CLEAN_ADDITION);
+    commit_unchecked(
+        dir.path(),
+        &format!("subject\n\nbody with {}", fake_token()),
+    );
+    let ran = secrets(dir.path());
+    assert!(blocked(&ran) && ran.output.contains(LEAK), "{}", ran.output);
+}
+
+#[test]
+fn secrets_find_a_token_in_an_unstaged_change_to_a_tracked_file() {
+    let dir = make_repo();
+    append(
+        dir.path(),
+        "src/lib.rs",
+        &format!("\npub const KEY: &str = \"{}\";\n", fake_token()),
+    );
+    let ran = secrets(dir.path());
+    assert!(blocked(&ran) && ran.output.contains(LEAK), "{}", ran.output);
+}
+
+#[test]
+fn secrets_staged_scans_only_what_is_staged() {
+    let dir = make_repo();
+    append(
+        dir.path(),
+        "src/lib.rs",
+        &format!("\npub const KEY: &str = \"{}\";\n", fake_token()),
+    );
+    let unstaged = run(dir.path(), "just", &["secrets-staged"]);
+    assert_eq!(unstaged.code, 0, "{}", unstaged.output);
+    must(dir.path(), "git", &["add", "--all"]);
+    let staged = run(dir.path(), "just", &["secrets-staged"]);
+    assert!(
+        blocked(&staged) && staged.output.contains(LEAK),
+        "{}",
+        staged.output
+    );
+}
+
+#[test]
+fn secrets_message_refuses_to_run_outside_the_commit_msg_hook() {
+    let dir = make_repo();
+    let ran = run(dir.path(), "just", &["secrets-message"]);
+    assert!(blocked(&ran), "{}", ran.output);
+    assert!(
+        ran.output.contains("HOOK_ARG_1 is not set"),
+        "{}",
+        ran.output
+    );
+}
+
+// ---- `just setup` -------------------------------------------------------------
+
+#[test]
+fn setup_installs_the_three_hooks() {
+    let dir = make_repo();
+    let ran = run(dir.path(), "just", &["setup"]);
+    assert_eq!(ran.code, 0, "{}", ran.output);
+    for hook in ["pre-commit", "commit-msg", "pre-push"] {
+        assert!(
+            dir.path().join(".git/hooks").join(hook).is_file(),
+            "no {hook} hook was installed"
+        );
+    }
+}
+
+fn require_floor(dir: &Path, floor: &str) {
+    let path = dir.join("lefthook.yml");
+    let text = fs::read_to_string(&path).expect("read lefthook.yml");
+    let edited: Vec<String> = text
+        .lines()
+        .map(|line| {
+            if line.starts_with("min_version:") {
+                format!("min_version: {floor}")
+            } else {
+                line.to_owned()
+            }
+        })
+        .collect();
+    fs::write(&path, edited.join("\n") + "\n").expect("write lefthook.yml");
+}
+
+#[test]
+fn setup_refuses_a_lefthook_older_than_the_floor_and_installs_nothing() {
+    // `lefthook install` itself does not enforce min_version, so the recipe must.
+    let dir = make_repo();
+    require_floor(dir.path(), "99.0.0");
+    let ran = run(dir.path(), "just", &["setup"]);
+    assert!(blocked(&ran), "{}", ran.output);
+    assert!(
+        ran.output.contains("older than the 99.0.0"),
+        "{}",
+        ran.output
+    );
+    assert!(
+        !dir.path().join(".git/hooks/pre-commit").exists(),
+        "hooks were installed anyway"
+    );
+}
+
+#[test]
+fn setup_stops_when_git_config_sets_a_hooks_path() {
+    // lefthook refuses to install over a core.hooksPath. That is its own rule,
+    // listed in docs/accepted-boundaries.md; this pins that the recipe stops.
+    let dir = make_repo();
+    must(
+        dir.path(),
+        "git",
+        &["config", "core.hooksPath", "elsewhere"],
+    );
+    let ran = run(dir.path(), "just", &["setup"]);
+    assert!(blocked(&ran), "{}", ran.output);
+    assert!(ran.output.contains("core.hooksPath"), "{}", ran.output);
+}
+
+// ---- the hook runner --------------------------------------------------------
+
+/// The tests that need a `PATH` without lefthook in it. They build that `PATH` from
+/// symbolic links, so they run on Unix only; the end-to-end job covers Windows.
+#[cfg(unix)]
+mod missing_runner {
+    use super::common::{copy, find_on_path};
+    use super::*;
+    use std::ffi::OsString;
+
+    /// A directory holding only the tools a generated hook needs once it has failed
+    /// to find lefthook, so `PATH` can be set to something with no lefthook in it
+    /// even when lefthook lives beside git (as it does in /usr/bin).
+    fn path_without_lefthook(parent: &Path) -> OsString {
+        let farm = parent.join("farm");
+        fs::create_dir_all(&farm).expect("create the tool directory");
+        for tool in ["git", "uname", "tr", "sed"] {
+            let real = find_on_path(tool).unwrap_or_else(|| panic!("{tool} is not on PATH"));
+            std::os::unix::fs::symlink(real, farm.join(tool)).expect("link a tool");
+        }
+        farm.into_os_string()
+    }
+
+    /// A copy of the real lefthook at `<parent>/bin/lefthook`.
+    fn lefthook_copy(parent: &Path) -> PathBuf {
+        let real = find_on_path("lefthook").expect("lefthook is not on PATH");
+        let target = parent.join("bin").join(if cfg!(windows) {
+            "lefthook.exe"
+        } else {
+            "lefthook"
+        });
+        copy(&real, &target);
+        target
+    }
+
+    fn git_path() -> PathBuf {
+        find_on_path("git").expect("git is not on PATH")
+    }
+
+    #[test]
+    fn a_missing_runner_blocks_the_commit() {
+        // Install from a copy and delete the copy. The generated hook remembers the
+        // path it was installed from and tries it after PATH, so a test that only
+        // empties PATH passes for the wrong reason (see the next test).
+        let dir = make_repo();
+        let tools = TempDir::new();
+        let copy = lefthook_copy(tools.path());
+        must(dir.path(), &copy, &["install"]);
+        fs::remove_file(&copy).expect("delete the copy");
+        append(dir.path(), "src/lib.rs", CLEAN_ADDITION);
+        must(dir.path(), git_path(), &["add", "--all"]);
+        let path = path_without_lefthook(tools.path());
+        let ran = run_env(
+            dir.path(),
+            git_path(),
+            &["commit", "--quiet", "-m", "x"],
+            &[("PATH", path.as_os_str())],
+        );
+        assert!(blocked(&ran), "{}", ran.output);
+        assert!(ran.output.contains("Can't find lefthook"), "{}", ran.output);
+        assert_eq!(commit_count(dir.path()), 1);
+    }
+
+    #[test]
+    fn the_install_path_is_a_fallback_so_emptying_path_alone_proves_nothing() {
+        let dir = make_repo();
+        let tools = TempDir::new();
+        let copy = lefthook_copy(tools.path());
+        must(dir.path(), &copy, &["install"]);
+        append(dir.path(), "src/lib.rs", CLEAN_ADDITION);
+        must(dir.path(), git_path(), &["add", "--all"]);
+        let path = path_without_lefthook(tools.path());
+        let ran = run_env(
+            dir.path(),
+            git_path(),
+            &["commit", "--quiet", "-m", "x"],
+            &[("PATH", path.as_os_str())],
+        );
+        assert!(
+            !ran.output.contains("Can't find lefthook"),
+            "the hook did not fall back to its install path: {}",
+            ran.output
+        );
+    }
+
+    #[test]
+    fn without_assert_lefthook_installed_a_missing_runner_passes_silently() {
+        // The negative control for the test above: it is the setting that blocks.
+        let dir = make_repo();
+        let path = dir.path().join("lefthook.yml");
+        let text = fs::read_to_string(&path).expect("read lefthook.yml");
+        let without: Vec<&str> = text
+            .lines()
+            .filter(|line| !line.starts_with("assert_lefthook_installed"))
+            .collect();
+        fs::write(&path, without.join("\n") + "\n").expect("write lefthook.yml");
+        let tools = TempDir::new();
+        let copy = lefthook_copy(tools.path());
+        must(dir.path(), &copy, &["install"]);
+        fs::remove_file(&copy).expect("delete the copy");
+        append(dir.path(), "src/lib.rs", CLEAN_ADDITION);
+        must(dir.path(), git_path(), &["add", "--all"]);
+        let farm = path_without_lefthook(tools.path());
+        let ran = run_env(
+            dir.path(),
+            git_path(),
+            &["commit", "--quiet", "-m", "x"],
+            &[("PATH", farm.as_os_str())],
+        );
+        assert_eq!(ran.code, 0, "{}", ran.output);
+        assert_eq!(commit_count(dir.path()), 2);
+    }
+}
+
+fn stub_runner(parent: &Path) -> PathBuf {
+    let stub = parent.join("stub-lefthook");
+    write_script(&stub, "#!/bin/sh\nexit 0\n");
+    stub
+}
+
+#[test]
+fn a_lefthook_bin_override_does_not_bypass_the_hooks() {
+    let dir = hooked_repo();
+    let tools = TempDir::new();
+    let stub = stub_runner(tools.path());
+    append(dir.path(), "src/lib.rs", UNFORMATTED);
+    must(dir.path(), "git", &["add", "--all"]);
+    let ran = run_env(
+        dir.path(),
+        "git",
+        &["commit", "--quiet", "-m", "x"],
+        &[("LEFTHOOK_BIN", stub.as_os_str())],
+    );
+    assert!(
+        blocked(&ran),
+        "LEFTHOOK_BIN swapped the hooks for a no-op: {}",
+        ran.output
+    );
+}
+
+#[test]
+fn a_lefthook_config_override_does_not_bypass_the_hooks() {
+    let dir = hooked_repo();
+    let nowhere = dir.path().join("does-not-exist.yml");
+    append(dir.path(), "src/lib.rs", UNFORMATTED);
+    must(dir.path(), "git", &["add", "--all"]);
+    let ran = run_env(
+        dir.path(),
+        "git",
+        &["commit", "--quiet", "-m", "x"],
+        &[("LEFTHOOK_CONFIG", nowhere.as_os_str())],
+    );
+    assert!(
+        blocked(&ran),
+        "LEFTHOOK_CONFIG swapped the configuration for nothing: {}",
+        ran.output
+    );
+}
+
+#[test]
+fn without_the_unset_line_the_overrides_bypass_the_hooks() {
+    // The negative control for the two tests above: it is rc.sh that blocks them.
+    let dir = hooked_repo();
+    let rc = dir.path().join(".lefthook/rc.sh");
+    let text = fs::read_to_string(&rc).expect("read rc.sh");
+    let without: Vec<&str> = text
+        .lines()
+        .filter(|line| !line.starts_with("unset "))
+        .collect();
+    fs::write(&rc, without.join("\n") + "\n").expect("write rc.sh");
+    let tools = TempDir::new();
+    let stub = stub_runner(tools.path());
+    append(dir.path(), "src/lib.rs", UNFORMATTED);
+    must(dir.path(), "git", &["add", "--all"]);
+    let ran = run_env(
+        dir.path(),
+        "git",
+        &["commit", "--quiet", "-m", "x"],
+        &[("LEFTHOOK_BIN", stub.as_os_str())],
+    );
+    assert_eq!(ran.code, 0, "{}", ran.output);
+}
+
+#[test]
+fn a_lefthook_older_than_the_floor_blocks_the_commit() {
+    let dir = hooked_repo();
+    require_floor(dir.path(), "99.0.0");
+    append(dir.path(), "src/lib.rs", CLEAN_ADDITION);
+    let ran = commit(dir.path(), "x");
+    assert!(blocked(&ran), "{}", ran.output);
+    assert!(
+        ran.output.contains("required lefthook version (99.0.0)"),
+        "{}",
+        ran.output
+    );
+}
+
+// ---- pre-push -----------------------------------------------------------------
+
+#[test]
+fn pre_push_blocks_a_push_that_fails_the_fast_gate() {
+    // The fast gate stops at its first failing recipe, formatting here, before
+    // `deny` would reach for the network.
+    let dir = hooked_repo();
+    let _remote = add_remote(dir.path());
+    append(dir.path(), "src/lib.rs", UNFORMATTED);
+    must(dir.path(), "git", &["add", "--all"]);
+    must(
+        dir.path(),
+        "git",
+        &["commit", "--quiet", "--no-verify", "-m", "unformatted"],
+    );
+    let ran = run(dir.path(), "git", &["push", "origin", "main"]);
+    assert!(blocked(&ran), "{}", ran.output);
+    assert!(
+        ran.output.contains("fmt-check"),
+        "the fast gate did not run: {}",
+        ran.output
+    );
+    let local = must(dir.path(), "git", &["rev-parse", "main"]).output;
+    let remote = must(dir.path(), "git", &["ls-remote", "origin", "main"]).output;
+    assert!(
+        !remote.contains(local.trim()),
+        "the push reached the remote"
+    );
+}
+
+#[test]
+fn pre_push_blocks_an_empty_commit_push_that_fails_the_fast_gate() {
+    // A push that changes no file leaves lefthook nothing to match a glob against, so a
+    // `run:` job would be skipped (`check (skip) no matching push files`). The fast gate
+    // is a script job and still runs. The formatting fault is already on the remote;
+    // only an empty commit is pushed now.
+    let dir = hooked_repo();
+    let _remote = add_remote(dir.path());
+    append(dir.path(), "src/lib.rs", UNFORMATTED);
+    must(dir.path(), "git", &["add", "--all"]);
+    must(
+        dir.path(),
+        "git",
+        &["commit", "--quiet", "--no-verify", "-m", "unformatted"],
+    );
+    must(
+        dir.path(),
+        "git",
+        &["push", "--quiet", "--no-verify", "origin", "main"],
+    );
+    must(
+        dir.path(),
+        "git",
+        &[
+            "commit",
+            "--quiet",
+            "--no-verify",
+            "--allow-empty",
+            "-m",
+            "empty",
+        ],
+    );
+    let ran = run(dir.path(), "git", &["push", "origin", "main"]);
+    assert!(blocked(&ran), "{}", ran.output);
+    assert!(
+        ran.output.contains("fmt-check"),
+        "the fast gate did not run: {}",
+        ran.output
+    );
+    let local = must(dir.path(), "git", &["rev-parse", "main"]).output;
+    let remote = must(dir.path(), "git", &["ls-remote", "origin", "main"]).output;
+    assert!(
+        !remote.contains(local.trim()),
+        "the push reached the remote"
+    );
+}
+
+#[test]
+fn a_repository_can_be_built_in_a_named_directory() {
+    let parent = TempDir::new();
+    let dir = parent.path().join("named");
+    fs::create_dir_all(&dir).expect("create the directory");
+    build_repo(&dir);
+    assert_eq!(commit_count(&dir), 1);
+}
