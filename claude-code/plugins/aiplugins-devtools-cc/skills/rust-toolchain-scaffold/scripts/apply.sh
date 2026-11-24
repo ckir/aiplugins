@@ -39,11 +39,12 @@ target="$(cd -- "$target" && pwd -P)"
 git -C "$target" rev-parse --git-dir >/dev/null 2>&1 || {
   echo "apply.sh: $target is not a git repository (run git init first)" >&2; exit 2; }
 # The files belong at the top of the repository: hooks, CODEOWNERS and workflows are read from
-# there only. Going through cd and pwd -P puts both paths in one spelling (on Windows git prints
-# C:/x where bash prints /c/x).
-toplevel="$(cd -- "$(git -C "$target" rev-parse --show-toplevel)" && pwd -P)"
-[ "$toplevel" = "$target" ] || {
-  echo "apply.sh: $target is inside the repository at $toplevel, not its top level; run it on $toplevel" >&2; exit 2; }
+# there only. --show-prefix is the target's path below the top level, empty exactly at the top, so
+# no two spellings of a path are compared (on Windows, Git Bash and git can spell a temp directory
+# differently).
+prefix="$(git -C "$target" rev-parse --show-prefix)"
+[ -z "$prefix" ] || {
+  echo "apply.sh: $target is inside the repository at $(git -C "$target" rev-parse --show-toplevel), not its top level; run it on the top level" >&2; exit 2; }
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
