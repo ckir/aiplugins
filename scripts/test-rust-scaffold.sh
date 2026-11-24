@@ -18,7 +18,7 @@
 # of seeded weakenings is applied to it one at a time: the gate tests must fail
 # on each, or a passing scaffold would prove nothing (the templates would be
 # testing themselves).
-# Needs: git, cargo, just, lefthook, gitleaks, cargo-nextest, cargo-deny, typos.
+# Needs: git, cargo, rustup, just, lefthook, gitleaks, cargo-nextest, cargo-deny, typos.
 set -euo pipefail
 
 repo=$(cd "$(dirname "$0")/.." && pwd -P)
@@ -49,12 +49,20 @@ has_line() { grep -qx -- "$1"; }
 section() { awk -v h="$1" 'index($0, h) { found = 1; next } /^(SKIPPED|NOT TOUCHED|NOTE|ERROR)/ { found = 0 } found'; }
 has_text() { grep -q -- "$1"; }
 
-# A clean environment for every git and cargo command, as the suite's own helpers build.
+# A clean environment for every git, cargo and just command. These are the families the
+# scaffold's own test helpers drop (toolchain-tests/tests/common/mod.rs, spec 4.4): a value
+# left in the caller's shell must not change what is measured. An exported JUST_DRY_RUN, for
+# one, makes `just check` print its recipes and exit 0 without running a single gate.
+for name in $(compgen -v); do
+  case "$name" in
+    GIT_* | LEFTHOOK* | GITLEAKS_* | JUST_* | HOOK_ARG_* | NEXTEST_* | TYPOS_* | CARGO_BUILD_* | CARGO_PROFILE_*) unset "$name" ;;
+  esac
+done
+unset CDPATH BASH_ENV ENV RUSTFLAGS CARGO_ENCODED_RUSTFLAGS CARGO_TARGET_DIR RUSTC_WRAPPER RUSTUP_TOOLCHAIN
 export GIT_CONFIG_GLOBAL="$work/empty" GIT_CONFIG_NOSYSTEM=1
 : > "$work/empty"
 export GIT_AUTHOR_NAME=scaffold-test GIT_AUTHOR_EMAIL=scaffold-test@example.invalid
 export GIT_COMMITTER_NAME=scaffold-test GIT_COMMITTER_EMAIL=scaffold-test@example.invalid
-unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE LEFTHOOK LEFTHOOK_BIN LEFTHOOK_CONFIG HOOK_ARG_1 CDPATH BASH_ENV ENV
 
 # new_repo <dir>: a git repository holding one small, clean, private crate.
 new_repo() {
@@ -116,15 +124,33 @@ if [ "$mode" = "--quick" ]; then
   exit 0
 fi
 
-echo "== the scaffolded repository runs its own gates"
+# in_dir <dir> <command...>: run a command in a directory without leaving this one.
+in_dir() { ( cd "$1" && shift && "$@" ); }
+
+# gates <dir> <label>: commit the scaffold, install the hooks, then run the scaffolded
+# repository's own `just check`, which includes the toolchain suite.
+gates() {
+  local dir=$1 label=$2
+  # deny.toml was edited above on purpose in the first repository; start from the shipped one.
+  cp "$skill/assets/template/deny.toml.tmpl" "$dir/deny.toml"
+  git -C "$dir" add -A
+  git -C "$dir" commit -q --no-verify -m "scaffold"
+  expect "$label: the pinned toolchain is installed" in_dir "$dir" rustup toolchain install
+  expect "$label: just setup installs the hooks" in_dir "$dir" just setup
+  if in_dir "$dir" just check >"$work/check.out" 2>&1; then
+    ok "$label: just check passes on the scaffolded repository"
+  else
+    tail -40 "$work/check.out" >&2
+    bad "$label: just check failed on the scaffolded repository"
+  fi
+}
+
+echo "== the scaffolded single-crate repository runs its own gates"
+gates "$r1" "single crate"
+echo "== the scaffolded workspace repository runs its own gates"
+gates "$r3" "workspace"
+
 cd "$r1"
-# deny.toml was edited above on purpose; start the gates from the shipped one.
-cp "$skill/assets/template/deny.toml.tmpl" deny.toml
-git add -A
-git commit -q --no-verify -m "scaffold"
-expect "the pinned toolchain is installed" rustup toolchain install
-expect "just setup installs the hooks" just setup
-if just check >"$work/check.out" 2>&1; then ok "just check passes on the scaffolded repository"; else tail -40 "$work/check.out" >&2; bad "just check failed on the scaffolded repository"; fi
 
 echo "== seeded weakenings: the gate tests must fail on each"
 gate() { cargo nextest run --manifest-path toolchain-tests/Cargo.toml --test gate --no-fail-fast 2>&1 || true; }
