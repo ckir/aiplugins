@@ -90,6 +90,13 @@ rust-toolchain-scaffold/
   references/                pitfalls.md, adapting.md, github-settings.md, review-workflow.md
 ```
 
+Re-running and upgrades. `apply.sh` is a first-install tool: it never overwrites, so a repository scaffolded last
+month does not receive a fixed template by running it again. To keep that from being silent, `apply.sh` classifies
+every file it skips as identical to the template (after the same owner substitution) or different from it, so a
+re-run doubles as a drift report. Adopting a newer gate is a manual merge, as in the Bun skill, and a changed gate
+still needs its changed test shown failing. No template version stamp is kept; that is a deliberate omission, to be
+revisited if the drift reports prove too noisy to act on.
+
 Why every template is a `.tmpl`: this repository's license-header gate (`scripts/check-license-headers.sh`) requires
 this repository's PolyForm header on every tracked `.rs`, `.sh`, `.ts`, `.js`, `.py` and `.ps1` file outside a short
 exclusion list, and generated files must not carry that header (decision 5). A `.tmpl` suffix keeps the templates out
@@ -177,7 +184,7 @@ The tests live in `toolchain-tests/`, an excluded standalone crate: its `Cargo.t
 the target's root `Cargo.toml` and `Cargo.lock` untouched (measured, section 6) and lets the tests use a YAML crate
 (`yaml-rust2`), which a std-only Rust test cannot.
 
-- `gate` tests (fast, under a second) read the workflow, CODEOWNERS, `deny.toml`, `typos.toml`, `lefthook.yml`,
+- `gate` tests (fast: the target is under a second, not yet measured) read the workflow, CODEOWNERS, `deny.toml`, `typos.toml`, `lefthook.yml`,
   `.gitattributes` and the justfile. The workflow rules are tiered (decision 6, section 2). In EVERY file under
   `.github/workflows/`: no `env:` key at workflow, job or step level that `just` itself reads (`JUST_DRY_RUN` makes
   `just check` exit 0 without running anything, measured; the plan takes the full list from `just --help`), and no
@@ -335,6 +342,10 @@ Each was measured or read on 2026-11-24 and is reproducible.
 - The total run time of the toolchain suite, and whether the `SKILL.md` description fits the footprint cap.
 - Whether the four bundlers and `tools/plugin-footprint` accept a skill with a `scripts/` directory and `.tmpl`
   assets (the `license-headers` skill is the precedent for scripts and assets).
+- Whether GitHub lets a same-named job in a second workflow satisfy a required status check. The tiered rule in
+  section 4.4 forbids the collision as a precaution; whether the collision is exploitable needs a throwaway GitHub
+  repository with a required check, which cannot be done from this machine.
+- How long the `gate` tests take; "under a second" is a target.
 
 ## 8. Plan discipline
 
@@ -387,3 +398,12 @@ root `/target` entry does not cover it (4.4); FOLDED, the template `deny.toml` s
 true }` because `publish = false` alone still fails `licenses` (4.4); FOLDED, pre-commit runs the same `just clippy`
 recipe as `lint` so a change only inside `toolchain-tests/` is linted (4.2). Nothing is discarded below the floor;
 nothing is unverified-accepted.
+
+Round 3 (agy, with Fold Auditor, Upgrade Walker and a claims census). The Fold Auditor found no contradiction in the
+round 2 edits. Findings: FOLDED, a re-run of `apply.sh` is a drift report because it classifies each skipped file as
+identical or different, and upgrades stay a manual merge (4.1); FOLDED, "gate tests under a second" is a target and
+not a measurement, because the census row that cited a `0.26 s` figure for it names a number that is nowhere in the
+spec (4.4, section 7); FOLDED, the same-named-job precaution is recorded as unverified against GitHub (section 7).
+The census inspected 16 of the 24 statements that use the word "measured"; the cited lines were checked and exist
+and hold the facts, except that one figure. Not a finding: a compile failure of the suite in pre-push is not a
+distinct case, because any non-zero job exit blocks the push. Nothing is unverified-accepted.
