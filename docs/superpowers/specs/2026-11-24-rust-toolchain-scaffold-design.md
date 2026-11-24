@@ -98,6 +98,21 @@ header, like `license-headers.sh` does today.
 | Tests | `toolchain-tests/` (section 4.4) |
 | Docs | agent-instructions section, README "Development" section, `docs/accepted-boundaries.md` |
 
+Recipe composition, ported from the Bun skill's justfile: `lint` is `cargo fmt --all -- --check` plus clippy with
+`-D warnings` over the workspace and over `toolchain-tests/`; `check-fast` is `lint`, `test`, `deny`, `spellcheck`
+and `secrets`; `check` is `check-fast` plus `test-toolchain`. CI runs `just check`.
+
+Hook jobs, ported from the Bun skill's `lefthook.yml`: pre-commit runs the format check, clippy on staged `.rs`
+files, typos and `just secrets-staged`; commit-msg runs `just secrets-message`; pre-push runs the always-on fast
+gate as a `script:` job and the toolchain suite as a `run:` job glob-conditioned on every file the suite copies.
+Whether clippy belongs in pre-commit (this repository's own hook runs it) or only in pre-push is left to the plan,
+because it trades commit latency against earlier feedback.
+
+Toolchain and tool pins: a `rust-toolchain.toml` pins a recent stable channel with the `rustfmt` and `clippy`
+components, and CI installs `just`, `gitleaks`, `lefthook` and the cargo tools at pinned versions. Clippy with
+`-D warnings` on a floating `stable` turns CI red whenever a new lint ships. As in the Bun skill, `apply.sh` leaves
+the pinned values as written and `SKILL.md` tells the agent to resolve them fresh at scaffold time.
+
 Machine prerequisites: `just`, `cargo`, `lefthook`, `gitleaks`, `git`. `cargo-nextest`, `cargo-deny` and
 `typos-cli` come from `cargo binstall`. `lefthook` and `gitleaks` have no cargo route (measured, section 6), so
 `just setup` and the README snippet give a per-OS install command for each. The Bun skill's
@@ -114,6 +129,8 @@ lefthook from `PATH`, hardened:
   `references/pitfalls.md`).
 - `just setup` checks that `lefthook` is on `PATH` and at or above the floor before it runs `lefthook install`,
   because `lefthook install` does not enforce `min_version` (measured).
+- The version floor is written once, in `lefthook.yml`. `just setup` reads it from there instead of repeating the
+  number, and a gate test fails if the two ever differ.
 - `.gitattributes` pins `lefthook.yml` and `.lefthook/**` to `eol=lf`.
 - Pre-push keeps the Bun skill's split: the always-on fast gate is a `script:` job, because a `run:` job is skipped
   when no pushed file matches its glob; only the slow toolchain suite is glob-conditioned.
@@ -146,7 +163,9 @@ the target's root `Cargo.toml` and `Cargo.lock` untouched (measured, section 6) 
 
 - `gate` tests (fast, under a second) read the workflow, CODEOWNERS, `deny.toml`, `typos.toml`, `lefthook.yml`,
   `.gitattributes` and the justfile. They check: actions pinned to a 40-hex SHA, read-only permissions, no
-  `continue-on-error`, `if`, `container`, `services`, `||` or `set +` in a workflow script; CI runs `just check`;
+  `continue-on-error`, `if`, `container`, `services`, `||` or `set +` in a workflow script; CI runs `just check`,
+meaning a workflow step whose `run:` line is that command, not a line that merely mentions it (the same rule
+`scripts/check-gate-wiring.sh` applies in this repository, so an `echo "just check"` does not pass);
   CODEOWNERS is evaluated last-match-wins like GitHub and covers the protected files; the lefthook settings of
   section 4.3; no tracked `lefthook-local.yml`; the recipes the tests name exist. They run inside `just test`, so a
   pull request that downgrades CI still runs them.
@@ -157,25 +176,36 @@ the target's root `Cargo.toml` and `Cargo.lock` untouched (measured, section 6) 
 - Carried over from the Bun skill: a gate change comes with a test change shown failing when the gate is weakened;
   token-shaped literals are built at run time and never committed; the test environment strips `GIT_*`,
   `LEFTHOOK*`, `GITLEAKS_*`, `JUST_*`, `HOOK_ARG_*`, `CDPATH`, `BASH_ENV` and `ENV`, and in Rust also `CARGO_*`,
-  `RUSTFLAGS`, `RUSTUP_TOOLCHAIN`, `NEXTEST_*` and `TYPOS_*`.
+  `RUSTFLAGS`, `RUSTUP_TOOLCHAIN`, `NEXTEST_*` and `TYPOS_*`. Stripping variables does not isolate git's config
+  files, so the throwaway repositories also set `GIT_CONFIG_GLOBAL` to an empty file and `GIT_CONFIG_NOSYSTEM=1`:
+  a developer's global `core.hooksPath` makes `lefthook install` fail (measured, section 6).
 - The suite is not split into a smaller target-side set. A fresh no-dependency crate costs about 0.14 s for
   `cargo fmt --check`, 0.4 to 0.6 s for a cold clippy and 1.3 to 1.4 s for a cold nextest run (section 6), so
   throwaway repositories are affordable. The total suite time is not known until it is built.
-- Consequence the skill must handle: `cargo clippy --workspace` and `cargo deny` do not cover an excluded crate, so
-  the justfile has explicit recipe lines for `toolchain-tests/`, and `references/adapting.md` says to exclude
-  `toolchain-tests` from any root `members` glob (a glob that captures it fails with "multiple workspace roots").
+- Consequence the skill must handle: `cargo fmt --all`, `cargo clippy --workspace`, `cargo nextest --workspace` and
+  `cargo deny` do not cover an excluded crate (measured for `fmt`, section 6), so the justfile has explicit recipe
+  lines for `toolchain-tests/` in each of them, a gate test fails if one is missing, and `references/adapting.md`
+  says to exclude `toolchain-tests` from any root `members` glob (a glob that captures it fails with "multiple
+  workspace roots").
+- A developer whose global git config sets `core.hooksPath` cannot run `lefthook install` at all, which is
+  lefthook's own refusal. `just setup` reports that and stops; the case is listed in `docs/accepted-boundaries.md`.
 
 ### 4.5 Proving the skill works, in this repository
 
 1. `scripts/check-rust-scaffold.sh`: a cheap static gate in the style of `scripts/check-devtools-skills.sh`, with a
    `--mutation-test` that applies one defect at a time to a throwaway copy and requires the gate to fail with the
    message naming it. It checks that every file under `assets/template/` ends in `.tmpl`, that `apply.sh` covers
-   every template and refuses to overwrite, that every file the `SKILL.md` and references name exists, that the
+   every template and refuses to overwrite (including a `justfile` when `Justfile` or `.justfile` already exists:
+   `just` fails with "multiple candidate justfiles" when two spellings coexist, measured, and this repository uses
+   `Justfile`), that every file the `SKILL.md` and references name exists, that the
    template workflow's action pins are 40-hex SHAs, and that the `SKILL.md` frontmatter name matches its folder.
    It is wired into `just check` and CI, as `scripts/check-gate-wiring.sh` requires of every `check-*.sh`.
 2. `scripts/test-rust-scaffold.sh`: the end-to-end test, run by a new CI job on ubuntu, windows and macos. It applies
    the scaffold to a throwaway single-crate repository and to a workspace repository, then runs the scaffolded
-   `just check` and the toolchain suite in each. Its name does not start with `check-`, so it is not a gate that
+   `just check` and the toolchain suite in each. A passing scaffold proves little on its own, because the templates
+   would be testing themselves, so the script also applies a few seeded weakenings to the scaffolded repository and
+   requires the matching test to go red for each: remove `assert_lefthook_installed`, remove the `unset` line from
+   `rc.sh`, replace an action SHA with a tag, drop a CODEOWNERS entry. Its name does not start with `check-`, so it is not a gate that
    must be in `just check`; it has its own `just` recipe and its own CI job, like `test-live-ghidra`.
 
 ### 4.6 Changes from the Bun original
@@ -194,7 +224,9 @@ the target's root `Cargo.toml` and `Cargo.lock` untouched (measured, section 6) 
 - **Footprint cap:** the resident cost of every new `SKILL.md` frontmatter and every OpenCode command file's
   frontmatter counts against a 500-byte per-change delta in `docs/footprints/budgets.json`, and growth that trips it
   is never overridden (`shared/devtools/README.md`). The Bun skill's description is about 800 bytes, so the port's
-  must be much shorter. If it still trips the cap, that is the owner's decision.
+  must be much shorter. If it still trips the cap, that is the owner's decision. The short description still has to
+  name Rust and Cargo and the verbs that should trigger it (set up, bootstrap, harden hooks, CI, secret scanning),
+  because it competes with the owner's Bun skill and with generic tooling skills for the same request.
 - **Cargo workspace:** the root `Cargo.toml` already excludes `shared/devtools`, so nothing under the skill folder
   joins the workspace.
 - **Markdown checks:** this repository runs typos, mlc and a doc-path check (`lefthook.yml`, `Justfile`). Which of
@@ -228,6 +260,13 @@ Each was measured or read on 2026-11-24 and is reproducible.
 - Timing, two runs each in a fresh no-dependency crate on an 8-CPU machine with a load average near 1.8 before the
   run (background load not controlled): `cargo fmt --check` 136 ms and 136 ms; cold `cargo clippy --all-targets -D
   warnings` 615 ms and 385 ms; cold `cargo nextest run` 1266 ms and 1393 ms; warm 625 ms and 268 ms.
+- `cargo fmt --all --check` run at the root of that same layout reported an unformatted file in the member crate
+  and none in the nested crate: it does not reach an excluded crate.
+- A directory holding both `justfile` and `Justfile` makes `just a` fail with "multiple candidate justfiles found".
+- With a global `core.hooksPath` set in a fake `HOME`, `lefthook install` exits 1 ("Custom hooks paths are not
+  supported by default"); with `GIT_CONFIG_GLOBAL=/dev/null` it exits 0.
+- The Bun skill's hook jobs and recipe composition (section 4.2) were read in its `assets/template/lefthook.yml` and
+  `justfile`.
 - The repository's gates and conventions named in section 5 were read in `scripts/check-license-headers.sh`,
   `shared/devtools/README.md`, the `emit-devtools-skills` recipe and the root `Cargo.toml`.
 
@@ -263,3 +302,13 @@ the scaffold's `just setup` is built, once this design is agreed.
 One feature branch, one `feat:` commit group. Order: the source skill and templates, the emitted copies, the static
 gate, the end-to-end CI job, footprint regeneration. `just skills-bundles` confirms the zips still build. Nothing is
 claimed verified on a host or an OS that has not run it.
+
+## 11. Stand-downs (adversarial panel review)
+
+Round 1, solo seats (Axiom Breaker, Cascade Analyst, Mechanism Gamer, Literal Implementer, Dependency Cynic, State
+Corruptor, Activation Auditor, Blindspot Auditor). Nothing was discarded below the floor and nothing is
+unverified-accepted. Folded: the lefthook floor is written once (4.3); the excluded crate needs explicit `fmt`,
+clippy, nextest and deny lines, `fmt` measured (4.4); `justfile` against `Justfile` collision, measured (4.5);
+global git config isolation in the test repositories, measured (4.4); "CI runs `just check`" defined as a run
+line, not a mention (4.4); seeded weakenings in the end-to-end script (4.5); hook jobs, recipe composition and
+toolchain pins specified (4.2); the description must name Rust and Cargo (5). Blindspot Auditor: no new findings.
