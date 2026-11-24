@@ -281,7 +281,9 @@ the target's root `Cargo.toml` and `Cargo.lock` untouched (measured, section 6) 
 - **Markdown checks:** this repository runs typos, mlc and a doc-path check (`lefthook.yml`, `Justfile`). Which of
   them reach `shared/devtools/skills/` and the emitted copies is not established here; the plan reads each one and
   the skill's markdown is written to pass whichever do (links as code spans, not relative links).
-- **Versioning:** a `feat:` commit makes release-please bump the four devtools packages by a minor version. No tags
+- **Versioning:** a `feat:` commit makes release-please bump the four devtools packages by a minor version (`release-please-config.json`
+  sets neither `bump-minor-pre-major` nor `bump-patch-for-minor-pre-major` for them, so release-please's documented
+  defaults apply; read from the config, not run here). No tags
   are created by hand: the "first release order" steps in `shared/devtools/README.md` apply only to a plugin's first
   release.
 
