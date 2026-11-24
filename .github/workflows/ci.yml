@@ -299,6 +299,42 @@ jobs:
       - name: Check that every gate script is wired in
         run: bash scripts/check-gate-wiring.sh
 
+  # The Rust scaffold ships to other repositories and works through bash scripts,
+  # git hooks, lefthook and gitleaks, all of which behave differently on Git Bash
+  # and on macOS. This applies it to throwaway repositories on all three systems,
+  # runs its own `just check` there, and weakens each gate once to see its test
+  # fail; a Linux-only run would leave Windows and macOS unmeasured.
+  rust-scaffold:
+    name: Rust scaffold (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install just, cargo-nextest, cargo-deny and typos
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just,cargo-nextest,cargo-deny,typos
+
+      # lefthook and gitleaks have no cargo or install-action route. A version-pinned
+      # `go install` works the same on all three runners (Go is preinstalled) and is
+      # verified by Go's module checksum database. gitleaks declares its module path
+      # under the old organization name.
+      - name: Install lefthook and gitleaks
+        run: |
+          go install github.com/evilmartians/lefthook/v2@v2.1.17
+          go install github.com/zricethezav/gitleaks/v8@v8.30.1
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Test the Rust scaffold
+        run: bash scripts/test-rust-scaffold.sh
+
   # Stages the Pages tree on pull requests so a staging failure is seen before
   # the merge. On push to main docs.yml already stages, so this skips there.
   site-stage:
