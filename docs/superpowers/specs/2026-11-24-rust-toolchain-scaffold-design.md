@@ -30,6 +30,12 @@ Intent: a new skill `rust-toolchain-scaffold` in the `aiplugins-devtools` plugin
 4. **Test host:** an excluded standalone crate inside the target repository (section 4.4).
 5. **License of generated files:** no header. The files the scaffold writes belong to the repository they are written
    into. The skill's own text stays under the plugin license (PolyForm-Noncommercial-1.0.0).
+6. **Workflow scope of the gate tests:** tiered. Every workflow file is checked for the two rules that stop a second
+   workflow defeating the gate (no `JUST_*` env key `just` reads; no job named like the gate job). The strict rules
+   (read-only permissions, SHA pins, default shell, no `if`, runs `just check`) apply to `ci.yml` only. Agy and the
+   driver both recommended it, after agy's walk of this repository found that a strict-everywhere rule fails on its
+   other workflows (measured in section 4.4); the owner chose it on 2026-11-24. The Bun skill's strict-everywhere rule and an exemption file were not
+   chosen.
 
 ## 3. Goals, non-goals, anti-goals
 
@@ -98,7 +104,7 @@ header, like `license-headers.sh` does today.
 | Task runner | `justfile`: `setup`, `fmt`, `clippy`, `lint`, `test`, `test-toolchain`, `deny`, `spellcheck`, `secrets`, `secrets-staged`, `secrets-message`, `check-fast`, `check` |
 | Git hooks | `lefthook.yml`, `.lefthook/rc.sh`, `.lefthook/pre-push/check.sh` |
 | Settings | `deny.toml`, `typos.toml`, `.gitattributes`, `.gitignore` additions, a Cargo `[lints]` snippet (clippy `-D warnings` is the recipe's job, the table pins the rest) |
-| CI | `.github/workflows/ci.yml` (runs `just check`), `.github/CODEOWNERS`; `apply.sh` also prints every other workflow file it finds, because the gate tests apply to all of them (section 4.4) |
+| CI | `.github/workflows/ci.yml` (runs `just check`), `.github/CODEOWNERS`; `apply.sh` also prints every other workflow file it finds, because the shadowing rules of section 4.4 apply to all of them |
 | Tests | `toolchain-tests/` (section 4.4) |
 | Docs | agent-instructions section, README "Development" section, `docs/accepted-boundaries.md` |
 
@@ -172,12 +178,17 @@ the target's root `Cargo.toml` and `Cargo.lock` untouched (measured, section 6) 
 (`yaml-rust2`), which a std-only Rust test cannot.
 
 - `gate` tests (fast, under a second) read the workflow, CODEOWNERS, `deny.toml`, `typos.toml`, `lefthook.yml`,
-  `.gitattributes` and the justfile. They check, in every file under `.github/workflows/` and not only `ci.yml`:
-  actions pinned to a 40-hex SHA, read-only permissions, no `env:` key at workflow, job or step level that `just`
-  itself reads (`JUST_DRY_RUN` makes `just check` exit 0 without running anything, measured; the plan takes the
-  full list from `just --help`), no `continue-on-error`, `if`, `container`, `services`, `||` or `set +` in a workflow script; CI runs `just check`,
-meaning a workflow step whose `run:` line is that command, not a line that merely mentions it (the same rule
-`scripts/check-gate-wiring.sh` applies in this repository, so an `echo "just check"` does not pass);
+  `.gitattributes` and the justfile. The workflow rules are tiered (decision 6, section 2). In EVERY file under
+  `.github/workflows/`: no `env:` key at workflow, job or step level that `just` itself reads (`JUST_DRY_RUN` makes
+  `just check` exit 0 without running anything, measured; the plan takes the full list from `just --help`), and no
+  job id or `name:` equal to the gate job's, so a second workflow cannot present a green check under the gate's
+  name. In `ci.yml` ONLY: actions pinned to a 40-hex SHA, read-only permissions, the default shell, no
+  `continue-on-error`, `if`, `container`, `services`, `||` or `set +` in a workflow script, and CI runs `just check`,
+  meaning a workflow step whose `run:` line is that command, not a line that merely mentions it (the same rule
+  `scripts/check-gate-wiring.sh` applies in this repository, so an `echo "just check"` does not pass). Release,
+  docs and other workflows are otherwise untested: measured on this repository, 10 of its 13 workflows have write
+  permissions and 11 use `if:`, so a rule over every workflow would fail the first Rust repository with a release
+  workflow. `references/adapting.md` advises pinning actions in those workflows too, as advice and not as a test;
   CODEOWNERS is evaluated last-match-wins like GitHub and covers the protected files; the lefthook settings of
   section 4.3; no tracked `lefthook-local.yml`; the recipes the tests name exist. They run inside `just test`, so a
   pull request that downgrades CI still runs them.
@@ -364,3 +375,15 @@ its measurement: `working-directory` changing which justfile runs (an empty subd
 "multi-minute" pre-push latency (a cold throwaway build is 1.3 to 1.4 s; folded as a plan-time measurement with a
 CI-only fallback); OpenCode passing too few arguments to `apply.sh` (the command only loads the skill, the agent
 finds the owner; folded as a wording fix). Nothing is discarded below the floor; nothing is unverified-accepted.
+
+Round 2 (agy, with two bespoke seats: Fresh-Clone Walker and Fold Auditor). Counter-turn on the four disputed round 1
+items: agy measured each at the source and its observations agree with the driver's (`cargo deny` regenerated the
+lock and exited 4 on `unlicensed`; the OpenCode command only loads the skill and the agent runs `apply.sh`;
+`JUST_DRY_RUN` exits 0 without running while `working-directory` changes nothing; cold clippy 0.52 to 2.20 s and
+cold nextest 1.01 to 3.85 s in its runs, the same order as the driver's). Four findings, each measured or read:
+FOLDED, the workflow-scope contradiction, by owner ruling (decision 6, 4.4), after measuring that 10 of this
+repository's 13 workflows have write permissions; FOLDED, `toolchain-tests/` carries its own `.gitignore` because a
+root `/target` entry does not cover it (4.4); FOLDED, the template `deny.toml` sets `[licenses] private = { ignore =
+true }` because `publish = false` alone still fails `licenses` (4.4); FOLDED, pre-commit runs the same `just clippy`
+recipe as `lint` so a change only inside `toolchain-tests/` is linted (4.2). Nothing is discarded below the floor;
+nothing is unverified-accepted.
