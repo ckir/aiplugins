@@ -86,7 +86,8 @@ while IFS= read -r -d '' file; do
   mkdir -p -- "$(dirname -- "$target/$dest")"
   cp -- "$rendered" "$target/$dest"
   # A template installed read-only (a read-only skill directory) must not make the copy read-only.
-  chmod u+w -- "$target/$dest"
+  # No `--` here: BSD chmod (macOS) takes it for a file name. The path is absolute, so it cannot look like an option.
+  chmod u+w "$target/$dest"
   copied="$copied$dest"$'\n'
 done < <(find "$template" -type f -print0 | sort -z)
 
