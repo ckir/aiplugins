@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.6.0](https://github.com/ckir/aiplugins/compare/aiplugins-devtools-agy-v0.5.0...aiplugins-devtools-agy-v0.6.0) (2026-11-24)
+
+
+### Features
+
+* add the rust-toolchain-scaffold skill text and its footprint ([974de26](https://github.com/ckir/aiplugins/commit/974de267a3c2a34b2cbc9b8f444d075f886131db))
+* add the rust-toolchain-scaffold skill to aiplugins-devtools ([ec1d86d](https://github.com/ckir/aiplugins/commit/ec1d86d64255d2cb2202c1fa0f083f1562d1fcb2))
+* add the rust-toolchain-scaffold templates and apply.sh ([f8f1cdf](https://github.com/ckir/aiplugins/commit/f8f1cdfa48b4a23b384c24ed8a17340c570725c1))
+
+
+### Bug Fixes
+
+* bring the agent-instructions snippet in line with the review fixes ([c6d947f](https://github.com/ckir/aiplugins/commit/c6d947f5d258c21e773b9fb3b7e50e37373c7242))
+* close the gaps the whole-branch review found in the rust-toolchain-scaffold skill ([626432f](https://github.com/ckir/aiplugins/commit/626432f1ba8b1fac89cf46f579bbc7d0a0701aad))
+* drop the -- from apply.sh's chmod so it runs on macOS ([17f4b8a](https://github.com/ckir/aiplugins/commit/17f4b8a61e8f0e418ed9a55268e43d613dec3d22))
+* retry the lockfile on a re-run when the first run could not generate it ([b1fcc1a](https://github.com/ckir/aiplugins/commit/b1fcc1a69399bda8c6f197e597c75b137cf105e0))
+* test for the repository top level without comparing path spellings ([f411198](https://github.com/ckir/aiplugins/commit/f4111989cdcaa4b7d985cba7d89c94997a163a87))
+
 ## [0.5.0](https://github.com/ckir/aiplugins/compare/aiplugins-devtools-agy-v0.4.0...aiplugins-devtools-agy-v0.5.0) (2026-11-18)
 
 

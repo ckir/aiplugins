@@ -23,7 +23,7 @@ Slash commands: `/aiplugins-devtools:spec-panel-review <path>`, `/aiplugins-devt
 ### Via `qwen extensions install`
 
 ```bash
-qwen extensions install https://github.com/ckir/aiplugins/releases/download/aiplugins-devtools-qwen-v0.4.0/aiplugins-devtools-qwen-extension.zip
+qwen extensions install https://github.com/ckir/aiplugins/releases/download/aiplugins-devtools-qwen-v0.5.0/aiplugins-devtools-qwen-extension.zip
 ```
 
 > **Known issue:** As of Qwen Code v0.22.3, `qwen extensions install` from
@@ -37,7 +37,7 @@ qwen extensions install https://github.com/ckir/aiplugins/releases/download/aipl
 
    | Platform | URL |
    |---|---|
-   | All | https://github.com/ckir/aiplugins/releases/download/aiplugins-devtools-qwen-v0.4.0/aiplugins-devtools-qwen-extension.zip |
+   | All | https://github.com/ckir/aiplugins/releases/download/aiplugins-devtools-qwen-v0.5.0/aiplugins-devtools-qwen-extension.zip |
 
 2. Extract it to your Qwen extensions directory. The installed directory is named after the manifest `name` (`aiplugins-devtools`), not after this repository folder:
 

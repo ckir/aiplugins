@@ -21,13 +21,13 @@ It carries only skills: no hooks, no MCP servers, no binaries.
 
 ## Installation
 
-1. **Download the plugin bundle** for tag `aiplugins-devtools-agy-v0.5.0`. The
+1. **Download the plugin bundle** for tag `aiplugins-devtools-agy-v0.6.0`. The
    asset name is `<package>-agy-plugin.zip` for package
    `aiplugins-devtools-agy`, hence the doubled `agy`:
 
    ```bash
    curl -fsSL -o /tmp/aiplugins-devtools-agy-agy-plugin.zip \
-     https://github.com/ckir/aiplugins/releases/download/aiplugins-devtools-agy-v0.5.0/aiplugins-devtools-agy-agy-plugin.zip
+     https://github.com/ckir/aiplugins/releases/download/aiplugins-devtools-agy-v0.6.0/aiplugins-devtools-agy-agy-plugin.zip
    unzip -q -o /tmp/aiplugins-devtools-agy-agy-plugin.zip -d /tmp/aiplugins-devtools
    ```
 
