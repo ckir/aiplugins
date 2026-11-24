@@ -128,6 +128,20 @@ refuse "a second run with cargo still failing fails again" env PATH="$shim:$PATH
 bash "$apply" "$r4" @someone >/dev/null 2>&1 || bad "the run with a working cargo failed"
 expect "a run with a working cargo generates the missing lock" test -f "$r4/toolchain-tests/Cargo.lock"
 
+# The files belong at the top of the repository: a subdirectory of one is refused with exit 2 and
+# nothing is written, while the top level is accepted however its path is spelled.
+r5="$work/subdir"
+new_repo "$r5"
+mkdir -p "$r5/crates/inner"
+rc=0
+bash "$apply" "$r5/crates/inner" @someone >/dev/null 2>&1 || rc=$?
+expect "a subdirectory of a repository is refused with exit 2" test "$rc" = 2
+expect "the refused run wrote nothing in the subdirectory" test -z "$(find "$r5/crates/inner" -type f -print -quit)"
+expect "the refused run wrote nothing at the top level" test ! -e "$r5/justfile"
+r6="$work/trailing"
+new_repo "$r6"
+expect "the top level is accepted with a trailing slash" bash "$apply" "$r6/" @someone
+
 refuse "a missing directory is refused" bash "$apply" "$work/missing-dir" @someone
 refuse "an owner without @ is refused" bash "$apply" "$r1" someone
 refuse "an owner with sed syntax is refused" bash "$apply" "$r1" '@a|b'
@@ -190,6 +204,8 @@ w_just_env() { printf '        env:\n          JUST_DRY_RUN: "true"\n' >> .githu
 w_skippable_step() { printf '        if: always()\n' >> .github/workflows/ci.yml; }
 w_clippy_gap() { dropline 'cargo clippy --manifest-path toolchain-tests' justfile; }
 w_fast_gate() { edit 's/run: just check$/run: just check-fast/' .github/workflows/ci.yml; }
+w_clippy_targets() { edit 's/ --all-targets -- -D warnings/ -- -D warnings/' justfile; }
+w_push_run_job() { edit 's/script: check\.sh/run: sh .lefthook\/pre-push\/check.sh/' lefthook.yml; }
 w_shadow_job() { printf 'name: Other\non: push\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n' > .github/workflows/other.yml; }
 weaken "remove assert_lefthook_installed" lefthook_fails_closed_and_loads_the_rc_file w_remove_assert
 weaken "remove the unset line from rc.sh" the_rc_file_exports_the_hook_argument_and_drops_the_override_variables w_remove_unset
@@ -200,6 +216,8 @@ weaken "let a step be skipped" nothing_in_the_ci_job_lets_a_failing_step_pass_or
 weaken "stop clippy covering the test crate" every_cargo_recipe_also_covers_the_excluded_test_crate w_clippy_gap
 weaken "make CI run the fast gate only" ci_runs_the_full_gate_not_the_fast_one w_fast_gate
 weaken "add a workflow with a job named check" no_other_workflow_has_a_job_that_shadows_the_gate_job w_shadow_job
+weaken "stop clippy linting every target" clippy_lints_every_target_and_denies_warnings_in_each_command w_clippy_targets
+weaken "make the pre-push fast gate a run job" the_pre_push_fast_gate_is_an_unconditional_script_job w_push_run_job
 git checkout -q -- .
 git clean -fdq -e toolchain-tests/target -e target
 

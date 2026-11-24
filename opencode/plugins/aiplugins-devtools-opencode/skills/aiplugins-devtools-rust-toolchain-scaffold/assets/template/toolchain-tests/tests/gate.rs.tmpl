@@ -623,6 +623,30 @@ fn every_cargo_recipe_also_covers_the_excluded_test_crate() {
     }
 }
 
+#[test]
+fn clippy_lints_every_target_and_denies_warnings_in_each_command() {
+    // Without `--all-targets` clippy skips tests, benches and examples; without
+    // `-D warnings` a lint is only printed. Each command is read on its own, so a
+    // flag left in a comment or on another line does not count for it.
+    let body = recipes()["clippy"].1.clone();
+    let commands: Vec<&str> = body
+        .lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with("cargo clippy"))
+        .collect();
+    assert!(!commands.is_empty(), "the clippy recipe runs no clippy: {body}");
+    for command in commands {
+        assert!(
+            command.contains(" --all-targets "),
+            "`{command}` does not lint every target"
+        );
+        assert!(
+            command.ends_with("-- -D warnings"),
+            "`{command}` does not deny warnings"
+        );
+    }
+}
+
 // ---- the hooks -------------------------------------------------------------
 
 fn lefthook() -> Yaml {
@@ -717,6 +741,33 @@ fn lefthook_yml_is_the_only_tracked_lefthook_configuration() {
         })
         .collect();
     assert_eq!(configs, ["lefthook.yml"]);
+}
+
+#[test]
+fn the_pre_push_fast_gate_is_an_unconditional_script_job() {
+    // lefthook skips a `run:` job that has a glob when no pushed file matches it; a
+    // `script:` job is not skipped. The fast gate has to run on every push, so it is a
+    // script job with nothing that can switch it off.
+    let config = lefthook();
+    let job = config["pre-push"]["jobs"]
+        .as_vec()
+        .expect("pre-push jobs")
+        .iter()
+        .find(|job| job["name"].as_str() == Some("check"))
+        .expect("pre-push has a check job");
+    assert_eq!(job["script"].as_str(), Some("check.sh"));
+    assert_eq!(job["runner"].as_str(), Some("sh"));
+    for key in ["run", "glob", "files", "only", "skip", "exclude"] {
+        assert!(job[key].is_badvalue(), "the fast gate sets `{key}`");
+    }
+    let script = read(".lefthook/pre-push/check.sh");
+    assert!(
+        script
+            .lines()
+            .map(str::trim)
+            .any(|line| line == "exec just check-fast"),
+        "the script does not run the fast gate: {script}"
+    );
 }
 
 #[test]

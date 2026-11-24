@@ -102,7 +102,7 @@ just setup     # checks the tools, then installs the git hooks
 just check     # lint, tests, deny, spell check, secret scan, then the toolchain suite
 ```
 
-Expect 26 gate tests and 27 toolchain tests (24 on Windows, where the three tests that build a
+Expect 28 gate tests and 27 toolchain tests (24 on Windows, where the three tests that build a
 `PATH` without lefthook are skipped). The secret scan needs at least one commit to scan.
 
 Existing project code will often fail `cargo fmt --check` or clippy with `-D warnings` the first

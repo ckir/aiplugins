@@ -348,8 +348,8 @@ Each was measured or read on 2026-11-24 and is reproducible.
 - The Bun skill's hook jobs and recipe composition (section 4.2) were read in its `assets/template/lefthook.yml` and
   `justfile`.
 - Prototype run on Linux while the plan was written (scratch directory, not committed): applying the templates to a fresh
-  repository and running its own `just check` passes (26 gate tests, 27 toolchain tests, real `cargo deny`, typos and
-  gitleaks); nine seeded weakenings each turn the named gate test red; a second `apply.sh` run copies nothing and reports
+  repository and running its own `just check` passes (28 gate tests, 27 toolchain tests, real `cargo deny`, typos and
+  gitleaks); eleven seeded weakenings each turn the named gate test red; a second `apply.sh` run copies nothing and reports
   the one differing file; `go install` of lefthook 2.1.17 and gitleaks 8.30.1 takes about 25 s each. Windows and macOS
   were not run.
 - `just --help` lists 39 `JUST_*` variables; `just` accepts the justfile name in any case (`JUSTFILE` ran).
