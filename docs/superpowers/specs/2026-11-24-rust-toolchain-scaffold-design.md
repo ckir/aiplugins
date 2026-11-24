@@ -86,7 +86,7 @@ rust-toolchain-scaffold/
     toolchain-tests/        the excluded standalone crate: Cargo.toml, gate/ and toolchain/ tests
                             (its Cargo.lock is generated at scaffold time, not shipped as a template;
                             its own .gitignore ignores /target/)
-  assets/snippets/           agent-instructions section, README "Development" section, Cargo lints table
+  assets/snippets/           agent-instructions section, README "Development" section
   references/                pitfalls.md, adapting.md, github-settings.md, review-workflow.md
 ```
 
@@ -108,9 +108,9 @@ header, like `license-headers.sh` does today.
 
 | Piece | Files |
 |---|---|
-| Task runner | `justfile`: `setup`, `fmt`, `clippy`, `lint`, `test`, `test-toolchain`, `deny`, `spellcheck`, `secrets`, `secrets-staged`, `secrets-message`, `check-fast`, `check` |
+| Task runner | `justfile`: `setup`, `fmt`, `fmt-check`, `clippy`, `lint`, `test`, `test-toolchain`, `deny`, `spellcheck`, `secrets`, `secrets-staged`, `secrets-message`, `check-fast`, `check` |
 | Git hooks | `lefthook.yml`, `.lefthook/rc.sh`, `.lefthook/pre-push/check.sh` |
-| Settings | `deny.toml`, `typos.toml`, `.gitattributes`, `.gitignore` additions, a Cargo `[lints]` snippet (clippy `-D warnings` is the recipe's job, the table pins the rest) |
+| Settings | `deny.toml`, `typos.toml`, `.gitattributes`, `.gitignore` additions (clippy with `-D warnings` is the recipe's job; a lint policy is repository-specific, so no lints table is shipped) |
 | CI | `.github/workflows/ci.yml` (runs `just check`), `.github/CODEOWNERS`; `apply.sh` also prints every other workflow file it finds, because the shadowing rules of section 4.4 apply to all of them |
 | Tests | `toolchain-tests/` (section 4.4) |
 | Docs | agent-instructions section, README "Development" section, `docs/accepted-boundaries.md` |
