@@ -574,6 +574,53 @@ fn pre_push_blocks_a_push_that_fails_the_fast_gate() {
 }
 
 #[test]
+fn pre_push_blocks_an_empty_commit_push_that_fails_the_fast_gate() {
+    // A push that changes no file leaves lefthook nothing to match a glob against, so a
+    // `run:` job would be skipped (`check (skip) no matching push files`). The fast gate
+    // is a script job and still runs. The formatting fault is already on the remote;
+    // only an empty commit is pushed now.
+    let dir = hooked_repo();
+    let _remote = add_remote(dir.path());
+    append(dir.path(), "src/lib.rs", UNFORMATTED);
+    must(dir.path(), "git", &["add", "--all"]);
+    must(
+        dir.path(),
+        "git",
+        &["commit", "--quiet", "--no-verify", "-m", "unformatted"],
+    );
+    must(
+        dir.path(),
+        "git",
+        &["push", "--quiet", "--no-verify", "origin", "main"],
+    );
+    must(
+        dir.path(),
+        "git",
+        &[
+            "commit",
+            "--quiet",
+            "--no-verify",
+            "--allow-empty",
+            "-m",
+            "empty",
+        ],
+    );
+    let ran = run(dir.path(), "git", &["push", "origin", "main"]);
+    assert!(blocked(&ran), "{}", ran.output);
+    assert!(
+        ran.output.contains("fmt-check"),
+        "the fast gate did not run: {}",
+        ran.output
+    );
+    let local = must(dir.path(), "git", &["rev-parse", "main"]).output;
+    let remote = must(dir.path(), "git", &["ls-remote", "origin", "main"]).output;
+    assert!(
+        !remote.contains(local.trim()),
+        "the push reached the remote"
+    );
+}
+
+#[test]
 fn a_repository_can_be_built_in_a_named_directory() {
     let parent = TempDir::new();
     let dir = parent.path().join("named");
