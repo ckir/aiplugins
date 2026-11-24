@@ -45,7 +45,7 @@ Do not proceed on an assumed default.
 Set the agreed version once:
 
 ```bash
-VERSION=0.5.0
+VERSION=0.6.0
 ```
 
 Download the versioned bundle: asset `aiplugins-devtools-opencode-opencode.zip`
