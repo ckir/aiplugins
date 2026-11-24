@@ -35,6 +35,8 @@ Every task's requirements implicitly include these, copied from the spec.
 
 Each task is "write exactly these bytes, run the stated verification". Tasks 1 and 3 are file creation with a verification command and can go to the lowest-capability tier; Tasks 4 to 6 edit existing repository files and need judgment about what the repository's own gates say, so use a mid tier. Per the repository's rule, verify lower-tier output harder: after any task, run its stated verification yourself and read the diff against the block in this plan.
 
+The commits along the way are not releasable states: after Task 1 the plugins list a skill whose `apply.sh` and templates arrive in Task 3. Nothing releases from a feature branch (release-please acts on `main`), so keep the whole branch in one pull request and merge only after Task 6.
+
 ## File structure
 
 | Path | Responsibility | Task |
@@ -60,11 +62,11 @@ Each task is "write exactly these bytes, run the stated verification". Tasks 1 a
 - [ ] **Step 1: Confirm the tools**
 
 ```bash
-for t in git cargo rustup just lefthook gitleaks cargo-nextest cargo-deny typos actionlint shellcheck addlicense gh jq; do printf '%-14s' "$t"; command -v "$t" >/dev/null && echo ok || echo MISSING; done
+for t in git cargo rustup just lefthook gitleaks cargo-nextest cargo-deny typos actionlint shellcheck addlicense mlc gh jq tar zip unzip zipinfo; do printf '%-14s' "$t"; command -v "$t" >/dev/null && echo ok || echo MISSING; done
 rustup toolchain list | grep -c '^1\.99\.1' 
 ```
 
-Expected: no `MISSING` (install any that is, per `shared/devtools/skills/rust-toolchain-scaffold/SKILL.md` once Task 1 has run, or the lines in the spec's section 4.2), and `1` for the toolchain. If `1.99.1` is missing, `rustup toolchain install 1.99.1` before Task 3.
+Expected: no `MISSING`. `mlc` is the link checker that `just links` runs; `tar`, `zip`, `unzip`, `zipinfo` and `jq` are what `just skills-bundles` needs. (Install any that is missing, per `shared/devtools/skills/rust-toolchain-scaffold/SKILL.md` once Task 1 has run, or the lines in the spec's section 4.2.) The second command must print `1`, the toolchain. If `1.99.1` is missing, `rustup toolchain install 1.99.1` before Task 3.
 
 - [ ] **Step 2: Start the branch**
 
@@ -644,7 +646,7 @@ git diff --stat -- docs/footprints README.md
 bash scripts/check-footprint-budgets.sh
 ```
 
-Expected: no error from `ratchet` (it fails when a delta exceeds `deltaBytes`). The resident bytes in each regenerated document rise by 341 (Claude Code, Antigravity) and 418 (OpenCode) over the committed ones; the `git status` lists the three `docs/footprints/aiplugins-devtools-*.json`, `docs/footprints/budgets.json`, the footprint regions of the plugin READMEs and of the root `README.md`, and nothing else besides the files from Steps 1 to 5 and the emitted copies. If a `ratchet` fails, shorten the `description:` line in `SKILL.md` (the measured cost is the frontmatter text), run `just emit-devtools-skills` again and repeat this step. Do not edit `budgets.json` by hand.
+Expected: no error from `ratchet` (it fails when a delta exceeds `deltaBytes`). The resident bytes in each regenerated document rise by 341 (Claude Code, Antigravity) and 418 (OpenCode) over the committed ones; the `git status` lists the three `docs/footprints/aiplugins-devtools-*.json`, `docs/footprints/budgets.json`, the footprint regions of the plugin READMEs and of the root `README.md`, and nothing else besides the files from Steps 1 to 5 and the emitted copies. If a `ratchet` fails, shorten the `description:` line in `SKILL.md` (the measured cost is the frontmatter text), run `just emit-devtools-skills` again and repeat this step. Do not edit `budgets.json` by hand. `ratchet` rewrites `budgets.json` in place, so before repeating this step run `git checkout -- docs/footprints README.md` to start from the committed baseline; otherwise the retry measures against a half-updated one.
 
 (`just footprint-regen` does the same for every plugin but needs the other plugins' binaries built; the loop above is its devtools part.)
 
@@ -652,7 +654,24 @@ Expected: no error from `ratchet` (it fails when a delta exceeds `deltaBytes`). 
 
 In each README, make the three edits shown. Use the exact old text; each occurs once in its file.
 
-`claude-code/plugins/aiplugins-devtools-cc/README.md` and `qwen/plugins/aiplugins-devtools-qwen/README.md` (the opening words differ: `A Claude Code plugin that ships four dev-tool skills:` and `A Qwen Code extension that ships four dev-tool skills:`; change only `four` to `five`):
+First the opening line of each file, line 3, which says `four` and must say `five`:
+
+```
+claude-code/plugins/aiplugins-devtools-cc/README.md
+  old: A Claude Code plugin that ships four dev-tool skills:
+  new: A Claude Code plugin that ships five dev-tool skills:
+qwen/plugins/aiplugins-devtools-qwen/README.md
+  old: A Qwen Code extension that ships four dev-tool skills:
+  new: A Qwen Code extension that ships five dev-tool skills:
+antigravity/plugins/aiplugins-devtools-agy/README.md
+  old: An Antigravity plugin that ships four dev-tool skills:
+  new: An Antigravity plugin that ships five dev-tool skills:
+opencode/plugins/aiplugins-devtools-opencode/README.md
+  old: An OpenCode plugin that ships four dev-tool skills:
+  new: An OpenCode plugin that ships five dev-tool skills:
+```
+
+Then, in `claude-code/plugins/aiplugins-devtools-cc/README.md` and `qwen/plugins/aiplugins-devtools-qwen/README.md` (the same text in both):
 
 Old:
 
@@ -673,7 +692,7 @@ New:
 Slash commands: `/aiplugins-devtools:spec-panel-review <path>`, `/aiplugins-devtools:human-friendly <path>` and `/aiplugins-devtools:rust-toolchain-scaffold <request>`.
 ```
 
-`antigravity/plugins/aiplugins-devtools-agy/README.md` (change `ships four dev-tool skills:` to `ships five dev-tool skills:`):
+`antigravity/plugins/aiplugins-devtools-agy/README.md`:
 
 Old:
 
@@ -694,7 +713,7 @@ New:
 Slash commands: `/spec-panel-review <path>`, `/human-friendly <path>` and `/rust-toolchain-scaffold <request>`.
 ```
 
-`opencode/plugins/aiplugins-devtools-opencode/README.md` (change `ships four dev-tool skills:` to `ships five dev-tool skills:`). Edit one:
+`opencode/plugins/aiplugins-devtools-opencode/README.md`. Edit one:
 
 Old:
 
@@ -971,7 +990,24 @@ Expected: both silent, exit 0.
 bash scripts/test-rust-scaffold.sh --quick
 ```
 
-Expected: exit status 1. The output starts with `bash: .../scripts/apply.sh: No such file or directory` and `FAIL  apply.sh failed on a fresh repository`, then one `FAIL  copied <file>` for each of the sixteen files it expects, then it stops at `No such file or directory` for `.github/CODEOWNERS`. (Measured on a copy of the skill with `apply.sh` removed: 17 FAIL lines.) Do not commit yet: Task 3 commits the script together with what makes it pass.
+Expected: exit status 1. The output starts with `bash: .../scripts/apply.sh: No such file or directory` and `FAIL  apply.sh failed on a fresh repository`, then one `FAIL  copied <file>` for each of the sixteen files it expects, then it stops at `No such file or directory` for `.github/CODEOWNERS`. (Measured on a copy of the skill with `apply.sh` removed: 17 FAIL lines.) 
+- [ ] **Step 4: Commit the failing test**
+
+Nothing wires this script into `just check`, `lefthook.yml` or CI yet (`grep -n test-rust-scaffold Justfile .github/workflows/ci.yml lefthook.yml` prints nothing), so committing it now cannot turn a gate red, and it will not be lost to a working-tree reset.
+
+```bash
+git add scripts/test-rust-scaffold.sh
+git commit -m "$(cat <<'EOF'
+test: add the end-to-end test for the rust-toolchain-scaffold skill
+
+Applies the scaffold to throwaway repositories, runs its own just check, and weakens
+nine gates one at a time. It fails until apply.sh and the templates land in the next
+commit, and nothing runs it yet.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+EOF
+)"
+```
 
 ---
 
@@ -981,7 +1017,7 @@ Expected: exit status 1. The output starts with `bash: .../scripts/apply.sh: No 
 - Create: `shared/devtools/skills/rust-toolchain-scaffold/scripts/apply.sh`
 - Create under `shared/devtools/skills/rust-toolchain-scaffold/assets/template/` (every file ends in `.tmpl`): `justfile.tmpl`, `lefthook.yml.tmpl`, `.lefthook/rc.sh.tmpl`, `.lefthook/pre-push/check.sh.tmpl`, `deny.toml.tmpl`, `typos.toml.tmpl`, `.gitattributes.tmpl`, `.gitignore.tmpl`, `rust-toolchain.toml.tmpl`, `.github/CODEOWNERS.tmpl`, `.github/workflows/ci.yml.tmpl`, `docs/accepted-boundaries.md.tmpl`, `toolchain-tests/.gitignore.tmpl`, `toolchain-tests/Cargo.toml.tmpl`, `toolchain-tests/src/lib.rs.tmpl`, `toolchain-tests/tests/common/mod.rs.tmpl`, `toolchain-tests/tests/gate.rs.tmpl`, `toolchain-tests/tests/toolchain.rs.tmpl`
 - Regenerated: the emitted copies of the skill.
-- Commit together with `scripts/test-rust-scaffold.sh` from Task 2.
+- `scripts/test-rust-scaffold.sh` (Task 2) is already committed and is the test for this task.
 
 **Interfaces:**
 - Consumes: `scripts/test-rust-scaffold.sh` (Task 2) as the test.
@@ -3367,17 +3403,17 @@ Expected: `Devtools skills consistent.`, `Skills bundles consistent.`, and the s
 - [ ] **Step 10: Commit**
 
 ```bash
-git add scripts/test-rust-scaffold.sh shared/devtools/skills/rust-toolchain-scaffold \
+git add shared/devtools/skills/rust-toolchain-scaffold \
   claude-code/plugins/aiplugins-devtools-cc antigravity/plugins/aiplugins-devtools-agy qwen/plugins/aiplugins-devtools-qwen opencode/plugins/aiplugins-devtools-opencode
 git status --short
 git commit -m "$(cat <<'EOF'
-feat: add the rust-toolchain-scaffold templates, apply.sh and its end-to-end test
+feat: add the rust-toolchain-scaffold templates and apply.sh
 
 The scaffold: a justfile, lefthook hooks with a fail-closed install, deny, typos and
 toolchain settings, a pinned CI workflow, CODEOWNERS, and an excluded test crate with
-26 gate tests and 27 toolchain tests. apply.sh never overwrites and reports drift.
-scripts/test-rust-scaffold.sh applies it to throwaway repositories, runs its own just
-check, and weakens nine gates one at a time, requiring each test to go red.
+26 gate tests and 27 toolchain tests. apply.sh never overwrites and reports drift. The
+end-to-end test from the previous commit now passes: it applies the scaffold to
+throwaway repositories, runs its own just check, and weakens nine gates one at a time.
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
 EOF
@@ -3829,3 +3865,7 @@ Check each spec section 4.x requirement against a task in this plan; any gap is 
 **Deliberate refinements of the spec, found by measurement.** The `JUST_` rule is by prefix (39 variables today). No new `.gitattributes` rule: the repository already pins `shared/devtools/skills/**` and each emitted copy to LF, and the static gate guards that line. The scaffold's CI tool pins are `TOOL_*`. The gate test count is 26 and the toolchain count 27 (24 off Unix), recorded in SKILL.md.
 
 **Gaps closed here, and one left open.** Left open, on purpose: Windows and macOS behaviour, because nothing on this machine can measure it; Task 5 is the measurement and Task 5 Step 3 says what to read first. No step defers a decision; the two places that say "if X, then Y" (a failing `ratchet`, a missing toolchain) name the action.
+
+## Stand-downs (adversarial panel review)
+
+Round 1 (agy, with a Cold Executor seat that walked Tasks 0 to 6), three findings, each checked against the repository before folding. FOLDED: the preflight now lists `mlc`, `tar`, `zip`, `unzip` and `zipinfo`, which `just links` and `just skills-bundles` need (Task 0); the README opening-line edit has exact old and new text (Task 1 Step 7); `ratchet` rewrites `budgets.json` in place, so a retry starts from `git checkout -- docs/footprints README.md` (Task 1 Step 6); the end-to-end script is committed straight after it is written, because nothing wires it yet and an untracked file can be lost to a reset (Task 2 Step 4). RECORDED, not changed: the commits along the way are not releasable states (a skill advertised before its templates land), which the Execution notes now say, because nothing releases from a feature branch and moving the README edits to the end would only add a commit. Not re-raised: Windows and macOS behaviour, left to Task 5's first run. Nothing is discarded below the floor; nothing is unverified-accepted.
