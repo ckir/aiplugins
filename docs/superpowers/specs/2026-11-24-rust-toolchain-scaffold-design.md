@@ -78,7 +78,8 @@ rust-toolchain-scaffold/
     deny.toml, typos.toml, .gitattributes, .gitignore,
     .github/workflows/ci.yml, .github/CODEOWNERS,
     toolchain-tests/        the excluded standalone crate: Cargo.toml, gate/ and toolchain/ tests
-                            (its Cargo.lock is generated at scaffold time, not shipped as a template)
+                            (its Cargo.lock is generated at scaffold time, not shipped as a template;
+                            its own .gitignore ignores /target/)
   assets/snippets/           agent-instructions section, README "Development" section, Cargo lints table
   references/                pitfalls.md, adapting.md, github-settings.md, review-workflow.md
 ```
@@ -94,7 +95,7 @@ header, like `license-headers.sh` does today.
 
 | Piece | Files |
 |---|---|
-| Task runner | `justfile`: `setup`, `fmt`, `lint`, `test`, `test-toolchain`, `deny`, `spellcheck`, `secrets`, `secrets-staged`, `secrets-message`, `check-fast`, `check` |
+| Task runner | `justfile`: `setup`, `fmt`, `clippy`, `lint`, `test`, `test-toolchain`, `deny`, `spellcheck`, `secrets`, `secrets-staged`, `secrets-message`, `check-fast`, `check` |
 | Git hooks | `lefthook.yml`, `.lefthook/rc.sh`, `.lefthook/pre-push/check.sh` |
 | Settings | `deny.toml`, `typos.toml`, `.gitattributes`, `.gitignore` additions, a Cargo `[lints]` snippet (clippy `-D warnings` is the recipe's job, the table pins the rest) |
 | CI | `.github/workflows/ci.yml` (runs `just check`), `.github/CODEOWNERS`; `apply.sh` also prints every other workflow file it finds, because the gate tests apply to all of them (section 4.4) |
@@ -105,9 +106,10 @@ Recipe composition, ported from the Bun skill's justfile: `lint` is `cargo fmt -
 `-D warnings` over the workspace and over `toolchain-tests/`; `check-fast` is `lint`, `test`, `deny`, `spellcheck`
 and `secrets`; `check` is `check-fast` plus `test-toolchain`. CI runs `just check`.
 
-Hook jobs, ported from the Bun skill's `lefthook.yml`: pre-commit runs the format check, clippy over the whole
-workspace when a staged `.rs` file exists (clippy works on crates, not files, and like every hook here it sees the
-working tree, not the staged snapshot), typos and `just secrets-staged`; commit-msg runs `just secrets-message`; pre-push runs the always-on fast
+Hook jobs, ported from the Bun skill's `lefthook.yml`: pre-commit runs the format check, the same `just clippy`
+recipe that `lint` uses (the workspace and `toolchain-tests/`) when a staged `.rs` file exists (clippy works on
+crates, not files, and like every hook here it sees the working tree, not the staged snapshot), typos and
+`just secrets-staged`; commit-msg runs `just secrets-message`; pre-push runs the always-on fast
 gate as a `script:` job and the toolchain suite as a `run:` job glob-conditioned on every file the suite copies.
 Whether clippy belongs in pre-commit (this repository's own hook runs it) or only in pre-push is left to the plan,
 because it trades commit latency against earlier feedback.
@@ -199,10 +201,14 @@ meaning a workflow step whose `run:` line is that command, not a line that merel
   `lefthook.yml` says its own suite takes about 12 seconds in pre-push; the plan measures this one, and if the
   pre-push job is slower than the owner accepts it becomes CI-only.
 - `toolchain-tests/` is a private crate (`publish = false`). `apply` runs `cargo generate-lockfile` for it and the
-  lock is committed, so CI resolves the crates the scaffold resolved; its `target/` directory is gitignored, because
-  a nested crate builds into its own `target/` (measured). `cargo deny` covers it with the repository's `deny.toml`;
-  how a private crate with no `license` field passes the `licenses` check is measured in the plan (an unlicensed
-  fixture crate fails `licenses` without a deny config, measured).
+  lock is committed, so CI resolves the crates the scaffold resolved. A nested crate builds into its own `target/`
+  (measured), and the root `.gitignore` does not cover it: `apply.sh` skips a root `.gitignore` that exists, and the
+  usual `/target` entry is anchored to the root (measured with `git check-ignore`). So the crate carries its own
+  `.gitignore` containing `/target/`, which `apply.sh` always copies because it is a new file. `cargo deny` covers
+  the crate with the repository's `deny.toml`. The crate sets `publish = false` and the template `deny.toml` sets
+  `[licenses] private = { ignore = true }`; both are needed, because `publish = false` alone still fails `licenses`
+  with exit 4 (measured). For an existing `deny.toml` that `apply.sh` skips, `references/adapting.md` names the line
+  to merge.
 - Consequence the skill must handle: `cargo fmt --all`, `cargo clippy --workspace`, `cargo nextest --workspace` and
   `cargo deny` do not cover an excluded crate (measured for `fmt`, section 6), so the justfile has explicit recipe
   lines for `toolchain-tests/` in each of them, a gate test fails if one is missing, and `references/adapting.md`
