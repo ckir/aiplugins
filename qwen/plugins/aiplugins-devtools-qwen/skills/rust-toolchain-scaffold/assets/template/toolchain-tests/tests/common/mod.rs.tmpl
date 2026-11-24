@@ -1,0 +1,379 @@
+//! Helpers shared by the gate and toolchain tests.
+//!
+//! Each toolchain test builds a throwaway git repository holding a copy of the
+//! tooling files, then runs the real recipes and hooks in it to prove that a
+//! gate blocks what it should.
+
+// Each test binary uses a different subset of these helpers.
+#![allow(dead_code)]
+
+use std::collections::hash_map::RandomState;
+use std::ffi::OsStr;
+use std::fs;
+use std::hash::{BuildHasher, Hasher};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::OnceLock;
+
+/// The line gitleaks prints when it finds something ("no leaks found" has no colon).
+pub const LEAK: &str = "leaks found:";
+
+/// The tooling under test, copied into every throwaway repository, besides the
+/// justfile (whose spelling varies, see `justfile_name`). Neither `src/` nor
+/// `tests/` of the repository is copied: the result must not depend on whatever
+/// product code or scratch files are in the working tree. `rust-toolchain.toml`
+/// is not copied either, so that a throwaway repository builds with the
+/// toolchain the developer has installed instead of triggering a download.
+pub const TOOLCHAIN_FILES: &[&str] = &[
+    ".gitattributes",
+    ".gitignore",
+    ".lefthook",
+    "deny.toml",
+    "lefthook.yml",
+    "typos.toml",
+];
+
+/// Environment variables dropped by prefix, upper-cased. They change what the
+/// tools under test do, so a developer's shell settings must not alter a result.
+const DROPPED_PREFIXES: &[&str] = &[
+    "GIT_",
+    "LEFTHOOK",
+    "GITLEAKS_",
+    "JUST_",
+    // Exported by .lefthook/rc.sh in the hook this suite may be running under.
+    "HOOK_ARG_",
+    // Changes what `cd` prints; a test sets it on purpose where that matters.
+    "CDPATH",
+    "NEXTEST_",
+    "TYPOS_",
+    "CARGO_BUILD_",
+    "CARGO_PROFILE_",
+];
+
+/// Environment variables dropped by exact name, upper-cased. `CARGO_HOME`,
+/// `RUSTUP_HOME` and the registry and network settings stay: a mirror or
+/// credentials configured there are part of a working environment.
+const DROPPED_NAMES: &[&str] = &[
+    "BASH_ENV",
+    "ENV",
+    "RUSTFLAGS",
+    "CARGO_ENCODED_RUSTFLAGS",
+    "CARGO_TARGET_DIR",
+    "RUSTC_WRAPPER",
+    "RUSTUP_TOOLCHAIN",
+];
+
+const FIXTURE_MANIFEST: &str =
+    "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\npublish = false\n";
+const FIXTURE_LIB: &str =
+    "/// Adds two numbers.\npub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n";
+const FIXTURE_TEST: &str =
+    "use fixture::add;\n\n#[test]\nfn adds() {\n    assert_eq!(add(1, 2), 3);\n}\n";
+const STUB_MANIFEST: &str = "[package]\nname = \"toolchain-tests\"\nversion = \"0.0.0\"\nedition = \"2021\"\npublish = false\n\n[workspace]\n";
+const STUB_TEST: &str = "#[test]\nfn placeholder() {}\n";
+
+/// The repository the tests guard: the parent of this crate.
+pub fn repo_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("toolchain-tests has a parent directory")
+        .to_path_buf()
+}
+
+/// The spelling of the justfile this repository uses. `just` refuses to run
+/// when two spellings coexist, so a repository has exactly one.
+pub fn justfile_name() -> &'static str {
+    ["justfile", "Justfile", ".justfile"]
+        .into_iter()
+        .find(|name| repo_root().join(name).is_file())
+        .expect("the repository has no justfile")
+}
+
+/// A file of the repository, as text. Panics with the path if it cannot be read.
+pub fn read(relative: &str) -> String {
+    fs::read_to_string(repo_root().join(relative))
+        .unwrap_or_else(|error| panic!("cannot read {relative}: {error}"))
+}
+
+/// A directory removed when dropped.
+pub struct TempDir(PathBuf);
+
+impl TempDir {
+    pub fn new() -> TempDir {
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "toolchain-suite-{}-{}",
+            std::process::id(),
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&path).expect("create a temporary directory");
+        TempDir(path)
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+/// An empty file, used wherever git or a tool needs a config file that says nothing.
+/// (A file rather than /dev/null, which a native Windows git does not understand.)
+fn empty_file() -> &'static Path {
+    static EMPTY: OnceLock<PathBuf> = OnceLock::new();
+    EMPTY.get_or_init(|| {
+        let path =
+            std::env::temp_dir().join(format!("toolchain-suite-empty-{}", std::process::id()));
+        fs::write(&path, "").expect("create an empty file");
+        path
+    })
+}
+
+/// A command with the clean environment every spawned process gets. Git exports
+/// `GIT_DIR` and friends to hooks, and this suite can run inside the pre-push
+/// hook: left in place, those variables would point the throwaway repositories'
+/// git commands at the real repository. Settings for lefthook, gitleaks, just,
+/// cargo and bash are dropped too, so that for example `LEFTHOOK=0` or
+/// `JUST_DRY_RUN` in the caller's shell cannot switch off what is being tested.
+/// Git's config files are replaced by an empty one: stripping `GIT_*` variables
+/// does not isolate the files, and a global `core.hooksPath` makes
+/// `lefthook install` fail.
+pub fn command<S: AsRef<OsStr>>(dir: &Path, program: S) -> Command {
+    let mut cmd = Command::new(program);
+    cmd.current_dir(dir).stdin(Stdio::null()).env_clear();
+    for (key, value) in std::env::vars() {
+        let upper = key.to_ascii_uppercase();
+        let dropped = DROPPED_NAMES.contains(&upper.as_str())
+            || DROPPED_PREFIXES
+                .iter()
+                .any(|prefix| upper.starts_with(prefix));
+        if !dropped {
+            cmd.env(key, value);
+        }
+    }
+    let empty = empty_file();
+    cmd.env("GIT_CONFIG_GLOBAL", empty)
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_COUNT", "2")
+        .env("GIT_CONFIG_KEY_0", "core.excludesFile")
+        .env("GIT_CONFIG_VALUE_0", empty)
+        .env("GIT_CONFIG_KEY_1", "core.attributesFile")
+        .env("GIT_CONFIG_VALUE_1", empty)
+        .env("GIT_AUTHOR_NAME", "Toolchain Test")
+        .env("GIT_AUTHOR_EMAIL", "toolchain-test@example.invalid")
+        .env("GIT_COMMITTER_NAME", "Toolchain Test")
+        .env("GIT_COMMITTER_EMAIL", "toolchain-test@example.invalid");
+    cmd
+}
+
+/// What a command printed and how it ended.
+pub struct Ran {
+    pub code: i32,
+    pub output: String,
+}
+
+fn finish(mut cmd: Command) -> Ran {
+    let out = cmd.output().expect("spawn the command");
+    Ran {
+        code: out.status.code().unwrap_or(-1),
+        output: format!(
+            "{}{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        ),
+    }
+}
+
+/// Run a command in `dir`; never panics on a failing exit.
+pub fn run<S: AsRef<OsStr>>(dir: &Path, program: S, args: &[&str]) -> Ran {
+    let mut cmd = command(dir, program);
+    cmd.args(args);
+    finish(cmd)
+}
+
+/// Like `run`, with extra environment variables set after the clean environment.
+pub fn run_env<S: AsRef<OsStr>>(
+    dir: &Path,
+    program: S,
+    args: &[&str],
+    env: &[(&str, &OsStr)],
+) -> Ran {
+    let mut cmd = command(dir, program);
+    cmd.args(args);
+    for (key, value) in env {
+        cmd.env(key, value);
+    }
+    finish(cmd)
+}
+
+/// Run a setup command that has to succeed; panic with its output if it does not.
+pub fn must<S: AsRef<OsStr>>(dir: &Path, program: S, args: &[&str]) -> Ran {
+    let ran = run(dir, &program, args);
+    assert!(
+        ran.code == 0,
+        "setup command failed ({}): {} {}\n{}",
+        ran.code,
+        program.as_ref().to_string_lossy(),
+        args.join(" "),
+        ran.output
+    );
+    ran
+}
+
+/// Write a file under `dir`, creating its parent directories.
+pub fn write(dir: &Path, relative: &str, content: &str) {
+    let path = dir.join(relative);
+    fs::create_dir_all(path.parent().expect("a file has a parent")).expect("create directories");
+    fs::write(&path, content).unwrap_or_else(|error| panic!("write {relative}: {error}"));
+}
+
+/// Append to a file under `dir`.
+pub fn append(dir: &Path, relative: &str, content: &str) {
+    let path = dir.join(relative);
+    let mut text = fs::read_to_string(&path).unwrap_or_default();
+    text.push_str(content);
+    fs::write(&path, text).unwrap_or_else(|error| panic!("append {relative}: {error}"));
+}
+
+/// Write an executable shell script (the mode bit only matters on Unix).
+pub fn write_script(path: &Path, body: &str) {
+    fs::write(path, body).expect("write a script");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o755)).expect("chmod a script");
+    }
+}
+
+/// Copy a file or a whole directory.
+pub fn copy(from: &Path, to: &Path) {
+    if from.is_dir() {
+        fs::create_dir_all(to).expect("create a directory");
+        for entry in fs::read_dir(from).expect("read a directory") {
+            let entry = entry.expect("a directory entry");
+            copy(&entry.path(), &to.join(entry.file_name()));
+        }
+    } else {
+        fs::create_dir_all(to.parent().expect("a file has a parent")).expect("create directories");
+        fs::copy(from, to).unwrap_or_else(|error| panic!("copy {}: {error}", from.display()));
+    }
+}
+
+/// Find a program on `PATH`.
+pub fn find_on_path(name: &str) -> Option<PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path)
+        .flat_map(|dir| [dir.join(name), dir.join(format!("{name}.exe"))])
+        .find(|candidate| candidate.is_file())
+}
+
+/// A new git repository on branch `main` holding a copy of the tooling files, a
+/// small fixture crate and a stub of this test crate (the justfile's recipes
+/// name it), with one commit and a clean working tree.
+pub fn make_repo() -> TempDir {
+    let dir = TempDir::new();
+    build_repo(dir.path());
+    dir
+}
+
+/// Build that repository in an existing, empty directory.
+pub fn build_repo(dir: &Path) {
+    let root = repo_root();
+    let name = justfile_name();
+    copy(&root.join(name), &dir.join(name));
+    for file in TOOLCHAIN_FILES {
+        let from = root.join(file);
+        if from.exists() {
+            copy(&from, &dir.join(file));
+        }
+    }
+    write(dir, "Cargo.toml", FIXTURE_MANIFEST);
+    write(dir, "src/lib.rs", FIXTURE_LIB);
+    write(dir, "tests/add.rs", FIXTURE_TEST);
+    write(dir, "toolchain-tests/Cargo.toml", STUB_MANIFEST);
+    write(
+        dir,
+        "toolchain-tests/src/lib.rs",
+        "//! Stub of the test crate.\n",
+    );
+    write(dir, "toolchain-tests/tests/gate.rs", STUB_TEST);
+    write(dir, "toolchain-tests/tests/toolchain.rs", STUB_TEST);
+    write(dir, "toolchain-tests/.gitignore", "/target/\n");
+    // The copied .gitignore may not ignore build output.
+    append(dir, ".gitignore", "\n/target\n");
+    must(dir, "git", &["init", "--quiet", "--initial-branch=main"]);
+    commit_all(dir, "initial");
+}
+
+/// How many commits `HEAD` has.
+pub fn commit_count(dir: &Path) -> u32 {
+    must(dir, "git", &["rev-list", "--count", "HEAD"])
+        .output
+        .trim()
+        .parse()
+        .expect("a commit count")
+}
+
+/// Stage everything and commit it, bypassing hooks.
+pub fn commit_all(dir: &Path, message: &str) {
+    must(dir, "git", &["add", "--all"]);
+    must(
+        dir,
+        "git",
+        &["commit", "--quiet", "--no-verify", "-m", message],
+    );
+}
+
+/// Give `dir` a bare remote named `origin` and push `main` to it, bypassing hooks.
+pub fn add_remote(dir: &Path) -> TempDir {
+    let remote = TempDir::new();
+    must(remote.path(), "git", &["init", "--quiet", "--bare"]);
+    let url = remote.path().to_string_lossy().into_owned();
+    must(dir, "git", &["remote", "add", "origin", &url]);
+    must(
+        dir,
+        "git",
+        &[
+            "push",
+            "--quiet",
+            "--no-verify",
+            "--set-upstream",
+            "origin",
+            "main",
+        ],
+    );
+    remote
+}
+
+/// Install the git hooks in `dir` with the real lefthook.
+pub fn install_hooks(dir: &Path) {
+    must(dir, "lefthook", &["install"]);
+}
+
+/// A string shaped like a GitHub personal access token, generated at run time so
+/// that no token-shaped literal is ever committed to the repository.
+pub fn fake_token() -> String {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let state = RandomState::new();
+    let mut body = String::new();
+    let mut counter: u64 = 0;
+    while body.len() < 36 {
+        let mut hasher = state.build_hasher();
+        hasher.write_u64(counter);
+        counter += 1;
+        for byte in hasher.finish().to_le_bytes() {
+            // Six bits of each byte give a number from 0 to 63, an even draw from 64 characters.
+            if let Some(character) = ALPHABET.get(usize::from(byte & 63)) {
+                if body.len() < 36 {
+                    body.push(char::from(*character));
+                }
+            }
+        }
+    }
+    format!("ghp_{body}")
+}

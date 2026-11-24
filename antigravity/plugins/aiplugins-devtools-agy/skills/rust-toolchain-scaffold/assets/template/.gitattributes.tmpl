@@ -1,0 +1,13 @@
+# The hooks, the recipes and the tests that read them run on every platform, and a
+# CRLF in a script or in a config they parse breaks them: `sh` reads `set -e\r`
+# as an invalid option, and the gate tests compare lines exactly.
+*.sh text eol=lf
+justfile text eol=lf
+Justfile text eol=lf
+lefthook.yml text eol=lf
+.lefthook/** text eol=lf
+rust-toolchain.toml text eol=lf
+deny.toml text eol=lf
+typos.toml text eol=lf
+toolchain-tests/** text eol=lf
+.github/** text eol=lf

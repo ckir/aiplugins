@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    # `edited` reruns the check when a pull request's base branch is changed.
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+# Tool versions are pinned so a new release cannot break an unchanged commit.
+# Actions are pinned to a commit, with the release it corresponds to in a
+# comment, because a tag can be moved. The Rust toolchain comes from
+# rust-toolchain.toml. The names start with TOOL_ on purpose: the gate tests
+# reject any env key starting with JUST_, which `just` itself reads.
+env:
+  TOOL_LEFTHOOK_VERSION: 2.1.17
+  TOOL_GITLEAKS_VERSION: 8.30.1
+  TOOL_JUST_VERSION: 1.58.0
+  TOOL_NEXTEST_VERSION: 0.9.146
+  TOOL_DENY_VERSION: 0.20.2
+  TOOL_TYPOS_VERSION: 1.51.1
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history so gitleaks can scan every commit reachable from the checkout.
+          fetch-depth: 0
+
+      - name: Install the Rust toolchain pinned in rust-toolchain.toml
+        run: rustup toolchain install
+
+      - uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: just@${{ env.TOOL_JUST_VERSION }},cargo-nextest@${{ env.TOOL_NEXTEST_VERSION }},cargo-deny@${{ env.TOOL_DENY_VERSION }},typos@${{ env.TOOL_TYPOS_VERSION }}
+
+      - name: Install lefthook
+        run: |
+          base="https://github.com/evilmartians/lefthook/releases/download/v${TOOL_LEFTHOOK_VERSION}"
+          bin="lefthook_${TOOL_LEFTHOOK_VERSION}_Linux_x86_64"
+          curl -fsSLO "${base}/${bin}"
+          curl -fsSLO "${base}/lefthook_checksums.txt"
+          grep " ${bin}\$" lefthook_checksums.txt | sha256sum -c -
+          mkdir -p "${RUNNER_TEMP}/lefthook"
+          install -m 0755 "${bin}" "${RUNNER_TEMP}/lefthook/lefthook"
+          echo "${RUNNER_TEMP}/lefthook" >> "${GITHUB_PATH}"
+          rm "${bin}" lefthook_checksums.txt
+
+      - name: Install gitleaks
+        run: |
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${TOOL_GITLEAKS_VERSION}"
+          tarball="gitleaks_${TOOL_GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSLO "${base}/${tarball}"
+          curl -fsSLO "${base}/gitleaks_${TOOL_GITLEAKS_VERSION}_checksums.txt"
+          grep " ${tarball}\$" "gitleaks_${TOOL_GITLEAKS_VERSION}_checksums.txt" | sha256sum -c -
+          mkdir -p "${RUNNER_TEMP}/gitleaks"
+          tar -xzf "${tarball}" -C "${RUNNER_TEMP}/gitleaks" gitleaks
+          echo "${RUNNER_TEMP}/gitleaks" >> "${GITHUB_PATH}"
+          rm "${tarball}" "gitleaks_${TOOL_GITLEAKS_VERSION}_checksums.txt"
+
+      - name: Check
+        run: just check

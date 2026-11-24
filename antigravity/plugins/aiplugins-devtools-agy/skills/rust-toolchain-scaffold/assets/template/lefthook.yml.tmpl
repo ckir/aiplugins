@@ -1,0 +1,75 @@
+# Git hooks. Install with `just setup`.
+#
+# These hooks are fast local feedback, not the gate: they check the working
+# tree rather than the exact commit, so uncommitted or unstaged files can mask
+# a problem. CI (.github/workflows/ci.yml) is authoritative.
+
+# The one place the lefthook version floor is written. `just setup` reads it
+# from here and a gate test fails if the two ever disagree. lefthook enforces it
+# when it runs a hook; `lefthook install` does not.
+min_version: 2.1.17
+
+# Sourced by each generated hook before lefthook starts. It exports git's hook
+# argument as HOOK_ARG_1 and drops the lefthook override variables; see the file.
+rc: .lefthook/rc.sh
+
+# Fail the git operation, rather than silently skipping the hooks, when the
+# lefthook binary cannot be found.
+assert_lefthook_installed: true
+
+pre-commit:
+  jobs:
+    # Cargo works on crates, not files: these run the whole recipe whenever a
+    # staged .rs file exists, and see the working tree, not the staged snapshot.
+    - name: fmt
+      run: just fmt-check
+      glob: "*.rs"
+
+    - name: clippy
+      run: just clippy
+      glob: "*.rs"
+
+    - name: spellcheck
+      run: just spellcheck
+
+    - name: secrets
+      run: just secrets-staged
+
+commit-msg:
+  jobs:
+    # The message is scanned before the commit exists, so a secret typed into
+    # it never enters the history. The message file's path is not passed here:
+    # lefthook would paste `{1}` into a shell command unescaped. The recipe
+    # reads it from HOOK_ARG_1, which .lefthook/rc.sh exports.
+    - name: secrets
+      run: just secrets-message
+
+pre-push:
+  jobs:
+    # The fast gate, on every push. A script, not `run`: lefthook skips a
+    # pre-push `run` job when the push changes no existing files (deletion-only
+    # pushes, tags, empty commits). Script jobs are not skipped. The script is
+    # .lefthook/pre-push/check.sh and runs `just check-fast`.
+    - name: check
+      script: check.sh
+      runner: sh
+      # Explicit args replace the remote name and URL that git passes to the
+      # hook, which lefthook would otherwise append to the shell command unquoted.
+      args: "--"
+
+    # The toolchain suite is slower, so it runs only when the push touches a
+    # file it tests. CI runs it on every change. The list must cover every file
+    # the suite copies (TOOLCHAIN_FILES in toolchain-tests/tests/common/mod.rs);
+    # a gate test fails if it does not.
+    - name: toolchain-tests
+      run: just test-toolchain
+      glob:
+        - ".gitattributes"
+        - ".gitignore"
+        - ".lefthook/**"
+        - "deny.toml"
+        - "justfile"
+        - "lefthook.yml"
+        - "rust-toolchain.toml"
+        - "toolchain-tests/**"
+        - "typos.toml"
