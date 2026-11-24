@@ -363,6 +363,18 @@ devtools-skills:
     bash scripts/check-devtools-skills.sh
     bash scripts/check-devtools-skills.sh --mutation-test
 
+# Check the rust-toolchain-scaffold skill source (structure, pins), then prove the gate
+# fails on each seeded defect
+rust-scaffold:
+    bash scripts/check-rust-scaffold.sh
+    bash scripts/check-rust-scaffold.sh --mutation-test
+
+# End to end: apply the Rust scaffold to throwaway repositories, run its own gates, then
+# weaken each gate once and require its test to fail. Slow. Needs just, lefthook, gitleaks,
+# cargo-nextest, cargo-deny and typos; pass --quick for the apply.sh checks alone.
+test-rust-scaffold *args:
+    bash scripts/test-rust-scaffold.sh {{args}}
+
 # Build every skills-only plugin bundle and check zip names, manifests and skills
 skills-bundles:
     bash scripts/check-skills-bundles.sh
@@ -399,7 +411,7 @@ lock:
 
 # Run all pre-flight checks (what CI and lefthook run; see ci.yml — `links`
 # is hook-only and `gen-* --check` + opencode suites run in CI but not here)
-check: lock fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace agy-marketplace dispatch smoke footprint opencode-wiring bump-opencode-plugin-test rerun-runner-failures-test doc-paths-test doc-paths gate-wiring-test gate-wiring install-pins-test install-pins readme-coverage-test readme-coverage agy-wiring agy-validate footprint-budgets devtools-skills skills-bundles skills-release-wiring site-check
+check: lock fmt lint test deny spellcheck links versions wiring marketplace qwen-marketplace agy-marketplace dispatch smoke footprint opencode-wiring bump-opencode-plugin-test rerun-runner-failures-test doc-paths-test doc-paths gate-wiring-test gate-wiring install-pins-test install-pins readme-coverage-test readme-coverage agy-wiring agy-validate footprint-budgets devtools-skills rust-scaffold skills-bundles skills-release-wiring site-check
 
 # Build the example Claude Code plugin's binaries into its bin/ directory.
 # Windows developers run this locally; CI produces the other platforms.

@@ -210,6 +210,14 @@ jobs:
       - name: Check devtools skills gate against seeded defects
         run: bash scripts/check-devtools-skills.sh --mutation-test
 
+      - name: Check the Rust scaffold skill
+        run: bash scripts/check-rust-scaffold.sh
+
+      # The gate must fail on each seeded defect, or an edit to it could turn a
+      # failure branch into a no-op and leave it green.
+      - name: Check the Rust scaffold gate against seeded defects
+        run: bash scripts/check-rust-scaffold.sh --mutation-test
+
       # The gate only compares the committed copies; this runs the emitter that
       # writes them and requires it to change nothing in a clean checkout.
       - name: Install just
