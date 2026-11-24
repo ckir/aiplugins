@@ -64,8 +64,10 @@ The canonical source is `shared/devtools/skills/rust-toolchain-scaffold/`. The e
 folder name `aiplugins-devtools-rust-toolchain-scaffold` and one rewritten `name:` line). The drift check
 `scripts/check-devtools-skills.sh` discovers a new skill folder by itself. OpenCode needs one command file,
 `shared/devtools/commands/rust-toolchain-scaffold.md`, whose body names the prefixed skill and contains
-`$ARGUMENTS` (the target repository path). No change to `agents.json`, the marketplaces or the bundlers is expected;
-the plan confirms that.
+`$ARGUMENTS`, which is the user's free-text request (the target path and, optionally, the code owner). The command
+only loads the skill; the agent following `SKILL.md` runs `apply.sh`, and finds the code owner itself (from
+`gh repo view`, or by asking) when the request does not give one. No change to `agents.json`, the marketplaces or
+the bundlers is expected; the plan confirms that.
 
 ```
 rust-toolchain-scaffold/
@@ -76,6 +78,7 @@ rust-toolchain-scaffold/
     deny.toml, typos.toml, .gitattributes, .gitignore,
     .github/workflows/ci.yml, .github/CODEOWNERS,
     toolchain-tests/        the excluded standalone crate: Cargo.toml, gate/ and toolchain/ tests
+                            (its Cargo.lock is generated at scaffold time, not shipped as a template)
   assets/snippets/           agent-instructions section, README "Development" section, Cargo lints table
   references/                pitfalls.md, adapting.md, github-settings.md, review-workflow.md
 ```
@@ -94,7 +97,7 @@ header, like `license-headers.sh` does today.
 | Task runner | `justfile`: `setup`, `fmt`, `lint`, `test`, `test-toolchain`, `deny`, `spellcheck`, `secrets`, `secrets-staged`, `secrets-message`, `check-fast`, `check` |
 | Git hooks | `lefthook.yml`, `.lefthook/rc.sh`, `.lefthook/pre-push/check.sh` |
 | Settings | `deny.toml`, `typos.toml`, `.gitattributes`, `.gitignore` additions, a Cargo `[lints]` snippet (clippy `-D warnings` is the recipe's job, the table pins the rest) |
-| CI | `.github/workflows/ci.yml` (runs `just check`), `.github/CODEOWNERS` |
+| CI | `.github/workflows/ci.yml` (runs `just check`), `.github/CODEOWNERS`; `apply.sh` also prints every other workflow file it finds, because the gate tests apply to all of them (section 4.4) |
 | Tests | `toolchain-tests/` (section 4.4) |
 | Docs | agent-instructions section, README "Development" section, `docs/accepted-boundaries.md` |
 
@@ -102,8 +105,9 @@ Recipe composition, ported from the Bun skill's justfile: `lint` is `cargo fmt -
 `-D warnings` over the workspace and over `toolchain-tests/`; `check-fast` is `lint`, `test`, `deny`, `spellcheck`
 and `secrets`; `check` is `check-fast` plus `test-toolchain`. CI runs `just check`.
 
-Hook jobs, ported from the Bun skill's `lefthook.yml`: pre-commit runs the format check, clippy on staged `.rs`
-files, typos and `just secrets-staged`; commit-msg runs `just secrets-message`; pre-push runs the always-on fast
+Hook jobs, ported from the Bun skill's `lefthook.yml`: pre-commit runs the format check, clippy over the whole
+workspace when a staged `.rs` file exists (clippy works on crates, not files, and like every hook here it sees the
+working tree, not the staged snapshot), typos and `just secrets-staged`; commit-msg runs `just secrets-message`; pre-push runs the always-on fast
 gate as a `script:` job and the toolchain suite as a `run:` job glob-conditioned on every file the suite copies.
 Whether clippy belongs in pre-commit (this repository's own hook runs it) or only in pre-push is left to the plan,
 because it trades commit latency against earlier feedback.
@@ -115,7 +119,11 @@ the pinned values as written and `SKILL.md` tells the agent to resolve them fres
 
 Machine prerequisites: `just`, `cargo`, `lefthook`, `gitleaks`, `git`. `cargo-nextest`, `cargo-deny` and
 `typos-cli` come from `cargo binstall`. `lefthook` and `gitleaks` have no cargo route (measured, section 6), so
-`just setup` and the README snippet give a per-OS install command for each. The Bun skill's
+`just setup` and the README snippet give a per-OS install command for each. For CI, `taiki-e/install-action` (which
+this repository's CI already uses) lists `just`, `cargo-nextest`, `cargo-deny` and `typos` in its `manifests/` but
+neither `gitleaks` nor `lefthook` (measured), so those two need a pinned release download with a checksum check or an
+OS package manager. A pinned download is the default, because the pins above require a version to be nameable; the
+plan confirms it on all three runners. The Bun skill's
 `.claude/recommended-tools.json` is dropped: it is one user's convention, not something four agents share.
 
 ### 4.3 Hook runner (agreed by the owner, agy and the driver)
@@ -162,8 +170,10 @@ the target's root `Cargo.toml` and `Cargo.lock` untouched (measured, section 6) 
 (`yaml-rust2`), which a std-only Rust test cannot.
 
 - `gate` tests (fast, under a second) read the workflow, CODEOWNERS, `deny.toml`, `typos.toml`, `lefthook.yml`,
-  `.gitattributes` and the justfile. They check: actions pinned to a 40-hex SHA, read-only permissions, no
-  `continue-on-error`, `if`, `container`, `services`, `||` or `set +` in a workflow script; CI runs `just check`,
+  `.gitattributes` and the justfile. They check, in every file under `.github/workflows/` and not only `ci.yml`:
+  actions pinned to a 40-hex SHA, read-only permissions, no `env:` key at workflow, job or step level that `just`
+  itself reads (`JUST_DRY_RUN` makes `just check` exit 0 without running anything, measured; the plan takes the
+  full list from `just --help`), no `continue-on-error`, `if`, `container`, `services`, `||` or `set +` in a workflow script; CI runs `just check`,
 meaning a workflow step whose `run:` line is that command, not a line that merely mentions it (the same rule
 `scripts/check-gate-wiring.sh` applies in this repository, so an `echo "just check"` does not pass);
   CODEOWNERS is evaluated last-match-wins like GitHub and covers the protected files; the lefthook settings of
@@ -175,13 +185,24 @@ meaning a workflow step whose `run:` line is that command, not a line that merel
   section 4.3.
 - Carried over from the Bun skill: a gate change comes with a test change shown failing when the gate is weakened;
   token-shaped literals are built at run time and never committed; the test environment strips `GIT_*`,
-  `LEFTHOOK*`, `GITLEAKS_*`, `JUST_*`, `HOOK_ARG_*`, `CDPATH`, `BASH_ENV` and `ENV`, and in Rust also `CARGO_*`,
-  `RUSTFLAGS`, `RUSTUP_TOOLCHAIN`, `NEXTEST_*` and `TYPOS_*`. Stripping variables does not isolate git's config
+  `LEFTHOOK*`, `GITLEAKS_*`, `JUST_*`, `HOOK_ARG_*`, `CDPATH`, `BASH_ENV` and `ENV`, and in Rust also an explicit list
+  of the variables that change a gate's outcome (`RUSTFLAGS`, `CARGO_ENCODED_RUSTFLAGS`, `CARGO_BUILD_*`,
+  `CARGO_PROFILE_*`, `CARGO_TARGET_DIR`, `RUSTC_WRAPPER`, `RUSTUP_TOOLCHAIN`, `NEXTEST_*`, `TYPOS_*`; the plan fixes
+  the list). It is deliberately not a `CARGO_*` glob: `CARGO_HOME`, `RUSTUP_HOME` and the registry and network
+  settings stay, because a mirror or credentials configured there are part of a working environment, and
+  `CARGO_TARGET_DIR` goes so that each throwaway repository builds into its own `target/`. Stripping variables does not isolate git's config
   files, so the throwaway repositories also set `GIT_CONFIG_GLOBAL` to an empty file and `GIT_CONFIG_NOSYSTEM=1`:
   a developer's global `core.hooksPath` makes `lefthook install` fail (measured, section 6).
 - The suite is not split into a smaller target-side set. A fresh no-dependency crate costs about 0.14 s for
   `cargo fmt --check`, 0.4 to 0.6 s for a cold clippy and 1.3 to 1.4 s for a cold nextest run (section 6), so
-  throwaway repositories are affordable. The total suite time is not known until it is built.
+  throwaway repositories are affordable. The total suite time is not known until it is built. The Bun skill's
+  `lefthook.yml` says its own suite takes about 12 seconds in pre-push; the plan measures this one, and if the
+  pre-push job is slower than the owner accepts it becomes CI-only.
+- `toolchain-tests/` is a private crate (`publish = false`). `apply` runs `cargo generate-lockfile` for it and the
+  lock is committed, so CI resolves the crates the scaffold resolved; its `target/` directory is gitignored, because
+  a nested crate builds into its own `target/` (measured). `cargo deny` covers it with the repository's `deny.toml`;
+  how a private crate with no `license` field passes the `licenses` check is measured in the plan (an unlicensed
+  fixture crate fails `licenses` without a deny config, measured).
 - Consequence the skill must handle: `cargo fmt --all`, `cargo clippy --workspace`, `cargo nextest --workspace` and
   `cargo deny` do not cover an excluded crate (measured for `fmt`, section 6), so the justfile has explicit recipe
   lines for `toolchain-tests/` in each of them, a gate test fails if one is missing, and `references/adapting.md`
@@ -222,9 +243,13 @@ meaning a workflow step whose `run:` line is that command, not a line that merel
 - **License-header gate:** applies to tracked `.rs`, `.sh`, `.ts`, `.js`, `.py`, `.ps1` files; handled by the `.tmpl`
   rule (section 4.1).
 - **Footprint cap:** the resident cost of every new `SKILL.md` frontmatter and every OpenCode command file's
-  frontmatter counts against a 500-byte per-change delta in `docs/footprints/budgets.json`, and growth that trips it
-  is never overridden (`shared/devtools/README.md`). The Bun skill's description is about 800 bytes, so the port's
-  must be much shorter. If it still trips the cap, that is the owner's decision. The short description still has to
+  frontmatter counts against a per-change delta (`deltaBytes` 500 for each `aiplugins-devtools` package in
+  `docs/footprints/budgets.json`), enforced by `scripts/check-footprint-budgets.sh`, and growth that trips it is
+  never overridden (`shared/devtools/README.md`). The four existing skills cost 2369 resident bytes in the Claude
+  Code and Antigravity packages and 2388 in the OpenCode one, about 590 bytes a skill, and the Bun skill's
+  description alone is about 800 bytes. So the new frontmatter, plus the command file's frontmatter on OpenCode,
+  must fit in 500 bytes; that is a requirement of this design, measured by `just footprint-regen` in the plan, and
+  the budget file itself is not edited to make room. The short description still has to
   name Rust and Cargo and the verbs that should trigger it (set up, bootstrap, harden hooks, CI, secret scanning),
   because it competes with the owner's Bun skill and with generic tooling skills for the same request.
 - **Cargo workspace:** the root `Cargo.toml` already excludes `shared/devtools`, so nothing under the skill folder
@@ -265,6 +290,15 @@ Each was measured or read on 2026-11-24 and is reproducible.
 - A directory holding both `justfile` and `Justfile` makes `just a` fail with "multiple candidate justfiles found".
 - With a global `core.hooksPath` set in a fake `HOME`, `lefthook install` exits 1 ("Custom hooks paths are not
   supported by default"); with `GIT_CONFIG_GLOBAL=/dev/null` it exits 0.
+- `JUST_DRY_RUN=true just check` exits 0 and prints the recipe without running it; `JUST_JUSTFILE=/dev/null` fails
+  closed ("justfile does not contain recipe"); a `just` call from an empty subdirectory still finds the parent's
+  justfile, so `working-directory` does not change the result.
+- `cargo deny --offline check bans licenses sources` on the nested crate with its `Cargo.lock` deleted regenerated the
+  lock and ran; it exited 4 because the fixture crate was `unlicensed`, not because of the missing lock.
+- `taiki-e/install-action`'s `manifests/` (read with `gh api`) contains `just`, `cargo-nextest`, `cargo-deny` and
+  `typos`, and neither `gitleaks` nor `lefthook`.
+- `docs/footprints/budgets.json`: `deltaBytes` 500 and `residentBytes` 2369, 2369 and 2388 for the claude-code,
+  antigravity and opencode devtools packages.
 - The Bun skill's hook jobs and recipe composition (section 4.2) were read in its `assets/template/lefthook.yml` and
   `justfile`.
 - The repository's gates and conventions named in section 5 were read in `scripts/check-license-headers.sh`,
@@ -312,3 +346,15 @@ clippy, nextest and deny lines, `fmt` measured (4.4); `justfile` against `Justfi
 global git config isolation in the test repositories, measured (4.4); "CI runs `just check`" defined as a run
 line, not a mention (4.4); seeded weakenings in the end-to-end script (4.5); hook jobs, recipe composition and
 toolchain pins specified (4.2); the description must name Rust and Cargo (5). Blindspot Auditor: no new findings.
+
+Round 1, agy escalation (nine findings, each measured or read before folding). FOLDED: clippy runs over the whole
+workspace when a `.rs` file is staged (4.2); a step-level `env:` that `just` reads, `JUST_DRY_RUN`, turns the CI gate
+into a green no-op, measured, and the gate tests now cover every workflow file (4.4); `toolchain-tests/` gets a
+generated and committed `Cargo.lock` and an ignored `target/` (4.4); the `CARGO_*` glob in the test environment is
+an explicit list (4.4); a CI install route for `gitleaks` and `lefthook`, which `taiki-e/install-action` does not
+list, measured (4.2); the footprint cap is a stated requirement with the measured numbers (5). REJECTED, each with
+its measurement: `working-directory` changing which justfile runs (an empty subdirectory still finds the parent's);
+`cargo deny` crashing without a lockfile (it regenerated the lock and failed `licenses` on the fixture, exit 4);
+"multi-minute" pre-push latency (a cold throwaway build is 1.3 to 1.4 s; folded as a plan-time measurement with a
+CI-only fallback); OpenCode passing too few arguments to `apply.sh` (the command only loads the skill, the agent
+finds the owner; folded as a wording fix). Nothing is discarded below the floor; nothing is unverified-accepted.
