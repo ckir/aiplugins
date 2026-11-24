@@ -114,6 +114,20 @@ rm -rf "$r3/src"
 out4=$(bash "$apply" "$r3" @someone 2>&1) || bad "apply.sh failed on a workspace"
 expect "a workspace root gets the exclude note" has_text 'root Cargo.toml is a workspace' <<<"$out4"
 
+# A first run whose lockfile could not be generated (offline, no cargo) must not leave the next run
+# to skip it because the manifest is by then identical to the template.
+r4="$work/lockretry"
+new_repo "$r4"
+shim="$work/shim"
+mkdir -p "$shim"
+printf '#!/bin/sh\nexit 101\n' > "$shim/cargo"
+chmod +x "$shim/cargo"
+refuse "a first run whose lock cannot be generated fails" env PATH="$shim:$PATH" bash "$apply" "$r4" @someone
+expect "the failed run left no lock" test ! -e "$r4/toolchain-tests/Cargo.lock"
+refuse "a second run with cargo still failing fails again" env PATH="$shim:$PATH" bash "$apply" "$r4" @someone
+bash "$apply" "$r4" @someone >/dev/null 2>&1 || bad "the run with a working cargo failed"
+expect "a run with a working cargo generates the missing lock" test -f "$r4/toolchain-tests/Cargo.lock"
+
 refuse "a missing directory is refused" bash "$apply" "$work/missing-dir" @someone
 refuse "an owner without @ is refused" bash "$apply" "$r1" someone
 refuse "an owner with sed syntax is refused" bash "$apply" "$r1" '@a|b'

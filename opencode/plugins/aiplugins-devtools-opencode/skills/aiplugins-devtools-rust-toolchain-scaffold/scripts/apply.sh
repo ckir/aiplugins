@@ -91,7 +91,11 @@ while IFS= read -r -d '' file; do
 done < <(find "$template" -type f -print0 | sort -z)
 
 lock_failed=0
-if printf '%s' "$copied" | grep -qx 'toolchain-tests/Cargo.toml'; then
+# Generate the lock whenever the scaffold's own toolchain-tests/Cargo.toml is there (copied now, or identical from an
+# earlier run) and no lock is: a first run that failed (offline, no cargo) must be retried by the next run, not skipped
+# because the manifest is by then "identical". A differing manifest is the user's own crate and is left alone.
+if printf '%s' "$copied$identical" | grep -qx 'toolchain-tests/Cargo.toml' \
+  && [ ! -e "$target/toolchain-tests/Cargo.lock" ] && [ ! -L "$target/toolchain-tests/Cargo.lock" ]; then
   if command -v cargo >/dev/null 2>&1; then
     # The lock is generated here, not shipped: a shipped one would be stale on arrival.
     (cd "$target" && cargo generate-lockfile --manifest-path toolchain-tests/Cargo.toml) || lock_failed=1
