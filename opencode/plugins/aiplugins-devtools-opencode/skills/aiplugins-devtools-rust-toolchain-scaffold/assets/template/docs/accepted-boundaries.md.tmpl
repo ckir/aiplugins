@@ -2,8 +2,8 @@
 
 Behaviours the tests deliberately do not cover, each accepted by the owner, with what compensates for
 it. A test audit does not re-raise these while the compensation still exists. Remove an entry when it
-is closed. The dates and names below are the scaffold's examples: keep only what you accept, and put
-your own name and date on it.
+is closed. The entries below are the scaffold's examples: edit them to match this repository, keep only
+what you accept, and add your own name and the date to each if you want that on record.
 
 ## Secret scan
 
@@ -25,7 +25,7 @@ your own name and date on it.
 - **A lefthook on `PATH` is trusted.** The hooks find `lefthook` on `PATH`, with `min_version` as a floor
   and `assert_lefthook_installed` as the fail-closed setting; a spoofed `PATH`, an older lefthook that
   does not know `min_version`, and a local deletion of `.lefthook/rc.sh` (which removes the unset of
-  `LEFTHOOK_BIN` and `LEFTHOOK_CONFIG`) are not blocked. Compensation: the same CI run. Anchor:
+  `LEFTHOOK_BIN`, `LEFTHOOK_CONFIG` and `LEFTHOOK_EXCLUDE`) are not blocked. Compensation: the same CI run. Anchor:
   `lefthook.yml`.
 - **Hooks are not installed until `just setup` runs, and a global `core.hooksPath` stops
   `lefthook install`.** Compensation: the same CI run. Anchor: `justfile`, recipe `setup`.
@@ -38,9 +38,16 @@ your own name and date on it.
 - **A config file that a tool reads automatically is not covered until it is added to
   `TOOLCHAIN_FILES` and the hook's glob.** Compensation: documented in the agent instructions file,
   section Tests. Anchor: `toolchain-tests/tests/common/mod.rs`, `TOOLCHAIN_FILES`.
+- **A tool configuration file that can switch a gate off is protected by review, not by a test.** That
+  covers `.gitleaks.toml`, `.gitleaksignore`, `rustfmt.toml`, `.rustfmt.toml`, `clippy.toml`,
+  `.clippy.toml`, `_typos.toml`, `.typos.toml`, `.cargo/` and `.config/`: a test cannot tell a legitimate
+  setting from one that disables the check. Compensation: CODEOWNERS routes each of them to the owner,
+  which takes effect only with branch protection requiring Code Owner review. Anchor:
+  `.github/CODEOWNERS`.
 - **The CI workflow is checked by reading it, not by running it.** Compensation: it runs on every pull
   request. Anchor: `toolchain-tests/tests/gate.rs`.
-- **Workflows other than `ci.yml` are checked only for a `JUST_*` env key and for a job named `check`.**
+- **Workflows other than `ci.yml` are checked only for an env key from the `JUST_`, `GITLEAKS_`, `LEFTHOOK`,
+  `HOOK_ARG_`, `NEXTEST_` and `TYPOS_` families and for a job named `check`.**
   Compensation: review of workflow changes through CODEOWNERS. Anchor: `toolchain-tests/tests/gate.rs`.
 - **Whether GitHub lets a same-named job in another workflow satisfy a required check is not tested.**
   Compensation: the shadowing rule forbids the collision. Anchor: `toolchain-tests/tests/gate.rs`.

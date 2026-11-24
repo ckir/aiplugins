@@ -14,7 +14,7 @@ An OpenCode plugin that ships five dev-tool skills:
   `LICENSE-ADDENDUM` template for extra terms. Bundles a wrapper script; needs `addlicense`.
 - `rust-toolchain-scaffold`, scaffolds a tested quality toolchain into a Rust repository: just
   recipes, lefthook hooks, rustfmt, clippy, nextest, cargo-deny, typos, gitleaks, SHA-pinned CI and
-  CODEOWNERS, plus tests that prove each gate blocks. Its checks need `just`, `lefthook` and `gitleaks`.
+  CODEOWNERS, plus tests that prove each gate blocks. Its checks need `just`, `lefthook`, `gitleaks`, `cargo-nextest`, `cargo-deny` and `typos`.
 
 Slash commands: `/spec-panel-review <path>`, `/human-friendly <path>`, `/license-headers <request>` and `/rust-toolchain-scaffold <request>` (command files; see Invocation).
 It carries only skills: no plugin code, no hooks, no MCP servers, no binaries.

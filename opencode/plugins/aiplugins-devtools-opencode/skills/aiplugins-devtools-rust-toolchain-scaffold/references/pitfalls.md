@@ -20,10 +20,11 @@ tidy-up does not reopen one.
   checks the installed version against the floor in `lefthook.yml` before it installs anything. The
   floor is written once, in `lefthook.yml`; the recipe reads it and a gate test fails if the recipe
   writes a number of its own.
-- **`LEFTHOOK_BIN` and `LEFTHOOK_CONFIG` override everything.** The first picks the binary ahead of
-  `PATH`, the second swaps the configuration for any file, including one that does not exist, and
-  either one set in the caller's environment turns the hooks into a no-op that exits 0. `rc.sh` runs
-  `unset LEFTHOOK_BIN LEFTHOOK_CONFIG`, and the generated hook sources it before it reads either.
+- **`LEFTHOOK_BIN`, `LEFTHOOK_CONFIG` and `LEFTHOOK_EXCLUDE` override everything.** The first picks the
+  binary ahead of `PATH`, the second swaps the configuration for any file, including one that does not
+  exist, and the third skips the named hook jobs; any of them set in the caller's environment turns
+  the hooks into a no-op that exits 0. `rc.sh` runs `unset LEFTHOOK_BIN LEFTHOOK_CONFIG
+  LEFTHOOK_EXCLUDE`, and the generated hook sources it before it reads any of them.
   Deleting `rc.sh` locally removes that protection (an accepted boundary: CI is the gate).
 - **A missing-runner test passes for the wrong reason unless it installs from a copy.** The generated
   hook remembers the path lefthook was installed from and tries it after `PATH`. The test installs
@@ -39,8 +40,8 @@ tidy-up does not reopen one.
 - **A tracked `lefthook-local.yml` overrides `lefthook.yml` for everyone**; a gate test forbids
   tracking one.
 - **A global `core.hooksPath` makes `lefthook install` refuse.** That is lefthook's own rule. The
-  tests set `GIT_CONFIG_GLOBAL` to an empty file, because stripping `GIT_*` variables does not isolate
-  git's config files.
+  tests set `GIT_CONFIG_GLOBAL` to an empty file and `GIT_CONFIG_NOSYSTEM=1`, because stripping
+  `GIT_*` variables does not isolate git's config files.
 
 ## The commit message check (`just secrets-message`)
 
@@ -95,21 +96,31 @@ common directory. Each clause has a test or a comment:
   spell check or secret scan, so the tests assemble both at run time.
 - CODEOWNERS is evaluated last-match-wins, like GitHub: a trailing `*` line would take every
   protected file away from its entry. The matcher handles `**` matching zero directories.
-- **The workflow rules are tiered.** In every workflow file: no `env:` key starting with `JUST_` (the
-  variables `just` itself reads: `JUST_DRY_RUN=true` makes `just check` print the recipe and exit 0
-  without running it), and no job named `check`, so a second workflow cannot report green under the
+- **The workflow rules are tiered.** In every workflow file: no `env:` key, at workflow, job or step
+  level, from the tool-configuration families `JUST_`, `GITLEAKS_`, `LEFTHOOK`, `HOOK_ARG_`, `NEXTEST_` and `TYPOS_` (the variables the gate's tools read: `JUST_DRY_RUN=true` makes `just check`
+  print the recipe and exit 0 without running it, and `GITLEAKS_CONFIG_TOML` with an empty rule set
+  makes the secret scan pass on a committed token; `RUSTFLAGS`, `CARGO_*` and `RUSTUP_*` are not on the
+  list because CI legitimately sets them), and no job named `check`, so a second workflow cannot report green under the
   gate's name. In `ci.yml` only: read-only permissions, actions pinned to a 40-hex SHA, the default
   shell, no `continue-on-error`, `if`, `container`, `services`, `||` or `set +`, and a step whose
-  `run:` line is exactly `just check`. Release and docs workflows with write permissions pass
-  unchanged.
+  `run:` line is exactly `just check` (the SHA, `if`, `continue-on-error`, `||` and `set +` rules read
+  the steps of every job in `ci.yml`; the `just check` rule reads the `check` job). Release and docs
+  workflows with write permissions pass unchanged.
+- **Tool configuration files that switch a gate off are protected by CODEOWNERS, not by a test.** An
+  empty `.gitleaks.toml` makes `gitleaks git` exit 0 on a committed token, `rustfmt.toml` with
+  `disable_all_formatting = true` makes the format check pass on unformatted code, and a
+  `.config/nextest.toml` with `default-filter = "none()"` makes nextest pass with a failing test. The
+  scaffold's CODEOWNERS lists these paths (and `clippy.toml`, `_typos.toml`, `.typos.toml`, `.cargo/`,
+  `.gitleaksignore`), with a test that each has an owner; whether a given setting is legitimate is a
+  review decision.
 - A `justfile` and a `Justfile` side by side make `just` fail with "multiple candidate justfiles", and
   `just` accepts the name in any case. `apply.sh` treats any spelling as present.
 
 ## Still open, by design
 
 - Hooks check the working tree, not the exact commit, and `--no-verify` skips them.
-- `JUST_DRY_RUN=true`, or a shell function named `cd`, in a developer's shell defeats the local
-  commit-msg check. CI is unaffected.
+- `JUST_DRY_RUN=true` in a developer's shell defeats every local hook, because each calls `just`; a
+  shell function named `cd` defeats the local commit-msg check. CI is unaffected.
 - Whether GitHub lets a same-named job in another workflow satisfy a required check is not tested.
 - The tests that build a `PATH` without lefthook use symbolic links and run on Unix only.
 - Windows and macOS are covered by the end-to-end job in the repository that ships this skill, not

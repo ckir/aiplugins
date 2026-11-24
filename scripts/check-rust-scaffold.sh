@@ -149,6 +149,15 @@ if [ -f "$skill/SKILL.md" ]; then
     done < <(grep -oE '`(assets|references|scripts)/[^`]*`' "$skill/SKILL.md" | tr -d '`' | sort -u)
 fi
 
+# The same for the references/ files, which the SKILL.md sends the agent to read.
+for doc in "$skill"/references/*.md; do
+    [ -f "$doc" ] || continue
+    # shellcheck disable=SC2016  # the backticks are literal markdown, not a command
+    while IFS= read -r ref; do
+        [ -e "$skill/$ref" ] || bad "$doc: dangling reference $ref"
+    done < <(grep -oE '`(assets|references|scripts)/[^`]*`' "$doc" | tr -d '`' | sort -u)
+done
+
 # --- the templates ---
 while IFS= read -r f; do
     case "$f" in

@@ -31,7 +31,7 @@ Intent: a new skill `rust-toolchain-scaffold` in the `aiplugins-devtools` plugin
 5. **License of generated files:** no header. The files the scaffold writes belong to the repository they are written
    into. The skill's own text stays under the plugin license (PolyForm-Noncommercial-1.0.0).
 6. **Workflow scope of the gate tests:** tiered. Every workflow file is checked for the two rules that stop a second
-   workflow defeating the gate (no `JUST_*` env key `just` reads; no job named like the gate job). The strict rules
+   workflow defeating the gate (no `env:` key from the tool-configuration families `JUST_`, `GITLEAKS_`, `LEFTHOOK`, `HOOK_ARG_`, `NEXTEST_` and `TYPOS_`; no job named like the gate job). The strict rules
    (read-only permissions, SHA pins, default shell, no `if`, runs `just check`) apply to `ci.yml` only. Agy and the
    driver both recommended it, after agy's walk of this repository found that a strict-everywhere rule fails on its
    other workflows (measured in section 4.4); the owner chose it on 2026-11-24. The Bun skill's strict-everywhere rule and an exemption file were not
@@ -134,7 +134,7 @@ the pinned values as written and `SKILL.md` tells the agent to resolve them fres
 
 Machine prerequisites: `just`, `cargo`, `lefthook`, `gitleaks`, `git`. `cargo-nextest`, `cargo-deny` and
 `typos-cli` come from `cargo binstall`. `lefthook` and `gitleaks` have no cargo route (measured, section 6), so
-`just setup` and the README snippet give a per-OS install command for each. For CI, `taiki-e/install-action` (which
+`just setup` points to the README (Development) for the per-OS install commands rather than printing them, and the README snippet gives one for each. For CI, `taiki-e/install-action` (which
 this repository's CI already uses) lists `just`, `cargo-nextest`, `cargo-deny` and `typos` in its `manifests/` but
 neither `gitleaks` nor `lefthook` (measured), so those two need a pinned release download with a checksum check or an
 OS package manager. The scaffold's own `ci.yml` (Ubuntu only) uses a pinned download with a checksum check, built and linted with
@@ -157,7 +157,7 @@ lefthook from `PATH`, hardened:
 
 - `lefthook.yml` sets `min_version` (a floor), `assert_lefthook_installed: true` and `rc: .lefthook/rc.sh`. It does
   not set the `lefthook:` pin, because a Rust repository has no `node_modules` to pin into.
-- `.lefthook/rc.sh` exports `HOOK_ARG_1` from `$1` and runs `unset LEFTHOOK_BIN LEFTHOOK_CONFIG`. `lefthook.yml`
+- `.lefthook/rc.sh` exports `HOOK_ARG_1` from `$1` and runs `unset LEFTHOOK_BIN LEFTHOOK_CONFIG LEFTHOOK_EXCLUDE` (the third skips named hook jobs: `internal/config/loader.go:494` at v2.1.17). `lefthook.yml`
   never uses `{0}`, `{1}` and so on: the generated hook pastes them into `sh -c` unescaped (Bun skill
   `references/pitfalls.md`).
 - `just setup` checks that `lefthook` is on `PATH` and at or above the floor before it runs `lefthook install`,
@@ -175,7 +175,7 @@ Failure matrix. Every row blocks or is a documented accepted boundary; none sile
 | Runner missing | Blocks (exit 1) | toolchain test: install from a copy, delete the copy, strip `PATH` |
 | Runner missing, `assert_lefthook_installed` removed | Silent pass | gate test pins the setting |
 | Runner too old | Blocks, with "required lefthook version (X) is higher than current (Y)" | toolchain test with an impossible `min_version`; `just setup` stub test |
-| `LEFTHOOK_BIN` or `LEFTHOOK_CONFIG` set in the environment | Blocks with `rc.sh`; silent pass without it | toolchain test both ways; gate test pins `rc.sh` and the `unset` line |
+| `LEFTHOOK_BIN`, `LEFTHOOK_CONFIG` or `LEFTHOOK_EXCLUDE` set in the environment | Blocks with `rc.sh`; silent pass without it | toolchain test both ways; gate test pins `rc.sh` and the `unset` line |
 | Setup never run, `--no-verify`, `LEFTHOOK=0`, `PATH` spoofing, local deletion of `rc.sh` | Accepted boundary | `docs/accepted-boundaries.md`; CI is the authoritative gate |
 | Windows Git Bash, macOS | Unverified until the end-to-end CI job (section 4.5) runs | that job |
 
@@ -194,21 +194,24 @@ The tests live in `toolchain-tests/`, an excluded standalone crate: its `Cargo.t
 the target's root `Cargo.toml` and `Cargo.lock` untouched (measured, section 6) and lets the tests use a YAML crate
 (`yaml-rust2`), which a std-only Rust test cannot.
 
-- `gate` tests (fast: 26 tests ran in 0.107 s against a scaffolded repository, one run) read the workflow, CODEOWNERS, `deny.toml`, `typos.toml`, `lefthook.yml`,
+- `gate` tests (fast: 26 tests ran in 0.107 s against a scaffolded repository, one run) read the workflow, CODEOWNERS, `deny.toml`, `lefthook.yml`,
   `.gitattributes` and the justfile. The workflow rules are tiered (decision 6, section 2). In EVERY file under
-  `.github/workflows/`: no `env:` key at workflow, job or step level whose name starts with `JUST_` (`just` reads
-  only those, 39 of them today per `just --help`, and a prefix rule also covers one a later release adds;
-  `JUST_DRY_RUN` makes `just check` exit 0 without running anything, measured; the CI tool pins are named `TOOL_*`
-  for this reason), and no
+  `.github/workflows/`: no `env:` key at workflow, job or step level whose name starts with one of the
+  tool-configuration families `JUST_`, `GITLEAKS_`, `LEFTHOOK`, `HOOK_ARG_`, `NEXTEST_` and `TYPOS_` (each tool reads only its own prefix, and a prefix rule also covers a
+  variable a later release adds; `just` has 39 `JUST_*` variables today per `just --help`; `JUST_DRY_RUN` makes
+  `just check` exit 0 without running anything, and `GITLEAKS_CONFIG_TOML` with an empty rule set makes the secret
+  scan exit 0 on a committed token, both measured; the CI tool pins are named `TOOL_*` for this reason; `RUSTFLAGS`,
+  `CARGO_*` and `RUSTUP_*` are not listed because CI legitimately sets them), and no
   job id or `name:` equal to the gate job's, so a second workflow cannot present a green check under the gate's
   name. In `ci.yml` ONLY: actions pinned to a 40-hex SHA, read-only permissions, the default shell, no
-  `continue-on-error`, `if`, `container`, `services`, `||` or `set +` in a workflow script, and CI runs `just check`,
+  `continue-on-error`, `if`, `container`, `services`, `||` or `set +` in a workflow script (the SHA, `if`,
+  `continue-on-error`, `||` and `set +` rules read the steps of every job), and CI runs `just check`,
   meaning a workflow step whose `run:` line is that command, not a line that merely mentions it (the same rule
   `scripts/check-gate-wiring.sh` applies in this repository, so an `echo "just check"` does not pass). Release,
   docs and other workflows are otherwise untested: measured on this repository, 10 of its 13 workflows have write
   permissions and 11 use `if:`, so a rule over every workflow would fail the first Rust repository with a release
   workflow. `references/adapting.md` advises pinning actions in those workflows too, as advice and not as a test;
-  CODEOWNERS is evaluated last-match-wins like GitHub and covers the protected files; the lefthook settings of
+  CODEOWNERS is evaluated last-match-wins like GitHub and covers the protected files, including the tool configuration files that can switch a gate off (`.gitleaks.toml`, `.gitleaksignore`, `rustfmt.toml`, `.rustfmt.toml`, `clippy.toml`, `.clippy.toml`, `_typos.toml`, `.typos.toml`, `.cargo/`, `.config/`; measured: an empty `.gitleaks.toml` makes `gitleaks git` exit 0 on a committed token), which are protected by review, not by a test, and listed in `docs/accepted-boundaries.md`; the lefthook settings of
   section 4.3; no tracked `lefthook-local.yml`; the recipes the tests name exist. They run inside `just test`, so a
   pull request that downgrades CI still runs them.
 - `toolchain` tests (slow) build throwaway git repositories and prove each gate blocks: pre-commit rejects
@@ -251,12 +254,15 @@ the target's root `Cargo.toml` and `Cargo.lock` untouched (measured, section 6) 
 
 1. `scripts/check-rust-scaffold.sh`: a cheap static gate in the style of `scripts/check-devtools-skills.sh`, with a
    `--mutation-test` that applies one defect at a time to a throwaway copy and requires the gate to fail with the
-   message naming it. It checks that every file under `assets/template/` ends in `.tmpl`, that `apply.sh` covers
-   every template and refuses to overwrite (including a `justfile` when `Justfile` or `.justfile` already exists:
-   `just` fails with "multiple candidate justfiles" when two spellings coexist, measured, and this repository uses
-   `Justfile`), that every file the `SKILL.md` and references name exists, that the
-   template workflow's action pins are 40-hex SHAs, and that the `SKILL.md` frontmatter name matches its folder.
-   It is wired into `just check` and CI, as `scripts/check-gate-wiring.sh` requires of every `check-*.sh`.
+   message naming it. It checks structure only: that every file under `assets/template/` ends in `.tmpl`, that the
+   required templates and `apply.sh` exist, that every file the `SKILL.md` and the `references/*.md` files name
+   exists, that the template workflow's action pins are 40-hex SHAs, that the test crate stays private with its own
+   `[workspace]` table, and that the `SKILL.md` frontmatter name matches its folder. It does not run `apply.sh`:
+   that `apply.sh` copies every template and refuses to overwrite (including a `justfile` when `Justfile` or
+   `.justfile` already exists: `just` fails with "multiple candidate justfiles" when two spellings coexist,
+   measured, and this repository uses `Justfile`) is proven by the end-to-end test (`just test-rust-scaffold`, and
+   the CI job `rust-scaffold`), not by the static gate. The static gate is wired into `just check` and CI, as
+   `scripts/check-gate-wiring.sh` requires of every `check-*.sh`.
 2. `scripts/test-rust-scaffold.sh`: the end-to-end test, run by a new CI job on ubuntu, windows and macos. It applies
    the scaffold to a throwaway single-crate repository and to a workspace repository, then runs the scaffolded
    `just check` and the toolchain suite in each. A passing scaffold proves little on its own, because the templates
@@ -371,6 +377,16 @@ Each was measured or read on 2026-11-24 and is reproducible.
 - Whether GitHub lets a same-named job in a second workflow satisfy a required status check. The tiered rule in
   section 4.4 forbids the collision as a precaution; whether the collision is exploitable needs a throwaway GitHub
   repository with a required check, which cannot be done from this machine.
+- First-run watch list. These are hypotheses, not findings, until the first three-OS run of the end-to-end job
+  (section 4.5) shows or refutes them. Windows first:
+  - `just` may pick WSL's `bash.exe` from System32 instead of Git Bash for `set shell := ["bash", ...]`.
+  - The `EXIT` trap's `rm -rf` of a working directory the script is still inside.
+  - `go env GOPATH` printing mixed separators when it is written to `GITHUB_PATH`.
+  - The `secrets-message` path comparison when the temp directory has an 8.3 short name.
+  - The extension-less `#!/bin/sh` `LEFTHOOK_BIN` stub.
+  - lefthook v2.1.17 declares go 1.26.6, so an older preinstalled Go downloads a toolchain.
+  - macOS: `go` presence and version; `\s` under BSD `grep`; `sort -V` in `just setup`; a symlinked tool
+    directory; bash 3.2.
 
 ## 8. Plan discipline
 

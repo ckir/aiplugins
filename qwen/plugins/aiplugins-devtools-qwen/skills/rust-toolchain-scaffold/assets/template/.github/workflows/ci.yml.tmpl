@@ -14,7 +14,8 @@ permissions:
 # Actions are pinned to a commit, with the release it corresponds to in a
 # comment, because a tag can be moved. The Rust toolchain comes from
 # rust-toolchain.toml. The names start with TOOL_ on purpose: the gate tests
-# reject any env key starting with JUST_, which `just` itself reads.
+# reject any env key starting with JUST_, GITLEAKS_, LEFTHOOK, HOOK_ARG_,
+# NEXTEST_ or TYPOS_, which the tools of the gate read.
 env:
   TOOL_LEFTHOOK_VERSION: 2.1.17
   TOOL_GITLEAKS_VERSION: 8.30.1

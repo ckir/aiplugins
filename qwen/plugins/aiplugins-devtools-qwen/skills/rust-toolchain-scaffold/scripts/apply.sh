@@ -38,6 +38,12 @@ template="$here/../assets/template"
 target="$(cd -- "$target" && pwd -P)"
 git -C "$target" rev-parse --git-dir >/dev/null 2>&1 || {
   echo "apply.sh: $target is not a git repository (run git init first)" >&2; exit 2; }
+# The files belong at the top of the repository: hooks, CODEOWNERS and workflows are read from
+# there only. Going through cd and pwd -P puts both paths in one spelling (on Windows git prints
+# C:/x where bash prints /c/x).
+toplevel="$(cd -- "$(git -C "$target" rev-parse --show-toplevel)" && pwd -P)"
+[ "$toplevel" = "$target" ] || {
+  echo "apply.sh: $target is inside the repository at $toplevel, not its top level; run it on $toplevel" >&2; exit 2; }
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -54,10 +60,12 @@ while IFS= read -r -d '' file; do
   esac
   dest="${rel%.tmpl}"
   rendered="$tmp/rendered"
+  # The file is reused for every template; a read-only one left by the last round would refuse the next write.
+  rm -f -- "$rendered"
   if [ "$dest" = ".github/CODEOWNERS" ]; then
     sed "s|@OWNER|$owner|g" "$file" > "$rendered"
   else
-    cp -p -- "$file" "$rendered"
+    cp -- "$file" "$rendered"
   fi
 
   existing="$target/$dest"
@@ -65,7 +73,8 @@ while IFS= read -r -d '' file; do
     existing="$existing_justfile"
     dest="${existing#"$target"/}"
   fi
-  if [ -e "$existing" ]; then
+  # A dangling symlink is not -e but is something at the destination: never write through it.
+  if [ -e "$existing" ] || [ -L "$existing" ]; then
     if cmp -s -- "$rendered" "$existing"; then
       identical="$identical$dest"$'\n'
     else
@@ -74,7 +83,9 @@ while IFS= read -r -d '' file; do
     continue
   fi
   mkdir -p -- "$(dirname -- "$target/$dest")"
-  cp -p -- "$rendered" "$target/$dest"
+  cp -- "$rendered" "$target/$dest"
+  # A template installed read-only (a read-only skill directory) must not make the copy read-only.
+  chmod u+w -- "$target/$dest"
   copied="$copied$dest"$'\n'
 done < <(find "$template" -type f -print0 | sort -z)
 
@@ -119,8 +130,8 @@ if [ -n "$existing_justfile" ]; then
 fi
 others="$(find "$target/.github/workflows" -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) ! -name ci.yml 2>/dev/null | sort || true)"
 if [ -n "$others" ]; then
-  echo "NOTE: other workflow files exist. The gate tests check every one of them for a JUST_* env key and for a job"
-  echo "      named like the gate job (check):"
+  echo "NOTE: other workflow files exist. The gate tests check every one of them for an env key from the"
+  echo "      JUST_, GITLEAKS_, LEFTHOOK, HOOK_ARG_, NEXTEST_ and TYPOS_ families and for a job named like the gate job (check):"
   printf '%s\n' "$others" | sed "s|^$target/|  |"
 fi
 [ "$lock_failed" -eq 0 ] || exit 1

@@ -367,7 +367,8 @@ pub fn fake_token() -> String {
         hasher.write_u64(counter);
         counter += 1;
         for byte in hasher.finish().to_le_bytes() {
-            // Six bits of each byte give a number from 0 to 63, an even draw from 64 characters.
+            // Six bits of each byte give a number from 0 to 63. The alphabet has 62
+            // characters, so 62 and 63 find nothing and are skipped: the draw stays even.
             if let Some(character) = ALPHABET.get(usize::from(byte & 63)) {
                 if body.len() < 36 {
                     body.push(char::from(*character));

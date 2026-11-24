@@ -28,7 +28,7 @@ mode=${1:-}
 [ -z "$mode" ] || [ "$mode" = "--quick" ] || { echo "usage: $0 [--quick]" >&2; exit 2; }
 
 work=$(mktemp -d)
-trap 'rm -rf "$work"' EXIT
+trap 'cd /; rm -rf "$work"' EXIT
 fail=0
 bad() { echo "  FAIL  $1" >&2; fail=1; }
 ok() { echo "  ok    $1"; }
@@ -140,7 +140,7 @@ gates() {
   if in_dir "$dir" just check >"$work/check.out" 2>&1; then
     ok "$label: just check passes on the scaffolded repository"
   else
-    tail -40 "$work/check.out" >&2
+    cat "$work/check.out" >&2
     bad "$label: just check failed on the scaffolded repository"
   fi
 }
@@ -162,7 +162,7 @@ weaken() {
   "$change"
   if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then bad "weakening '$name' changed nothing"; return; fi
   out=$(gate)
-  if printf '%s\n' "$out" | grep -E "^\s+FAIL .*$want" >/dev/null; then ok "$name -> $want fails"; else bad "$name: $want did not fail"; fi
+  if printf '%s\n' "$out" | grep -E "^[[:space:]]+FAIL .*$want" >/dev/null; then ok "$name -> $want fails"; else bad "$name: $want did not fail"; fi
 }
 # dropline <pattern> <file>: delete every line matching the pattern.
 dropline() { grep -v -- "$1" "$2" > "$2.tmp" && mv "$2.tmp" "$2"; }

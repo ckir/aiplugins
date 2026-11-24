@@ -72,8 +72,8 @@ hand against `assets/template/`, keeping the user's content, and keep what the t
   `test`, `test-toolchain` and `deny` must name `toolchain-tests/Cargo.toml`.
 - If the root `Cargo.toml` is a workspace whose `members` glob could match `toolchain-tests`,
   add it to `exclude`, or cargo fails with "multiple workspace roots".
-- Other workflows may stay as they are. The tests check every workflow only for a `JUST_*`
-  env key and for a job named `check`; the strict rules apply to `ci.yml`.
+- Other workflows may stay as they are. The tests check every workflow only for an `env:` key
+  from the tool-configuration families `JUST_`, `GITLEAKS_`, `LEFTHOOK`, `HOOK_ARG_`, `NEXTEST_` and `TYPOS_`, and for a job named `check`; the strict rules apply to `ci.yml`.
 
 ### 3. Dependencies and versions
 
@@ -92,8 +92,8 @@ The templates carry the versions from when the skill was written. Bring them up 
   `assets/snippets/agent-instructions.md` under the project's own heading.
 - `README.md`: add `assets/snippets/README.development.md`.
 - `docs/accepted-boundaries.md`: these are limits a previous owner accepted. Show the list to
-  this user and keep only what they accept; the dates and "(owner, ...)" notes in the template
-  are not theirs.
+  this user and keep only what they accept; the entries are the scaffold's examples, so edit
+  them to match this repository.
 
 ### 5. Prove it works here
 

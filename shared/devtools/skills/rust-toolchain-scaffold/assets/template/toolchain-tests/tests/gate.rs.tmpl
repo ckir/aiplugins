@@ -36,6 +36,18 @@ fn steps(workflow: &Yaml) -> Vec<&Yaml> {
         .collect()
 }
 
+/// The steps of every job, in file order. The strict checks read these, so a job
+/// added to ci.yml later cannot carry an unpinned action or a swallowed failure.
+fn all_steps(workflow: &Yaml) -> Vec<&Yaml> {
+    workflow["jobs"]
+        .as_hash()
+        .expect("ci.yml has jobs")
+        .values()
+        .filter_map(|job| job["steps"].as_vec())
+        .flatten()
+        .collect()
+}
+
 fn step_using<'a>(all: &[&'a Yaml], action: &str) -> &'a Yaml {
     let prefix = format!("{action}@");
     all.iter()
@@ -159,7 +171,7 @@ fn ci_runs_the_full_gate_not_the_fast_one() {
 fn ci_pins_every_action_to_a_full_commit_sha() {
     // A version tag can be moved to different code; a commit SHA cannot.
     let workflow = ci();
-    let used: Vec<&str> = steps(&workflow)
+    let used: Vec<&str> = all_steps(&workflow)
         .iter()
         .filter_map(|step| step["uses"].as_str())
         .collect();
@@ -246,7 +258,7 @@ fn nothing_in_the_ci_job_lets_a_failing_step_pass_or_be_skipped() {
     }
     assert!(workflow["jobs"]["check"]["continue-on-error"].is_badvalue());
     assert!(workflow["jobs"]["check"]["if"].is_badvalue());
-    for step in steps(&workflow) {
+    for step in all_steps(&workflow) {
         for key in ["continue-on-error", "if", "shell"] {
             assert!(step[key].is_badvalue(), "a step sets `{key}`: {step:?}");
         }
@@ -270,8 +282,7 @@ fn no_ci_script_swallows_a_failing_command() {
     // download through. No script here needs `||` or `set +...` at all; a future
     // one that does should change this test.
     let workflow = ci();
-    let all = steps(&workflow);
-    for step in &all {
+    for step in &all_steps(&workflow) {
         let text = script(step);
         assert!(!text.contains("||"), "a script contains ||: {text}");
         assert!(!text.contains("set +"), "a script contains `set +`: {text}");
@@ -280,6 +291,7 @@ fn no_ci_script_swallows_a_failing_command() {
             "a script contains `; true`: {text}"
         );
     }
+    let all = steps(&workflow);
     for name in ["Install lefthook", "Install gitleaks"] {
         let checks: Vec<&str> = script(step_named(&all, name))
             .lines()
@@ -305,16 +317,31 @@ fn no_ci_script_swallows_a_failing_command() {
 #[test]
 fn no_workflow_sets_an_env_key_that_just_reads() {
     // `JUST_DRY_RUN=true` makes `just check` print the recipe and exit 0 without
-    // running it, which would turn the gate into a green no-op. The rule is every
-    // key starting with JUST_ (just reads only those), so a variable added to a
-    // future just release is covered too. The pins in ci.yml are TOOL_*.
+    // running it, and `GITLEAKS_CONFIG_TOML` with an empty rule set makes the
+    // secret scan exit 0 on a committed token: either turns the gate into a green
+    // no-op. The rule is every key starting with one of the prefixes below (each
+    // tool reads only its own), so a variable added to a future release is covered
+    // too. The pins in ci.yml are TOOL_*. These six are the tool-configuration
+    // families the gate's tools read; RUSTFLAGS, CARGO_* and RUSTUP_* are not
+    // listed because CI legitimately sets them.
+    const SWITCH_OFF_PREFIXES: &[&str] = &[
+        "JUST_",
+        "GITLEAKS_",
+        "LEFTHOOK",
+        "HOOK_ARG_",
+        "NEXTEST_",
+        "TYPOS_",
+    ];
     for (file, workflow) in workflows() {
         let mut keys = Vec::new();
         env_keys(&workflow, &mut keys);
         for key in keys {
+            let upper = key.to_ascii_uppercase();
             assert!(
-                !key.to_ascii_uppercase().starts_with("JUST_"),
-                "{file} sets env {key}"
+                !SWITCH_OFF_PREFIXES
+                    .iter()
+                    .any(|prefix| upper.starts_with(prefix)),
+                "{file} sets env {key}, a tool-configuration variable that can switch a gate off"
             );
         }
     }
@@ -425,6 +452,16 @@ fn the_ci_workflow_the_recipes_the_hooks_the_tool_settings_their_tests_and_codeo
         "/deny.toml",
         "/typos.toml",
         "/.gitattributes",
+        "/.gitleaks.toml",
+        "/.gitleaksignore",
+        "/rustfmt.toml",
+        "/.rustfmt.toml",
+        "/clippy.toml",
+        "/.clippy.toml",
+        "/_typos.toml",
+        "/.typos.toml",
+        "/.cargo/",
+        "/.config/",
     ] {
         let owners = owned
             .get(path)
@@ -463,6 +500,16 @@ fn no_later_codeowners_rule_takes_a_protected_file_away_from_its_entry() {
         ("deny.toml", "/deny.toml"),
         ("typos.toml", "/typos.toml"),
         (".gitattributes", "/.gitattributes"),
+        (".gitleaks.toml", "/.gitleaks.toml"),
+        (".gitleaksignore", "/.gitleaksignore"),
+        ("rustfmt.toml", "/rustfmt.toml"),
+        (".rustfmt.toml", "/.rustfmt.toml"),
+        ("clippy.toml", "/clippy.toml"),
+        (".clippy.toml", "/.clippy.toml"),
+        ("_typos.toml", "/_typos.toml"),
+        (".typos.toml", "/.typos.toml"),
+        (".cargo/config.toml", "/.cargo/"),
+        (".config/nextest.toml", "/.config/"),
     ] {
         let decided_by = rules.iter().rfind(|rule| owns(rule, file));
         assert_eq!(
@@ -606,7 +653,7 @@ fn the_rc_file_exports_the_hook_argument_and_drops_the_override_variables() {
     let lines: Vec<&str> = rc.lines().map(str::trim).collect();
     assert!(lines.contains(&"HOOK_ARG_1=\"${1:-}\""));
     assert!(lines.contains(&"export HOOK_ARG_1"));
-    assert!(lines.contains(&"unset LEFTHOOK_BIN LEFTHOOK_CONFIG"));
+    assert!(lines.contains(&"unset LEFTHOOK_BIN LEFTHOOK_CONFIG LEFTHOOK_EXCLUDE"));
 }
 
 #[test]

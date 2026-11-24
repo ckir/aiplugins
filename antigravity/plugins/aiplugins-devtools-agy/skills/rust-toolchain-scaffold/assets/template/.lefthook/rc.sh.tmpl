@@ -10,7 +10,8 @@
 HOOK_ARG_1="${1:-}"
 export HOOK_ARG_1
 
-# lefthook lets these two override which binary and which configuration it
-# uses, ahead of anything in this repository. A value left in the caller's
-# environment would swap the hooks for a no-op, so drop both here.
-unset LEFTHOOK_BIN LEFTHOOK_CONFIG
+# lefthook lets these three override which binary and which configuration it
+# uses, and which hook jobs it skips, ahead of anything in this repository. A
+# value left in the caller's environment would swap the hooks for a no-op or
+# skip the jobs by name, so drop all three here.
+unset LEFTHOOK_BIN LEFTHOOK_CONFIG LEFTHOOK_EXCLUDE

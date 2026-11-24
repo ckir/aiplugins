@@ -14,7 +14,7 @@ A Claude Code plugin that ships five dev-tool skills:
   `LICENSE-ADDENDUM` template for extra terms. Bundles a wrapper script; needs `addlicense`.
 - `rust-toolchain-scaffold`, scaffolds a tested quality toolchain into a Rust repository: just
   recipes, lefthook hooks, rustfmt, clippy, nextest, cargo-deny, typos, gitleaks, SHA-pinned CI and
-  CODEOWNERS, plus tests that prove each gate blocks. Its checks need `just`, `lefthook` and `gitleaks`.
+  CODEOWNERS, plus tests that prove each gate blocks. Its checks need `just`, `lefthook`, `gitleaks`, `cargo-nextest`, `cargo-deny` and `typos`.
 
 Slash commands: `/aiplugins-devtools:spec-panel-review <path>`, `/aiplugins-devtools:human-friendly <path>` and `/aiplugins-devtools:rust-toolchain-scaffold <request>`.
 

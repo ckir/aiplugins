@@ -307,6 +307,7 @@ jobs:
   rust-scaffold:
     name: Rust scaffold (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
