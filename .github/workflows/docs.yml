@@ -16,10 +16,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  # Build and upload in one job, deploy in the next. Uploading and deploying as
+  # consecutive steps of one job let deploy-pages look the artifact up about 300 ms
+  # after it was finalized and find none ("Found 0 artifact(s)"), and re-running that
+  # job cannot recover, because it uploads a second "github-pages" artifact to the same
+  # run ("Artifact count is 2"). Tracked upstream: actions/deploy-pages#451.
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -54,7 +56,14 @@ jobs:
           retention-days: 1
           # Upload the staged site: storefront at the root, rustdoc beside it
           path: 'target/site'
-          
+
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
