@@ -16,11 +16,11 @@
   "antigravity/plugins/repo-tasks-mcp-agy": "0.3.0",
   "opencode/plugins/opencode-ctl-mcp-opencode": "0.2.1",
   "opencode/plugins/repo-tasks-mcp-opencode": "0.2.0",
-  "claude-code/plugins/aiplugins-devtools-cc": "0.4.0",
+  "claude-code/plugins/aiplugins-devtools-cc": "0.5.0",
   "claude-code/plugins/repo-user-guide-cc": "0.2.0",
-  "qwen/plugins/aiplugins-devtools-qwen": "0.4.0",
-  "opencode/plugins/aiplugins-devtools-opencode": "0.5.0",
+  "qwen/plugins/aiplugins-devtools-qwen": "0.5.0",
+  "opencode/plugins/aiplugins-devtools-opencode": "0.6.0",
   "opencode/plugins/repo-user-guide-opencode": "0.3.0",
-  "antigravity/plugins/aiplugins-devtools-agy": "0.5.0",
+  "antigravity/plugins/aiplugins-devtools-agy": "0.6.0",
   "antigravity/plugins/repo-user-guide-agy": "0.4.0"
 }
