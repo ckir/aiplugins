@@ -181,7 +181,8 @@ gates "$r3" "workspace"
 cd "$r1"
 
 echo "== seeded weakenings: the gate tests must fail on each"
-gate() { cargo nextest run --manifest-path toolchain-tests/Cargo.toml --test gate --no-fail-fast 2>&1 || true; }
+# --color never: CI sets CARGO_TERM_COLOR=always, and the escape codes around "FAIL" stop the grep below matching.
+gate() { cargo nextest run --manifest-path toolchain-tests/Cargo.toml --test gate --no-fail-fast --color never 2>&1 || true; }
 # weaken <description> <expected failing test> <function that weakens the scaffolded repository>
 weaken() {
   local name=$1 want=$2 change=$3 out
