@@ -59,6 +59,11 @@ for name in $(compgen -v); do
   esac
 done
 unset CDPATH BASH_ENV ENV RUSTFLAGS CARGO_ENCODED_RUSTFLAGS CARGO_TARGET_DIR RUSTC_WRAPPER RUSTUP_TOOLCHAIN
+# CI sets this for every job, and the first run of the rust-scaffold job failed because of it: nextest wrapped
+# FAIL in escape codes and the harness grep below matched nothing. Exporting it here means a local run meets the
+# same colour-hostile condition, so a grep that depends on plain output fails on a developer machine, not only
+# in CI. gate() still passes --color never; removing that makes this script fail locally.
+export CARGO_TERM_COLOR=always
 export GIT_CONFIG_GLOBAL="$work/empty" GIT_CONFIG_NOSYSTEM=1
 : > "$work/empty"
 export GIT_AUTHOR_NAME=scaffold-test GIT_AUTHOR_EMAIL=scaffold-test@example.invalid
